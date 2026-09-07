@@ -1,0 +1,128 @@
+//! Hard, universe-wide resource bounds.
+//!
+//! These numbers are part of the u1 profile contract (see `docs/U1_SPEC.md`).
+//! Parsers, schedulers, decoders, kernels, and evidence accounting all enforce
+//! the same ceilings so that hostile input cannot produce unbounded allocation,
+//! unbounded expansion, pathological recursion, or accumulator overflow.
+//!
+//! This module is `no_std`-clean and compiles unchanged for the GPU device
+//! targets; kernels share the identical constants.
+//!
+//! Freezing policy: changing any bound below is a universe/profile change and
+//! requires a new profile id plus fresh reference vectors.
+
+#![allow(dead_code)] // Constants are consumed progressively as phases land.
+
+/// Nominal channel ceiling for observation views and ingest.
+pub const MAX_CHANNELS: u32 = 32;
+
+/// Maximum object intrinsic extent, in frames.
+///
+/// 2^40 frames ≈ 6.4 hours at 44.1 kHz. Large enough that extent is never the
+/// practical constraint; small enough that frame coordinates always fit i64
+/// with headroom for rate multiplication.
+pub const MAX_OBJECT_FRAMES: u64 = 1 << 40;
+
+/// Maximum concurrent active voices in the sampler world.
+///
+/// Overflow proof (U1_SPEC.md §"Mixing bound"): each voice's contribution to
+/// the per-channel mix accumulator is saturated to |c| <= 2^31 - 1 before the
+/// i64 accumulation, so |mix| <= 4096 * (2^31 - 1) < 2^43, far inside i64.
+pub const MAX_ACTIVE_VOICES: u32 = 4096;
+
+/// Maximum total scheduled events in a world timeline.
+pub const MAX_SCHEDULED_EVENTS: u32 = 1 << 20;
+
+/// Maximum events consumed within a single quantum (host submit slice).
+pub const MAX_EVENTS_PER_QUANTUM: u32 = 1 << 16;
+
+/// Maximum dependencies declared by one SampleObject.
+pub const MAX_DEPENDENCIES_PER_OBJECT: u32 = 256;
+
+/// Maximum nodes in one dependency/reference graph (reachable set).
+pub const MAX_GRAPH_NODES: u32 = 1 << 16;
+
+/// Maximum reference indirection depth before a dependency is declared cyclic.
+pub const MAX_REFERENCE_DEPTH: u32 = 64;
+
+/// Maximum residual records in one residual-governed object.
+pub const MAX_RESIDUAL_RECORDS: u32 = 1 << 24;
+
+/// Maximum checkpoints in one checkpointed object.
+pub const MAX_CHECKPOINTS_PER_OBJECT: u32 = 1 << 16;
+
+/// Maximum SampleObjects in one corpus / archive.
+pub const MAX_OBJECTS_PER_CORPUS: u32 = 1 << 20;
+
+/// Maximum nominal sample rate accepted by ingest (Hz).
+pub const MAX_SAMPLE_RATE_HZ: u32 = 1_000_000;
+
+/// Maximum nominal sample rate accepted by observation (Hz); endpoints and
+/// clock hardware must report rates in `[MIN, MAX]`.
+pub const MIN_SAMPLE_RATE_HZ: u32 = 1;
+
+/// Maximum observation quantum (frames) for one submit slice.
+pub const MAX_QUANTUM_FRAMES: u32 = 1 << 16;
+
+/// Absolute file-size ceiling for any ingest path (archive or WAV).
+pub const MAX_FILE_BYTES: u64 = 1 << 40;
+
+/// Maximum WAV data payload bytes accepted by the parser.
+pub const MAX_WAV_DATA_BYTES: u64 = 1 << 34;
+
+/// Maximum single archive chunk length.
+pub const MAX_CHUNK_BYTES: u32 = 1 << 30;
+
+/// Maximum length of any bounded string field (ids, names, paths in media).
+pub const MAX_STRING_BYTES: u32 = 1 << 12;
+
+/// Maximum frozen lookup-table size the loader will accept into any memory
+/// class (the u1 polyphase resampler table is 128 KiB; this is a generous cap).
+pub const MAX_TABLE_BYTES: u32 = 1 << 20;
+
+/// Maximum partials in a partial-bank SampleObject.
+pub const MAX_PARTIALS: u32 = 4096;
+
+/// Maximum taps of the frozen polyphase resampler.
+pub const MAX_INTERPOLATION_TAPS: u32 = 64;
+
+/// Default u1 nominal sample rate (Hz).
+pub const DEFAULT_SAMPLE_RATE_HZ: u32 = 48_000;
+
+/// Default observation quantum for the sampler scheduler (frames).
+pub const DEFAULT_QUANTUM_FRAMES: u32 = 1024;
+
+/// Fixed-point fraction bits for source position and rate (u1 semantics).
+pub const FIXED_Q: u32 = 24;
+
+/// Fixed-point fraction bits for gain/pan/envelope multipliers (u1 semantics).
+/// Unity (exactly 1.0) is raw `1 << GAIN_Q`.
+pub const GAIN_Q: u32 = 16;
+
+/// Oscillator phase width: u64 modulo 2^64.
+pub const PHASE_BITS: u32 = 64;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mixing_bound_has_headroom() {
+        // The documented proof: 4096 voices each saturating at 2^31-1 before
+        // i64 accumulation stays far below i64::MAX.
+        let worst: i128 = MAX_ACTIVE_VOICES as i128 * ((1i64 << 31) - 1) as i128;
+        assert!(worst < (1i128 << 62));
+        // Half of i64 magnitude is 2^62; we demand an order of magnitude margin.
+        assert!(worst < (1i128 << 53));
+    }
+
+    #[test]
+    fn limits_respect_repr_widths() {
+        // Frame coordinates are i64; extents are far below i64 headroom and the
+        // quantum stays comfortably inside i32/i64 hot-path arithmetic.
+        const {
+            assert!(MAX_OBJECT_FRAMES < (1u64 << 41));
+            assert!(MAX_QUANTUM_FRAMES < (1 << 20));
+        };
+    }
+}

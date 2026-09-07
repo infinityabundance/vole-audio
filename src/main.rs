@@ -1,0 +1,194 @@
+//! VOLE-Audio command-line interface.
+//!
+//! The CLI only ever reports what this build actually supports. Courts and
+//! backends land in later phases; until then their commands exit with an
+//! explicit `NOT_IMPLEMENTED` status (exit code 3) and a message — the CLI
+//! never implies support that is not present.
+
+use std::process::ExitCode;
+use vole_audio::error::{Error, Kind, Result};
+use vole_audio::evidence::receipt::ReceiptEnvelope;
+
+const USAGE: &str = "\
+vole-audio — procedural sampling and direct audio materialization
+
+USAGE:
+    vole-audio <command> [args]
+
+COMMANDS (current build):
+    probe                 Capture environment + hardware evidence summary
+    receipt show <file>   Verify and print an evidence receipt
+    version               Print version and build identity
+    help                  Show this help
+
+Planned commands arrive with their phases (inspect/verify/encode/observe/play,
+bench/court/corpus and probe cuda|rocm|alsa|d1|d2). Until implemented they
+exit with NOT_IMPLEMENTED (3); the CLI never implies support that is absent.
+";
+
+fn main() -> ExitCode {
+    let args: Vec<String> = std::env::args().collect();
+    match run(&args) {
+        Ok(code) => ExitCode::from(code),
+        Err(e) => {
+            eprintln!("error: {e}");
+            ExitCode::from(1)
+        }
+    }
+}
+
+fn run(args: &[String]) -> Result<u8> {
+    let cmd = args.get(1).map(String::as_str).unwrap_or("help");
+    match cmd {
+        "help" | "--help" | "-h" => {
+            print!("{USAGE}");
+            Ok(0)
+        }
+        "version" | "--version" | "-V" => {
+            println!("vole-audio {}", env!("CARGO_PKG_VERSION"));
+            println!("evidence schema: vole.audio.evidence.v1");
+            Ok(0)
+        }
+        "probe" => cmd_probe(&args[2..]),
+        "receipt" => cmd_receipt(&args[2..]),
+        "inspect" | "verify" | "encode" | "observe" | "play" | "bench" | "court" | "corpus" => {
+            // Declared-but-not-yet-implemented surface: exit 3 (NOT_IMPLEMENTED);
+            // the CLI never implies support that is absent.
+            eprintln!(
+                "not implemented: command '{cmd}' arrives with its phase; \
+                 see docs/PROJECT_STATE.md"
+            );
+            Ok(3)
+        }
+        other => {
+            eprintln!("error: unknown command '{other}'");
+            eprint!("{USAGE}");
+            Ok(2)
+        }
+    }
+}
+
+fn cmd_probe(args: &[String]) -> Result<u8> {
+    let json = args.iter().any(|a| a == "--json");
+    let env = vole_audio::evidence::environment::Environment::capture();
+    let hw = vole_audio::evidence::hardware::Hardware::capture();
+    if json {
+        let doc = serde_json::json!({
+            "schema": "vole.audio.evidence.v1",
+            "kind": "probe",
+            "environment": env,
+            "hardware": hw,
+        });
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&doc).map_err(|e| Error::new(Kind::Io, e.to_string()))?
+        );
+        return Ok(0);
+    }
+    println!("vole-audio probe (evidence constitution)");
+    println!("------------------------------------------------");
+    if let Some(id) = env.git_identity() {
+        println!("git:            {id}");
+    } else {
+        println!("git:            (not a git work tree)");
+    }
+    if let Some(rc) = &env.rustc_version {
+        println!("rustc:          {rc}");
+    }
+    println!("crate:          vole-audio {}", env.crate_version);
+    if let Some(os) = &env.os.os_pretty_name {
+        println!("os:             {os}");
+    }
+    if let Some(rel) = &env.os.release {
+        println!("kernel:         {rel}");
+    }
+    if let Some(m) = &env.cpu.model {
+        println!("cpu:            {m}");
+    }
+    let simd = if env.cpu.has_avx512 {
+        "avx2+avx512"
+    } else if env.cpu.has_avx2 {
+        "avx2"
+    } else if env.cpu.has_neon {
+        "neon"
+    } else {
+        "scalar"
+    };
+    println!("simd:           {simd}");
+    if let Some(t) = env.memory.total_bytes {
+        println!("memory:         {} bytes", t);
+    }
+    if let Some(g) = &env.cpu_governor {
+        println!("governor:       {g}");
+    }
+    let gpus: Vec<_> = hw
+        .pci_devices
+        .iter()
+        .filter(|d| d.is_display() && (d.is_nvidia() || d.is_amd()))
+        .collect();
+    for g in &gpus {
+        println!(
+            "gpu pci:        {} vendor={} device={} driver={}",
+            g.bdf,
+            g.vendor.clone().unwrap_or_default(),
+            g.device.clone().unwrap_or_default(),
+            g.driver.clone().unwrap_or_default(),
+        );
+    }
+    if gpus.is_empty() {
+        println!("gpu pci:        (none found in sysfs)");
+    }
+    let audio: Vec<_> = hw.pci_devices.iter().filter(|d| d.is_audio()).collect();
+    for a in &audio {
+        println!(
+            "audio pci:      {} vendor={} device={} driver={}",
+            a.bdf,
+            a.vendor.clone().unwrap_or_default(),
+            a.device.clone().unwrap_or_default(),
+            a.driver.clone().unwrap_or_default(),
+        );
+    }
+    if audio.is_empty() {
+        println!("audio pci:      (none found in sysfs)");
+    }
+    println!("------------------------------------------------");
+    Ok(0)
+}
+
+fn cmd_receipt(args: &[String]) -> Result<u8> {
+    let sub = args.first().map(String::as_str).unwrap_or("show");
+    match sub {
+        "show" => {
+            let path = args
+                .get(1)
+                .ok_or_else(|| Error::malformed("receipt show <file>"))?;
+            let bytes = std::fs::read(path)?;
+            let env: ReceiptEnvelope = ReceiptEnvelope::from_json_bytes(&bytes)?;
+            let r = &env.receipt;
+            println!("schema:         {}", r.schema);
+            println!("run_id:         {}", r.run_id);
+            println!("court:          {}", r.court);
+            println!("result:         {}", r.result);
+            if let Some(d) = &r.result_detail {
+                println!("detail:         {d}");
+            }
+            if let Some(b) = &r.params.backend {
+                println!("backend:        {b}");
+            }
+            if let Some(u) = &r.params.universe {
+                println!("universe:       {u}");
+            }
+            println!("self-hash:      {}", env.receipt_sha256);
+            if let Some(gh) = &r.provenance.reference_hash {
+                println!("reference sha:  {gh}");
+            }
+            if let Some(gh) = &r.provenance.backend_hash {
+                println!("backend sha:    {gh}");
+            }
+            Ok(0)
+        }
+        other => Err(Error::malformed(format!(
+            "unknown receipt subcommand '{other}' (expected: show)"
+        ))),
+    }
+}

@@ -1,0 +1,10 @@
+{
+  "schema": "vole.audio.corpus.v1",
+  "universe": "vole.audio.u1",
+  "profile": "u1/v1",
+  "nominal_sample_rate_hz": 48000,
+  "state": "EMPTY_DRAFT",
+  "note": "The frozen ~100-object flagship corpus is defined in Phase M. Until then no content claims are made from this directory.",
+  "objects": [],
+  "sha256": null
+}

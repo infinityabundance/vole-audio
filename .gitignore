@@ -5,6 +5,7 @@
 # Rust build artifacts
 /target/
 **/*.rs.bk
+/.scratch/
 
 # GPU build artifacts produced by scripts/build-*.sh
 /scripts/out/

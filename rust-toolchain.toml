@@ -1,0 +1,19 @@
+# VOLE-Audio pins ONE toolchain so that semantic, GPU-artifact, and evidence
+# reproducibility are anchored to a single compiler.
+#
+# channel: nightly-2026-07-24 (rustc 1.99.0-nightly, 89c61a754 2026-07-23).
+#   Device kernels require nightly features on this toolchain:
+#     - nvptx64-nvidia-cuda:  extern "ptx-kernel"  (feature `abi_ptx`)
+#     - amdgcn-amd-amdhsa:    extern "gpu-kernel"  (feature `abi_gpu_kernel`)
+#     - both: inline asm for special registers (feature `asm_experimental_arch`)
+# components: rust-src is required for `-Z build-std=core` on amdgcn-amd-amdhsa
+#   (a Tier-3 target with no prebuilt rust-std); llvm-bitcode-linker is required
+#   to link PTX artifacts for nvptx64-nvidia-cuda.
+# targets: amdgcn-amd-amdhsa has no rustup artifacts and is installed via the
+#   build scripts using the pinned rustc directly; it is therefore not listed.
+
+[toolchain]
+channel = "nightly-2026-07-24"
+profile = "minimal"
+components = ["rust-src", "llvm-bitcode-linker", "rustfmt", "clippy", "llvm-tools"]
+targets = ["nvptx64-nvidia-cuda", "x86_64-unknown-linux-gnu"]

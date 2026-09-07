@@ -1,0 +1,48 @@
+[package]
+name = "vole-audio"
+version = "0.1.0"
+edition = "2024"
+description = "VOLE-Audio: procedural sampling and direct audio materialization from deterministic state. One package; PCM is an observation view; SampleObject is authoritative."
+keywords = ["audio", "sampler", "procedural", "gpu", "deterministic"]
+categories = ["multimedia::audio", "science", "hardware-support"]
+readme = "README.md"
+
+# Exactly ONE Cargo package. No workspace. No internal crates.
+# The GPU targets are produced by cross-compiling this same package
+# (see scripts/build-cuda-device.sh and scripts/build-rocm-device.sh).
+
+[lib]
+name = "vole_audio"
+path = "src/lib.rs"
+
+[[bin]]
+name = "vole-audio"
+path = "src/main.rs"
+
+[features]
+default = ["std"]
+# "std" is the host feature set. Device targets (nvptx64-nvidia-cuda,
+# amdgcn-amd-amdhsa) compile this same package with --no-default-features
+# and never see the std-only modules (backend, audio, format archive
+# readers, evidence serialization, courts, CLI).
+std = ["dep:libc", "dep:serde", "dep:serde_json"]
+
+[dependencies]
+# Host-only. Never enabled on device targets (feature-gated above).
+libc = { version = "0.2.172", optional = true }
+serde = { version = "1.0", features = ["derive"], optional = true }
+serde_json = { version = "1.0", optional = true }
+
+[dev-dependencies]
+serde_json = "1.0"
+
+[profile.dev]
+debug = true
+overflow-checks = true
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+panic = "abort"
+debug = true
