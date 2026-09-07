@@ -1,0 +1,24 @@
+# Research materials and working context are not part of the implementation tree.
+/research/
+/vole-audio-prompt.txt
+
+# Rust build artifacts
+/target/
+**/*.rs.bk
+
+# GPU build artifacts produced by scripts/build-*.sh
+/scripts/out/
+target/device/
+*.ptx
+*.cubin
+*.hsaco
+*.gpu
+
+# Receipts are immutable evidence outputs; the raw data is versioned below but
+# bulk generated artifacts should not be committed.
+/receipts/traces/
+/receipts/artifacts/
+
+# ALSA / endpoint scratch
+*.core
+core
