@@ -14,11 +14,17 @@ pub mod descriptor;
 pub mod graph;
 pub mod id;
 pub mod literal;
+pub mod oscillator;
 pub mod reference;
+pub mod simple;
+pub mod wavetable;
 
 pub use descriptor::{LoopRegion, ObjectDescriptor, Representation, canonical_header_bytes};
 pub use id::{ContentId, Dependency, ObjectId};
 pub use literal::Literal;
+pub use oscillator::{Oscillator, PartialBank};
+pub use simple::{Constant, Noise};
+pub use wavetable::Cycle;
 
 use crate::error::{Error, Result};
 use std::collections::HashMap;
@@ -42,6 +48,67 @@ pub struct SampleObject {
 pub enum ObjectData {
     Literal(Literal),
     Referenced(reference::Referenced),
+    /// Endless silence.
+    Silence,
+    /// Endless constant level.
+    Constant(Constant),
+    /// Periodic cycle content (wavetable).
+    Wavetable(wavetable::Cycle),
+    /// Periodic single-cycle content.
+    SingleCycle(wavetable::Cycle),
+    /// Periodic exact-repeat motif content.
+    ExactRepeat(wavetable::Cycle),
+    /// Endless oscillator.
+    Oscillator(Oscillator),
+    /// Endless partial bank.
+    PartialBank(PartialBank),
+    /// Endless deterministic noise.
+    Noise(Noise),
+}
+
+impl ObjectData {
+    /// True for sources without a finite intrinsic extent (silence,
+    /// constant, oscillator, partial bank, noise). Such voices have no
+    /// natural end and are position-independent.
+    pub const fn is_endless(&self) -> bool {
+        matches!(
+            self,
+            ObjectData::Silence
+                | ObjectData::Constant(_)
+                | ObjectData::Oscillator(_)
+                | ObjectData::PartialBank(_)
+                | ObjectData::Noise(_)
+        )
+    }
+
+    /// True for periodic cycle content (wavetable family): reads always wrap
+    /// the cycle; no natural end.
+    pub const fn is_periodic(&self) -> bool {
+        matches!(
+            self,
+            ObjectData::Wavetable(_) | ObjectData::SingleCycle(_) | ObjectData::ExactRepeat(_)
+        )
+    }
+
+    /// Bytes of *resident sample-domain content* owned by this payload
+    /// (sample-domain exposure accounting; §41). Endless procedural objects
+    /// own zero resident sample bytes; literal and cycle objects own their
+    /// stored sample bytes. Frozen tables/generators are accounted separately
+    /// as dependencies.
+    pub const fn resident_sample_bytes(&self) -> u64 {
+        match self {
+            ObjectData::Literal(l) => (l.samples.len() as u64) * 4,
+            ObjectData::Wavetable(c) | ObjectData::SingleCycle(c) | ObjectData::ExactRepeat(c) => {
+                (c.samples.len() as u64) * 4
+            }
+            ObjectData::Referenced(_)
+            | ObjectData::Silence
+            | ObjectData::Constant(_)
+            | ObjectData::Oscillator(_)
+            | ObjectData::PartialBank(_)
+            | ObjectData::Noise(_) => 0,
+        }
+    }
 }
 
 /// Bounds for accumulated reference transpose (Q24). Composition of
@@ -60,25 +127,19 @@ pub fn compose_transpose(a_q24: i64, b_q24: i64) -> i64 {
 }
 
 impl SampleObject {
-    /// Content identity of a literal object.
-    pub fn literal_content_id(descriptor: &ObjectDescriptor, literal: &Literal) -> ContentId {
-        Literal::content_id(descriptor, literal)
-    }
-
-    /// Resolve this object to its effective literal view following reference
-    /// chains. Returns the deepest literal and the *accumulated transpose*
-    /// (Q24 rate multiplier, saturated at `MAX_ACCUMULATED_TRANSPOSE_Q24`).
-    /// Depth is bounded by `MAX_REFERENCE_DEPTH`; cycles surface as
-    /// `Dependency` errors.
-    pub fn resolve_literal(
+    /// Resolve reference chains to the final (non-`Referenced`) target.
+    /// Returns the final object id, the final object, and the accumulated
+    /// transpose (Q24, saturated at `MAX_ACCUMULATED_TRANSPOSE_Q24`). Depth
+    /// is bounded by `MAX_REFERENCE_DEPTH`; cycles surface as `Dependency`
+    /// errors.
+    pub fn resolve_target(
         store: &ObjectStore,
         mut id: ObjectId,
-    ) -> Result<(ObjectId, &Literal, i64)> {
+    ) -> Result<(ObjectId, &SampleObject, i64)> {
         let mut transpose: i64 = 1 << 24; // unity
         for _ in 0..crate::limits::MAX_REFERENCE_DEPTH {
             let obj = store.get(id)?;
             match &obj.data {
-                ObjectData::Literal(l) => return Ok((id, l, transpose)),
                 ObjectData::Referenced(r) => {
                     transpose = compose_transpose(transpose, r.transpose_q24);
                     id = store.id_of_content(&r.target_content).ok_or_else(|| {
@@ -88,6 +149,7 @@ impl SampleObject {
                         ))
                     })?;
                 }
+                _ => return Ok((id, obj, transpose)),
             }
         }
         Err(Error::dependency(format!(
@@ -126,7 +188,8 @@ impl ObjectStore {
     }
 
     /// Insert an object (assigned by content id so re-insertion is a no-op
-    /// returning the existing id — content is authoritative).
+    /// returning the existing id — content is authoritative). Validates the
+    /// payload against its descriptor (hostile input).
     pub fn insert(&mut self, descriptor: ObjectDescriptor, data: ObjectData) -> Result<ObjectId> {
         if !descriptor.check_dependency_budget() {
             return Err(Error::limit("dependency budget exceeded"));
@@ -134,7 +197,8 @@ impl ObjectStore {
         if self.objects.len() as u32 >= crate::limits::MAX_OBJECTS_PER_CORPUS {
             return Err(Error::limit("MAX_OBJECTS_PER_CORPUS exceeded"));
         }
-        let content_id = canonical_content_id(&descriptor, &data)?;
+        validate_payload(&descriptor, &data)?;
+        let content_id = canonical_content_id(&descriptor, &data);
         if let Some(&existing) = self.by_content.get(&content_id) {
             return Ok(existing);
         }
@@ -187,12 +251,98 @@ impl ObjectStore {
 
 /// Canonical content identity of an object: SHA-256 over the canonical bytes
 /// of (descriptor header + representation payload).
-pub fn canonical_content_id(descriptor: &ObjectDescriptor, data: &ObjectData) -> Result<ContentId> {
+pub fn canonical_content_id(descriptor: &ObjectDescriptor, data: &ObjectData) -> ContentId {
     let bytes: Vec<u8> = match data {
         ObjectData::Literal(l) => l.canonical_bytes(descriptor),
         ObjectData::Referenced(r) => r.canonical_bytes(descriptor),
+        ObjectData::Silence => simple::canonical_bytes(descriptor, Representation::Silence, &[]),
+        ObjectData::Constant(c) => {
+            simple::canonical_bytes(descriptor, Representation::Constant, &c.level.to_le_bytes())
+        }
+        ObjectData::Wavetable(c) => {
+            wavetable::cycle_canonical_bytes(descriptor, c, Representation::Wavetable)
+        }
+        ObjectData::SingleCycle(c) => {
+            wavetable::cycle_canonical_bytes(descriptor, c, Representation::SingleCycle)
+        }
+        ObjectData::ExactRepeat(c) => {
+            wavetable::cycle_canonical_bytes(descriptor, c, Representation::ExactRepeat)
+        }
+        ObjectData::Oscillator(o) => oscillator::oscillator_canonical_bytes(descriptor, o),
+        ObjectData::PartialBank(b) => oscillator::partial_bank_canonical_bytes(descriptor, b),
+        ObjectData::Noise(n) => {
+            simple::canonical_bytes(descriptor, Representation::Noise, &n.seed.to_le_bytes())
+        }
     };
-    Ok(ContentId(crate::hash::sha256::Sha256::digest(&bytes)))
+    ContentId(crate::hash::sha256::Sha256::digest(&bytes))
+}
+
+/// Validate a payload against its descriptor before insertion.
+fn validate_payload(descriptor: &ObjectDescriptor, data: &ObjectData) -> Result<()> {
+    let malformed = |m: &str| Error::malformed(m.to_string());
+    match data {
+        ObjectData::Literal(l) => {
+            let ch = usize::from(descriptor.layout.count());
+            let expect =
+                usize::try_from(descriptor.extent_frames).map_err(|_| malformed("extent"))?;
+            if l.samples.len() != expect * ch {
+                return Err(malformed("literal length != extent x channels"));
+            }
+        }
+        ObjectData::Referenced(r) => {
+            if descriptor.extent_frames == 0 {
+                return Err(malformed("referenced object with zero extent"));
+            }
+            let _ = r;
+        }
+        ObjectData::Wavetable(c) | ObjectData::SingleCycle(c) | ObjectData::ExactRepeat(c) => {
+            if descriptor.extent_frames == 0 {
+                return Err(malformed("cycle object with zero extent"));
+            }
+            let ch = usize::from(descriptor.layout.count());
+            let expect =
+                usize::try_from(descriptor.extent_frames).map_err(|_| malformed("extent"))?;
+            if c.samples.len() != expect * ch {
+                return Err(malformed("cycle length != extent x channels"));
+            }
+            if descriptor.loop_region.is_some() {
+                return Err(malformed(
+                    "cycle objects declare no loop region (they always wrap)",
+                ));
+            }
+        }
+        ObjectData::Silence | ObjectData::Constant(_) | ObjectData::Noise(_) => {
+            if descriptor.extent_frames != 0 {
+                return Err(malformed("endless object must declare extent 0"));
+            }
+            if descriptor.loop_region.is_some() {
+                return Err(malformed("endless object must not declare a loop region"));
+            }
+        }
+        ObjectData::Oscillator(o) => {
+            if descriptor.extent_frames != 0 {
+                return Err(malformed("oscillator must declare extent 0"));
+            }
+            if descriptor.loop_region.is_some() {
+                return Err(malformed("oscillator must not declare a loop region"));
+            }
+            if oscillator::Oscillator::checked(o.freq_hz, o.amp_q16).is_none() {
+                return Err(malformed("oscillator params out of domain"));
+            }
+        }
+        ObjectData::PartialBank(b) => {
+            if descriptor.extent_frames != 0 {
+                return Err(malformed("partial bank must declare extent 0"));
+            }
+            if descriptor.loop_region.is_some() {
+                return Err(malformed("partial bank must not declare a loop region"));
+            }
+            if oscillator::PartialBank::checked(b.freq_hz, b.partials.clone()).is_none() {
+                return Err(malformed("partial bank params out of domain"));
+            }
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -237,9 +387,12 @@ mod tests {
             .insert(ref_desc.clone(), ObjectData::Referenced(r))
             .unwrap();
 
-        let (resolved_id, lit2, tr) = SampleObject::resolve_literal(&store, rid).unwrap();
+        let (resolved_id, obj, tr) = SampleObject::resolve_target(&store, rid).unwrap();
         assert_eq!(resolved_id, lit_id);
-        assert_eq!(lit2.samples, vec![1, 2, 3, 4]);
+        match &obj.data {
+            ObjectData::Literal(l) => assert_eq!(l.samples, vec![1, 2, 3, 4]),
+            _ => panic!("target should be literal"),
+        }
         assert_eq!(tr, 1 << 24);
 
         // B references A (cycle) must fail.

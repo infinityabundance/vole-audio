@@ -4,9 +4,9 @@
   "receipt": {
     "schema": "vole.audio.evidence.v1",
     "schema_version": 1,
-    "run_id": "semantic-468732729-90a4",
+    "run_id": "semantic-469300903-ce56",
     "court": "semantic",
-    "created_unix_ms": 468732729,
+    "created_unix_ms": 469300903,
     "result": "SUPPORTED",
     "result_detail": "determinism battery passed; reference sha256 1791816f4b938375cc4298b2587ce19eef260d063d9ed88c597e04d31837f6d0",
     "environment": {
@@ -195,7 +195,7 @@
       "memory": {
         "total_bytes": 134689935360
       },
-      "git_commit": "f608bfc0b63b92397058a2eab6cd1fa920ace6fc",
+      "git_commit": "0351a4615a738c6b27da80ab8df6042952318783",
       "git_dirty": true,
       "git_branch": "main",
       "rustc_version": "rustc 1.99.0-nightly (89c61a754 2026-07-23)",
@@ -738,5 +738,5 @@
     "limitations": [],
     "extras": {}
   },
-  "receipt_sha256": "167f72b54734bc92d4d2ee87a81bcbc0a322ae9ee136f9511e017571be1ad6ce"
+  "receipt_sha256": "0272bc1402cafc19b725d654b96230b096d2b9edbd6db6c7ca1837a2a16601fd"
 }

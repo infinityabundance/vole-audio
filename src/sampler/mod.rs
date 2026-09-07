@@ -10,11 +10,13 @@ pub mod envelope;
 pub mod filter;
 pub mod gain;
 pub mod interpolation;
-pub mod mix;
 pub mod pan;
+pub mod procedural;
 pub mod rate;
 pub mod resampler;
 
+#[cfg(feature = "std")]
+pub mod mix;
 #[cfg(feature = "std")]
 pub mod scheduler;
 #[cfg(feature = "std")]

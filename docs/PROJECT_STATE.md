@@ -146,6 +146,39 @@ Verified: 136 tests green; `clippy -D warnings` clean; `fmt` clean;
 `court semantic` SUPPORTED with receipt
 `receipts/semantic/semantic-*.json`.
 
+### Phase D — Procedural objects (complete)
+
+Exit criteria: authored objects observe without resident full-object PCM.
+
+Delivered:
+
+- `object/simple.rs` — Silence / Constant / Noise payloads (endless, extent 0,
+  canonical bytes; representation tag `Noise = 0x0C` added to the frozen
+  taxonomy).
+- `object/wavetable.rs` — `Cycle` payload for `Wavetable`/`SingleCycle`/
+  `ExactRepeat` (resident-cycle tables, always-wrap playback, table bytes
+  bounded by `MAX_TABLE_BYTES`).
+- `object/oscillator.rs` — `Oscillator` (base freq + Q16 amp) and
+  `PartialBank` (ascending harmonic list) payloads with domain validation
+  and canonical bytes.
+- `sampler/procedural.rs` (no_std, device-shared) — frozen generator
+  semantics: `eff_incr` (exact, clamped, i128 host), modulo-2^64 phase
+  accumulation, sine-table oscillator sample, i64-accumulate + single-
+  saturation partial bank, partial validation.
+- `ResolvedVoice` reworked around play-source classes (literal content,
+  cycle content, endless procedural) with per-class validation; references
+  resolve to any class. `SampleObject::resolve_target` replaces the literal-
+  only resolver; store insert validates payload/descriptor consistency.
+- `resident_sample_bytes()` accounting (endless = 0) for §41 exposure math.
+- `court authored` — procedural battery (determinism, chunk equality, zero
+  resident bytes, hostile spec rejection); reference hash frozen & enforced.
+- `mix` gated host-only; library still compiles `no_std` for the device
+  target. Semantic court reference hash unchanged across the refactor
+  (1791816f...), demonstrating semantic stability.
+
+Verified: 143 tests green; clippy/fmt clean; `court semantic` and
+`court authored` SUPPORTED with receipts.
+
 ## Known blockers
 
 - None for Phase D. ROCm hardware absent (evidence row only). ALSA D1 court

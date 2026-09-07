@@ -10,21 +10,30 @@
 //! random-access/negative/interference (Phase M), all.
 
 #[cfg(feature = "std")]
+pub mod authored;
+#[cfg(feature = "std")]
 pub mod semantic;
 
 use crate::status::Verdict;
 use std::path::Path;
 
 /// Court registry: name -> human description.
-pub const COURT_NAMES: &[(&str, &str)] = &[(
-    "semantic",
-    "scalar oracle determinism battery: repeated-hash, chunked==contiguous, seek==sequential",
-)];
+pub const COURT_NAMES: &[(&str, &str)] = &[
+    (
+        "semantic",
+        "scalar oracle determinism battery: repeated-hash, chunked==contiguous, seek==sequential",
+    ),
+    (
+        "authored",
+        "procedural SampleObject battery: deterministic observation without resident full-object PCM",
+    ),
+];
 
 /// Run `court <name>`; unknown courts are usage errors.
 pub fn run(name: &str, receipts_root: &Path) -> crate::error::Result<Verdict> {
     match name {
         "semantic" => semantic::run(receipts_root),
+        "authored" => authored::run(receipts_root),
         other => Err(crate::error::Error::malformed(format!(
             "unknown court '{other}' (available: {})",
             COURT_NAMES

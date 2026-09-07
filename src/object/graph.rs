@@ -15,8 +15,8 @@ use std::collections::HashSet;
 fn outgoing(store: &ObjectStore, id: ObjectId) -> Vec<ContentId> {
     match store.get(id) {
         Ok(obj) => match &obj.data {
-            ObjectData::Literal(_) => Vec::new(),
             ObjectData::Referenced(r) => vec![r.target_content],
+            _ => Vec::new(),
         },
         Err(_) => Vec::new(),
     }
@@ -105,10 +105,10 @@ mod tests {
         let root_content = store.get(root).unwrap().content_id;
         // Chain of 3 references to the literal.
         let (d1, o1) = ref_obj(root_content);
-        let c1 = crate::object::canonical_content_id(&d1, &o1).unwrap();
+        let c1 = crate::object::canonical_content_id(&d1, &o1);
         let _ = store.insert(d1, o1).unwrap();
         let (d2, o2) = ref_obj(c1);
-        let c2 = crate::object::canonical_content_id(&d2, &o2).unwrap();
+        let c2 = crate::object::canonical_content_id(&d2, &o2);
         let _ = store.insert(d2, o2).unwrap();
         let (d3, o3) = ref_obj(c2);
         let id3 = store.insert(d3, o3).unwrap();
@@ -131,7 +131,7 @@ mod tests {
         let n = crate::limits::MAX_REFERENCE_DEPTH + 2;
         for _ in 0..n {
             let (d, o) = ref_obj(target);
-            let content = crate::object::canonical_content_id(&d, &o).unwrap();
+            let content = crate::object::canonical_content_id(&d, &o);
             let id = store.insert(d, o).unwrap();
             target = store.get(id).unwrap().content_id;
             // canonical_content_id must equal stored content id

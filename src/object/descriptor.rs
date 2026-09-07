@@ -43,6 +43,8 @@ pub enum Representation {
     Compound = 0x0A,
     /// Residual-governed object: model + explicit residual.
     PredictorResidual = 0x0B,
+    /// Endless deterministic noise (frozen stream algorithm).
+    Noise = 0x0C,
 }
 
 impl Representation {
@@ -63,6 +65,7 @@ impl Representation {
             0x09 => Some(Representation::Referenced),
             0x0A => Some(Representation::Compound),
             0x0B => Some(Representation::PredictorResidual),
+            0x0C => Some(Representation::Noise),
             _ => None,
         }
     }
@@ -80,6 +83,7 @@ impl Representation {
             Representation::Referenced => "referenced",
             Representation::Compound => "compound",
             Representation::PredictorResidual => "predictor_residual",
+            Representation::Noise => "noise",
         }
     }
 }
@@ -215,13 +219,14 @@ mod tests {
             (Representation::Referenced, 0x09),
             (Representation::Compound, 0x0A),
             (Representation::PredictorResidual, 0x0B),
+            (Representation::Noise, 0x0C),
         ];
         for (r, t) in pairs {
             assert_eq!(r.tag(), t);
             assert_eq!(Representation::from_tag(t), Some(r));
         }
         assert_eq!(Representation::from_tag(0), None);
-        assert_eq!(Representation::from_tag(0x0C), None);
+        assert_eq!(Representation::from_tag(0x0D), None);
     }
 
     #[test]

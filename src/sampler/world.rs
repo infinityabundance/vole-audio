@@ -108,7 +108,7 @@ impl World {
             .map(|v| {
                 let mut spec = v.spec.clone();
                 spec.note_off = v.note_off;
-                ResolvedVoice::resolve(store, spec)
+                ResolvedVoice::resolve(store, spec, self.nominal_rate_hz)
             })
             .collect::<Result<Vec<_>>>()?;
 
@@ -175,8 +175,9 @@ pub fn world_with_one_voice(rate_hz: u32, channels: u8, spec: VoiceSpec) -> Resu
 mod tests {
     use super::*;
     use crate::object::descriptor::{ObjectDescriptor, Representation};
-    use crate::object::{Literal, ObjectData, ObjectStore};
+    use crate::object::{Literal, ObjectData, ObjectId, ObjectStore};
     use crate::sampler::envelope::{ENV_UNITY, EnvelopeParams};
+    use crate::sampler::procedural::Partial;
     use crate::sampler::voice::{Interp, LoopMode};
     use crate::universe::layout::Layout;
 
@@ -268,5 +269,128 @@ mod tests {
         let seeked = world.observe(&store, 100, 256).unwrap();
         assert_eq!(&contig[100..356], &seeked[..]);
         let _ = seq;
+    }
+
+    #[test]
+    fn procedural_objects_observe_without_resident_pcm() {
+        // Build one of every procedural class; verify (a) zero resident sample
+        // bytes, (b) deterministic repeated observation, (c) chunk equality.
+        let mut store = ObjectStore::new();
+        let ed = ObjectDescriptor::new(Representation::Oscillator, 0, Layout::Mono, None).unwrap();
+        let osc = store
+            .insert(
+                ed.clone(),
+                ObjectData::Oscillator(crate::object::Oscillator::checked(440, 1 << 16).unwrap()),
+            )
+            .unwrap();
+        let cd = ObjectDescriptor::new(Representation::Constant, 0, Layout::Mono, None).unwrap();
+        let cst = store
+            .insert(
+                cd.clone(),
+                ObjectData::Constant(crate::object::Constant::new(123_456)),
+            )
+            .unwrap();
+        let nd = ObjectDescriptor::new(Representation::Noise, 0, Layout::Mono, None).unwrap();
+        let nse = store
+            .insert(
+                nd.clone(),
+                ObjectData::Noise(crate::object::Noise::new(0xABCD)),
+            )
+            .unwrap();
+        let bd = ObjectDescriptor::new(Representation::PartialBank, 0, Layout::Mono, None).unwrap();
+        let bank = store
+            .insert(
+                bd.clone(),
+                ObjectData::PartialBank(
+                    crate::object::PartialBank::checked(
+                        110,
+                        vec![
+                            Partial {
+                                harmonic: 1,
+                                amp_q16: 1 << 15,
+                            },
+                            Partial {
+                                harmonic: 2,
+                                amp_q16: 1 << 14,
+                            },
+                            Partial {
+                                harmonic: 3,
+                                amp_q16: 1 << 14,
+                            },
+                            Partial {
+                                harmonic: 4,
+                                amp_q16: 1 << 12,
+                            },
+                        ],
+                    )
+                    .unwrap(),
+                ),
+            )
+            .unwrap();
+        let sd = ObjectDescriptor::new(Representation::Silence, 0, Layout::Mono, None).unwrap();
+        let sil = store.insert(sd.clone(), ObjectData::Silence).unwrap();
+
+        // (a) No resident sample bytes for endless classes.
+        for id in [osc, cst, nse, bank, sil] {
+            let o = store.get(id).unwrap();
+            assert_eq!(o.data.resident_sample_bytes(), 0, "object {id}");
+        }
+
+        // (b)+(c) deterministic and chunk-safe through the world.
+        let instant = EnvelopeParams::new(0, 0, ENV_UNITY, 0).unwrap();
+        let mk = |object: ObjectId, trigger: i64| -> VoiceSpec {
+            VoiceSpec {
+                object,
+                trigger_frame: trigger,
+                note_off: None,
+                start_pos_q24: 0,
+                rate_q24: 1 << 24,
+                object_channel: 0,
+                route: Route::Mono(0),
+                gain_q16: 1 << 15,
+                pan_q16: 0,
+                envelope: instant,
+                loop_mode: LoopMode::Off,
+                interp: Interp::Linear,
+            }
+        };
+        let mut evs = vec![
+            TimelineEvent::VoiceOn(mk(osc, 0)),
+            TimelineEvent::VoiceOn(mk(cst, 0)),
+            TimelineEvent::VoiceOn(mk(nse, 16)),
+            TimelineEvent::VoiceOn(mk(bank, 32)),
+            TimelineEvent::VoiceOn(mk(sil, 0)),
+        ];
+        // A wavetable (cycle) voice as well.
+        let cyc: Vec<i32> = (0..64)
+            .map(|i| ((i as i64 - 32) * (1 << 22)) as i32)
+            .collect();
+        let wd = ObjectDescriptor::new(Representation::Wavetable, 64, Layout::Mono, None).unwrap();
+        let wt = store
+            .insert(
+                wd.clone(),
+                ObjectData::Wavetable(crate::object::Cycle::new(&wd, cyc).unwrap()),
+            )
+            .unwrap();
+        evs.push(TimelineEvent::VoiceOn(mk(wt, 8)));
+
+        let world = World::new(48_000, 1, evs).unwrap();
+        let a = world.observe(&store, 0, 2048).unwrap();
+        let b = world.observe(&store, 0, 2048).unwrap();
+        assert_eq!(a, b);
+        let mut joined = Vec::new();
+        for (s, l) in [(0usize, 777usize), (777, 900), (1677, 371)] {
+            joined.extend_from_slice(&world.observe(&store, s as i64, l).unwrap());
+        }
+        assert_eq!(joined, a);
+        // Wavetable cycles repeat: positions 8..72 in the world correspond to
+        // cycle indices 0..64 repeated; verify the first 64 samples after
+        // trigger equal the cycle (mono route, gain applied: half => cycle/2).
+        let world2 = World::new(48_000, 1, vec![TimelineEvent::VoiceOn(mk(wt, 8))]).unwrap();
+        let seg = world2.observe(&store, 8, 64).unwrap();
+        let expected: Vec<i32> = (0..64)
+            .map(|i| crate::universe::arithmetic::sat_i32((i as i64 - 32) * (1 << 22) / 2))
+            .collect();
+        assert_eq!(seg, expected, "cycle content repeats exactly at unity rate");
     }
 }

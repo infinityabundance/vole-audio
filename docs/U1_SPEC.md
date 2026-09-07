@@ -232,3 +232,34 @@ expected observation hashes) freeze in Phase C.
   `1791816f4b938375cc4298b2587ce19eef260d063d9ed88c597e04d31837f6d0`
   (enforced by `courts::semantic::tests::fixture_reference_hash_is_frozen`).
 * Resampler table SHA-256 and sine table SHA-256 (see §§5, 9).
+
+### Phase D vectors (frozen)
+
+* `court authored` fixture observation hash (4000 frames, mono; silence,
+  constant, deterministic noise, oscillator, 8-partial bank, wavetable,
+  single-cycle, exact-repeat, and a half-transpose reference to a wavetable):
+  `f91b5b4228022d46a609a2fe7fc862e6e72c4058405c4b72316b202feb14fe87`
+  (enforced by `courts::authored::tests::fixture_reference_hash_is_frozen`).
+
+## 13. Procedural generators (frozen, Phase D)
+
+Object payloads and observation semantics:
+
+* `Silence`/`Constant`/`Noise`/`Oscillator`/`PartialBank` are **endless**
+  (extent 0, no natural end; observation never depends on stored samples —
+  zero resident sample bytes by construction).
+* `Wavetable`/`SingleCycle`/`ExactRepeat` hold one stored **cycle** (a
+  resident table; bytes counted as table/dependency) and always wrap the
+  cycle; voice loop regions are rejected for them.
+* Oscillator/partial-bank phase advance modulo 2^64 with per-output-frame
+  increment `eff_incr = clamp(round(2^64·f0·rate/2^24/fs), 2^63)` computed
+  host-side (device receives the increment). Fundamentals clamp at Nyquist
+  (no alias fold); harmonic partials alias-fold through their modulo-2^64
+  increment arithmetic.
+* Oscillator output `sat(rnd(T30·amp, 15))` from the frozen sine table;
+  partial banks accumulate in i64 and saturate once at the generator output
+  boundary (order-independent).
+* Noise: `VOLE-SPLITMIX64-STREAM` keyed by object seed and the **media
+  frame** (identical objects at the same media frame sound identical).
+* Reference transpose composes with rate; endless sources require start
+  position 0 and no voice loop region (malformed otherwise).

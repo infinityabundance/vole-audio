@@ -63,6 +63,7 @@ pub mod error;
 pub mod evidence;
 #[cfg(feature = "std")]
 pub mod object;
+#[cfg(feature = "std")]
 pub use error::{Error, Kind, Result};
 
 // ---------------------------------------------------------------------------
