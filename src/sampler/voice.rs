@@ -321,7 +321,8 @@ impl ResolvedVoice {
             data @ (ObjectData::Literal(_)
             | ObjectData::Wavetable(_)
             | ObjectData::SingleCycle(_)
-            | ObjectData::ExactRepeat(_)) => {
+            | ObjectData::ExactRepeat(_)
+            | ObjectData::PredictorResidual(_)) => {
                 let w = self.position_at(t);
                 self.read_content(data, channels, ch, w)
             }
@@ -332,46 +333,59 @@ impl ResolvedVoice {
     /// Interpolated content read at a Q24 position for one channel, with the
     /// frozen continuation rules:
     ///   cycle content: `[0, extent)` always wraps (neighbor at `extent-1` is
-    ///   0); literal loop: region `[a, b)` wraps (neighbor at `b-1` is `a`);
-    ///   literal one-shot: hold the final sample.
+    ///   0); literal and residual-governed content honor the voice loop
+    ///   region (neighbor at `b-1` is `a`) or hold the final sample.
+    /// Residual-governed reads evaluate the *closure* (H+R) at the two
+    /// neighbor frames, so integer-frame reads reproduce the intrinsic
+    /// exactly.
     #[inline]
     fn read_content(&self, data: &ObjectData, channels: usize, ch: usize, w_q24: i64) -> i32 {
-        let content: &[i32] = match data {
-            ObjectData::Literal(l) => &l.samples,
-            ObjectData::Wavetable(c) | ObjectData::SingleCycle(c) | ObjectData::ExactRepeat(c) => {
-                &c.samples
+        let is_cycle = matches!(
+            data,
+            ObjectData::Wavetable(_) | ObjectData::SingleCycle(_) | ObjectData::ExactRepeat(_)
+        );
+        let sample_at = |i: usize| -> i32 {
+            match data {
+                ObjectData::Literal(l) => l.samples[i * channels + ch],
+                ObjectData::Wavetable(c)
+                | ObjectData::SingleCycle(c)
+                | ObjectData::ExactRepeat(c) => c.samples[i * channels + ch],
+                ObjectData::PredictorResidual(r) => r.closure_sample(i as u64, ch as u8),
+                _ => unreachable!(),
             }
-            _ => unreachable!(),
         };
-        let (region_last, wrap_to) = match data {
-            ObjectData::Literal(_) => match self.loop_region {
+        let (region_last, wrap_to) = if is_cycle {
+            (self.extent_frames - 1, Some(0u64)) // cycle content wraps
+        } else {
+            match self.loop_region {
                 Some(l) => (l.end_frame - 1, Some(l.start_frame)),
                 None => (self.extent_frames - 1, None),
-            },
-            _ => (self.extent_frames - 1, Some(0)), // cycle content wraps
+            }
         };
-        let w = match data {
-            ObjectData::Literal(_) => match self.loop_region {
+        let w = if is_cycle {
+            rate::wrap_loop_q24(w_q24, 0, self.extent_frames)
+        } else {
+            match self.loop_region {
                 Some(l) => rate::wrap_loop_q24(w_q24, l.start_frame, l.end_frame),
                 None => w_q24,
-            },
-            _ => rate::wrap_loop_q24(w_q24, 0, self.extent_frames),
+            }
         };
         let idx0 = ((w >> FIXED_Q) as usize).min(region_last as usize);
         let frac = (w as u64 & 0xFF_FFFF) as u32;
-        let at = |i: usize| content[i * channels + ch];
         let next = if idx0 == region_last as usize {
             wrap_to.map(|a| a as usize).unwrap_or(idx0)
         } else {
             idx0 + 1
         };
         match self.spec.interp {
-            Interp::Linear => crate::universe::arithmetic::lerp_i32(at(idx0), at(next), frac),
+            Interp::Linear => {
+                crate::universe::arithmetic::lerp_i32(sample_at(idx0), sample_at(next), frac)
+            }
             Interp::Nearest => {
                 if frac >= (1 << 23) && next != idx0 {
-                    at(next)
+                    sample_at(next)
                 } else {
-                    at(idx0)
+                    sample_at(idx0)
                 }
             }
         }

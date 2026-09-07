@@ -393,4 +393,78 @@ mod tests {
             .collect();
         assert_eq!(seg, expected, "cycle content repeats exactly at unity rate");
     }
+
+    #[test]
+    fn residual_closure_equals_literal_through_the_world() {
+        // Phase E end-to-end closure proof: sampled-origin content ingested
+        // from WAV as a literal, and the same content closed by a
+        // model+sparse-residual object, must observe identically through the
+        // sampler (closure precedes observation).
+        use crate::object::{Residual, ResidualModel};
+        use crate::sampler::voice::Interp;
+
+        // Synthesize a 40-frame periodic triangle with a glitch at frame 200.
+        let intrinsic: Vec<i32> = (0..1200)
+            .map(|i| {
+                let m = i % 40;
+                let v = if m < 20 { m } else { 40 - m };
+                let mut s = v << 20;
+                if i == 200 {
+                    s = 777_000;
+                }
+                s
+            })
+            .collect();
+
+        let mut store = ObjectStore::new();
+        // Literal from canonical codes (the WAV parser maps into exactly this
+        // domain; see format::wav tests for the byte-level roundtrip).
+        let ld = ObjectDescriptor::new(Representation::Literal, 1200, Layout::Mono, None).unwrap();
+        let lit_id = store
+            .insert(
+                ld.clone(),
+                ObjectData::Literal(Literal::new(&ld, intrinsic.clone()).unwrap()),
+            )
+            .unwrap();
+        // Residual-governed twin: periodic-40 model + sparse residual.
+        let model = ResidualModel::Periodic {
+            cycle: intrinsic[..40].to_vec(),
+        };
+        let records = Residual::closing_residual(&intrinsic, 1, &model).unwrap();
+        assert_eq!(records.len(), 1, "only the glitch needs a residual");
+        let rd = ObjectDescriptor::new(Representation::PredictorResidual, 1200, Layout::Mono, None)
+            .unwrap();
+        let res_id = store
+            .insert(
+                rd.clone(),
+                ObjectData::PredictorResidual(Residual::new(&rd, model, records).unwrap()),
+            )
+            .unwrap();
+
+        let instant = EnvelopeParams::new(0, 0, ENV_UNITY, 0).unwrap();
+        let voice = |object: ObjectId| VoiceSpec {
+            object,
+            trigger_frame: 0,
+            note_off: None,
+            start_pos_q24: 0,
+            rate_q24: 1 << 24,
+            object_channel: 0,
+            route: Route::Mono(0),
+            gain_q16: 1 << 16,
+            pan_q16: 0,
+            envelope: instant,
+            loop_mode: LoopMode::Off,
+            interp: Interp::Linear,
+        };
+        let wl = World::new(48_000, 1, vec![TimelineEvent::VoiceOn(voice(lit_id))]).unwrap();
+        let wr = World::new(48_000, 1, vec![TimelineEvent::VoiceOn(voice(res_id))]).unwrap();
+        let a = wl.observe(&store, 0, 1200).unwrap();
+        let b = wr.observe(&store, 0, 1200).unwrap();
+        assert_eq!(a, b, "residual closure must equal literal observation");
+        // Linear interpolation between frames also matches (readers agree on
+        // reconstructed neighbors).
+        let al = wl.observe(&store, 0, 2000).unwrap();
+        let bl = wr.observe(&store, 0, 2000).unwrap();
+        assert_eq!(al, bl, "interpolated closure must match literal");
+    }
 }

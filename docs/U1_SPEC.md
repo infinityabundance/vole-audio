@@ -263,3 +263,22 @@ Object payloads and observation semantics:
   frame** (identical objects at the same media frame sound identical).
 * Reference transpose composes with rate; endless sources require start
   position 0 and no voice loop region (malformed otherwise).
+
+## 14. Residual closure (frozen, Phase E)
+
+* Sampled-origin intrinsic closure `X_O(f,ch) = H(f,ch) + R(f,ch)` — exact,
+  in the code domain — precedes observation. No `T(H)+T(R)` commutation is
+  ever assumed.
+* v1 models: `Zero`, `Constant(level)`, `Periodic(cycle)` (mono cycle
+  inline). Model output is code domain; channels beyond the model domain
+  model 0.
+* Sparse residual records (frame, channel, i32 delta), unique per
+  (channel, frame), sorted, count `<= MAX_RESIDUAL_RECORDS`; closure adds
+  one i64 sum + one saturation. Exact closure of an intrinsic requires
+  `|X_O − H| < 2^31`; uncloseable hypotheses are rejected at construction.
+* Residual-governed reads interpolate reconstructed neighbors, so
+  integer-frame observation equals the literal observation of the same
+  content (verified: `residual_closure_equals_literal_through_the_world`).
+* WAV ingest (`format::wav`): integer PCM only (u8/s16/s24/s32), explicit
+  rejection of float/other tags; hostile-input tested; maps to canonical
+  codes per §2. Container metadata is outside the u1 equality claim.

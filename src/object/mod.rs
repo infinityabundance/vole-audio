@@ -16,6 +16,7 @@ pub mod id;
 pub mod literal;
 pub mod oscillator;
 pub mod reference;
+pub mod residual;
 pub mod simple;
 pub mod wavetable;
 
@@ -23,6 +24,7 @@ pub use descriptor::{LoopRegion, ObjectDescriptor, Representation, canonical_hea
 pub use id::{ContentId, Dependency, ObjectId};
 pub use literal::Literal;
 pub use oscillator::{Oscillator, PartialBank};
+pub use residual::{Residual, ResidualModel, ResidualRecord};
 pub use simple::{Constant, Noise};
 pub use wavetable::Cycle;
 
@@ -64,6 +66,8 @@ pub enum ObjectData {
     PartialBank(PartialBank),
     /// Endless deterministic noise.
     Noise(Noise),
+    /// Residual-governed object (model + sparse residual, exact closure).
+    PredictorResidual(Residual),
 }
 
 impl ObjectData {
@@ -93,14 +97,16 @@ impl ObjectData {
     /// Bytes of *resident sample-domain content* owned by this payload
     /// (sample-domain exposure accounting; §41). Endless procedural objects
     /// own zero resident sample bytes; literal and cycle objects own their
-    /// stored sample bytes. Frozen tables/generators are accounted separately
-    /// as dependencies.
+    /// stored sample bytes; residual deltas count as sample-domain content
+    /// (4 bytes each). Frozen tables/generators are accounted separately as
+    /// dependencies.
     pub const fn resident_sample_bytes(&self) -> u64 {
         match self {
             ObjectData::Literal(l) => (l.samples.len() as u64) * 4,
             ObjectData::Wavetable(c) | ObjectData::SingleCycle(c) | ObjectData::ExactRepeat(c) => {
                 (c.samples.len() as u64) * 4
             }
+            ObjectData::PredictorResidual(r) => (r.records.len() as u64) * 4,
             ObjectData::Referenced(_)
             | ObjectData::Silence
             | ObjectData::Constant(_)
@@ -273,6 +279,7 @@ pub fn canonical_content_id(descriptor: &ObjectDescriptor, data: &ObjectData) ->
         ObjectData::Noise(n) => {
             simple::canonical_bytes(descriptor, Representation::Noise, &n.seed.to_le_bytes())
         }
+        ObjectData::PredictorResidual(r) => r.canonical_bytes(descriptor),
     };
     ContentId(crate::hash::sha256::Sha256::digest(&bytes))
 }
@@ -328,6 +335,14 @@ fn validate_payload(descriptor: &ObjectDescriptor, data: &ObjectData) -> Result<
             }
             if oscillator::Oscillator::checked(o.freq_hz, o.amp_q16).is_none() {
                 return Err(malformed("oscillator params out of domain"));
+            }
+        }
+        ObjectData::PredictorResidual(r) => {
+            if descriptor.extent_frames == 0 {
+                return Err(malformed("residual object with zero extent"));
+            }
+            if residual::Residual::new(descriptor, r.model.clone(), r.records.clone()).is_none() {
+                return Err(malformed("residual payload out of domain"));
             }
         }
         ObjectData::PartialBank(b) => {
