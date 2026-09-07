@@ -4,11 +4,11 @@
   "receipt": {
     "schema": "vole.audio.evidence.v1",
     "schema_version": 1,
-    "run_id": "semantic-469300903-ce56",
-    "court": "semantic",
-    "created_unix_ms": 469300903,
+    "run_id": "authored-469698219-1096d",
+    "court": "authored",
+    "created_unix_ms": 469698219,
     "result": "SUPPORTED",
-    "result_detail": "determinism battery passed; reference sha256 1791816f4b938375cc4298b2587ce19eef260d063d9ed88c597e04d31837f6d0",
+    "result_detail": "procedural battery passed; reference sha256 f91b5b4228022d46a609a2fe7fc862e6e72c4058405c4b72316b202feb14fe87",
     "environment": {
       "os": {
         "sysname": "Linux",
@@ -195,7 +195,7 @@
       "memory": {
         "total_bytes": 134689935360
       },
-      "git_commit": "0351a4615a738c6b27da80ab8df6042952318783",
+      "git_commit": "3c723bacb0a27bf0ed36d84cdea797dce4d2117a",
       "git_dirty": true,
       "git_branch": "main",
       "rustc_version": "rustc 1.99.0-nightly (89c61a754 2026-07-23)",
@@ -679,11 +679,11 @@
       "profile": "u1/v1",
       "backend": "scalar",
       "sample_rate_hz": 48000,
-      "channels": 2,
+      "channels": 1,
       "voices": null,
-      "quantum_frames": 2400,
-      "duration_secs": 0.05,
-      "content_kind": "deterministic-mini-score"
+      "quantum_frames": 4000,
+      "duration_secs": 0.08333333333333333,
+      "content_kind": "procedural-battery"
     },
     "counters": {
       "host_pcm_staging_bytes": 0,
@@ -697,7 +697,7 @@
       "endpoint_depth_frames": 0,
       "endpoint_depth_min_frames": 18446744073709551615,
       "endpoint_depth_max_frames": 0,
-      "quanta_submitted": 1,
+      "quanta_submitted": 0,
       "events_consumed": 0,
       "xruns": 0,
       "kernel_launches": 0,
@@ -712,7 +712,7 @@
       "tail": null
     },
     "provenance": {
-      "reference_hash": "1791816f4b938375cc4298b2587ce19eef260d063d9ed88c597e04d31837f6d0",
+      "reference_hash": "f91b5b4228022d46a609a2fe7fc862e6e72c4058405c4b72316b202feb14fe87",
       "backend_hash": null,
       "gpu_artifact_hash": null,
       "source_hash": null,
@@ -738,5 +738,5 @@
     "limitations": [],
     "extras": {}
   },
-  "receipt_sha256": "0272bc1402cafc19b725d654b96230b096d2b9edbd6db6c7ca1837a2a16601fd"
+  "receipt_sha256": "b273da917db956c5967371ea377c7b4ad2ec06423cf17471b58c4724de91c8f2"
 }

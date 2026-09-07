@@ -179,6 +179,32 @@ Delivered:
 Verified: 143 tests green; clippy/fmt clean; `court semantic` and
 `court authored` SUPPORTED with receipts.
 
+### Phase E — Exact residual / literal + exact WAV ingest (complete)
+
+Exit criteria: intrinsic closure; literal fallback; residual variants; exact
+WAV ingest; every accepted E1 input has exact intrinsic closure.
+
+Delivered:
+
+- `object/residual.rs` — `PredictorResidual` payload: v1 models (Zero /
+  Constant / mono Periodic cycle) + sparse residual records (frame, channel,
+  i32 delta; unique, sorted, bounded) with canonical bytes/identity,
+  validation, `closing_residual` (compute the exact residual that closes an
+  intrinsic under a model; uncloseable gaps rejected), and binary-search
+  closure samples. `resident_sample_bytes` counts residual deltas.
+- Closure semantics frozen (U1_SPEC §14): `X_O = H + R` precedes
+  observation; no `T(H)+T(R)` commutation; residual-governed reads
+  interpolate reconstructed neighbors.
+- `format/wav.rs` — narrow exact WAV ingest (u8/s16/s24/s32 integer PCM
+  only; float/extensible/other tags rejected explicitly), hostile-input
+  tests (truncation, duplicate chunks, lying lengths, absurd rates/depths,
+  bad magic, zero channels), metadata-chunk skipping, container bytes
+  outside the equality claim.
+- End-to-end proof: `residual_closure_equals_literal_through_the_world`
+  (closure observation == literal observation, incl. interpolated reads).
+
+Verified: 154 tests green; clippy/fmt clean; device no_std compile clean.
+
 ## Known blockers
 
 - None for Phase D. ROCm hardware absent (evidence row only). ALSA D1 court
@@ -187,14 +213,13 @@ Verified: 143 tests green; clippy/fmt clean; `court semantic` and
 
 ## Next work (exact order — the implementation contract is executed in sequence)
 
-1. **Phase D — procedural objects**: silence/constant/wavetable/oscillator/
-   repeat/noise/partial-bank SampleObjects on the frozen observation path.
-   Exit: authored objects observe without resident full-object PCM.
-2. Phase E — exact residual / literal + exact WAV ingest.
-3. Phase F — SIMD (AVX2 baseline; scalar == SIMD).
-4. Phase G — CUDA (Rust PTX evaluator, buffered diagnostic).
-5. Phase H — CUDA D1 falsification (ALSA mmap + registration).
-6. Phase I — ROCm (hardware-unavailable evidence + clean amdgcn build).
-7. Phase J — ROCm D1.
-8. Phase K — inverse compiler; Phase L — GPU inverse search;
-9. Phase M — production depth/courts/corpus; Phase N — transport/archive.
+1. **Phase F — SIMD (AVX2 baseline; scalar == SIMD)** on the host: the same
+   frozen semantics vectorized with runtime dispatch; differential parity
+   tests vs the scalar oracle.
+2. Phase G — CUDA (Rust PTX evaluator, GPU-resident world, buffered
+   diagnostic D0; scalar == CUDA differential).
+3. Phase H — CUDA D1 falsification (ALSA mmap + registration).
+4. Phase I — ROCm (hardware-unavailable evidence + clean amdgcn build).
+5. Phase J — ROCm D1.
+6. Phase K — inverse compiler; Phase L — GPU inverse search;
+7. Phase M — production depth/courts/corpus; Phase N — transport/archive.
