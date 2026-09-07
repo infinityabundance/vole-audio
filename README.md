@@ -114,5 +114,14 @@ exists yet — [docs/PERFORMANCE.md](docs/PERFORMANCE.md) says exactly
 
 ## License
 
-No license is asserted by this repository's maintainers at this time; see
-the upstream paper for disclosure terms.
+Licensed under either of
+
+- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE) /
+  https://www.apache.org/licenses/LICENSE-2.0)
+- MIT license ([LICENSE-MIT](LICENSE-MIT) /
+  https://opensource.org/licenses/MIT)
+
+at your option.
+
+The VOLE-Audio v1.0 paper (DOI 10.5281/zenodo.22649073) remains a separate
+work with its own disclosure terms.

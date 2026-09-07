@@ -7,6 +7,7 @@ keywords = ["audio", "sampler", "procedural", "gpu", "deterministic"]
 categories = ["multimedia::audio", "science", "hardware-support"]
 readme = "README.md"
 repository = "https://github.com/infinityabundance/vole-audio"
+license = "MIT OR Apache-2.0"
 
 # Published-package hygiene: keep the crates.io tarball lean and buildable on
 # stable Rust. In particular `rust-toolchain.toml` (a repo-local nightly pin
