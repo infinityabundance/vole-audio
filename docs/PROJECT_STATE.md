@@ -110,27 +110,58 @@ Verified: 70 unit tests pass (incl. FIPS vectors, i128 oracle sweeps, u128
 increment oracle, symmetry + hash pin); `clippy -D warnings` clean; `fmt`
 clean; library still compiles `no_std` for `nvptx64-nvidia-cuda`.
 
+### Phase C — Scalar oracle (complete)
+
+Exit criteria: SampleObject model, voices, triggering, loop/reverse/rate,
+gain/pan, ADSR, mix, interpolation, narrow filter, observation ranges;
+deterministic repeated hashes; chunked == contiguous; seek == sequential;
+reference vectors frozen; `court semantic` executable.
+
+Delivered:
+
+- `object/` — SampleObject (descriptor + content identity + literal +
+  referenced + dependency-graph validation with depth/cycle bounds, hostile
+  ceilings enforced), canonical per-representation byte forms.
+- `sampler/` (pure semantics, no_std): analytic piecewise-linear ADSR;
+  Q16 gain chain (unity-identity, +6 dB ceiling); linear equal-gain pan with
+  exact `L + R == unity`; signed-Q24 rate/position + Euclidean loop wrap
+  (forward = reverse tape) + exact one-shot end frames; linear/nearest reads
+  with frozen continuation rules; i64 per-(frame,channel) mixer with one
+  final saturation; narrow exact filter set (integer-coefficient Butterworth
+  biquad from the sine table, one-pole smoother) with explicit state.
+- `sampler/voice.rs|world.rs|scheduler.rs` (host): immutable voice specs,
+  functional world (voices = spawn records), validated timeline assembly.
+- `sampler/resampler.rs` — frozen 64×1024 polyphase FIR: asset
+  `assets/u1/resampler_bh64_p1024_q15.bin`, exact-DC rows, measured
+  passband ripple ≤ 1.5e-4 / stopband ≥ 210 dB, hash pinned.
+- `eval/scalar.rs` — the scalar oracle (semantic authority).
+- `court semantic` — first executable court: repeated-hash, chunked ==
+  contiguous, seek == sequential, hostile-note-off rejection; emits immutable
+  receipts; reference hash frozen and enforced by test.
+- CLI `court` + `receipt show` wired.
+- U1_SPEC updated: sampler transforms (§12), resampler freeze (§9),
+  Phase C reference vectors (§11).
+
+Verified: 136 tests green; `clippy -D warnings` clean; `fmt` clean;
+`court semantic` SUPPORTED with receipt
+`receipts/semantic/semantic-*.json`.
+
 ## Known blockers
 
-- None for Phase C. ROCm hardware absent (evidence row only). ALSA D1 court
+- None for Phase D. ROCm hardware absent (evidence row only). ALSA D1 court
   needs a user decision on audible output (courts default to silence-safe
   probes; `--emit-audio` opt-in flag will gate audible content).
 
 ## Next work (exact order — the implementation contract is executed in sequence)
 
-1. **Phase C — scalar oracle**: SampleObject model, voices, world, ADSR
-   envelope (analytic), gain/pan, i64 mix with one final saturation, nearest/
-   linear interpolation, frozen polyphase resampler table (measured then
-   frozen, hash appended to U1_SPEC), random access, observation ranges,
-   reference vectors. Exit: deterministic repeated hashes, chunked ==
-   contiguous, seek == sequential, `court semantic` executable.
-2. Phase D — procedural objects (silence/constant/wavetable/oscillator/
-   repeat/noise/partial bank).
-3. Phase E — exact residual / literal + WAV ingest.
-4. Phase F — SIMD (AVX2 baseline; scalar == SIMD).
-5. Phase G — CUDA (Rust PTX evaluator, buffered diagnostic).
-6. Phase H — CUDA D1 falsification (ALSA mmap + registration).
-7. Phase I — ROCm (hardware-unavailable evidence + clean amdgcn build).
-8. Phase J — ROCm D1.
-9. Phase K — inverse compiler; Phase L — GPU inverse search;
-   Phase M — production depth/courts/corpus; Phase N — transport/archive.
+1. **Phase D — procedural objects**: silence/constant/wavetable/oscillator/
+   repeat/noise/partial-bank SampleObjects on the frozen observation path.
+   Exit: authored objects observe without resident full-object PCM.
+2. Phase E — exact residual / literal + exact WAV ingest.
+3. Phase F — SIMD (AVX2 baseline; scalar == SIMD).
+4. Phase G — CUDA (Rust PTX evaluator, buffered diagnostic).
+5. Phase H — CUDA D1 falsification (ALSA mmap + registration).
+6. Phase I — ROCm (hardware-unavailable evidence + clean amdgcn build).
+7. Phase J — ROCm D1.
+8. Phase K — inverse compiler; Phase L — GPU inverse search;
+9. Phase M — production depth/courts/corpus; Phase N — transport/archive.

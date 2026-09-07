@@ -275,7 +275,7 @@ mod tests {
             t[2048 - k] = t[k];
         }
         t[2048] = 0; // sin(pi) exactly.
-                     // Odd half: S[2048 + k] = -S[k] for k = 1..=1024.
+        // Odd half: S[2048 + k] = -S[k] for k = 1..=1024.
         for k in 1..=1024usize {
             t[2048 + k] = -t[k];
         }

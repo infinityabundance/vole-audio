@@ -18,10 +18,15 @@ pub const MAX_CHANNELS: u32 = 32;
 
 /// Maximum object intrinsic extent, in frames.
 ///
-/// 2^40 frames ≈ 6.4 hours at 44.1 kHz. Large enough that extent is never the
-/// practical constraint; small enough that frame coordinates always fit i64
-/// with headroom for rate multiplication.
-pub const MAX_OBJECT_FRAMES: u64 = 1 << 40;
+/// (2^39 - 1) frames ≈ 3.2 hours at 44.1 kHz, and the bound exists so that
+/// `extent << 24` fits a positive i64 (Q24 positions can address any valid
+/// frame). This is the *ceiling*; real objects are far smaller.
+pub const MAX_OBJECT_FRAMES: u64 = (1 << 39) - 1;
+
+/// Maximum single observation window, in frames. Bounded so that
+/// `rate_max * window` cannot overflow i64 position math
+/// (2^16 frames/frame * 2^32 frames = 2^48).
+pub const MAX_OBSERVATION_FRAMES: u64 = 1 << 32;
 
 /// Maximum concurrent active voices in the sampler world.
 ///
@@ -118,11 +123,12 @@ mod tests {
 
     #[test]
     fn limits_respect_repr_widths() {
-        // Frame coordinates are i64; extents are far below i64 headroom and the
-        // quantum stays comfortably inside i32/i64 hot-path arithmetic.
+        // Frame coordinates are i64; extents stay below the Q24 i64 ceiling
+        // (extent<<24 < 2^63) and the quantum stays small.
         const {
-            assert!(MAX_OBJECT_FRAMES < (1u64 << 41));
+            assert!(MAX_OBJECT_FRAMES < (1u64 << 39));
             assert!(MAX_QUANTUM_FRAMES < (1 << 20));
+            assert!(MAX_OBSERVATION_FRAMES <= 1u64 << 32);
         };
     }
 }

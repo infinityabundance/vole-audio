@@ -49,20 +49,20 @@ pub mod hash;
 pub mod limits;
 pub mod status;
 
+pub mod eval;
+pub mod sampler;
 pub mod universe;
-
-// ---------------------------------------------------------------------------
-// Host-only modules.
-// ---------------------------------------------------------------------------
 
 #[cfg(feature = "std")]
 pub mod audio;
 #[cfg(feature = "std")]
+pub mod courts;
+#[cfg(feature = "std")]
 pub mod error;
 #[cfg(feature = "std")]
 pub mod evidence;
-
 #[cfg(feature = "std")]
+pub mod object;
 pub use error::{Error, Kind, Result};
 
 // ---------------------------------------------------------------------------

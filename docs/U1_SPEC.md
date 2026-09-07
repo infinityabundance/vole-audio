@@ -155,12 +155,57 @@ order, or allocation order.
 
 ## 9. Interpolation and resampling
 
-* Nearest and linear are integer-exact as specified in §4.
-* Production resampler: frozen polyphase FIR. **Status: table under
-  measurement in Phase C** (64-tap / 1024-phase starting point; final tap/phase
-  counts, integer coefficients, stopband/passband measurements, footprint,
-  and the frozen table SHA-256 will be appended here when chosen). Once
-  frozen, the table is a universe dependency, never regenerated at runtime.
+* Nearest and linear are integer-exact as specified in §4; read-continuation
+  rules: one-shot holds the final sample (`b = a`); loop `[a, b)` wraps the
+  interpolation neighbor at the region end back to `a` (periodic
+  continuation). Reads at the wrapped coordinate are half-open `[a, b)`.
+* **Frozen polyphase resampler** (`sampler::resampler`): 64 taps × 1024
+  phases, i16 Q15 coefficients, Blackman–Harris (4-term) windowed sinc with
+  cutoff at source Nyquist, phase-major canonical bytes in
+  `assets/u1/resampler_bh64_p1024_q15.bin` (128 KiB).
+  * Evaluation: `y = sat(rnd(Σ_j c_j·x_j, 15))`, tap `j` reads source frame
+    `m + j - 31` (`m = floor(pos)`); one rounding, one saturation.
+  * Every phase row sums to exactly `2^15` (largest-remainder quantization),
+    so DC gain is exactly 1.0 in Q15 arithmetic: constant input reproduces
+    itself through every phase.
+  * SHA-256: `3b3015a81b9da1298b532127e72309f7dd1afdbf817628dbcabd8fe958438750`
+  * Measured (frozen kernel family, host test `measure_response`):
+    continuous-kernel passband ripple `max |H-1| = 8.3e-5` (0.0007 dB) for
+    F ≤ 0.45; worst sampled-row passband deviation ≤ `1.5e-4`; stopband
+    attenuation ≥ 210 dB for F ∈ [0.5625, 1] (numerically; window sidelobe
+    floor ≈ −92 dB near the transition at F = 0.5). Table footprint 128 KiB;
+    cost 64 multiply-adds per output sample.
+  * The resampler is a **fractional-coordinate interpolator** (not a
+    ratio-adaptive decimator); object reads default to the linear path and
+    the polyphase path is an explicit quality transform.
+
+## 12. Sampler transforms (frozen, Phase C)
+
+Position/loop semantics (see also `sampler::rate`, `sampler::voice`):
+
+* Signed Q24 rate; domain `0` or `[±2^8, ±2^40]`; position
+  `u(t) = p0 + rate·(t − t0)` — analytic, no per-frame state.
+* Loop mapping for both directions is the single Euclidean wrap
+  `w = A + ((u − A) mod L)` (reverse tape looping = negative rate).
+* One-shot ends exactly at the first out-of-range frame (`end_frame`); reads
+  are half-open `[0, extent)`.
+* Reference transpose composes with rate via one Q24 rounding
+  (`compose_transpose`, saturated at `±2^47`); effective rate revalidated.
+
+Envelope: analytic piecewise-linear ADSR as in `sampler::envelope` (Q16,
+round-half-up segment law, zero-length segments jump instantly, release
+starts at the note-off frame's level). Gain chain and pan law as in
+`sampler::gain`/`pan` (unity-identity chain, `L + R == unity` exact). Mix:
+per-(frame, channel) i64 accumulators, one final saturation.
+
+Filter set: `Biquad` (RBJ Butterworth lowpass, integer coefficients from the
+frozen sine table, Direct Form I, `DirectStateful`) and `OnePole`
+(`y += (x−y)>>k`). State is explicit and checkpointable; neither sits on the
+stateless fused path without declared state.
+
+Observation: canonical interleaved output; voices are immutable spawn
+records, so `chunked == contiguous` and `seek == sequential` hold by
+construction (verified by `court semantic`).
 
 ## 10. Host clock (non-media)
 
@@ -178,3 +223,12 @@ SHA-256; SplitMix64 first-output vector; event-order determinism; interleave/
 deinterleave roundtrip; empty-observation hash
 `e3b0c442...52b855`. Object-level vectors (small SampleObjects and their
 expected observation hashes) freeze in Phase C.
+
+### Phase C vectors (frozen)
+
+* `court semantic` fixture observation hash (2400 frames, stereo, 4 voices:
+  one-shot ramp w/ ADSR, looped voice w/ note-off, referenced-object reverse
+  at half transpose, panned stereo object):
+  `1791816f4b938375cc4298b2587ce19eef260d063d9ed88c597e04d31837f6d0`
+  (enforced by `courts::semantic::tests::fixture_reference_hash_is_frozen`).
+* Resampler table SHA-256 and sine table SHA-256 (see §§5, 9).

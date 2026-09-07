@@ -51,7 +51,8 @@ fn run(args: &[String]) -> Result<u8> {
         }
         "probe" => cmd_probe(&args[2..]),
         "receipt" => cmd_receipt(&args[2..]),
-        "inspect" | "verify" | "encode" | "observe" | "play" | "bench" | "court" | "corpus" => {
+        "court" => cmd_court(&args[2..]),
+        "inspect" | "verify" | "encode" | "observe" | "play" | "bench" | "corpus" => {
             // Declared-but-not-yet-implemented surface: exit 3 (NOT_IMPLEMENTED);
             // the CLI never implies support that is absent.
             eprintln!(
@@ -152,6 +153,40 @@ fn cmd_probe(args: &[String]) -> Result<u8> {
         println!("audio pci:      (none found in sysfs)");
     }
     println!("------------------------------------------------");
+    Ok(0)
+}
+
+/// Run an executable court: `vole-audio court <name> [--receipts DIR]`.
+fn cmd_court(args: &[String]) -> Result<u8> {
+    let name = args.first().map(String::as_str);
+    let Some(name) = name else {
+        eprintln!("available courts:");
+        for (n, desc) in vole_audio::courts::COURT_NAMES {
+            eprintln!("  {n:<14} {desc}");
+        }
+        return Ok(0);
+    };
+    let mut receipts = std::path::PathBuf::from("receipts");
+    let mut i = 1;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--receipts" => {
+                i += 1;
+                receipts = std::path::PathBuf::from(
+                    args.get(i)
+                        .ok_or_else(|| Error::malformed("--receipts requires a directory"))?,
+                );
+            }
+            other => {
+                return Err(Error::malformed(format!("unknown court flag '{other}'")));
+            }
+        }
+        i += 1;
+    }
+    // Courts record evidence; the process exits 0 when a receipt was written
+    // (whatever its verdict), nonzero only on operational failure.
+    let verdict = vole_audio::courts::run(name, &receipts)?;
+    println!("court {name}: {verdict}");
     Ok(0)
 }
 
