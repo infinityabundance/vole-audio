@@ -72,22 +72,65 @@ Delivered:
 Current evidence files: (probe receipts are produced by `vole-audio probe`;
 first court receipts arrive with Phase C.)
 
+## Completed phases
+
+### Phase A — Evidence constitution (complete)
+
+_... see git history / earlier ledger entries ..._ (Phase A summary retained in
+`PROJECT_STATE` at commit `efaebf7`.)
+
+### Phase B — vole.audio.u1 (complete)
+
+Exit criteria: frozen reference vectors; `U1_SPEC.md` matches code; unit
+tests enforce the freeze.
+
+Delivered (`src/universe/`, all `no_std`, device-compiled):
+
+- `u1.rs` — universe/profile identity (`vole.audio.u1`, `u1/v1`).
+- `sample.rs` — i32 canonical code domain; exact u8/s16/s24/s32 ingest.
+- `time.rs` — typed frame coordinates (MediaFrame/ObjectFrame/EndpointFrame),
+  `EpochId`, `NominalRate`; no f64 media time.
+- `clock.rs` — `XrunPolicy` vocabulary; integer host frame<->time rounding.
+- `arithmetic.rs` — Q24 positions/rates, Q16 multipliers, round-half-away
+  (`rnd_shift`), `sat_i32`, `mul_q16`, `lerp_i32`, mixing-bound proof test.
+- `phase.rs` — u64-mod-2^64 oscillator phase, exact 64-bit `freq_to_incr`
+  (u128 only in test oracle), 12-bit index + 24-bit frac addressing,
+  Q30 sine table freeze.
+- `prng.rs` — VOLE-SPLITMIX64-STREAM (per-frame noise, random-access pure),
+  VOLE-XOSHIRO256STARSTAR-1 with splitmix64 seeding + jump.
+- `event.rs` — total order (frame, class priority, sequence); priority table.
+- `layout.rs` — Mono/Stereo/N channels; canonical interleave.
+- `observation.rs` — canonical interleaved LE-i32 form; streaming
+  `observation_sha256` (alloc-free).
+- Frozen asset `assets/u1/sine_q30_4096.bin` (4096 x i32 LE, Q30,
+  structurally symmetric, SHA-256 pinned in spec + test).
+- `docs/U1_SPEC.md` rewritten as the normative freeze.
+
+Verified: 70 unit tests pass (incl. FIPS vectors, i128 oracle sweeps, u128
+increment oracle, symmetry + hash pin); `clippy -D warnings` clean; `fmt`
+clean; library still compiles `no_std` for `nvptx64-nvidia-cuda`.
+
 ## Known blockers
 
-- None for Phase B. ROCm hardware absent (evidence row only). ALSA D1 court
+- None for Phase C. ROCm hardware absent (evidence row only). ALSA D1 court
   needs a user decision on audible output (courts default to silence-safe
   probes; `--emit-audio` opt-in flag will gate audible content).
 
 ## Next work (exact order — the implementation contract is executed in sequence)
 
-1. **Phase B — vole.audio.u1**: sample domain (i32 canonical code); fixed-point
-   semantics (Q24 position/rate, Q16 gain/pan, u64 phase); time/event total
-   order; canonical serialization; content identity; frozen-table policy.
-   Exit: U1_SPEC.md matches code; reference vectors frozen.
-2. Phase C — scalar oracle (SampleObject, voices, ADSR, mix, interpolation,
-   random access).
-3. Phase D — procedural objects; Phase E — residual/literal + exact WAV ingest;
-   Phase F — SIMD (AVX2 baseline); Phase G — CUDA; Phase H — CUDA D1;
-   Phase I — ROCm (hardware-unavailable evidence); Phase J — ROCm D1;
-   Phase K — inverse compiler; Phase L — GPU inverse search; Phase M —
-   production depth/courts/corpus; Phase N — transport/archive finalization.
+1. **Phase C — scalar oracle**: SampleObject model, voices, world, ADSR
+   envelope (analytic), gain/pan, i64 mix with one final saturation, nearest/
+   linear interpolation, frozen polyphase resampler table (measured then
+   frozen, hash appended to U1_SPEC), random access, observation ranges,
+   reference vectors. Exit: deterministic repeated hashes, chunked ==
+   contiguous, seek == sequential, `court semantic` executable.
+2. Phase D — procedural objects (silence/constant/wavetable/oscillator/
+   repeat/noise/partial bank).
+3. Phase E — exact residual / literal + WAV ingest.
+4. Phase F — SIMD (AVX2 baseline; scalar == SIMD).
+5. Phase G — CUDA (Rust PTX evaluator, buffered diagnostic).
+6. Phase H — CUDA D1 falsification (ALSA mmap + registration).
+7. Phase I — ROCm (hardware-unavailable evidence + clean amdgcn build).
+8. Phase J — ROCm D1.
+9. Phase K — inverse compiler; Phase L — GPU inverse search;
+   Phase M — production depth/courts/corpus; Phase N — transport/archive.
