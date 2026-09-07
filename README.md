@@ -1,6 +1,6 @@
-![VOLE-Audio](assets/vole.png)
-
 # VOLE-Audio
+
+<p align="center"><img src="assets/vole.png" alt="VOLE-Audio" width="314" /></p>
 
 > de Beer, R. (2026). *VOLE-Audio: Procedural Sampling and Direct Audio
 > Materialization from Deterministic State — Broad Prior-Art Technical
