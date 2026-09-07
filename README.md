@@ -2,6 +2,11 @@
 
 # VOLE-Audio
 
+> de Beer, R. (2026). *VOLE-Audio: Procedural Sampling and Direct Audio
+> Materialization from Deterministic State — Broad Prior-Art Technical
+> Disclosure and Research Architecture* (Version v1.0). Zenodo.
+> https://doi.org/10.5281/zenodo.22649073
+
 Procedural sampling and **direct audio materialization from deterministic
 state** — a rigorous native-Rust implementation of the VOLE-Audio v1.0
 research architecture
