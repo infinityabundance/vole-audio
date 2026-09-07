@@ -6,6 +6,20 @@ description = "VOLE-Audio: procedural sampling and direct audio materialization 
 keywords = ["audio", "sampler", "procedural", "gpu", "deterministic"]
 categories = ["multimedia::audio", "science", "hardware-support"]
 readme = "README.md"
+repository = "https://github.com/infinityabundance/vole-audio"
+
+# Published-package hygiene: keep the crates.io tarball lean and buildable on
+# stable Rust. In particular `rust-toolchain.toml` (a repo-local nightly pin
+# used for GPU device cross-compilation) must never ship, and the frozen
+# lookup tables under assets/u1/ (pulled in via include_bytes!) must ship.
+exclude = [
+    "rust-toolchain.toml",
+    "scripts/",
+    "receipts/",
+    "corpus/",
+    "docs/",
+    ".gitignore",
+]
 
 # Exactly ONE Cargo package. No workspace. No internal crates.
 # The GPU targets are produced by cross-compiling this same package
