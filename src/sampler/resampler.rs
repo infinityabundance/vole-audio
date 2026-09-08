@@ -13,9 +13,13 @@
 //! * Evaluation: `y = sat(rnd(Σ c_j·x_j, 15))` — one rounding, one
 //!   saturation, deterministic on every backend.
 //!
-//! Measured (host test `measure_response`): see the printed/stored values —
-//! stopband attenuation and passband ripple are asserted in tests and the
-//! numbers are recorded in `docs/U1_SPEC.md`.
+//! Measured (host tests `measure_response` / `quantized_table_response_bounds`):
+//! the *continuous pre-quantization prototype* and the *frozen Q15 table* are
+//! reported separately — see U1_SPEC §"Interpolation and resampling". The
+//! prototype's analog stopband (≈ 210 dB) is a design property only; the
+//! quantized rows are critically sampled (cutoff == Nyquist), so they have no
+//! digital stopband and are specified by their worst-case amplitude error
+//! (passband + image band ≤ 1.1e-3 over all 1024 rows).
 
 use crate::universe::arithmetic::{rnd_shift, sat_i32};
 
@@ -257,12 +261,27 @@ mod tests {
         assert!(y > 2_000 && y < 13_000, "y={y}");
     }
 
-    /// Response measurement of the frozen kernel family. Computes
-    /// (a) the continuous-time Fourier transform magnitude of the windowed
-    /// sinc kernel on a fine grid — passband ripple (F < 0.5) and stopband
-    /// attenuation (F > 0.5 + transition);
-    /// (b) worst-case per-phase passband deviation of the *sampled* rows
-    /// (the DTFT of each 64-tap row vs ideal 1.0) over F in [0.01, 0.45].
+    /// Response measurement of the frozen resampler family. Reports two
+    /// *separate* figures (the frozen table is the evaluator's actual
+    /// arithmetic, and coefficient quantization is a real effect):
+    ///
+    /// (a) **continuous design response** — the continuous-time Fourier
+    ///     transform magnitude of the pre-quantization Blackman-Harris
+    ///     windowed-sinc kernel (fine quadrature). Its cutoff sits at source
+    ///     Nyquist, so its stopband is only meaningful on the *analog*
+    ///     frequency axis (image rejection when the kernel is used for
+    ///     oversampling). This is a prototype property, not a property of the
+    ///     quantized table.
+    /// (b) **frozen-table response** — the DTFT of every one of the 1024
+    ///     frozen Q15 rows. Because the rows are critically sampled
+    ///     (cutoff == Nyquist), the response beyond Nyquist is the periodic
+    ///     image of the passband — there is *no digital stopband* to
+    ///     measure. The honest table figures are: worst-case passband
+    ///     deviation (F in [0.01, 0.45]) and worst-case image-band gain
+    ///     (F in [0.55, 0.95], which by symmetry must track the passband
+    ///     within the same deviation). Both bound the coefficient-noise
+    ///     leakage of the frozen arithmetic.
+    ///
     /// Run with `cargo test measure_response -- --ignored --nocapture` to
     /// refresh the numbers recorded in U1_SPEC.
     #[test]
@@ -293,7 +312,7 @@ mod tests {
             }
         };
 
-        // (a) continuous-kernel response via fine quadrature.
+        // (a) continuous-kernel response via fine quadrature (analog axis).
         let n = 1 << 16;
         let span = 32.0f64;
         let dt = 2.0 * span / n as f64;
@@ -317,41 +336,121 @@ mod tests {
             f += 0.005;
         }
         let mut stop_min_db = f64::MAX;
-        let mut f = 0.5 + 1.0 / 16.0; // past the 1/16 transition width
+        let mut f = 0.5 + 1.0 / 16.0;
         while f <= 1.0 {
             let m = resp(f).max(1e-12);
-            let db = 20.0 * m.log10();
-            stop_min_db = stop_min_db.min(db);
+            stop_min_db = stop_min_db.min(20.0 * m.log10());
             f += 0.005;
         }
 
-        // (b) worst per-phase sampled-row passband deviation vs ideal 1.0.
-        let mut worst_row = 0.0f64;
-        for p in [0usize, 256, 512, 768, 1023] {
-            let mut worst = 0.0f64;
-            let mut f = 0.01;
-            while f <= 0.45 {
-                let mut re = 0.0;
-                let mut im = 0.0;
-                for j in 0..RESAMPLER_TAPS {
-                    let c = coeff(p, j) as f64 / (1 << 15) as f64;
-                    let t = j as f64 - 31.0;
-                    let ph = 2.0 * std::f64::consts::PI * f * t;
-                    re += c * ph.cos();
-                    im -= c * ph.sin();
-                }
-                worst = worst.max((re.hypot(im) - 1.0).abs());
-                f += 0.01;
+        // (b) frozen-table response: DTFT of every quantized row.
+        // H(f, p) = sum_j (c[p][j] / 2^15) * e^{-i 2 pi f (j - 31)}.
+        let dtft_row = |p: usize, f: f64, re: &mut f64, im: &mut f64| {
+            *re = 0.0;
+            *im = 0.0;
+            for j in 0..RESAMPLER_TAPS {
+                let c = coeff(p, j) as f64 / (1 << 15) as f64;
+                let t = j as f64 - 31.0;
+                let ph = 2.0 * std::f64::consts::PI * f * t;
+                *re += c * ph.cos();
+                *im -= c * ph.sin();
             }
-            worst_row = worst_row.max(worst);
-        }
+        };
+        // Passband: worst |H - 1| over rows x F in [0.01, 0.45].
+        let mut table_pass_worst = 0.0f64;
+        // Image band F in [0.55, 0.95]: worst | |H| - 1 | (mirror of the
+        // passband by symmetry; anything beyond the passband deviation here
+        // would be spurious table gain).
+        let mut table_image_worst = 0.0f64;
+        // Index-stepped grids (a cumulative `f += step` can drift a ulp past
+        // the inclusive bound and skip the last bin).
+        let sweep = |lo: f64, hi: f64, dev: &mut f64| {
+            let steps = ((hi - lo) / 0.005).round() as usize;
+            for k in 0..=steps {
+                let f = lo + 0.005 * k as f64;
+                for p in 0..RESAMPLER_PHASES {
+                    let (mut re, mut im) = (0.0f64, 0.0f64);
+                    dtft_row(p, f, &mut re, &mut im);
+                    *dev = dev.max((re.hypot(im) - 1.0).abs());
+                }
+            }
+        };
+        sweep(0.01, 0.45, &mut table_pass_worst);
+        sweep(0.55, 0.95, &mut table_image_worst);
+        let pass_db_cont = 20.0 * (1.0 + passband_max_err).log10();
+        let pass_db = 20.0 * (1.0 + table_pass_worst).log10();
+        let image_db = 20.0 * (1.0 + table_image_worst).log10();
         eprintln!(
-            "passband ripple (F<=0.45): max |H-1| = {:.2e}  ({:.4} dB)",
-            passband_max_err,
-            20.0 * (1.0 + passband_max_err).log10()
+            "continuous design (analog prototype only): passband ripple (F<=0.45) \
+             max |H-1| = {passband_max_err:.2e} ({pass_db_cont:.4} dB); stopband min \
+             attenuation (F in [0.5625,1]) = {stop_min_db:.1} dB (window-sidelobe \
+             numerics; NOT a property of the quantized table)",
         );
-        eprintln!("stopband min attenuation (F in [0.5625,1]): {stop_min_db:.1} dB");
-        eprintln!("worst sampled-row passband deviation (F<=0.45): {worst_row:.2e}");
+        eprintln!(
+            "frozen Q15 table (all 1024 rows, DTFT): passband max |H-1| (F<=0.45) = \
+             {table_pass_worst:.2e} ({pass_db:.4} dB); image-band max | |H|-1 | \
+             (F in [0.55,0.95]) = {table_image_worst:.2e} ({image_db:.4} dB). No digital \
+             stopband exists (cutoff == Nyquist; beyond-Nyquist response is the \
+             periodic passband image).",
+        );
         eprintln!("transition band starts at F=0.5, BH-4 window, 64 taps @ 1024 phases");
+    }
+
+    /// Enforceable spec bounds on the *frozen Q15 table* (the arithmetic the
+    /// evaluator runs): worst-case passband deviation and worst-case
+    /// image-band gain over all 1024 quantized rows. Thresholds were set from
+    /// the `measure_response` run that froze the numbers in U1_SPEC.
+    #[test]
+    fn quantized_table_response_bounds() {
+        let dtft_row = |p: usize, f: f64, re: &mut f64, im: &mut f64| {
+            *re = 0.0;
+            *im = 0.0;
+            for j in 0..RESAMPLER_TAPS {
+                let c = coeff(p, j) as f64 / (1 << 15) as f64;
+                let t = j as f64 - 31.0;
+                let ph = 2.0 * std::f64::consts::PI * f * t;
+                *re += c * ph.cos();
+                *im -= c * ph.sin();
+            }
+        };
+        let mut table_pass_worst = 0.0f64;
+        let mut table_image_worst = 0.0f64;
+        let sweep = |lo: f64, hi: f64, dev: &mut f64| {
+            let steps = ((hi - lo) / 0.005).round() as usize;
+            for k in 0..=steps {
+                let f = lo + 0.005 * k as f64;
+                for p in 0..RESAMPLER_PHASES {
+                    let (mut re, mut im) = (0.0f64, 0.0f64);
+                    dtft_row(p, f, &mut re, &mut im);
+                    *dev = dev.max((re.hypot(im) - 1.0).abs());
+                }
+            }
+        };
+        sweep(0.01, 0.45, &mut table_pass_worst);
+        sweep(0.55, 0.95, &mut table_image_worst);
+        // Thresholds are properties of the frozen bytes; raising them means
+        // re-measuring, not editing the test. Set from the `measure_response`
+        // run: worst deviation sits at the passband/image edge F = 0.45
+        // (mirror 0.55), |H| - 1 ~ -1.1e-3.
+        assert!(
+            table_pass_worst < 1.5e-3,
+            "frozen-table passband deviation too large: {table_pass_worst:.2e}"
+        );
+        assert!(
+            table_image_worst < 1.5e-3,
+            "frozen-table image-band gain deviates beyond passband tolerance: \
+             {table_image_worst:.2e}"
+        );
+        // Mirror symmetry is exact for real symmetric-coefficient rows:
+        // |H(f)| == |H(1-f)| up to floating-point noise (bounds the grid too).
+        let (mut r1, mut i1) = (0.0f64, 0.0f64);
+        let (mut r2, mut i2) = (0.0f64, 0.0f64);
+        dtft_row(453, 0.45, &mut r1, &mut i1);
+        dtft_row(453, 0.55, &mut r2, &mut i2);
+        assert!(
+            (r1.hypot(i1) - r2.hypot(i2)).abs() < 1e-9,
+            "mirror symmetry broken: {}",
+            (r1.hypot(i1) - r2.hypot(i2)).abs()
+        );
     }
 }

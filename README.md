@@ -53,64 +53,109 @@ physical DAC as the hardware actually permits.
 
 ```
 Cargo.toml            one package; std feature gates host-only modules
-rust-toolchain.toml   pinned nightly (reproducible kernels + artifacts)
+rust-toolchain.toml   pinned nightly (device/GPU artifact builds only)
 src/
   status.rs           the nine verdict classes + NOT_IMPLEMENTED (shared u8 codes)
   limits.rs           hostile-input ceilings (no_std, shared with device)
   hash/               in-repo SHA-256 (FIPS 180-4), no_std
-  universe/           vole.audio.u1 exact semantics        (Phase B+)
-  object/             SampleObject model                    (Phase C+)
-  sampler/            voices/world/scheduler                (Phase C+)
-  eval/               scalar/SIMD evaluators                (Phase C+)
+  universe/           vole.audio.u1 exact semantics        (Phase B)
+  object/             SampleObject model                    (Phase C)
+  sampler/            voices/world/scheduler                (Phase C)
+  eval/               scalar + SIMD evaluators              (Phase C/F)
   device/             GPU ABI + nvptx/amdgcn entry points   (Phase G+)
   backend/            cuda/, rocm/ host runtimes            (Phase G+)
-  audio/              ALSA endpoint, directness, topology   (Phase 21+)
-  format/             canonical archive + WAV ingest        (Phase E+)
+  audio/              ALSA endpoint, directness, topology   (Phase G+)
+  format/             canonical archive + WAV ingest        (Phase E)
   inverse/            bounded inverse-proceduralization     (Phase K+)
   transport/          deterministic framing                 (Phase N+)
   evidence/           receipts/counters/timing/environment  (Phase A)
   courts/             executable courts                     (Phase C+)
   main.rs             the vole-audio CLI                    (grows by phase)
-docs/                 spec + evidence + non-claims
-corpus/               frozen flagship corpus (Phase M)
-receipts/             immutable evidence outputs
-assets/u1/            frozen deterministic tables (resampler, Phase C)
-scripts/              device build + court drivers
+docs/                 spec + evidence + non-claims (repo only)
+corpus/               frozen flagship corpus, Phase M (repo only)
+receipts/             immutable evidence outputs (repo only)
+assets/u1/            frozen deterministic tables (resampler, sine)
+scripts/              device build + court drivers (repo only)
 ```
+
+> Package vs repository: the crates.io tarball ships the library, binary,
+> `assets/` tables, licenses, and this README. `docs/`, `corpus/`, `receipts/`,
+> `scripts/`, and `rust-toolchain.toml` live in the GitHub repository only
+> (they are excluded from the published package to keep it lean and
+> stable-buildable). See the links under [Status](#current-status) and
+> [Building](#building) for the repository-only material.
 
 ## Current status
 
-Phase A (evidence constitution) is complete. See
-[docs/PROJECT_STATE.md](docs/PROJECT_STATE.md) for the exact ledger —
-completed phases, evidence, blockers, and the next work item. Phase B
-(`vole.audio.u1`) is next and is in progress.
+Phases A–F are complete; Phase G (CUDA) is next. Executable evidence today:
+
+- `cargo run -- court semantic` — scalar oracle determinism battery
+  (reference SHA-256 `1791816f…`);
+- `cargo run -- court authored` — procedural SampleObject battery
+  (`f7e103f3…`);
+- `cargo run -- court simd` — Phase F SIMD parity: scalar == SIMD on every
+  available ISA floor (AVX-512 / AVX2 / scalar) over frozen worlds, with
+  fixture-level timing.
+
+The exact ledger — completed phases, evidence, blockers, and the next work
+item — is
+[PROJECT_STATE.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/PROJECT_STATE.md)
+(repository-only). Fixture-level measurements are in
+[PERFORMANCE.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/PERFORMANCE.md);
+the spec is
+[U1_SPEC.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/U1_SPEC.md),
+and
+[NON_CLAIMS.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/NON_CLAIMS.md)
+says what this repository does *not* claim.
 
 ## Building
 
 ```sh
 cargo build     # host build; needs no CUDA/ROCm/ALSA development files
-cargo test      # unit + property tests
+cargo test      # unit + property + differential tests
 cargo clippy --all-targets --all-features -- -D warnings
 ```
 
-GPU artifacts are produced by cross-compiling this same package
-(`scripts/build-cuda-device.sh`, `scripts/build-rocm-device.sh`) and are
-opt-in. `cargo build`/`cargo test` succeed on machines with no GPU toolchain.
+Toolchain split (documented precisely because it is easy to blur):
+
+- **Host builds (the published crate) are stable-Rust**: `rust-version` in
+  `Cargo.toml` names the minimum stable release this package is verified
+  against. `cargo build`/`cargo test` succeed with that stable toolchain and
+  no GPU toolchain installed.
+- **Device/GPU artifact builds are nightly-only**: `rust-toolchain.toml` in
+  the repository pins the exact nightly used to cross-compile this same
+  package to `nvptx64-nvidia-cuda` (PTX) and `amdgcn-amd-amdhsa` (HSA/ELF).
+  The pin is repository-only — it is excluded from the published package so
+  the crates.io tarball never forces nightly on consumers.
+
+GPU artifacts are produced by cross-compiling this same package via
+[build-cuda-device.sh](https://github.com/infinityabundance/vole-audio/blob/main/scripts/build-cuda-device.sh)
+and
+[build-rocm-device.sh](https://github.com/infinityabundance/vole-audio/blob/main/scripts/build-rocm-device.sh)
+(repository-only; they become active in Phase G/I) and are opt-in.
 
 ## Evidence constitution
 
 Every claim this repository makes is backed by an immutable receipt. Run
 `vole-audio probe` to see the environment capture and `vole-audio receipt show
-<file>` to verify a receipt's self-hash. Courts arrive with their phases; the
-court list is fixed in the implementation contract (semantic, authored,
-inverse, flattening, cuda, rocm, d1, d2, depth, conventional, random-access,
-negative, interference, all).
+<file>` to verify a receipt's self-hash. Each receipt records its git commit,
+a source-tree hash, and a dirty-state that excludes receipt-output writes —
+see the
+[EVIDENCE.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/EVIDENCE.md)
+measurement-boundary notes (repository-only). Courts arrive with their phases;
+the court list is fixed in the implementation contract (semantic, authored,
+simd, inverse, flattening, cuda, rocm, d1, d2, depth, conventional,
+random-access, negative, interference, all).
 
 ## Non-claims
 
-See [docs/NON_CLAIMS.md](docs/NON_CLAIMS.md). Notably: no performance number
-exists yet — [docs/PERFORMANCE.md](docs/PERFORMANCE.md) says exactly
-`NOT YET MEASURED`. This repository is hostile to self-deception by design.
+See
+[NON_CLAIMS.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/NON_CLAIMS.md)
+(repository-only). Notably: no *flagship* performance figure exists yet —
+fixture-level Phase F measurements exist and are labeled as such in
+[PERFORMANCE.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/PERFORMANCE.md);
+no real-time/deadline claim is made before the Phase M courts. This
+repository is hostile to self-deception by design.
 
 ## License
 

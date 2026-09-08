@@ -39,12 +39,20 @@ pub struct MemInfo {
 }
 
 /// Snapshot of the machine + toolchain a receipt was produced on.
+///
+/// Canonicalism note: new optional fields are appended at the *end* and
+/// serialized only when present, so archived receipts (created before a field
+/// existed) still parse and re-verify byte-identically.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
 pub struct Environment {
     pub os: OsInfo,
     pub cpu: CpuInfo,
     pub memory: MemInfo,
     pub git_commit: Option<String>,
+    /// Source-tree dirty state. Receipt-output writes (`receipts/`) are
+    /// excluded from this computation: writing evidence must never by itself
+    /// mark the very tree it attests as dirty.
     pub git_dirty: Option<bool>,
     pub git_branch: Option<String>,
     pub rustc_version: Option<String>,
@@ -55,6 +63,12 @@ pub struct Environment {
     pub cpu_governor: Option<String>,
     /// DMI BIOS version, if readable.
     pub bios_version: Option<String>,
+    /// SHA-256-class content hash of the *committed* source tree
+    /// (`git rev-parse HEAD^{tree}`): an immutable anchor that is meaningful
+    /// even when the work tree is dirty (the commit the tree hash names is
+    /// stable regardless of uncommitted changes).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub git_tree_sha: Option<String>,
 }
 
 fn read_first_line(path: &str) -> Option<String> {
@@ -163,13 +177,37 @@ fn git(args: &[&str]) -> Option<String> {
     }
 }
 
+/// `git status --porcelain` limited to tracked-source dirtiness.
+///
+/// The `receipts/` output directory is excluded by pathspec so that writing
+/// evidence (immutable, `create_new`) never by itself marks the attested tree
+/// dirty. Any other uncommitted source/untracked change still does.
+fn git_source_dirty() -> Option<bool> {
+    let out = Command::new("git")
+        .args([
+            "status",
+            "--porcelain",
+            "--untracked-files=all",
+            "--",
+            ".",
+            ":(exclude)receipts",
+        ])
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let s = String::from_utf8(out.stdout).ok()?;
+    Some(!s.trim().is_empty())
+}
+
 impl Environment {
     /// Capture the current machine/toolchain snapshot.
     pub fn capture() -> Self {
         let os = OsInfo::capture();
         let cpu = CpuInfo::capture();
         let memory = MemInfo::capture();
-        let dirty = git(&["status", "--porcelain"]).map(|s| !s.is_empty());
+        let dirty = git_source_dirty();
         let gov = read_first_line("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor");
         let bios = read_first_line("/sys/class/dmi/id/bios_version");
         Self {
@@ -185,6 +223,7 @@ impl Environment {
             os,
             cpu,
             memory,
+            git_tree_sha: git(&["rev-parse", "HEAD^{tree}"]),
         }
     }
 

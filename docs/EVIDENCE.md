@@ -54,6 +54,14 @@ xruns, energy method, result, limitations.
 changes. Each receipt self-verifies (`receipt show <file>` recomputes the
 canonical-JSON self-hash).
 
+**Source anchors.** Each receipt records the git commit SHA, the committed
+source-tree hash (`git rev-parse HEAD^{tree}` — a content anchor that stays
+meaningful even when the work tree is dirty), and a source dirty flag. The
+dirty computation excludes `receipts/` by pathspec: writing evidence must
+never, by itself, mark the very tree it attests as dirty. Uncommitted source
+changes still do. New optional environment fields are appended and omitted
+when absent, so archived receipts continue to re-verify byte-identically.
+
 ## Measurement boundary (PCM/sample-domain exposure)
 
 Counted as sample-domain exposure (independently addressable storage):

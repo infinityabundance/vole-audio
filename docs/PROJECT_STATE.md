@@ -94,7 +94,10 @@ Delivered:
   functional world (voices = spawn records), validated timeline assembly.
 - `sampler/resampler.rs` — frozen 64×1024 polyphase FIR: asset
   `assets/u1/resampler_bh64_p1024_q15.bin`, exact-DC rows, measured
-  passband ripple ≤ 1.5e-4 / stopband ≥ 210 dB, hash pinned.
+  passband deviation ≤ 1.1e-3 (frozen Q15 table, all 1024 rows; DTFT) with
+  the continuous-design prototype (analog, pre-quantization) measured
+  separately (ripple 8.3e-5, stopband ≈ 210 dB — a prototype property only;
+  the critically sampled rows have no digital stopband), hash pinned.
 - `eval/scalar.rs` — the scalar oracle (semantic authority).
 - `court semantic` — first executable court: repeated-hash, chunked ==
   contiguous, seek == sequential, hostile-note-off rejection; emits immutable
@@ -240,6 +243,37 @@ Measured (Phase F fixture-level; method in docs/PERFORMANCE.md): AVX-512
 kernels 2.0–5.3× faster than the planned scalar floor (literal-interp 256v
 2.9×; noise 512v 5.3×; wavetable 256v 2.6×; osc/env churn 2.0×); AVX2
 1.1–2.8×; partial-bank class 1.0× (exact shared scalar path, documented).
+
+### Phase F seal amendments (evidence-chain hardening)
+
+Applied right after the phase commit, before Phase G:
+
+- **Receipt anchors**: receipts now record the committed source-tree hash
+  (`git rev-parse HEAD^{tree}`) alongside the commit SHA, and the source
+  dirty flag excludes `receipts/` writes by pathspec — writing evidence never
+  marks the attested tree dirty by itself. Optional fields are appended and
+  omitted when absent, so archived receipts still self-verify
+  byte-identically. Seal receipts are produced on a clean committed tree
+  (commit SHA + tree hash + `git_dirty: false`).
+- **MSRV**: `rust-version = "1.89"` in Cargo.toml, verified by running the
+  full suite (175 tests, incl. the AVX-512 kernels that need
+  `stdarch_x86_avx512`, stabilized in 1.89) on 1.89.0 and on stable 1.98.0.
+  Host builds are stable-only; the pinned nightly is used for device/GPU
+  artifact cross-compilation only (README documents the split).
+- **Resampler wording corrected**: the frozen 64×1024 Q15 table's response is
+  now measured and reported separately from the continuous pre-quantization
+  prototype. The rows are critically sampled (cutoff == source Nyquist), so
+  they have **no digital stopband** — the earlier "stopband ≥ 210 dB" figure
+  described the analog prototype only. Honest frozen-table figures (DTFT over
+  all 1024 rows): worst passband deviation `max |H−1| = 1.1e-3` (edge
+  F = 0.45) and the identical worst deviation in the beyond-Nyquist image
+  band (exact mirror); coefficient quantization is quoted as amplitude
+  error, never as a stopband figure. Enforced by
+  `quantized_table_response_bounds`; prototype numbers are labeled as
+  design-only in U1_SPEC.
+- Test count at seal: 175 green (debug + release), clippy `-D warnings`
+  clean, `fmt` clean, `no_std` host + `nvptx64-nvidia-cuda` device builds
+  clean.
 
 ## Known blockers
 

@@ -169,12 +169,24 @@ order, or allocation order.
     so DC gain is exactly 1.0 in Q15 arithmetic: constant input reproduces
     itself through every phase.
   * SHA-256: `3b3015a81b9da1298b532127e72309f7dd1afdbf817628dbcabd8fe958438750`
-  * Measured (frozen kernel family, host test `measure_response`):
-    continuous-kernel passband ripple `max |H-1| = 8.3e-5` (0.0007 dB) for
-    F ≤ 0.45; worst sampled-row passband deviation ≤ `1.5e-4`; stopband
-    attenuation ≥ 210 dB for F ∈ [0.5625, 1] (numerically; window sidelobe
-    floor ≈ −92 dB near the transition at F = 0.5). Table footprint 128 KiB;
-    cost 64 multiply-adds per output sample.
+  * Measured (host tests `measure_response` / `quantized_table_response_bounds`;
+    the two figures are deliberately separate):
+    - **Continuous design (analog prototype only)**: passband ripple
+      `max |H-1| = 8.3e-5` (0.0007 dB) for F ≤ 0.45; stopband attenuation
+      ≥ 210 dB for F ∈ [0.5625, 1] — window-sidelobe numerics of the
+      *pre-quantization* kernel. This is a prototype property (relevant to
+      image rejection when the kernel is used for oversampling), not a
+      property of the quantized table.
+    - **Frozen Q15 table (the arithmetic the evaluator runs)**: DTFT of all
+      1024 quantized rows; worst passband deviation `max |H-1| = 1.1e-3`
+      (0.0095 dB) for F ≤ 0.45 (edge-dominated at F = 0.45), and the same
+      worst deviation in the beyond-Nyquist image band F ∈ [0.55, 0.95]
+      (exact mirror of the passband). The rows are critically sampled
+      (cutoff == source Nyquist), so **no digital stopband exists**: the
+      beyond-Nyquist response is the periodic passband image, and
+      coefficient quantization is therefore quoted as amplitude error
+      (≤ 1.1e-3), never as a stopband figure.
+  * Table footprint 128 KiB; cost 64 multiply-adds per output sample.
   * The resampler is a **fractional-coordinate interpolator** (not a
     ratio-adaptive decimator); object reads default to the linear path and
     the polyphase path is an explicit quality transform.
