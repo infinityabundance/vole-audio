@@ -62,14 +62,18 @@ backends disagree.
 Rows stay visible as backends arrive: `rocm` joins with its phase, and every
 row must pass there too. `cuda` is live since Phase G: `court cuda` re-runs
 every windowed fact (F01–F14) on the device surface before reporting
-`SUPPORTED` (F15 is authority-level and surface-independent).
+`SUPPORTED` (F15 is authority-level and surface-independent). The ROCm
+surface is built in Phase I (thin amdgcn kernels over the same shared no_std
+semantics) but the matrix row is enforced only when ROCm hardware executes
+the battery (Phase J) — the same rule as CUDA, never a weaker one.
 
 ```text
                     scalar   simd/scalar   simd/avx2   simd/avx512   cuda   rocm*
 semantic fact         ✓          ✓            ✓            ✓          ✓      —
 reference hash        ✓          ✓            ✓            ✓          ✓      —
 random differential   —          ✓            ✓            ✓          ✓      —
-                      (*: ROCm arrives with its phase; rows stay visible)
+                      (*: ROCm surface built in Phase I; row enforced when
+                          ROCm hardware runs the battery (Phase J))
 ```
 
 `court facts` verdict is `SUPPORTED` only when every fact passes on every
@@ -113,5 +117,10 @@ integer derivations, not float approximations.
   fact world, renders every window on the device, and compares to the same
   first-principles expectations — a fact must pass on the device surface
   before that backend reports `SUPPORTED`.
-- When ROCm (Phase I) lands, extend the matrix the same way: every fact row
-  must pass on the device surface before that backend reports `SUPPORTED`.
+- Phase I (ROCm) ships the AMD surface build (thin `amdgcn_entry` kernels
+  over the same shared no_std semantics, `scripts/build-rocm-device.sh`) and
+  the presence probe; the ROCm matrix column stays visible-but-pending and
+  is enforced exactly like CUDA when ROCm hardware executes the battery
+  (Phase J): every fact row must pass on the device surface before that
+  backend reports `SUPPORTED`. Until then `court rocm` records
+  hardware-unavailable evidence and never a device result.

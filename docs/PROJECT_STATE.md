@@ -744,6 +744,38 @@ at `-C debuginfo=0`) and drops the matching `debug` target flag.
 Seal: see the ledger in `docs/PHASE_H2.md` and `receipts/` (immutable
 receipts under `receipts/<court>/`; negative rows preserved).
 
+### Phase I — ROCm (complete)
+
+Charter + seal ledger: `docs/PHASE_I.md`. Scope is the contract's own
+statement — **ROCm (hardware-unavailable evidence + clean amdgcn build)** —
+executed to the same evidence standard as every earlier phase.
+
+- `device/amdgcn_entry.rs` (was an empty placeholder): three
+  `extern "gpu-kernel"` entries mirroring the NVPTX surface exactly —
+  `vole_render_d0`, `vole_entropy_decode`, `vole_upmix_mono_dup` — thin
+  wrappers over the same `device::kernel_shared` / `device::entropy_shared`
+  no_std semantics; AMDGCN intrinsics (`workitem_id_x`, `workgroup_id_x`,
+  `feature(stdarch_amdgpu)`) with launch geometry passed as kernel
+  parameters (AMD exposes no workgroup-count/size intrinsic).
+- `scripts/build-rocm-device.sh` (was `NOT_IMPLEMENTED`): clean code-object
+  build on the pinned nightly — rustup ships no prebuilt amdgcn std, so
+  core is built from source (`-Z build-std=core`, rust-src component); the
+  amdgcn cdylib link ICEs in fat-LTO with incremental (documented;
+  `CARGO_INCREMENTAL=0`), and cargo's `--config` cannot override a manifest
+  crate-type, so the code object is linked by direct rustc against the
+  build-std rlibs (mirrors the CUDA script's direct-rustc style). Artifact:
+  `scripts/out/vole_audio.amdgcn.elf` (ELF AMDGPU code object) + sha256 +
+  provenance sidecar; per-ISA (`-C target-cpu=$VOLE_ROCM_GFX`, baseline
+  gfx906) — code objects are not portable like PTX text.
+- `backend/rocm/` (`mod.rs`, `probe.rs`): filesystem/sysfs presence probe
+  (AMD display GPUs, KFD nodes, ROCm userspace sonames) with a pure,
+  unit-tested classifier. The launch/direct-path runtime is Phase J scope,
+  where ROCm hardware can validate it.
+- `court rocm` + `probe rocm`: typed evidence. On this host:
+  `UNSUPPORTED_BY_HARDWARE` (no AMD GPU in sysfs; no KFD; no ROCm
+  userspace). Full-stack classification is `INCONCLUSIVE` with the Phase-J
+  reason — never a manufactured device result.
+
 ## Known blockers
 
 - None for Phases F/G/H/H.2. ROCm hardware absent (evidence row only). The D1
@@ -754,12 +786,15 @@ receipts under `receipts/<court>/`; negative rows preserved).
 
 Phase H.2 is complete (entropy-native core: all ten H.2 courts SUPPORTED on
 this machine, aggregate `court h2` SUPPORTED; fused entropy->CUDA->D1 endpoint
-path sealed). Next:
+path sealed). Phase I (ROCm) is complete: clean amdgcn code-object build +
+`backend/rocm` probe + `court rocm`/`probe rocm` hardware-unavailable evidence
+(no AMD GPU / KFD / ROCm userspace on this host). Next:
 
-1. Phase I — ROCm (hardware-unavailable evidence + clean amdgcn build).
-2. Phase J — ROCm D1.
-3. Phase K — inverse compiler (H.2 is its storage-cost oracle); Phase L — GPU
+1. Phase J — ROCm D1 (differential scalar == ROCm battery + the endpoint
+   experiment on ROCm hardware; validates the Phase I code object's
+   loadability).
+2. Phase K — inverse compiler (H.2 is its storage-cost oracle); Phase L — GPU
    inverse search;
-4. Phase M — production depth/courts/corpus; Phase N — transport/archive
+3. Phase M — production depth/courts/corpus; Phase N — transport/archive
    (embeds H.2 canonical records); Phase O — learned deterministic prediction
    addendum (judged by the H.2 complete-cost API).

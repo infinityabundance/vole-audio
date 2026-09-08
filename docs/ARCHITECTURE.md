@@ -16,7 +16,7 @@ The arithmetic-heavy semantics live in modules that compile unchanged for:
 | scalar reference (host)  | `x86_64-unknown-linux-gnu`     | `cargo build` (default `std`)                 |
 | SIMD (host)              | same, runtime-dispatched       | `cargo build --features std`                  |
 | NVIDIA device            | `nvptx64-nvidia-cuda`          | `scripts/build-cuda-device.sh` (`no_std`)     |
-| AMD device               | `amdgcn-amd-amdhsa`            | `scripts/build-rocm-device.sh` (`no_std`)     |
+| AMD device               | `amdgcn-amd-amdhsa`            | `scripts/build-rocm-device.sh` (`no_std`, build-std=core)     |
 
 Rule: **semantic duplication is forbidden; only tiny target entry points
 differ.** The scalar evaluator owns semantic authority. Every other surface is
@@ -40,10 +40,12 @@ supported features, and every backend's observation is compared by hash.
   because mixing is order-independent i64 accumulation with one final
   saturation).
 - `device/` — GPU ABI: `kernel_shared` (descriptors + layout shared with
-  host), `nvptx_entry`, `amdgcn_entry` (thin kernels only).
+  host), `nvptx_entry`, `amdgcn_entry` (thin kernels only; AMDGCN entry
+  lands in Phase I, geometry passed as kernel parameters).
 - `backend/` — host runtimes: `cuda/` (Driver API via audited FFI + dlopen),
-  `rocm/` (HIP/HSA via audited FFI + dlopen). Probes, memory, streams,
-  graphs, direct paths.
+  `rocm/` (Phase I: filesystem/sysfs presence probe + artifact contract;
+  the HIP/HSA launch runtime is Phase J, where ROCm hardware validates it).
+  Probes, memory, streams, graphs, direct paths.
 - `audio/` — ALSA endpoint (mmap discipline), endpoint clock, directness
   (D0..D3), topology. `directness.rs` and `topology.rs` are pure vocabulary;
   the endpoint implementation is deliberately separate.

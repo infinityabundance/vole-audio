@@ -91,9 +91,9 @@ src/
   entropy/            native rANS + models + pages + residual coding + corpus
                       + EmbeddedStore + DSFB observer       (Phase H.2)
   device/             flat kernel semantics (no_std); nvptx entry live (G);
-                      amdgcn entry (Phase I)
-  backend/            flatten (G); cuda/ host runtime live (G); rocm/ (I);
-                      entropy_flat (H.2) host flat-job builder
+                      amdgcn entry live (I; code object per gfx target)
+  backend/            flatten (G); cuda/ host runtime live (G); rocm/ probe
+                      + artifact (I); entropy_flat (H.2) host flat-job builder
   audio/              ALSA endpoint, directness, topology   (Phase H+)
   format/             canonical archive + WAV ingest        (Phase E)
   inverse/            bounded inverse-proceduralization     (Phase K+)
@@ -117,17 +117,22 @@ scripts/              device build + court drivers (repo only)
 
 ## Current status
 
-Phases A–H.2 are complete: A–E the exact representation model on the scalar
+Phases A–I are complete: A–E the exact representation model on the scalar
 oracle, F the honest SIMD baseline (scalar == AVX2 == AVX-512), G the CUDA D0
 buffered-diagnostic backend (scalar == SIMD == CUDA bit-for-bit; semantic
 facts F01–F14 verified on the device; F15 is authority-level and
 surface-independent), H the CUDA D1 falsification court
 against the real ALSA `hw:` mmap endpoint (the first direct-endpoint
-evidence), and H.2 the entropy-native core — a deterministic native rANS
+evidence), H.2 the entropy-native core — a deterministic native rANS
 codec with canonical models, block-addressable pages and mandatory RAW
 fallback; literal + exact-residual entropy representations; optional
-EntropyFS persistence and DSFB search governance; CUDA entropy decode; and
-the flagship **fused entropy -> CUDA -> D1 endpoint** court. Executable
+EntropyFS persistence and DSFB search governance; CUDA entropy decode; the
+flagship **fused entropy -> CUDA -> D1 endpoint** court — and I the ROCm
+device surface: a clean `amdgcn-amd-amdhsa` code-object build
+(`scripts/build-rocm-device.sh`, thin kernels over the same shared no_std
+semantics) plus the `backend::rocm` presence probe and `court rocm` /
+`probe rocm` evidence (hardware-unavailable on this host; the differential
+scalar == ROCm battery is Phase J on ROCm hardware). Executable
 evidence today:
 
 - `cargo run -- court semantic` — scalar oracle determinism battery
@@ -187,6 +192,14 @@ evidence today:
   32 768 B host copies (literal) and 16 384 B + 32 768 B (residual) with
   zero xruns and byte-exact ring codes; verification is separately
   accounted. `court h2` runs the whole H.2 battery as an aggregate.
+  `court rocm` (Phase I) records the ROCm/AMD evidence: presence probe
+  (AMD GPUs from the sysfs PCI walk, KFD nodes, ROCm userspace sonames) plus
+  the clean `amdgcn` code-object artifact state built by
+  `scripts/build-rocm-device.sh` — hardware-unavailable evidence on this
+  host (`UNSUPPORTED_BY_HARDWARE` with the typed cause); no kernel is
+  executed by the Phase I court, and the differential scalar == ROCm battery
+  is Phase J on ROCm hardware. `vole-audio probe rocm` prints the same
+  classification.
 
 The exact ledger — completed phases, evidence, blockers, and the next work
 item — is

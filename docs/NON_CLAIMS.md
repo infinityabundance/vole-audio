@@ -73,6 +73,13 @@ assertion.
     receipt is per-device/per-driver; transient page-local sample state,
     endpoint ring samples, and FIFO/DMA state always exist and are counted
     under their own surfaces.
+22. **Phase I (ROCm) executes kernels / the amdgcn artifact is loadable.**
+    No: this host has no AMD GPU, no KFD, and no ROCm userspace. The Phase I
+    `amdgcn` code object (`scripts/out/vole_audio.amdgcn.elf`) is compile
+    evidence only; it is per-ISA (baseline gfx906) and its loadability on a
+    real device is Phase J evidence, never assumed. `court rocm` never
+    reports device `SUPPORTED`; the scalar == ROCm differential battery is
+    Phase J on ROCm hardware.
 
 Anything in this list that later gains evidence moves into a claims document
 with its receipt. Until then: **not claimed.**
