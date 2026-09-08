@@ -488,12 +488,16 @@ device pointer, and successful direct kernel writes are the evidence (no
 pointer-attribute value is claimed).
 - **The bytes D1 removes, measured on equal frame counts**: the D0-mmap
 baseline on the same endpoint (48 000 frames, the same window as the D1
-session) moved 384 000 B device→host + 768 000 B host copies (the internal
-staging copy and the host buffer→region copy, both counted); the D1 path
-moved **0 B** device→host and **0 B** host copies while writing the same
-window into the endpoint region (`endpoint_observation_bytes` = 384 000 B).
-Top-level receipt counters describe the verdict-bearing D1 path; the D0
-baseline and an `experiment_aggregate` are separate named surfaces.
+session) uses the stronger `render_into` path — the DtoH transfer lands
+directly in one host buffer (no internal staging copy) and is copied once
+into the endpoint region: 384 000 B device→host + 384 000 B host copy; the
+D1 path moved **0 B** device→host and **0 B** host copies while writing the
+same window into the endpoint region (`endpoint_observation_bytes` =
+384 000 B). Top-level receipt counters describe the verdict-bearing D1
+path; the D0 baseline and an `experiment_aggregate` are separate named
+surfaces. Measured per-chunk wall (same court): D0 mean ≈ 0.2 ms, D1 mean
+≈ 0.5 ms — D1 is a directness/traffic result, not a latency optimization;
+Phase M owns the crossover question.
 - Every candidate device gets its own trial row: after the D1 session,
 remaining endpoints are probed for open/mmap/format/registration
 (`playback_attempted: false`). In the sealed receipt the other HDA rings
@@ -528,10 +532,16 @@ quanta, 94 launches, 384 000 endpoint-observation bytes) instead of the D0
 baseline; the baseline and an explicit `experiment_aggregate` are separate
 named surfaces.
 3. **D0 and D1 run the same 48 000-frame window**, so the byte comparison
-is direct (D0: 384 000 B DtoH + 768 000 B host copies vs D1: 0 B / 0 B).
-4. **D0 host-copy accounting counts both real copies** (the internal
-staging→buffer copy instrumented in `KernelWorld` and the court's
-buffer→region copy).
+is direct. The D0 baseline uses `KernelWorld::render_into` (DtoH lands
+directly in one host buffer, then one buffer→region copy): D0 = 384 000 B
+DtoH + 384 000 B host copy vs D1 = 0 B / 0 B. (An earlier amendment counted
+two host copies against the old staging-path baseline; switching the
+baseline to the stronger single-copy form is what makes any later D1
+latency claim harder to attack.)
+4. **D0 host-copy accounting counted both real copies of the then-current
+path** (the internal staging→buffer copy instrumented in `KernelWorld` and
+the court's buffer→region copy). Superseded by the stronger `render_into`
+baseline in the second amendment (single DtoH destination, one host copy).
 5. **Verification is copy-free and named**: the D1 verifier compares the
 mapped endpoint region against the oracle slice in place — no shadow
 sample buffer — and receipts split `verification_host_read_bytes` /
@@ -555,6 +565,49 @@ is checked (shared `addr`, `first == ch*32`, `step == channels*32` bits)
 before the simplified `base + offset * frame_bytes` arithmetic is used;
 receipts record the per-channel layout (`ch0 first=0 step=64; ch1
 first=32 step=64` on the sealed ALC897 ring).
+
+### Phase H second review amendment (external review, before reseal)
+
+The follow-up review confirmed the D1 result and the equal-work accounting,
+and found seven further fixes, all applied:
+
+1. **Structural teardown order (must-fix)**: the D1 session now binds the
+`HostRegistration` and the `KernelWorld` (which owns the CUDA context) in
+one `DirectSession` struct whose field order is the lifetime contract —
+Rust drops fields in declaration order, so `cuMemHostUnregister` always
+runs before context teardown. The earlier `drop(kw); drop(r)` ordering
+destroyed the context before the unregister. The `open_with` error path
+re-establishes a context before unregistering.
+2. **Top-level depth extremes**: the receipt counters now carry the session's
+recorded min and max endpoint depth (512..1024), not a single
+`observe_endpoint_depth(max)` call that collapsed both to 1024.
+3. **D0 residency measured as a peak**: the host materialization buffer is
+reported at its peak allocated capacity (4 096 B), not the trailing short
+chunk's length; the KernelWorld D0 diagnostic staging (unused on the
+measured paths) is disclosed in the receipt limitations rather than
+miscounted.
+4. **Probe rows retain `RegisterRange`**: the post-success capability-probe
+trials now record exact base/length/page alignment.
+5. **Short commits are xrun-class**: a nonnegative-but-short
+`snd_pcm_mmap_commit` increments `xruns` (explicit discontinuity) and
+carries the exact requested/transferred counts; `AlsaFailure::is_xrun_class`
+and the session expected-slice derivation from the committed media position
+keep recovery deterministic.
+6. **Geometry re-proved on every `mmap_begin`**: each chunk must still refer
+to the same registered interleaved ring (shared addr + per-channel
+first/step), not just the initial mapping.
+7. **Stronger D0 baseline**: the D0-mmap baseline uses `render_into` — the
+DtoH transfer lands directly in one host buffer (no internal staging copy)
+followed by one buffer→region copy — so the comparison D0: 384 000 B DtoH
++ 384 000 B host copy vs D1: 0 B / 0 B is the harder-to-attack form. The
+court also surfaced a genuinely useful tradeoff: D1 eliminates intermediate
+sample movement but mapped-host GPU stores are slower than VRAM renders in
+this 512-frame court (D1 mean chunk wall ≈ 0.5 ms vs D0 ≈ 0.2 ms). D1 is a
+directness/residency/traffic result; latency crossover belongs to Phase M.
+
+Test count now 200 green (debug + release; +1 xrun-class detection), clippy
+`-D warnings` clean, `fmt` clean, `no_std` lib check clean, MSRV 1.89
+verified.
 
 ## Known blockers
 

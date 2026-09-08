@@ -153,6 +153,14 @@ impl AlsaFailure {
             message: message.into(),
         }
     }
+
+    /// True for xrun-class conditions: an explicit `-EPIPE` rc or a short
+    /// `snd_pcm_mmap_commit` (a nonnegative transfer count that is less than
+    /// the requested frames — ALSA's documented xrun-class event, produced by
+    /// `mmap_commit` with `rc: None`). Sessions count these as discontinuities.
+    pub fn is_xrun_class(&self) -> bool {
+        self.rc == Some(-libc::EPIPE) || self.message.starts_with("short mmap_commit")
+    }
 }
 
 impl std::fmt::Display for AlsaFailure {
@@ -522,6 +530,43 @@ impl AlsaPcm {
                 Some(rc),
                 format!("mmap_begin returned invalid region (frames {frames}, want {want})"),
             ));
+        }
+        // Re-prove the channel-area geometry on EVERY begin: each chunk must
+        // still refer to the same registered interleaved ring (shared addr,
+        // first == ch*32, step == channels*32) rather than relying on driver
+        // stability across the session.
+        // SAFETY: the area array has one entry per channel (interleaved).
+        let areas = unsafe { std::slice::from_raw_parts(area_ptr, self.request.channels as usize) };
+        let base = areas[0].addr as usize;
+        if self.area_layout.len() != self.request.channels as usize
+            || self.area_layout.len() != areas.len()
+        {
+            return Err(AlsaFailure::new(
+                "mmap_geometry",
+                None,
+                "area array length changed since open".to_string(),
+            ));
+        }
+        for (c, area) in areas.iter().enumerate() {
+            let (expect_first, expect_step) =
+                expected_interleaved_first_step(c as u32, self.request.channels);
+            let (open_first, open_step) = self.area_layout[c];
+            if area.addr as usize != base
+                || area.first != expect_first
+                || area.step != expect_step
+                || area.first != open_first
+                || area.step != open_step
+            {
+                return Err(AlsaFailure::new(
+                    "mmap_geometry",
+                    None,
+                    format!(
+                        "channel {c} geometry changed since open (addr 0x{:x} first {} step {}; \
+                         expected first {expect_first} step {expect_step})",
+                        area.addr as usize, area.first, area.step
+                    ),
+                ));
+            }
         }
         Ok((offset as u64, frames as u64))
     }
@@ -1000,5 +1045,22 @@ mod tests {
         assert_eq!(expected_interleaved_first_step(0, 1), (0, 32));
         // Stereo frame = 64 bits; step scales with channel count.
         assert_eq!(expected_interleaved_first_step(3, 8), (96, 256));
+    }
+
+    #[test]
+    fn xrun_class_detection_covers_short_commits() {
+        // -EPIPE underrun.
+        assert!(AlsaFailure::new("run", Some(-libc::EPIPE), "xrun").is_xrun_class());
+        // Short (nonnegative-but-less) mmap_commit: rc None, marked message.
+        assert!(AlsaFailure::new(
+            "run",
+            None,
+            "short mmap_commit: requested 512 frames, driver transferred 128 frames (xrun-class \
+             event; explicit discontinuity recorded)"
+        )
+        .is_xrun_class());
+        // Ordinary failures are not xrun-class.
+        assert!(!AlsaFailure::new("open", Some(-libc::EBUSY), "busy").is_xrun_class());
+        assert!(!AlsaFailure::new("run", None, "mmap_begin failed").is_xrun_class());
     }
 }

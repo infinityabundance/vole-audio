@@ -88,18 +88,23 @@ content is silence-safe; `--emit-audio` opts into audible content.
 Measured on the seal machine (RTX 4080 SUPER, driver 610.57.04, on-board
 `ALC897` analog via `snd_hda_intel`). Both paths run the SAME 48 000-frame
 window; materialization traffic and verification reads are separate named
-surfaces:
+surfaces. The D0 baseline uses the stronger `render_into` form (the DtoH
+transfer lands directly in one host buffer — no internal staging copy — then
+one buffer→region copy):
 
 ```text
-D0-mmap baseline (48 000 frames):  dtoh 384 000 B | host copies 768 000 B | endpoint obs 384 000 B
-D1-direct        (48 000 frames):  dtoh       0 B | host copies       0 B | endpoint obs 384 000 B
+D0-mmap baseline (48 000 frames):  dtoh 384 000 B | host copy 384 000 B | endpoint obs 384 000 B
+D1-direct        (48 000 frames):  dtoh       0 B | host copy       0 B | endpoint obs 384 000 B
 ```
 
-D0's 768 000 B of host copies are the two real copies in that path (the
-instrumented internal staging→buffer copy plus the host buffer→region copy).
 Verification reads (comparing already-written samples against the oracle) are
 counted separately and are 0-shadow-copy: the D1 verifier compares the
-mapped region in place, never building a shadow sample buffer.
+mapped region in place, never building a shadow sample buffer. Measured
+per-chunk wall on this court: D0 mean ≈ 0.2 ms vs D1 mean ≈ 0.5 ms — D1
+eliminates intermediate sample movement but mapped-host GPU stores are
+slower than VRAM renders here; this court is therefore a
+directness/residency/traffic result, not a latency optimization. Phase M
+owns the workload crossover question.
 
 D1 verdict **SUPPORTED** (`D1_ENDPOINT_MAPPED` / `HOST_MAPPED`): the GPU
 wrote 94 chunks byte-exact vs the scalar oracle with zero xruns, an exact

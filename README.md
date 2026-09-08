@@ -122,7 +122,8 @@ see the summary below). Executable evidence today:
   exact transferred-frame check), and compare against a D0-mmap baseline
   that runs the **same 48 000-frame window** on the same endpoint shape —
   measuring the exact materialization bytes D1 removes (D0: 384 KB DtoH +
-  768 KB host copies; D1: 0 B / 0 B). Verification reads are a separately
+  384 KB host copy; D1: 0 B / 0 B — D1 is a directness/traffic result, not
+  a latency claim, in this court). Verification reads are a separately
   named surface. Default content is silence-safe; `--emit-audio` opts into
   an audible demo. Every candidate endpoint gets its own trial row (the
   first registered device runs the session; the rest are probed for

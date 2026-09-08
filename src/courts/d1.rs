@@ -77,7 +77,7 @@ mod linux {
         HostRegistration, PointerEvidence, RegisterRange, RegistrationAttempt, host_page_size,
     };
     use crate::backend::cuda::driver::Cuda;
-    use crate::backend::cuda::kernel::{KernelWorld, Strategy};
+    use crate::backend::cuda::kernel::KernelWorld;
     use crate::backend::cuda::probe::CudaProbe;
     use crate::backend::flatten::flatten;
     use crate::eval::ScalarOracle;
@@ -513,7 +513,12 @@ mod linux {
             }
         }
 
-        fn probe(dev: &EndpointInfo, pcm: &AlsaPcm, reg: &RegistrationAttempt) -> DeviceTrial {
+        fn probe(
+            dev: &EndpointInfo,
+            pcm: &AlsaPcm,
+            reg: &RegistrationAttempt,
+            range: RegisterRange,
+        ) -> DeviceTrial {
             let mut t = DeviceTrial {
                 device: dev.clone(),
                 opened: true,
@@ -524,7 +529,7 @@ mod linux {
                 registration_message: None,
                 registered: false,
                 missing_symbol: None,
-                range: None,
+                range: Some(range),
                 device_pointer: None,
                 pointer_evidence: None,
                 class: Verdict::Inconclusive,
@@ -597,7 +602,6 @@ mod linux {
         let mut shadow_exact = true;
         let mut detail: Option<String> = None;
         let mut drain_state: Option<String> = None;
-        let mut expected_pos = 0usize;
         let mut stalls = 0u32;
         let mut started = false;
         while frames_committed < total {
@@ -658,9 +662,12 @@ mod linux {
                 detail = Some("mmap_begin returned 0 frames".into());
                 break;
             }
+            // The expected slice is derived from the media position actually
+            // written (`frames_committed`), so a failed commit (xrun/short)
+            // that does not advance the position cannot desync later chunks.
             let chunk_codes = (frames * channels) as usize;
-            let expect = &expected[expected_pos..expected_pos + chunk_codes];
-            expected_pos += chunk_codes;
+            let base = (frames_committed * channels) as usize;
+            let expect = &expected[base..base + chunk_codes];
             let t0 = Instant::now();
             if let Err(e) = writer(frames_committed as i64, offset, frames, expect) {
                 shadow_exact = false;
@@ -670,14 +677,17 @@ mod linux {
             match pcm.mmap_commit(offset, frames) {
                 Ok(()) => wall.push(t0.elapsed().as_secs_f64() * 1e3),
                 Err(f) => {
-                    if f.rc == Some(-libc::EPIPE) {
+                    if f.is_xrun_class() {
+                        // -EPIPE underrun or a short (nonnegative-but-less)
+                        // transfer: both are xrun-class discontinuities.
                         xruns += 1;
+                        if f.rc.is_none() {
+                            // A short commit carries the exact
+                            // requested/transferred counts.
+                            detail = Some(format!("xrun-class short commit: {f}"));
+                        }
                         let _ = pcm.recover(-libc::EPIPE);
                     } else {
-                        // Includes the exact short-commit check inside
-                        // mmap_commit: a nonnegative-but-short transfer is an
-                        // xrun-class event and aborts with the exact
-                        // requested/transferred counts in the detail.
                         detail = Some(format!("mmap_commit failed: {f}"));
                         break;
                     }
@@ -804,6 +814,16 @@ mod linux {
             _ => 3,
         };
         (kind, dev.pcm_name.clone())
+    }
+
+    /// Registration + kernel world bound together so teardown order cannot
+    /// regress: Rust drops struct fields in **declaration order**, so
+    /// `registration` (whose drop calls `cuMemHostUnregister`) always runs
+    /// before `world` (which owns the CUDA context, destroyed in its drop).
+    /// Do not reorder these fields.
+    struct DirectSession {
+        registration: HostRegistration,
+        world: KernelWorld,
     }
 
     // ---------------------------------------------------------------------
@@ -951,20 +971,21 @@ mod linux {
             let mut region_copy_bytes = 0u64;
             let mut verification_read_bytes = 0u64;
             let mut hostbuf: Vec<i32> = Vec::new();
-            let mut hostbuf_resident = 0u64;
+            // Peak residency of the host materialization buffer, measured as
+            // the allocated capacity (clear+resize keeps the allocation; a
+            // trailing short chunk must not shrink the reported resident
+            // bytes).
+            let mut hostbuf_resident_peak = 0u64;
             let out = run_session(&pcm, &expected, |start, offset, chunk_frames, expect| {
-                // D0 path: DtoH render into the host buffer, verify it against
-                // the oracle, then copy into the endpoint region.
+                // D0 path (strong baseline): the DtoH transfer lands DIRECTLY
+                // in the host buffer (render_into — no internal staging
+                // copy), it is verified against the oracle in place, then
+                // copied once into the endpoint region.
                 hostbuf.clear();
                 hostbuf.resize((chunk_frames * u64::from(CHANNELS)) as usize, 0);
-                hostbuf_resident = hostbuf.len() as u64 * 4;
-                kw.render(
-                    Strategy::Standard,
-                    start,
-                    chunk_frames as usize,
-                    &mut hostbuf,
-                )
-                .map_err(|e| e.to_string())?;
+                hostbuf_resident_peak = hostbuf_resident_peak.max(hostbuf.capacity() as u64 * 4);
+                kw.render_into(start, chunk_frames as usize, &mut hostbuf)
+                    .map_err(|e| e.to_string())?;
                 // Verification read: compare the DtoH buffer in place.
                 verification_read_bytes += chunk_frames * u64::from(CHANNELS) * 4;
                 if hostbuf != expect {
@@ -985,14 +1006,10 @@ mod linux {
                 copy_into_region(&pcm, offset, chunk_frames, &hostbuf).map_err(|e| e.to_string())
             });
             let launches = kw.counters.kernel_launches;
-            // Materialization traffic: the DtoH transfer and the internal
-            // host staging->buffer copy are instrumented inside KernelWorld;
-            // the host buffer->region copy is the one this court performs.
+            // Materialization traffic of this baseline: the DtoH transfer
+            // (render_into) plus this court's single host buffer->region copy.
             let mat_gpu_to_host = kw.counters.gpu_to_host_pcm_bytes;
-            let mat_host_copy = kw
-                .counters
-                .host_pcm_copy_bytes
-                .saturating_add(region_copy_bytes);
+            let mat_host_copy = region_copy_bytes;
             let d0 = finish_session(
                 "d0-mmap",
                 &pcm,
@@ -1001,7 +1018,7 @@ mod linux {
                 SessionTraffic {
                     mat_gpu_to_host,
                     mat_host_copy,
-                    mat_host_resident: hostbuf_resident,
+                    mat_host_resident: hostbuf_resident_peak,
                     endpoint_obs: region_copy_bytes,
                     verification_read: verification_read_bytes,
                     verification_shadow_copy: 0,
@@ -1095,8 +1112,14 @@ mod linux {
                     trial.class_detail = "registered the exact endpoint region (DEVICEMAP)".into();
                     trial.playback_attempted = true;
                     trials.push(trial);
-                    // Run the D1 session on this device.
-                    let mut kw = match KernelWorld::open_with(
+                    // Build the kernel world, then bind the registration and
+                    // the world together in one session object. Field order is
+                    // the lifetime contract: `registration` (which calls
+                    // cuMemHostUnregister on drop) is declared BEFORE `world`
+                    // (which owns the CUDA context), and Rust drops struct
+                    // fields in declaration order — so the unregister always
+                    // precedes context teardown.
+                    let kw = match KernelWorld::open_with(
                         cuda,
                         &ptx,
                         flat.clone(),
@@ -1109,46 +1132,58 @@ mod linux {
                                 last.class_detail =
                                     format!("registered but KernelWorld::open_with failed: {e}");
                             }
+                            // open_with consumed and destroyed the context on
+                            // error; re-establish one so the registration can
+                            // be unregistered against a live driver.
+                            let _ctx = Cuda::open(0);
                             drop(r);
                             drop(pcm);
                             continue;
                         }
                     };
-                    let dev_base = dev_ptr;
-                    let region_base = r.host_ptr as usize;
-                    let frame_bytes = pcm.request.frame_bytes();
-                    let mut verification_read_bytes = 0u64;
+                    let mut session = DirectSession {
+                        registration: r,
+                        world: kw,
+                    };
                     println!(
                         "court d1: D1 session on {} (registered 0x{:x}+{}; device ptr 0x{:x})",
                         dev.pcm_name, base, len, dev_ptr
                     );
+                    let region_base = session.registration.host_ptr as usize;
+                    let frame_bytes = pcm.request.frame_bytes();
+                    let mut verification_read_bytes = 0u64;
                     let out =
                         run_session(&pcm, &expected, |start, offset, chunk_frames, expect| {
-                            // Fused direct render: the kernel writes the final
-                            // codes into the registered region at the chunk
-                            // offset. No D0 block, no DtoH, no host copy.
-                            let chunk_dev = dev_base + offset * frame_bytes;
-                            kw.render_direct(start, chunk_frames as usize, chunk_dev)
+                            // Fused direct render: the kernel writes the
+                            // final codes into the registered region at the
+                            // chunk offset. No D0 block, no DtoH, no host
+                            // copy.
+                            let chunk_dev = dev_ptr + offset * frame_bytes;
+                            session
+                                .world
+                                .render_direct(start, chunk_frames as usize, chunk_dev)
                                 .map_err(|e| e.to_string())?;
-                            // In-place shadow verification: read the region (the
-                            // CUDA mapped-memory coherency contract makes the GPU
-                            // writes visible after cuStreamSynchronize inside
-                            // render_direct) and compare against the oracle slice
-                            // WITHOUT creating a shadow sample buffer.
+                            // In-place shadow verification: read the region
+                            // (the CUDA mapped-memory coherency contract makes
+                            // the GPU writes visible after
+                            // cuStreamSynchronize inside render_direct) and
+                            // compare against the oracle slice WITHOUT creating
+                            // a shadow sample buffer.
                             let bytes = chunk_frames * u64::from(CHANNELS) * 4;
                             verification_read_bytes += bytes;
                             region_matches(&pcm, region_base, offset, chunk_frames, expect)
                         });
-                    let launches = kw.counters.kernel_launches;
-                    let endpoint_obs = kw.counters.endpoint_observation_bytes;
+                    let w = &session.world;
+                    let launches = w.counters.kernel_launches;
+                    let endpoint_obs = w.counters.endpoint_observation_bytes;
                     let d1 = finish_session(
                         "d1-direct",
                         &pcm,
                         out,
                         &expected,
                         SessionTraffic {
-                            mat_gpu_to_host: kw.counters.gpu_to_host_pcm_bytes,
-                            mat_host_copy: kw.counters.host_pcm_copy_bytes,
+                            mat_gpu_to_host: w.counters.gpu_to_host_pcm_bytes,
+                            mat_host_copy: w.counters.host_pcm_copy_bytes,
                             mat_host_resident: 0, // no host materialization buffer
                             endpoint_obs,
                             verification_read: verification_read_bytes,
@@ -1158,8 +1193,9 @@ mod linux {
                     );
                     sessions.push(d1);
                     d1_session_device = Some(dev.pcm_name.clone());
-                    drop(kw);
-                    drop(r);
+                    // Teardown order is structural (session drops registration
+                    // before the context); the endpoint closes last.
+                    drop(session);
                     drop(pcm);
                     break 'd1;
                 }
@@ -1227,7 +1263,12 @@ mod linux {
                             len as usize,
                         )
                     };
-                    let trial = DeviceTrial::probe(dev, &pcm, &attempt);
+                    let trial = DeviceTrial::probe(
+                        dev,
+                        &pcm,
+                        &attempt,
+                        RegisterRange::analyze(base, len as usize, host_page_size()),
+                    );
                     drop(attempt);
                     drop(pcm);
                     trials.push(trial);
@@ -1277,7 +1318,11 @@ mod linux {
             counters.endpoint_observation_bytes = s.endpoint_observation_bytes;
             counters.kernel_launches = s.kernel_launches;
             counters.quanta_submitted = s.chunks;
-            counters.observe_endpoint_depth(s.depth_max_frames);
+            // Depth extremes come from the session's recorded min/max (a
+            // single observe() call would collapse both to the same value).
+            counters.endpoint_depth_frames = s.depth_max_frames;
+            counters.endpoint_depth_min_frames = s.depth_min_frames;
+            counters.endpoint_depth_max_frames = s.depth_max_frames;
         }
         // Experiment aggregate: an explicitly named third surface summing
         // both sessions' materialization/verification traffic.
@@ -1412,6 +1457,11 @@ mod linux {
             "silence-safe content (peak codes <= 2^16 ~ -80 dBFS); endpoint consumption is \
              proven by commit/avail/drain evidence, not by listening"
         });
+        builder.limitation(
+            "KernelWorld allocates the D0 diagnostic block (4 KiB VRAM + 4 KiB host staging \
+             mirror) for every session, including the D1 and render_into paths where it is \
+             unused; it is excluded from both sessions' materialization counters",
+        );
         let (env, path) = builder.finish_write(receipts_root)?;
 
         println!("court d1: {verdict}");

@@ -313,6 +313,44 @@ impl KernelWorld {
         Ok(())
     }
 
+    /// D0 render whose DtoH transfer lands **directly** in the caller's
+    /// buffer — no internal host staging copy (`out_bytes` is left unused).
+    /// This is the stronger conventional D0 baseline for endpoint
+    /// comparisons: the D0 VRAM block and the explicit DtoH materialization
+    /// still exist, but the avoidable host-to-host copy is removed. Counters:
+    /// `gpu_to_host_pcm_bytes` records the actual transfer; `host_pcm_copy_
+    /// bytes` is NOT incremented here (any further copy is the caller's,
+    /// e.g. the court's buffer→endpoint-region copy).
+    pub fn render_into(&mut self, start_frame: i64, frames: usize, out: &mut [i32]) -> Result<()> {
+        if frames > self.max_frames {
+            return Err(Error::limit("render frames exceed KernelWorld max"));
+        }
+        if out.len() != frames * usize::from(self.flat.output_channels) {
+            return Err(Error::malformed("output buffer length mismatch"));
+        }
+        self.push_state(start_frame, frames)?;
+        let channels = self.flat.output_channels;
+        let grid = grid_for(frames, channels);
+        let params = self.kernel_params();
+        self.function.launch(
+            grid,
+            (BLOCK_THREADS, 1, 1),
+            self.stream_standard.handle,
+            &params,
+        )?;
+        self.stream_standard.synchronize()?;
+        self.counters.kernel_launches += 1;
+        let want = out.len() * 4;
+        // SAFETY: `out` is a live i32 buffer; its bytes are a valid transfer
+        // destination of exactly `want` bytes.
+        let out_bytes =
+            unsafe { std::slice::from_raw_parts_mut(out.as_mut_ptr() as *mut u8, want) };
+        self.d_out.download_prefix(out_bytes)?;
+        self.counters.gpu_to_host_pcm_bytes += want as u64;
+        self.counters.quanta_submitted += 1;
+        Ok(())
+    }
+
     /// D1 fused render: the kernel writes the final interleaved i32 codes
     /// directly into `out_dev` — the device-visible pointer of a registered
     /// *endpoint* region — with no D0 observation block, no device->host
