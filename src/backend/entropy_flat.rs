@@ -731,4 +731,80 @@ mod tests {
             );
         }
     }
+
+    /// Shared `decode_stream` adversarial checks (RANS.md decode step 3):
+    /// the function the host flat path and the CUDA kernel both call must
+    /// reject trailing bytes (extended payload_len), truncations, and a
+    /// below-range initial state on real flat jobs — never silently accept
+    /// them as canonical.
+    #[test]
+    fn shared_decode_stream_rejects_noncanonical_streams() {
+        use crate::device::entropy_shared::{STREAM_RANS, decode_stream};
+        let samples = tone(2048, 2);
+        let descriptor =
+            ObjectDescriptor::new(Representation::Literal, 2048, Layout::Stereo, None).unwrap();
+        let rl = RepresentedLiteral::encode(
+            descriptor,
+            &samples,
+            512,
+            Symbolization::DeltaLane4,
+            ModelMode::Inline,
+            false,
+        )
+        .unwrap();
+        let job = flatten_literal_range(&rl, 0, 2048).unwrap();
+        // Locate a RANS stream inside a RANS page.
+        let mut found = None;
+        'pages: for p in &job.pages {
+            let sbegin = p.stream_off as usize;
+            for si in 0..p.stream_count as usize {
+                let st = &job.streams[sbegin + si];
+                if st.kind == STREAM_RANS && st.symbol_count > 0 {
+                    found = Some((*p, si));
+                    break 'pages;
+                }
+            }
+        }
+        let Some((page, si)) = found else {
+            panic!("no RANS stream in the literal job");
+        };
+        let mut scratch = vec![0u8; (page.scratch_off as usize + 4096).max(64)];
+        let mut st_ok =
+            |job: &FlatEntropyJob, st: &crate::device::entropy_shared::FlatStream| -> bool {
+                decode_stream(st, &job.payload, &job.model_set(), &mut scratch)
+            };
+        let st = job.streams[page.stream_off as usize + si];
+        // Canonical stream decodes.
+        assert!(st_ok(&job, &st), "canonical RANS stream must decode");
+        let sidx = page.stream_off as usize + si;
+        // Trailing bytes: extend payload_len so the stream bleeds into the
+        // next stream's bytes / past the payload arena — rejected.
+        for extra in 1..=4u32 {
+            let mut j = job.clone();
+            j.streams[sidx].payload_len = st.payload_len.saturating_add(extra);
+            assert!(
+                !st_ok(&j, &j.streams[sidx]),
+                "trailing {extra} bytes must be rejected"
+            );
+        }
+        // Truncation of the encoded payload — rejected.
+        for cut in 1..=4u32 {
+            if st.payload_len > cut {
+                let mut j = job.clone();
+                j.streams[sidx].payload_len = st.payload_len - cut;
+                assert!(
+                    !st_ok(&j, &j.streams[sidx]),
+                    "truncation by {cut} must be rejected"
+                );
+            }
+        }
+        // Below-range initial state — rejected at dec_init.
+        let mut j = job.clone();
+        let low = (crate::entropy::rans::STATE_L - 1).to_le_bytes();
+        j.payload[st.payload_off as usize..st.payload_off as usize + 4].copy_from_slice(&low);
+        assert!(
+            !st_ok(&j, &j.streams[sidx]),
+            "below-range initial state must be rejected"
+        );
+    }
 }

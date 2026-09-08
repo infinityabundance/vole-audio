@@ -18,7 +18,7 @@
 //! Every offset is bounds-checked against the actual slice lengths (hostile
 //! inputs yield `false`, never out-of-bounds access, never panic).
 
-use crate::entropy::rans::{FwdReader, SCALE_BITS, dec_advance, dec_init, dec_slot};
+use crate::entropy::rans::{FwdReader, SCALE_BITS, STATE_L, dec_advance, dec_init, dec_slot};
 use crate::entropy::transform;
 use crate::limits::{MAX_CHANNELS, MAX_ENTROPY_PAGE_FRAMES};
 
@@ -162,6 +162,14 @@ pub fn decode_stream(
                     return false;
                 }
                 dst[i] = value;
+            }
+            // Canonical terminal condition (RANS.md decode step 3): after the
+            // final symbol the state must be exactly RANS_STATE_L and the byte
+            // cursor exactly at the end of this stream's encoded payload.
+            // Trailing garbage, altered states, and truncations are rejected
+            // identically on host and device.
+            if state.0 != STATE_L || reader.bytes_consumed() != src.len() {
+                return false;
             }
             true
         }

@@ -376,6 +376,13 @@ pub fn encode_rans_stream(model: &SymbolModel, symbols: &[u8], scale_bits: u32) 
 
 /// rANS-decode a stream given the model; returns the symbol bytes in
 /// **encode order**. Bounded by `symbol_count` and the encoded length.
+///
+/// Canonical validation (RANS.md "State machine", decode step 3): a valid
+/// stream must decode to the terminal state `x == RANS_STATE_L` after the
+/// final symbol's renorm **and** leave the byte cursor exactly at the end of
+/// the encoded payload. Streams with trailing garbage, altered initial or
+/// terminal state, or truncated renorm bytes are rejected — never silently
+/// accepted as if they were canonical.
 pub fn decode_rans_stream(
     model: &SymbolModel,
     encoded: &[u8],
@@ -392,7 +399,7 @@ pub fn decode_rans_stream(
     }
     let mut reader = rans::FwdReader::new(encoded);
     let Some(mut state) = rans::dec_init(&mut reader) else {
-        return Err(Error::malformed("truncated rANS state"));
+        return Err(Error::malformed("truncated or below-range rANS state"));
     };
     let mut out = vec![0u8; n];
     for i in (0..n).rev() {
@@ -413,6 +420,18 @@ pub fn decode_rans_stream(
             return Err(Error::malformed("truncated rANS renorm bytes"));
         }
         out[i] = model.symbols[idx] as u8;
+    }
+    // Canonical terminal condition: the state must return exactly to
+    // RANS_STATE_L and every payload byte must have been consumed.
+    if state.0 != rans::STATE_L {
+        return Err(Error::malformed(
+            "noncanonical terminal rANS state (state != RANS_STATE_L)",
+        ));
+    }
+    if reader.bytes_consumed() != encoded.len() {
+        return Err(Error::malformed(
+            "noncanonical rANS stream length (trailing or unread bytes)",
+        ));
     }
     Ok(out)
 }
@@ -563,6 +582,90 @@ mod tests {
         }
     }
 
+    #[test]
+    fn canonical_decoder_rejects_trailing_altered_and_truncated_streams() {
+        // RANS.md decode step 3 freeze: a valid decode ends with
+        // x == RANS_STATE_L and the cursor exactly at the payload end. The
+        // decoder must therefore reject appended bytes (any length, any
+        // value), tail truncations, and a below-range initial state. A byte
+        // mutation anywhere else must fail typed or decode to a *different*
+        // symbol sequence — encoding is a bijection for a fixed model and
+        // length, so silent acceptance of the original symbols is impossible.
+        let streams: Vec<Vec<u8>> = vec![
+            // Structured (compressible) stream.
+            (0..2000u32).map(|i| ((i * 7 + 3) % 251) as u8).collect(),
+            // Near-uniform stream (larger model, more renorm traffic).
+            (0..3000u32)
+                .map(|i| {
+                    let mut x = i.wrapping_mul(2654435761).wrapping_add(97);
+                    x ^= x >> 13;
+                    (x.wrapping_mul(0x9e3779b1) as u8) ^ ((i % 7) as u8)
+                })
+                .collect(),
+            // Tiny stream (single symbol, minimal state traffic).
+            vec![42u8; 3],
+        ];
+        for stream in &streams {
+            let model = byte_model(stream);
+            let encoded = encode_rans_stream(&model, stream, SCALE_BITS).unwrap();
+            // Sanity: canonical decode reproduces the stream.
+            assert_eq!(
+                decode_rans_stream(&model, &encoded, stream.len() as u64, SCALE_BITS).unwrap(),
+                *stream
+            );
+            // Every one-byte append (0..=255) is rejected (cursor must end
+            // exactly at the payload end).
+            for b in 0..=255u8 {
+                let mut tail = encoded.clone();
+                tail.push(b);
+                assert!(
+                    matches!(
+                        decode_rans_stream(&model, &tail, stream.len() as u64, SCALE_BITS),
+                        Err(e) if e.kind() == Kind::Malformed
+                    ),
+                    "append 0x{b:02x} accepted on {}-byte stream",
+                    stream.len()
+                );
+            }
+            // Multi-byte appends are rejected.
+            for trail in 1..=16usize {
+                let mut tail = encoded.clone();
+                tail.extend(std::iter::repeat_n(0u8, trail));
+                assert!(matches!(
+                    decode_rans_stream(&model, &tail, stream.len() as u64, SCALE_BITS),
+                    Err(e) if e.kind() == Kind::Malformed
+                ));
+            }
+            // Tail truncations are rejected (the terminal renorm needs every
+            // byte the canonical stream carries).
+            for cut in 1..=16usize.min(encoded.len()) {
+                let short = &encoded[..encoded.len() - cut];
+                assert!(
+                    decode_rans_stream(&model, short, stream.len() as u64, SCALE_BITS).is_err(),
+                    "truncation by {cut} accepted"
+                );
+            }
+            // A below-range initial state is rejected at dec_init.
+            let mut low = encoded.clone();
+            low[..4].copy_from_slice(&(crate::entropy::rans::STATE_L - 1).to_le_bytes());
+            assert!(matches!(
+                decode_rans_stream(&model, &low, stream.len() as u64, SCALE_BITS),
+                Err(e) if e.kind() == Kind::Malformed
+            ));
+            // Byte mutations (state bytes, renorm body, terminal byte): fail
+            // typed or decode to a different sequence — never the original.
+            for at in 0..encoded.len() {
+                for flip in [0x01u8, 0x40, 0x80, 0xff] {
+                    let mut mutv = encoded.clone();
+                    mutv[at] ^= flip;
+                    match decode_rans_stream(&model, &mutv, stream.len() as u64, SCALE_BITS) {
+                        Err(e) => assert_eq!(e.kind(), Kind::Malformed),
+                        Ok(seq) => assert_ne!(seq, *stream, "mutation at {at} undetected"),
+                    }
+                }
+            }
+        }
+    }
     #[test]
     fn hostile_blocks_fail_typed() {
         let raw = raw_block(Symbolization::Identity, 1, vec![0u8; 8]);

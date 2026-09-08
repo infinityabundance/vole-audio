@@ -190,9 +190,19 @@ pub fn enc_flush(state: &RansState, sink: &mut BackSink<'_>) -> bool {
 }
 
 /// Read the initial decoder state (u32 LE) from the front of the stream.
+///
+/// A valid stream always begins with a normalized state `>= RANS_STATE_L`
+/// (the encoder invariant holds after every transition and the flushed
+/// state is the post-transition state); a below-range initial state is a
+/// malformed stream and is rejected here (RANS.md "State machine", step 1
+/// of decode).
 #[inline]
 pub fn dec_init(reader: &mut FwdReader<'_>) -> Option<RansState> {
-    reader.read_u32_le().map(RansState)
+    let s = reader.read_u32_le()?;
+    if s < STATE_L {
+        return None;
+    }
+    Some(RansState(s))
 }
 
 /// Frequency slot of the current state (`x & (2^scale_bits - 1)`).
@@ -347,6 +357,26 @@ mod tests {
         let ea = encode_symbols(&starts, &freqs, SCALE_BITS, &mut a).unwrap();
         let eb = encode_symbols(&starts, &freqs, SCALE_BITS, &mut b).unwrap();
         assert_eq!(ea, eb);
+    }
+
+    #[test]
+    fn dec_init_rejects_below_range_states() {
+        // RANS.md decode step 1: a valid stream always begins with a
+        // normalized state >= STATE_L (the encoder flushes a post-transition
+        // state). Values below the range are malformed.
+        let mut reader = FwdReader::new(&[0u8; 4]);
+        assert!(dec_init(&mut reader).is_none());
+        let low = (STATE_L - 1).to_le_bytes();
+        let mut reader = FwdReader::new(&low);
+        assert!(dec_init(&mut reader).is_none());
+        // At and above the range are accepted by the primitive (canonical
+        // termination is enforced by the stream decoders).
+        let at = STATE_L.to_le_bytes();
+        let mut reader = FwdReader::new(&at);
+        assert_eq!(dec_init(&mut reader).unwrap().0, STATE_L);
+        let max = u32::MAX.to_le_bytes();
+        let mut reader = FwdReader::new(&max);
+        assert_eq!(dec_init(&mut reader).unwrap().0, u32::MAX);
     }
 
     #[test]
