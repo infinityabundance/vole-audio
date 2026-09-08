@@ -356,6 +356,49 @@ Seal run (release, `--all-features`, clean tree):
   nightly, debug and release; MSRV 1.89.0 green; clippy `-D warnings` and
   `cargo fmt --check` clean.
 
+### Seal 6 — path-specific verdict wording + verdict-bearing registration provenance (2026-09-08)
+
+Delta since Seal 5 (the final two review items):
+
+1. **Path-specific success sentences** (`9a5eaea`): `SessionOut::verdict` is
+   now path-aware. D0 sessions report “entropy decoded on GPU; sample block
+   transferred to host and copied into the ALSA ring; …”; D1 sessions report
+   “entropy decoded on GPU; final sample codes written directly into the
+   registered ALSA ring; …”. Receipt prose no longer contradicts the traffic
+   counters.
+2. **Verdict-bearing registration provenance** (`9a5eaea`):
+   `endpoint.registered_range` / `registration_result` / `device_pointer`
+   are captured from the **d1-literal session's own HostRegistration** — the
+   mapping whose bytes produced `endpoint_hash` — never from a post-hoc
+   re-open. The post-session endpoint open remains only as an explicitly
+   labeled `post_session_reprobe` snapshot row and is never registered.
+   Per-session rows carry each D1 session's `registered_range` and
+   `registered_device_ptr_present`; a new `endpoint_registration_provenance`
+   extra documents the chain
+   `scalar -> reference_hash; ALSA mmap region (d1-literal registration)
+   <- device pointer <- GPU writes -> in-place readback -> endpoint_hash
+   == backend_hash == reference_hash`. Missing registration evidence on the
+   verdict cell fails the court closed.
+
+Seal run (release, `--all-features`, clean tree):
+
+- Tree: commit `9a5eaea`, `git_dirty: false`. 17 receipts sealed under
+  `receipts/` (six A–H courts + ten H.2 courts + the `h2` aggregate),
+  committed separately at `9a8c22a`.
+- All six A–H courts and all ten H.2 courts + `court h2` aggregate re-sealed
+  SUPPORTED; frozen hashes unchanged (semantic `1791816f4b93…`, authored
+  `f7e103f3a97d…`).
+- Flagship `entropy-d1`: five sessions shadow-exact, zero xruns, clean drain;
+  the receipt's `registered_range` (e.g. `0x7f7f6026f000+32768` = the
+  buffer-sized ring region) is the d1-literal session's own registration;
+  provenance digests unchanged (`82fc9c9f…` literal / `f03fab…` residual /
+  `ff5db7…` noise windows), `exact_equality: true`.
+- PTX artifact unchanged (host-side-only delta): sha256
+  `8b23325d03700847b056b29df4f4d4afd1a0c67386458512986c52f4fca7896b`.
+- Host tests: 287 total (282 passed, 5 ignored) all-features on the pinned
+  nightly, debug and release; MSRV 1.89.0 green; clippy `-D warnings` and
+  `cargo fmt --check` clean.
+
 ## Execution record (implementation summary)
 
 All H.2.x work items were executed in sequence. Summary of what exists where:
