@@ -12,6 +12,7 @@
 
 pub mod direct;
 pub mod driver;
+pub mod entropy;
 pub mod ffi;
 pub mod kernel;
 pub mod probe;

@@ -441,6 +441,108 @@ pub fn decode_pages(
     true
 }
 
+/// Decode-job descriptor: arena lengths and geometry the kernel needs to
+/// rebuild slices from raw pointers (mirror of the host flat job).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(C)]
+pub struct EntropyJobDesc {
+    pub page_count: u32,
+    /// Output arena length in i32 elements.
+    pub arena_samples: u32,
+    /// Per-page scratch stride in bytes.
+    pub scratch_stride: u32,
+    pub payload_len: u32,
+    pub stream_count: u32,
+    pub mvalue_count: u32,
+    pub mstart_count: u32,
+    pub mfreq_count: u32,
+    pub mrange_count: u32,
+    pub cycle_count: u32,
+    /// Pages are decoded one per thread; status[i] = 1 on success.
+    pub statuses_len: u32,
+    pub _pad: [u8; 8],
+}
+
+impl EntropyJobDesc {
+    /// A zeroed descriptor (host fills it from a flat job).
+    pub const fn zeroed() -> EntropyJobDesc {
+        EntropyJobDesc {
+            page_count: 0,
+            arena_samples: 0,
+            scratch_stride: 0,
+            payload_len: 0,
+            stream_count: 0,
+            mvalue_count: 0,
+            mstart_count: 0,
+            mfreq_count: 0,
+            mrange_count: 0,
+            cycle_count: 0,
+            statuses_len: 0,
+            _pad: [0; 8],
+        }
+    }
+
+    /// Decode page `page_id` against the raw arenas described by this
+    /// descriptor. Mirrors the device kernel exactly; `false` on any
+    /// malformed condition.
+    ///
+    /// # Safety
+    /// Every pointer must reference an allocation of at least the length
+    /// declared in this descriptor (bytes for byte arenas, elements for the
+    /// i32/u16 arenas); `scratch` must have `scratch_stride` bytes available
+    /// at `page_id * scratch_stride`.
+    pub unsafe fn decode_page_raw(
+        &self,
+        page_id: u32,
+        pages: *const FlatPage,
+        streams: *const FlatStream,
+        payload: *const u8,
+        mvalues: *const u16,
+        mstarts: *const u32,
+        mfreqs: *const u32,
+        mranges: *const u32,
+        cycle: *const i32,
+        out: *mut i32,
+        scratch: *mut u8,
+    ) -> bool {
+        // SAFETY of the caller contract: all pointers reference allocations
+        // of at least the lengths declared in this descriptor. Every slice
+        // below is built against exactly those declared lengths; `decode_page`
+        // additionally bounds-checks all offsets before touching them.
+        unsafe {
+            let n_pages = self.page_count as usize;
+            if (page_id as usize) >= n_pages {
+                return false;
+            }
+            let pages_slice = core::slice::from_raw_parts(pages, n_pages);
+            let streams_slice = core::slice::from_raw_parts(streams, self.stream_count as usize);
+            let payload_slice = core::slice::from_raw_parts(payload, self.payload_len as usize);
+            let models = FlatModelSet {
+                values: core::slice::from_raw_parts(mvalues, self.mvalue_count as usize),
+                starts: core::slice::from_raw_parts(mstarts, self.mstart_count as usize),
+                freqs: core::slice::from_raw_parts(mfreqs, self.mfreq_count as usize),
+                ranges: core::slice::from_raw_parts(mranges, self.mrange_count as usize),
+            };
+            let cycle_slice = core::slice::from_raw_parts(cycle, self.cycle_count as usize);
+            let out_slice = core::slice::from_raw_parts_mut(out, self.arena_samples as usize);
+            let stride = self.scratch_stride as usize;
+            let scratch_slice = core::slice::from_raw_parts_mut(
+                scratch.add((page_id as usize).saturating_mul(stride)),
+                stride,
+            );
+            decode_page(
+                &pages_slice[page_id as usize],
+                streams_slice,
+                payload_slice,
+                &models,
+                cycle_slice,
+                out_slice,
+                scratch_slice,
+            )
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -450,6 +552,7 @@ mod tests {
         // Flat records are upload-identical across host and device builds.
         assert_eq!(core::mem::size_of::<FlatPage>(), 56);
         assert_eq!(core::mem::size_of::<FlatStream>(), 24);
+        assert_eq!(core::mem::size_of::<EntropyJobDesc>(), 52);
     }
 
     #[test]

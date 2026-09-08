@@ -17,9 +17,57 @@
 
 #![cfg(target_arch = "nvptx64")]
 
+use crate::device::entropy_shared::{EntropyJobDesc, FlatPage, FlatStream};
 use crate::device::kernel_shared::{FlatState, FlatVoice, render_sample};
 use crate::sampler::procedural::Partial;
 
+/// Decode entropy pages into a bounded output arena (Phase H.2).
+///
+/// Grid/block mapping: one thread per page (grid-stride over the declared
+/// page count); each thread decodes its page through the shared
+/// `device::entropy_shared::decode_page` and writes its status (1 = exact
+/// decode, 0 = malformed) to `status[page_id]`. The output arena holds the
+/// window's samples; every page writes at its `out_off`. Pages decode only
+/// the entropy payloads they reference — no full-object waveform is ever
+/// materialized (H.2.17/H.2.18).
+///
+/// # Safety
+/// All pointers must match the lengths declared in `*desc` (see
+/// `EntropyJobDesc`). The host builds these buffers exactly
+/// (`backend::cuda::EntropyWorld`); nothing here is user input.
+#[unsafe(no_mangle)]
+pub extern "ptx-kernel" fn vole_entropy_decode(
+    desc: *const EntropyJobDesc,
+    pages: *const FlatPage,
+    streams: *const FlatStream,
+    payload: *const u8,
+    mvalues: *const u16,
+    mstarts: *const u32,
+    mfreqs: *const u32,
+    mranges: *const u32,
+    cycle: *const i32,
+    out: *mut i32,
+    scratch: *mut u8,
+    status: *mut u8,
+) {
+    unsafe {
+        let tid = core::arch::nvptx::_thread_idx_x() as usize;
+        let nthreads = core::arch::nvptx::_block_dim_x() as usize;
+        let bid = core::arch::nvptx::_block_idx_x() as usize;
+        let nblocks = core::arch::nvptx::_grid_dim_x() as usize;
+        let d = &*desc;
+        let stride = nthreads * nblocks;
+        let mut g = bid * nthreads + tid;
+        while g < d.page_count as usize {
+            let ok = d.decode_page_raw(
+                g as u32, pages, streams, payload, mvalues, mstarts, mfreqs, mranges, cycle, out,
+                scratch,
+            );
+            *status.add(g) = u8::from(ok);
+            g += stride;
+        }
+    }
+}
 /// Render one window into the final interleaved observation block (D0).
 ///
 /// Grid/block mapping: `g = blockIdx.x * blockDim.x + threadIdx.x` indexes

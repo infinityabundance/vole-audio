@@ -21,6 +21,7 @@ pub mod d1;
 pub mod dsfb_entropy;
 #[cfg(feature = "std")]
 pub mod entropy_common;
+pub mod entropy_cuda;
 #[cfg(feature = "std")]
 pub mod entropy_literal;
 #[cfg(feature = "std")]
@@ -94,6 +95,11 @@ removes vs the D0-mmap baseline (default silence-safe; --emit-audio opt-in)",
         "Phase H.2 partial materialization: partial == full slice, pages touched, decode halo",
     ),
     (
+        "entropy-cuda",
+        "Phase H.2 CUDA entropy decode: scalar == CUDA on literal/RAW-fallback/residual closure \
+jobs (one thread per page; artifact scripts/out/vole_audio.ptx)",
+    ),
+    (
         "entropyfs",
         "Phase H.2 optional persistence: embedded == EntropyFS adapter roundtrip, integrity \
 reverify, declared/unique/physical accounting, exact shared model once physically \
@@ -121,6 +127,7 @@ pub fn run(name: &str, receipts_root: &Path) -> crate::error::Result<Verdict> {
         "entropy-residual" => entropy_residual::run(receipts_root),
         "entropy-pages" => entropy_pages::run(receipts_root),
         "entropy-partial" => entropy_partial::run(receipts_root),
+        "entropy-cuda" => entropy_cuda::run(receipts_root),
         "entropyfs" => entropyfs::run(receipts_root),
         "dsfb-entropy" => dsfb_entropy::run(receipts_root),
         other => Err(crate::error::Error::malformed(format!(
