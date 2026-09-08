@@ -3,13 +3,22 @@
 <p align="center"><img src="assets/vole.png" alt="VOLE-Audio" width="314" /></p>
 
 Procedural sampling and **direct audio materialization from deterministic
-state** — a rigorous native-Rust implementation of the VOLE-Audio v1.0
-research architecture.
+state** — a rigorous native-Rust implementation of the VOLE-Audio research
+architecture, currently specified by v1.1.
 
 > de Beer, R. (2026). *VOLE-Audio: Procedural Sampling and Direct Audio
-> Materialization from Deterministic State — Broad Prior-Art Technical
-> Disclosure and Research Architecture* (Version v1.0). Zenodo.
+> Materialization from Deterministic State — Entropy-Native Layer and
+> Late-Materialization Architecture* (Version v1.1). Zenodo.
+> https://doi.org/10.5281/zenodo.22666746
+
+> Original v1.0 broad prior-art disclosure:
 > https://doi.org/10.5281/zenodo.22649073
+>
+> v1.1 is the current architecture paper — it makes the entropy-native layer
+> explicit (persist the deterministic explanation, entropy-code the exact
+> residual, materialize samples only when an observation requires them), and
+> Phase H.2 of this repository implements exactly that layer. v1.0 remains
+> the earlier broad disclosure.
 
 > One Cargo package. PCM is an **observation view**. `SampleObject` is
 > authoritative. Literal fallback exists. Everything is measured; nothing is
@@ -263,5 +272,7 @@ Licensed under either of
 
 at your option.
 
-The VOLE-Audio v1.0 paper (DOI 10.5281/zenodo.22649073) remains a separate
-work with its own disclosure terms.
+The VOLE-Audio papers — v1.1, the current architecture paper (DOI
+10.5281/zenodo.22666746), and v1.0, the original broad prior-art disclosure
+(DOI 10.5281/zenodo.22649073) — remain separate works with their own
+disclosure terms.

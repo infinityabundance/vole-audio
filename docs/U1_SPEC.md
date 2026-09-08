@@ -5,8 +5,11 @@ has an executable counterpart in `src/universe/`; the unit tests enforce it.
 Changing any frozen item is a **profile change** (`u1/v2` at minimum): new
 profile id, new reference vectors, never a silent edit.
 
-Source of truth: VOLE-Audio v1.0 paper (DOI 10.5281/zenodo.22649073) + this
-spec + the code. Where this spec and the code disagree, the code is wrong.
+Source of truth: VOLE-Audio v1.0 paper (DOI 10.5281/zenodo.22649073 — the
+disclosure that normatively defines U1; the current architecture revision
+v1.1, DOI 10.5281/zenodo.22666746, makes the entropy layer explicit and does
+not contradict U1) + this spec + the code. Where this spec and the code
+disagree, the code is wrong.
 
 ---
 

@@ -1,7 +1,8 @@
 //! VOLE-Audio — procedural sampling and direct audio materialization from
 //! deterministic state.
 //!
-//! Architectural invariant (paper v1.0, DOI 10.5281/zenodo.22649073):
+//! Architectural invariant (paper v1.1, DOI 10.5281/zenodo.22666746;
+//! original broad disclosure v1.0, DOI 10.5281/zenodo.22649073):
 //!
 //! > A `SampleObject` is the authoritative media object. PCM/sample-domain
 //! > values are **observation surfaces**. A literal representation is valid

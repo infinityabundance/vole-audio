@@ -1,8 +1,11 @@
 # Architecture
 
-The VOLE-Audio v1.0 paper (DOI 10.5281/zenodo.22649073) is the architectural
-source of truth. This file is the implementation's own architecture map; it
-exists to make the code navigable, not to re-litigate the paper.
+The current VOLE-Audio architecture paper is v1.1 (DOI
+10.5281/zenodo.22666746), which makes the entropy-native layer explicit;
+the original v1.0 broad prior-art disclosure (DOI
+10.5281/zenodo.22649073) remains the earlier statement. This file is the
+implementation's own architecture map; it exists to make the code
+navigable, not to re-litigate the paper.
 
 ## 1. One semantic core, many execution surfaces
 

@@ -17,8 +17,10 @@
 > Companion architecture (must be studied before touching code): the VOLE
 > Video native rANS floor / DSFB search courts / feature-gated EntropyFS store
 > adapter (`infinityabundance/vole`), `infinityabundance/entropyfs`,
-> `infinityabundance/dsfb`; paper DOI 10.5281/zenodo.22649073 (v1.1 revision
-> makes the entropy layer explicit; this document does not contradict v1.0).
+> `infinityabundance/dsfb`; current architecture paper v1.1 (DOI
+> 10.5281/zenodo.22666746 — the entropy-native layer is explicit there) with
+> the original broad disclosure v1.0 (DOI 10.5281/zenodo.22649073). This
+> document does not contradict either.
 
 ## The defining principle
 
