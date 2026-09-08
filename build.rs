@@ -28,9 +28,10 @@ fn git(args: &[&str]) -> Option<String> {
 }
 
 fn main() {
-    // Re-stamp whenever sources change (build identity must track the tree).
-    println!("cargo:rerun-if-changed=src");
-    println!("cargo:rerun-if-changed=Cargo.toml");
+    // No rerun-if-changed declarations: build.rs then reruns on every build
+    // (trivial cost), so the stamped compiled-from identity always tracks
+    // the current git state — including HEAD moves that change no file
+    // (commit/checkout), which file-change watchers would miss.
 
     // Compiled-from identity. `--no-optional-locks` and the receipts/
     // pathspec exclusion mirror Environment::capture's runtime measurement:
