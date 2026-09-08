@@ -14,6 +14,8 @@
 #[cfg(feature = "std")]
 pub mod authored;
 #[cfg(feature = "std")]
+pub mod cuda;
+#[cfg(feature = "std")]
 pub mod facts;
 #[cfg(feature = "std")]
 pub mod semantic;
@@ -42,6 +44,11 @@ pub const COURT_NAMES: &[(&str, &str)] = &[
         "independent semantic facts: first-principles oracles for every representation/\
 transform on every host surface",
     ),
+    (
+        "cuda",
+        "Phase G CUDA D0: scalar == CUDA parity on frozen fixtures + facts on the device\
+surface + strategy comparison + fixture-level throughput",
+    ),
 ];
 
 /// Run `court <name>`; unknown courts are usage errors.
@@ -51,6 +58,7 @@ pub fn run(name: &str, receipts_root: &Path) -> crate::error::Result<Verdict> {
         "authored" => authored::run(receipts_root),
         "simd" => simd::run(receipts_root),
         "facts" => facts::run(receipts_root),
+        "cuda" => cuda::run(receipts_root),
         other => Err(crate::error::Error::malformed(format!(
             "unknown court '{other}' (available: {})",
             COURT_NAMES

@@ -34,6 +34,7 @@
     allow(unused_features)
 )]
 #![cfg_attr(target_arch = "nvptx64", feature(abi_ptx))]
+#![cfg_attr(target_arch = "nvptx64", feature(stdarch_nvptx))]
 #![cfg_attr(target_arch = "amdgpu", feature(abi_gpu_kernel))]
 #![cfg_attr(
     any(target_arch = "nvptx64", target_arch = "amdgpu"),
@@ -53,8 +54,15 @@ pub mod eval;
 pub mod sampler;
 pub mod universe;
 
+// GPU device surface (Phase G): the flat kernel semantics are `no_std`-clean
+// and compile for scalar host parity tests and device targets alike; the
+// device ABI entries are target-gated inside `device`.
+pub mod device;
+
 #[cfg(feature = "std")]
 pub mod audio;
+#[cfg(feature = "std")]
+pub mod backend;
 #[cfg(feature = "std")]
 pub mod courts;
 #[cfg(feature = "std")]

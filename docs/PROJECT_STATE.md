@@ -310,27 +310,96 @@ Committed immediately after the Phase F seal, before Phase G begins:
 - Test count now 177 green (debug + release; +2 facts tests), clippy
   `-D warnings` clean, `fmt` clean.
 
+### Phase G — CUDA D0 (complete)
+
+The first GPU phase, executed exactly as contracted: one package, PTX
+cross-compiled from `src/lib.rs`, GPU-resident flat world, D0 buffered
+diagnostic only (no D1 claim anywhere), bit-exact scalar == CUDA, honest
+throughput surfaces with a crossover sweep.
+
+Delivered:
+
+- **`device/` (no_std, shared host/device)**: `kernel_shared.rs` — flat
+  `#[repr(C)]` records (`FlatVoice` 128 B, `FlatState`, `FlatEnvelope`) and
+  the exact per-(frame, channel) evaluation mirroring
+  `ResolvedVoice::contribution_at`/`World::observe` over the same frozen
+  `no_std` functions; `nvptx_entry.rs` — `extern "ptx-kernel"
+  vole_render_d0` (one thread per output sample slot, i64 register mix,
+  single final saturation, coalesced write; grid-stride). `amdgcn_entry.rs`
+  placeholder for Phase I.
+- **`backend/flatten.rs`**: store+world → flat state; capability matrix
+  (`PredictorResidual` = `CUDA_FALLBACK`, closure materialized host-side and
+  counted; `Referenced` resolved before upload). Bit-exactness anchored on
+  the host by a 3000-seed random battery (`flat == scalar`).
+- **`backend/cuda/`**: audited dlopen FFI (legacy export names), RAII
+  driver/context/module/stream/event/buffer/graph, probe, `KernelWorld`
+  (world uploaded once; no per-quantum device allocation), D0 renders over
+  standard / highest-priority / captured-graph submission.
+- **`scripts/build-cuda-device.sh`** (live): rustc → PTX
+  (`--crate-type cdylib` for nvptx64-nvidia-cuda, panic=abort, opt-3) +
+  SHA-256 + provenance JSON (rustc/LLVM/target/source tree).
+- **`court cuda`**: probe → artifact binding → scalar == CUDA parity on the
+  frozen semantic/authored/mixed fixtures across all available strategies →
+  semantic facts F01–F14 re-verified on the device → 32-seed random
+  differential subset on the GPU → per-cell exactness check → fixture-level
+  throughput cells incl. a voices × quantum crossover sweep. Verdict
+  `SUPPORTED` only when every row passes; absent driver/device or artifact
+  writes `UNSUPPORTED_BY_HARDWARE`/`INCONCLUSIVE` receipts.
+
+Driver findings recorded (driver 610.57.04 / CUDA 13.3): the legacy
+`cuCtxCreate_v2` and primary-context exports yield contexts that reject later
+allocation with rc 201; the exported `cuCtxCreate` takes the modern
+`(CUcontext*, CUexecAffinityParam*, int, unsigned int, CUdevice)` signature;
+plain `cuModuleLoadData` fails PTX JIT with rc 218 where
+`cuModuleLoadDataEx` + error-log succeeds; the on-disk JIT cache can serve a
+stale entry as a silent rc 218. The runtime therefore sets
+`CUDA_MODULE_LOADING=EAGER` and `CUDA_CACHE_DISABLE=1` (when unset), JITs at
+load (setup, never a real-time path), and routes all loads through
+`cuModuleLoadDataEx` with a JIT log.
+
+Measured (fixture-level, 48 kHz mono, 8192-frame window unless noted; RTX
+4080 SUPER + driver 610.57.04 vs Ryzen 9800X3D; receipts under
+`receipts/cuda/`): mean wall ms per 8192-frame window.
+
+| fixture | scalar | avx2 | avx512 | cuda-d0 wall | cuda kernel |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| literal 256v | 40.0 | 11.4 | 6.1 | 2.1 | 2.0 |
+| noise 512v | 96.6 | 13.4 | 7.1 | 2.7 | 2.8 |
+| wavetable 256v | 38.3 | 11.4 | 6.1 | 2.6 | 2.5 |
+| oscillator 1024v | 143.3 | 39.8 | 20.9 | 11.0 | 10.3 |
+| partials 32v × 256 | 111.7 | 107.2 | 106.6 | 16.9 | 13.4 |
+
+Crossover cells (mean wall ms): quantum 512 favors CPU everywhere (e.g.
+noise 64v: avx512 0.060 vs cuda 0.193; partials 64v: 13.4 vs 19.7); quantum
+8192 favors CUDA (noise 1024v: 14.1 vs 3.1; noise 64v: 0.88 vs 0.20;
+oscillator 64v: 1.3 vs 0.37; partials 32v: 106.6 vs 16.9 — the class where
+the CPU SIMD floors gain nothing, now a legitimate GPU workload). Every cell
+verified bit-exact (cuda == scalar) before timing; all observations across
+floors hash-identical. These are fixture-level surfaces, not flagship claims
+(Phase M owns the frozen corpus).
+
+- Test count now 183 green (debug + release; +6 since the facts commit:
+  device layout/class ×4, flatten parity battery ×2), clippy `-D warnings`
+  clean, `fmt` clean, `no_std` lib check clean, device PTX build clean.
+  GPU-gated smoke tests exist but are `#[ignore]`d (require hardware).
+
 ## Known blockers
 
-- None for Phase F. ROCm hardware absent (evidence row only). ALSA D1 court
-  needs a user decision on audible output (courts default to silence-safe
-  probes; `--emit-audio` opt-in flag will gate audible content).
+- None for Phases F/G. ROCm hardware absent (evidence row only). ALSA D1
+  court needs a user decision on audible output (courts default to
+  silence-safe probes; `--emit-audio` opt-in flag will gate audible
+  content).
 
 ## Next work (exact order — the implementation contract is executed in sequence)
 
-The Phase G prerequisite (semantic-facts coverage, above) is complete. Phase
-G begins with CUDA:
+Phase G is complete. Phase H begins the direct-endpoint falsification work:
 
-1. Phase G — CUDA (Rust PTX evaluator, GPU-resident world, buffered
-   diagnostic D0; scalar == SIMD == CUDA differential). The semantic-facts
-   surface matrix extends to the CUDA row as soon as a device surface exists
-   — every fact F01–F15 must pass there before `SUPPORTED` is reported — and
-   the CUDA capability matrix starts from the class split learned in Phase F
-   (Literal/Wavetable/SingleCycle/ExactRepeat/Constant/Noise/Oscillator/
-   PartialBank native; PredictorResidual/Referenced resolved before device
-   execution; filters classified individually).
-2. Phase H — CUDA D1 falsification (ALSA mmap + registration).
-3. Phase I — ROCm (hardware-unavailable evidence + clean amdgcn build).
-4. Phase J — ROCm D1.
-5. Phase K — inverse compiler; Phase L — GPU inverse search;
-6. Phase M — production depth/courts/corpus; Phase N — transport/archive.
+1. Phase H — CUDA D1 falsification: ALSA `hw:` mmap region registration
+   (`cuMemHostRegister` DEVICEMAP against the actual mapped endpoint
+   region), fused final writes, memory-provenance + synchronization
+   evidence; SUPPORTED or an explicit negative status both complete the
+   court. Never substitute a new pinned buffer for the endpoint region.
+2. Phase I — ROCm (hardware-unavailable evidence + clean amdgcn build).
+3. Phase J — ROCm D1.
+4. Phase K — inverse compiler; Phase L — GPU inverse search;
+5. Phase M — production depth/courts/corpus; Phase N — transport/archive.

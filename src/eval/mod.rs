@@ -13,6 +13,8 @@ pub mod common;
 #[cfg(feature = "std")]
 pub mod backend;
 #[cfg(feature = "std")]
+pub mod battery;
+#[cfg(feature = "std")]
 pub mod scalar;
 #[cfg(feature = "std")]
 pub mod simd;

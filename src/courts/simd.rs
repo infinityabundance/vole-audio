@@ -63,7 +63,8 @@ fn floors() -> Vec<Isa> {
 /// Build a mixed world that crosses every vector/floor class boundary:
 /// looped and one-shot literal content (forward and reverse, nearest and
 /// linear), cycles, endless generators, a partial bank, and a residual.
-fn mixed_world() -> (ObjectStore, Vec<TimelineEvent>) {
+/// (pub(crate): reused by the Phase G `court cuda` parity fixtures.)
+pub(crate) fn mixed_world() -> (ObjectStore, Vec<TimelineEvent>) {
     let mut store = ObjectStore::new();
     let instant = EnvelopeParams::new(0, 0, crate::sampler::envelope::ENV_UNITY, 0).unwrap();
     let adr = EnvelopeParams::new(97, 250, (1 << 16) / 2, 500).unwrap();

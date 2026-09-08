@@ -71,7 +71,14 @@ pub fn osc_sample(phase: u64, amp_q16: i32) -> i32 {
 }
 
 /// One partial of a partial bank.
+///
+/// `#[repr(C)]` (added Phase G): partial banks are flattened into a device
+/// arena as raw bytes, so the in-memory layout must be identical on every
+/// compiler/surface that builds or consumes the arena. Layout is not part of
+/// content identity (canonical bytes are explicit), so this is purely an
+/// FFI/arena contract.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(C)]
 pub struct Partial {
     /// Harmonic number (1 = fundamental). 0 is rejected at construction.
     pub harmonic: u32,

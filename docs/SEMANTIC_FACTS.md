@@ -59,15 +59,17 @@ backends disagree.
 
 ## Surface matrix
 
-Rows stay visible as backends arrive: `cuda` and `rocm` columns join with
-their phases, and every row must pass there too.
+Rows stay visible as backends arrive: `rocm` joins with its phase, and every
+row must pass there too. `cuda` is live since Phase G: `court cuda` re-runs
+every windowed fact (F01–F14) on the device surface before reporting
+`SUPPORTED` (F15 is authority-level and surface-independent).
 
 ```text
-                    scalar   simd/scalar   simd/avx2   simd/avx512   cuda*   rocm*
-semantic fact         ✓          ✓            ✓            ✓          —       —
-reference hash        ✓          ✓            ✓            ✓          —       —
-random differential   —          ✓            ✓            ✓          —       —
-                      (*: backend arrives with its phase; rows stay visible)
+                    scalar   simd/scalar   simd/avx2   simd/avx512   cuda   rocm*
+semantic fact         ✓          ✓            ✓            ✓          ✓      —
+reference hash        ✓          ✓            ✓            ✓          ✓      —
+random differential   —          ✓            ✓            ✓          ✓      —
+                      (*: ROCm arrives with its phase; rows stay visible)
 ```
 
 `court facts` verdict is `SUPPORTED` only when every fact passes on every
@@ -107,6 +109,9 @@ integer derivations, not float approximations.
 - The F05 vectors are reproducible from `scripts/`-independent Python:
   `splitmix64_finalize` per the freeze record, verified byte-for-byte against
   `NOISE_VECTORS_16` before commit.
-- When CUDA (Phase G) and ROCm (Phase I) surfaces land, extend the matrix:
-  every fact row must pass on the device surface before that backend reports
-  `SUPPORTED`.
+- The CUDA column (Phase G) is enforced by `court cuda`, which flattens each
+  fact world, renders every window on the device, and compares to the same
+  first-principles expectations — a fact must pass on the device surface
+  before that backend reports `SUPPORTED`.
+- When ROCm (Phase I) lands, extend the matrix the same way: every fact row
+  must pass on the device surface before that backend reports `SUPPORTED`.

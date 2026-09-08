@@ -42,6 +42,12 @@ assertion.
     (`FUTURE_ENDPOINT_EVALUATORS.md`).
 14. **Performance expectations.** No expected-number claims appear in
     `PERFORMANCE.md`; it says NOT YET MEASURED until receipts exist.
+15. **Phase G CUDA results imply direct endpoint materialization.** No. Phase
+    G is the **D0 buffered diagnostic** only (`GpuBufferedDiagnostic`): the
+    GPU renders a final VRAM observation block that is copied back to host
+    PCM. No ALSA endpoint region is written by the GPU, no `cuMemHostRegister`
+    of an endpoint mapping exists, and no D1/D2 path exists until Phase H —
+    receipts carry the D0 label and the sample-traffic counters.
 
 Anything in this list that later gains evidence moves into a claims document
 with its receipt. Until then: **not claimed.**

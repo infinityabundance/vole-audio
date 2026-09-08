@@ -61,10 +61,11 @@ src/
   universe/           vole.audio.u1 exact semantics        (Phase B)
   object/             SampleObject model                    (Phase C)
   sampler/            voices/world/scheduler                (Phase C)
-  eval/               scalar + SIMD evaluators              (Phase C/F)
-  device/             GPU ABI + nvptx/amdgcn entry points   (Phase G+)
-  backend/            cuda/, rocm/ host runtimes            (Phase G+)
-  audio/              ALSA endpoint, directness, topology   (Phase G+)
+  eval/               scalar + SIMD + shared battery   (Phase C/F)
+  device/             flat kernel semantics (no_std); nvptx entry live (G);
+                      amdgcn entry (Phase I)
+  backend/            flatten (G); cuda/ host runtime live (G); rocm/ (I)
+  audio/              ALSA endpoint, directness, topology   (Phase H+)
   format/             canonical archive + WAV ingest        (Phase E)
   inverse/            bounded inverse-proceduralization     (Phase K+)
   transport/          deterministic framing                 (Phase N+)
@@ -87,7 +88,11 @@ scripts/              device build + court drivers (repo only)
 
 ## Current status
 
-Phases A–F are complete; Phase G (CUDA) is next. Executable evidence today:
+Phases A–G are complete: A–E the exact representation model on the scalar
+oracle, F the honest SIMD baseline (scalar == AVX2 == AVX-512), G the CUDA D0
+buffered-diagnostic backend (scalar == SIMD == CUDA bit-for-bit; semantic
+facts F01–F14 verified on the device). Phase H (CUDA D1 falsification against
+the ALSA-mapped endpoint region) is next. Executable evidence today:
 
 - `cargo run -- court semantic` — scalar oracle determinism battery
   (reference SHA-256 `1791816f…`);
@@ -98,8 +103,16 @@ Phases A–F are complete; Phase G (CUDA) is next. Executable evidence today:
   fixture-level timing;
 - `cargo run -- court facts` — independent semantic facts (F01–F15):
   first-principles oracles for every representation/transform, verified on
-  every host surface (the Phase G prerequisite coverage; see
-  [SEMANTIC_FACTS.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/SEMANTIC_FACTS.md)).
+  every host surface (see
+  [SEMANTIC_FACTS.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/SEMANTIC_FACTS.md));
+- `cargo run -- court cuda` — Phase G CUDA D0: `scalar == CUDA` bit-exact on
+  the frozen fixture worlds across standard / high-priority / captured-graph
+  submission, semantic facts F01–F14 re-verified on the device, a random
+  differential subset on the GPU, and fixture-level CPU vs CUDA throughput
+  cells incl. a voices × quantum crossover sweep. Needs the PTX artifact
+  (`scripts/build-cuda-device.sh`) and a CUDA device; absent hardware or
+  artifact yields an honest `UNSUPPORTED_BY_HARDWARE` / `INCONCLUSIVE`
+  receipt, never a manufactured result.
 
 The exact ledger — completed phases, evidence, blockers, and the next work
 item — is
@@ -132,11 +145,16 @@ Toolchain split (documented precisely because it is easy to blur):
   The pin is repository-only — it is excluded from the published package so
   the crates.io tarball never forces nightly on consumers.
 
-GPU artifacts are produced by cross-compiling this same package via
+The CUDA device artifact (Phase G, live) is produced by cross-compiling this
+same package via
 [build-cuda-device.sh](https://github.com/infinityabundance/vole-audio/blob/main/scripts/build-cuda-device.sh)
-and
+— one package, no second crate — emitting `scripts/out/vole_audio.ptx` plus
+SHA-256 and provenance metadata. `court cuda` loads that PTX through the CUDA
+driver API (dlopen'd; nothing links against CUDA at build time). The ROCm
+artifact is produced by the Phase I script
 [build-rocm-device.sh](https://github.com/infinityabundance/vole-audio/blob/main/scripts/build-rocm-device.sh)
-(repository-only; they become active in Phase G/I) and are opt-in.
+(repository-only; active in Phase I). GPU support is opt-in and runtime
+probed; CPU-only machines run every non-GPU court unchanged.
 
 ## Evidence constitution
 
