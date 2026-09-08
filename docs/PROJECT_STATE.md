@@ -409,20 +409,22 @@ at the 8192-frame window:
 
 | cell | scalar | avx2 | avx512 | cuda-d0 wall | cuda kernel |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| literal-256v-q8192 | 38.9 | 11.4 | 6.1 | 2.1 | 2.1 |
-| noise-512v-q8192 | 97.0 | 13.3 | 7.1 | 3.8 | 3.5 |
-| wavetable-256v-q8192 | 38.3 | 11.4 | 6.0 | 3.2 | 3.1 |
-| oscillator-1024v-q8192 | 143.6 | 39.8 | 21.4 | 12.4 | 11.7 |
-| partials-32v-q8192 | 110.4 | 106.6 | 106.6 | 18.5 | 14.6 |
+| literal-256v-q8192 | 39.1 | 11.4 | 6.2 | 2.5 | 2.6 |
+| noise-512v-q8192 | 96.6 | 13.3 | 6.9 | 2.5 | 2.3 |
+| wavetable-256v-q8192 | 38.3 | 11.4 | 6.1 | 2.2 | 2.1 |
+| oscillator-1024v-q8192 | 143.6 | 40.2 | 21.1 | 11.1 | 14.0 |
+| partials-32v-q8192 | 110.5 | 106.6 | 106.8 | 24.2 | 19.4 |
 
 Crossover cells (mean wall ms): quantum 512 favors CPU everywhere (noise
-64v: avx512 0.060 vs cuda 0.193; noise 1024v: 0.945 vs 3.056; partials
-64v: 13.342 vs 19.316); quantum 8192 favors CUDA (noise 1024v: 14.154 vs
-3.065; noise 64v: 0.886 vs 0.245; oscillator 64v: 1.337 vs 0.304; partials
-32v: 106.579 vs 18.486 — the class where the CPU SIMD floors gain nothing,
-now a legitimate GPU workload). Every cell verified bit-exact (cuda ==
-scalar) before timing; all observations across floors hash-identical.
-Fixture-level surfaces only (Phase M owns the flagship corpus).
+64v: avx512 0.058 vs cuda 0.192; noise 1024v: 0.926 vs 3.079; partials
+64v: 13.524 vs 19.397); quantum 8192 favors CUDA (noise 1024v: 13.926 vs
+3.118; noise 64v: 0.870 vs 0.197; oscillator 64v: 1.308 vs 0.297; partials
+32v: 106.800 vs 24.209 — the class where the CPU SIMD floors gain nothing,
+now a legitimate GPU workload). GPU cells carry run-to-run variance
+(thermal/clocks) — the crossover shape, not any single number, is the
+result. Every cell verified bit-exact (cuda == scalar) before timing; all
+observations across floors hash-identical. Fixture-level surfaces only
+(Phase M owns the flagship corpus).
 
 - Test count now 185 green (debug + release; +2 since the Phase G commit:
   frozen-constants audit, counters add_from), clippy `-D warnings` clean,
