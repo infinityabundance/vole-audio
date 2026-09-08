@@ -314,6 +314,48 @@ Seal run (release, `--all-features`, clean tree):
   nightly, debug and release; MSRV 1.89.0 green; clippy `-D warnings` and
   `cargo fmt --check` clean.
 
+### Seal 5 — fail-closed verdict gate + U1_SPEC authority fix (2026-09-08)
+
+Delta since Seal 4 (three review items + two polish items):
+
+1. **U1_SPEC normative authored hash corrected** (`30ddc47`): the Phase D
+   authored-vector section now names `f7e103f3a97d…` as the **current**
+   frozen authority (matching `AUTHORED_COURT_REFERENCE_SHA256` in
+   `src/courts/authored.rs`, enforced by
+   `courts::authored::tests::fixture_reference_hash_is_frozen`), with
+   `f91b5b42…` preserved as the original Phase D/E vector and the Phase F
+   correctness re-freeze history (endless/periodic-voice natural-end bug).
+   The spec no longer contradicts the code it claims to describe.
+2. **Fail-closed verdict gate** (`04a1a2d`): the entropy-d1 receipt builder
+   now requires the d1-literal verdict cell and equal, non-empty
+   independently accumulated reference/endpoint digests; a missing cell,
+   empty digest, or digest disagreement is an internal evidence error sealed
+   as `FAILED_CORRECTNESS` — never a SUPPORTED receipt. The endpoint-depth
+   cell reuses the same checked reference (removing the former `unwrap`).
+3. **Paper title** (with the author): the deposited v1.1 title is
+   *"… — Entropy-Native Layer and Late-Materialization Architecture"*;
+   README uses the deposited title. README now says Phase H.2 implements
+   "the first concrete entropy-native core" of the v1.1 layer.
+4. Seal 4 ledger heading records that its public release was 0.4.3.
+
+Seal run (release, `--all-features`, clean tree):
+
+- Tree: commit `30ddc47`, source-tree `51e5e95d3baa…`, `git_dirty: false`.
+  17 receipts sealed under `receipts/` (six A–H courts + ten H.2 courts + the
+  `h2` aggregate), committed separately at `78938d5`.
+- All six A–H courts and all ten H.2 courts + `court h2` aggregate re-sealed
+  SUPPORTED; frozen hashes unchanged (semantic `1791816f4b93…`, authored
+  `f7e103f3a97d…`).
+- Flagship `entropy-d1`: five sessions shadow-exact, zero xruns, clean drain;
+  provenance digests unchanged under the fail-closed gate
+  (`82fc9c9f…` literal / `f03fab…` residual / `ff5db7…` noise windows),
+  `exact_equality: true`.
+- PTX artifact unchanged (host-side-only delta): sha256
+  `8b23325d03700847b056b29df4f4d4afd1a0c67386458512986c52f4fca7896b`.
+- Host tests: 287 total (282 passed, 5 ignored) all-features on the pinned
+  nightly, debug and release; MSRV 1.89.0 green; clippy `-D warnings` and
+  `cargo fmt --check` clean.
+
 ## Execution record (implementation summary)
 
 All H.2.x work items were executed in sequence. Summary of what exists where:
