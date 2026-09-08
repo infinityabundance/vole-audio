@@ -100,9 +100,10 @@ D1-direct        (48 000 frames):  dtoh       0 B | host copy       0 B | endpoi
 Verification reads (comparing already-written samples against the oracle) are
 counted separately and are 0-shadow-copy: the D1 verifier compares the
 mapped region in place, never building a shadow sample buffer. Measured
-per-chunk wall on this court: D0 mean ≈ 0.2 ms vs D1 mean ≈ 0.5 ms — D1
-eliminates intermediate sample movement but mapped-host GPU stores are
-slower than VRAM renders here; this court is therefore a
+per-chunk wall across seals: D1 mean 0.20–0.55 ms vs D0 mean 0.14–0.19 ms
+(run-to-run variance; the gap shrinks when the D1 path is re-measured warm) —
+D1 eliminates intermediate sample movement but mapped-host GPU stores do not
+beat VRAM render + DtoH here; this court is therefore a
 directness/residency/traffic result, not a latency optimization. Phase M
 owns the workload crossover question.
 

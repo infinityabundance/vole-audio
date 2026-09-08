@@ -604,6 +604,18 @@ mod linux {
         let mut drain_state: Option<String> = None;
         let mut stalls = 0u32;
         let mut started = false;
+        // Falsification-court policy (frozen): zero xruns is the success
+        // criterion, so ANY xrun/short-commit/suspend event TERMINATES the
+        // session as FAILED_DEADLINE with the exact reason recorded. Recovery
+        // is deliberately not attempted mid-session: a recovered stream would
+        // silently drop the endpoint's timeline position, and this court's
+        // claim is "every chunk committed without discontinuity".
+        let xrun_terminate =
+            |xruns: &mut u64, detail: &mut Option<String>, stalls: &mut u32, what: String| {
+                *xruns += 1;
+                *stalls = 0;
+                *detail = Some(what);
+            };
         while frames_committed < total {
             let want = (total - frames_committed).min(period);
             let ready = match pcm.wait(WAIT_TIMEOUT_MS) {
@@ -622,25 +634,32 @@ mod linux {
                             false
                         }
                     }
-                    Err(_f) => {
-                        // xrun/suspend while waiting: recover; the media
-                        // timeline is preserved logically and the receipt
-                        // records an explicit discontinuity (never a silent
-                        // reset).
-                        xruns += 1;
-                        let _ = pcm.recover(-libc::EPIPE);
-                        false
+                    Err(f) if f.is_xrun_class() => {
+                        xrun_terminate(
+                            &mut xruns,
+                            &mut detail,
+                            &mut stalls,
+                            format!("xrun while waiting for avail: {f}"),
+                        );
+                        break;
+                    }
+                    Err(f) => {
+                        detail = Some(format!("avail failed: {f}"));
+                        break;
                     }
                 },
                 Err(f) => {
-                    if f.rc == Some(-libc::EPIPE) {
-                        xruns += 1;
-                        let _ = pcm.recover(-libc::EPIPE);
-                        false
+                    if f.is_xrun_class() {
+                        xrun_terminate(
+                            &mut xruns,
+                            &mut detail,
+                            &mut stalls,
+                            format!("xrun during wait: {f}"),
+                        );
                     } else {
                         detail = Some(format!("wait failed: {f}"));
-                        false
                     }
+                    break;
                 }
             };
             if !ready {
@@ -648,12 +667,16 @@ mod linux {
             }
             let (offset, frames) = match pcm.mmap_begin(want) {
                 Ok(r) => r,
+                Err(f) if f.is_xrun_class() => {
+                    xrun_terminate(
+                        &mut xruns,
+                        &mut detail,
+                        &mut stalls,
+                        format!("xrun during mmap_begin: {f}"),
+                    );
+                    break;
+                }
                 Err(f) => {
-                    if f.rc == Some(-libc::EPIPE) {
-                        xruns += 1;
-                        let _ = pcm.recover(-libc::EPIPE);
-                        continue;
-                    }
                     detail = Some(format!("mmap_begin failed: {f}"));
                     break;
                 }
@@ -676,37 +699,45 @@ mod linux {
             }
             match pcm.mmap_commit(offset, frames) {
                 Ok(()) => wall.push(t0.elapsed().as_secs_f64() * 1e3),
+                Err(f) if f.is_xrun_class() => {
+                    // -EPIPE underrun or a short (nonnegative-but-less)
+                    // transfer: both terminate the session. A short commit
+                    // carries the exact requested/transferred counts in its
+                    // message; frames_committed/chunks/media position are NOT
+                    // advanced.
+                    xrun_terminate(
+                        &mut xruns,
+                        &mut detail,
+                        &mut stalls,
+                        format!("xrun-class mmap_commit failure: {f}"),
+                    );
+                    break;
+                }
                 Err(f) => {
-                    if f.is_xrun_class() {
-                        // -EPIPE underrun or a short (nonnegative-but-less)
-                        // transfer: both are xrun-class discontinuities.
-                        xruns += 1;
-                        if f.rc.is_none() {
-                            // A short commit carries the exact
-                            // requested/transferred counts.
-                            detail = Some(format!("xrun-class short commit: {f}"));
-                        }
-                        let _ = pcm.recover(-libc::EPIPE);
-                    } else {
-                        detail = Some(format!("mmap_commit failed: {f}"));
-                        break;
-                    }
+                    detail = Some(format!("mmap_commit failed: {f}"));
+                    break;
                 }
             }
             frames_committed += frames;
             chunks += 1;
+            // Actual progress resets the consecutive-stall counter.
+            stalls = 0;
             // Explicit start after the first committed chunk (the sw
             // start-threshold does not reliably auto-start on every driver).
             if !started {
                 started = true;
                 if let Err(f) = pcm.start() {
-                    if f.rc == Some(-libc::EPIPE) {
-                        xruns += 1;
-                        let _ = pcm.recover(-libc::EPIPE);
+                    if f.is_xrun_class() {
+                        xrun_terminate(
+                            &mut xruns,
+                            &mut detail,
+                            &mut stalls,
+                            format!("xrun during snd_pcm_start: {f}"),
+                        );
                     } else {
                         detail = Some(format!("snd_pcm_start failed: {f}"));
-                        break;
                     }
+                    break;
                 }
             }
             if let Ok(avail) = pcm.avail() {
@@ -1279,6 +1310,25 @@ mod linux {
 
         extras.insert("device_trials".into(), serde_json::to_value(&trials)?);
         extras.insert("sessions".into(), serde_json::to_value(&sessions)?);
+        // Verification instrumentation is kept separate from materialization:
+        // verification residency is 0 for both paths (in-place compares, no
+        // shadow sample buffers); the D0 path's verification reads its own
+        // materialization buffer, adding no separate residency.
+        extras.insert(
+            "residency".into(),
+            serde_json::json!({
+                "per_session": sessions.iter().map(|s| {
+                    serde_json::json!({
+                        "path": s.path,
+                        "materialization_host_resident_bytes": s.materialization_host_resident_bytes,
+                        "verification_host_resident_bytes": 0u64,
+                        "verification_shadow_copy_bytes": s.verification_shadow_copy_bytes,
+                    })
+                }).collect::<Vec<_>>(),
+                "note": "verification residency is 0: all verification is in-place; materialization \
+                          residency counts only buffers the measured path allocates",
+            }),
+        );
 
         // Verdict: from the D1 session when present, else the D0 baseline /
         // per-device rows.
@@ -1406,8 +1456,9 @@ mod linux {
                 "path uses the actual ALSA hw:mmap region (access MMAP_INTERLEAVED on hw: \
                  device, no plug conversion). No application PCM staging exists in the D1 \
                  path; the region itself is the endpoint's DMA ring. The D0-mmap baseline \
-                 runs the same frame count and measures the exact materialization bytes D1 \
-                 removes (DtoH + both host copies)"
+                 uses render_into (DtoH lands directly in one host buffer, then one \
+                 buffer->region copy) and runs the same frame count, measuring the exact \
+                 materialization bytes D1 removes"
                     .into(),
             ),
             endpoint_clock: d1_session.map(|s| {
@@ -1445,6 +1496,14 @@ mod linux {
             .provenance(Provenance {
                 gpu_artifact_hash: Some(artifact_sha.clone()),
                 benchmark_order: vec!["d0-mmap".into(), "d1-direct".into()],
+                // Exact equality of the verdict-bearing path is promoted into
+                // the standard provenance field (reference hash == backend
+                // hash) rather than living only in session extras.
+                exact_equality: Some(
+                    d1_session
+                        .map(|s| s.shadow_exact && s.completed && s.xruns == 0)
+                        .unwrap_or(false),
+                ),
                 ..Default::default()
             })
             .endpoint(ep);

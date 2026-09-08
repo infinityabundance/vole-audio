@@ -495,9 +495,10 @@ D1 path moved **0 B** device→host and **0 B** host copies while writing the
 same window into the endpoint region (`endpoint_observation_bytes` =
 384 000 B). Top-level receipt counters describe the verdict-bearing D1
 path; the D0 baseline and an `experiment_aggregate` are separate named
-surfaces. Measured per-chunk wall (same court): D0 mean ≈ 0.2 ms, D1 mean
-≈ 0.5 ms — D1 is a directness/traffic result, not a latency optimization;
-Phase M owns the crossover question.
+surfaces. Measured per-chunk wall across seals (variance is real): D0 mean
+0.14–0.19 ms, D1 mean 0.20–0.55 ms (an earlier seal measured 0.55 vs 0.19;
+a warm re-measure 0.20 vs 0.14). D1 is a directness/traffic result, not a
+latency optimization; Phase M owns the crossover question.
 - Every candidate device gets its own trial row: after the D1 session,
 remaining endpoints are probed for open/mmap/format/registration
 (`playback_attempted: false`). In the sealed receipt the other HDA rings
@@ -608,6 +609,30 @@ directness/residency/traffic result; latency crossover belongs to Phase M.
 Test count now 200 green (debug + release; +1 xrun-class detection), clippy
 `-D warnings` clean, `fmt` clean, `no_std` lib check clean, MSRV 1.89
 verified.
+
+### Phase-H entry gate (closed before H.2, per the H.2 brief)
+
+Pre-H.2 edge cases closed on the D1 court and re-sealed:
+
+1. Every `snd_pcm_mmap_begin` now proves the returned base equals the base
+registered at open (`self.area_base`) — all channels sharing some base is
+not enough; a changed mapping terminates rather than writing through a
+stale registration.
+2. Falsification-court policy frozen: ANY xrun / short commit / suspend
+event TERMINATES the session as `FAILED_DEADLINE` (zero-xrun success is the
+criterion). `frames_committed`, `chunks`, and the media position never
+advance past a failed commit; expected slices derive from the committed
+media position, so a failed chunk cannot desync later verification. No
+mid-session recovery (a recovered stream would silently drop endpoint
+timeline position).
+3. Consecutive-stall counters reset on actual progress.
+4. Evidence promoted into standard fields where the schema supports it:
+`provenance.exact_equality` is set for the verdict-bearing path, and a
+`residency` extras block separates materialization residency from
+verification residency (0 for both paths: in-place verification, no shadow
+buffers).
+5. Stale D0/D1 timing prose refreshed from sealed receipts, including
+run-to-run variance (D1 mean 0.20–0.55 ms vs D0 0.14–0.19 ms per chunk).
 
 ## Known blockers
 

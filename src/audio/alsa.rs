@@ -532,12 +532,25 @@ impl AlsaPcm {
             ));
         }
         // Re-prove the channel-area geometry on EVERY begin: each chunk must
-        // still refer to the same registered interleaved ring (shared addr,
+        // still refer to the SAME registered interleaved ring (the returned
+        // base must equal the base registered at open, all channels share it,
         // first == ch*32, step == channels*32) rather than relying on driver
-        // stability across the session.
+        // stability across the session. If ALSA ever returned a different
+        // mapping, D1 must not continue writing through the old registration.
         // SAFETY: the area array has one entry per channel (interleaved).
         let areas = unsafe { std::slice::from_raw_parts(area_ptr, self.request.channels as usize) };
         let base = areas[0].addr as usize;
+        if base != self.area_base {
+            return Err(AlsaFailure::new(
+                "mmap_geometry",
+                None,
+                format!(
+                    "mmap_begin returned base 0x{base:x} != registered base 0x{:x}: the mapping \
+                     changed; refusing to write through the stale registration",
+                    self.area_base
+                ),
+            ));
+        }
         if self.area_layout.len() != self.request.channels as usize
             || self.area_layout.len() != areas.len()
         {
