@@ -315,6 +315,58 @@ Seal run (release, `--all-features`, clean tree `a948294`):
   the same all-features count; clippy `-D warnings` and
   `cargo fmt --check` clean.
 
+### Seal 4 — review-3 closure (2026-09-08)
+
+Delta since Seal 3 (five review-3 items):
+
+1. **Corrected, complete direct-HSA ABI table** (`96391bb`): rebuilt from the
+   current ROCR ABI — `hsa_iterate_agents` (not the outdated
+   `hsa_agent_iterate_agents`); `hsa_executable_create_alt` →
+   `hsa_code_object_reader_create_from_memory` →
+   `hsa_executable_load_agent_code_object` → `hsa_executable_freeze` →
+   `hsa_executable_get_symbol_by_name` (not `…_get_symbol`) →
+   `hsa_executable_symbol_get_info`, plus the queue/signal/memory
+   infrastructure — a healthy modern ROCR install can no longer be labeled
+   incomplete.
+2. **D0/D1 readiness split**: `HIP_D0_REQUIRED` (init/device/module/launch/
+   malloc/memcpy/sync) and `HIP_D1_ADDITIONAL` (host registration), same
+   split for HSA. A stack that runs the D0 battery but refuses host
+   registration classifies as “ROCm D0 runtime READY (…; D1 not ready
+   (missing: …))” under `INCONCLUSIVE_PENDING_EXECUTION` — never “runtime
+   unavailable” — so Phase J can falsify ROCm semantic parity even when
+   endpoint mapping fails.
+3. **Executable seal gate**: `vole-audio seal verify` validates an explicit
+   expected-verdict matrix over the newest receipts (`source_binding ==
+   bound`, one seal tree, frozen semantic/authored reference hashes, rocm
+   compile-surface rule for negatives). A seal is now executable evidence,
+   not console reading.
+4. **`SourceBinding::Partial`**: one-sided identity or an unmeasured dirty
+   state is `partial` (never bound/dirty/unavailable); Bound requires both
+   dirty states explicitly false; build.rs no longer maps a failed
+   `git status` to “clean” (the stamp is absent when unmeasured).
+5. **Determinism follows the artifact**: `<artifact>.determinism.json`
+   (canonical, written by the build script) with `VOLE_ROCM_DETERMINISM`
+   override and the default-tree legacy name as fallback; `/opt/rocm*`
+   scanning is by soname prefix so future versioned SONAMEs are discovered.
+
+Seal run (release, `--all-features`, clean tree `bb04c00`):
+
+- 18 receipts, committed separately at `cdffadc`; every receipt
+  `source_binding: bound`; the battery is verified by the executable seal
+  gate (`vole-audio seal verify` → PASS on all 8 matrix rows).
+- All pre-existing courts SUPPORTED with frozen hashes unchanged (semantic
+  `1791816f4b93…`, authored `f7e103f3a97d…`).
+- `court rocm`: `UNSUPPORTED_BY_HARDWARE` with the compile surface satisfied
+  and bound (artifact `5092e129…` == sidecar == both determinism shas;
+  entries present) and the runtime chain recording the D0/D1 readiness
+  split per soname.
+- PTX artifact unchanged: sha256
+  `8b23325d03700847b056b29df4f4d4afd1a0c67386458512986c52f4fca7896b`.
+- Host tests: 319 total (314 passed, 5 ignored) all-features on the pinned
+  nightly (309 total, 304 passed default-features); MSRV 1.89.0 green with
+  the same all-features count; clippy `-D warnings` and
+  `cargo fmt --check` clean.
+
 ## Execution record (implementation summary)
 
 - Entry freeze captured above; artifact baseline
