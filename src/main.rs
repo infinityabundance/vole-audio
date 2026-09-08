@@ -17,7 +17,8 @@ USAGE:
 
 COMMANDS (current build):
     probe                 Capture environment + hardware evidence summary
-    court <name>          Run an executable court (semantic, authored, simd, facts, cuda)
+    court <name>          Run an executable court (semantic, authored, simd, facts,
+                          cuda, d1) [--receipts DIR]; court d1 accepts --emit-audio
     receipt show <file>   Verify and print an evidence receipt
     receipt perf <file>   Render a receipt's throughput_cells as Markdown
     version               Print version and build identity
@@ -183,6 +184,18 @@ fn cmd_court(args: &[String]) -> Result<u8> {
                     args.get(i)
                         .ok_or_else(|| Error::malformed("--receipts requires a directory"))?,
                 );
+            }
+            "--emit-audio" => {
+                // Court-specific opt-in: audible content is never the
+                // default (courts are silence-safe probes). Only `court d1`
+                // understands it today; the flag is rejected elsewhere.
+                if name != "d1" {
+                    return Err(Error::malformed(format!(
+                        "--emit-audio is only valid for court d1 (got court '{name}')"
+                    )));
+                }
+                // SAFETY: single-threaded CLI setup before any court work.
+                unsafe { std::env::set_var("VOLE_D1_EMIT_AUDIO", "1") };
             }
             other => {
                 return Err(Error::malformed(format!("unknown court flag '{other}'")));

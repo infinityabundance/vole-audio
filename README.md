@@ -88,11 +88,12 @@ scripts/              device build + court drivers (repo only)
 
 ## Current status
 
-Phases A–G are complete: A–E the exact representation model on the scalar
+Phases A–H are complete: A–E the exact representation model on the scalar
 oracle, F the honest SIMD baseline (scalar == AVX2 == AVX-512), G the CUDA D0
 buffered-diagnostic backend (scalar == SIMD == CUDA bit-for-bit; semantic
-facts F01–F14 verified on the device). Phase H (CUDA D1 falsification against
-the ALSA-mapped endpoint region) is next. Executable evidence today:
+facts F01–F14 verified on the device), and H the CUDA D1 falsification court
+against the real ALSA `hw:` mmap endpoint (the first direct-endpoint evidence;
+see the summary below). Executable evidence today:
 
 - `cargo run -- court semantic` — scalar oracle determinism battery
   (reference SHA-256 `1791816f…`);
@@ -112,7 +113,19 @@ the ALSA-mapped endpoint region) is next. Executable evidence today:
   cells incl. a voices × quantum crossover sweep. Needs the PTX artifact
   (`scripts/build-cuda-device.sh`) and a CUDA device; absent hardware or
   artifact yields an honest `UNSUPPORTED_BY_HARDWARE` / `INCONCLUSIVE`
-  receipt, never a manufactured result.
+  receipt, never a manufactured result;
+- `cargo run -- court d1` — Phase H CUDA D1 falsification: register the
+  **actual** ALSA `hw:` mmap region (`cuMemHostRegister` DEVICEMAP + device
+  pointer), render each contiguous mmap chunk's final codes directly into
+  that region (kernel write → stream sync → in-place shadow verify vs the
+  scalar oracle → `snd_pcm_mmap_commit`), and compare against a D0-mmap
+  baseline on the same endpoint shape — measuring the exact bytes D1
+  removes. Default content is silence-safe; `--emit-audio` opts into an
+  audible demo. Verdicts are per-device and honest: the sealed run registered
+  the on-board HDA ring (`snd_hda_intel`) and played byte-exact with zero
+  xruns (`D1_ENDPOINT_MAPPED`, `HOST_MAPPED`); devices that refuse open,
+  mmap, format, or registration stay visible as their own negative rows.
+  Requires Linux + ALSA + the PTX artifact + a CUDA device.
 
 The exact ledger — completed phases, evidence, blockers, and the next work
 item — is

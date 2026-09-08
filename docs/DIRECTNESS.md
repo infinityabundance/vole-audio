@@ -71,3 +71,38 @@ the registered range; registration result (exact API error on failure);
 pointer attributes; device pointer; synchronization mechanism and fence/order
 evidence; coherency declarations; commit sequence; underrun evidence;
 unregister/shutdown ordering; and the verdict.
+
+## Phase H measured outcome (CUDA D1, `court d1`)
+
+`court d1` runs the falsification directly: for each candidate endpoint it
+opens the frozen `hw:` shape (MMAP_INTERLEAVED + S32_LE + 48 kHz + stereo,
+512-frame period / 1024-frame buffer), registers the **exact mapped ring**
+with `cuMemHostRegister(DEVICEMAP)` + `cuMemHostGetDevicePointer`, and — on
+the first successful registration — runs a paced session where every
+contiguous mmap chunk's final codes are written by the kernel into the
+registered region, the stream is synchronized, the codes are shadow-verified
+**in place** against the scalar oracle, and only then committed. A D0-mmap
+baseline on the same endpoint shape measures the bytes D1 removes. Default
+content is silence-safe; `--emit-audio` opts into audible content.
+
+Measured on the seal machine (RTX 4080 SUPER, driver 610.57.04, on-board
+`ALC897` analog via `snd_hda_intel`):
+
+```text
+D0-mmap baseline (24 000 frames):  gpu->host 192 000 B | host copy 192 000 B | endpoint obs 192 000 B
+D1-direct        (48 000 frames):  gpu->host       0 B | host copy       0 B | endpoint obs 384 000 B
+```
+
+D1 verdict **SUPPORTED** (`D1_ENDPOINT_MAPPED` / `HOST_MAPPED`): the GPU
+wrote 94 chunks byte-exact vs the scalar oracle with zero xruns and a clean
+drain; endpoint depth stayed 512–1024 frames. Registration of the actual HDA
+DMA ring succeeded — an important data point, and still one that must be
+re-measured per device: the receipt records every candidate's own row
+(open/mmap/format/registration), and failures are classified exactly
+(`UNSUPPORTED_BY_*` / busy `INCONCLUSIVE`), never replaced by a substitute
+pinned buffer.
+
+Interpretation discipline: this proves the memory path on one
+hardware/driver combination, not a universal property. A device whose ring
+the CUDA driver cannot register, or that lacks hw:mmap, produces an explicit
+negative row — which is exactly the first-class evidence the paper demands.

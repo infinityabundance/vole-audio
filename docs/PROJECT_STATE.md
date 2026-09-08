@@ -431,23 +431,90 @@ observations across floors hash-identical. Fixture-level surfaces only
   `fmt` clean, `no_std` lib check clean, device PTX build clean. GPU-gated
   smoke tests exist but are `#[ignore]`d (require hardware).
 
+### Phase H — CUDA D1 (complete)
+
+The first direct-endpoint falsification court. Question answered: can the GPU
+write final sample-domain observations *directly* into the actual
+ALSA-mapped endpoint region — the memory the endpoint DMA reads — with no D0
+VRAM block, no device→host transfer, and no host PCM copy?
+
+Delivered:
+
+- **`audio/` (Linux-only, Phase A module now live)**: `alsa_ffi.rs` — audited
+dlopen(`libasound.so.2`) bindings (every constant frozen from
+`/usr/include/alsa/pcm.h`, signatures transcribed from the header, pinned by
+tests) and `alsa.rs` — playback-endpoint discovery (/proc/asound parse, sysfs
+driver evidence), the frozen D1 shape (`hw:` only, MMAP_INTERLEAVED + S32_LE +
+48 kHz + stereo + 512-frame period / 1024-frame buffer = 8 KiB page-aligned
+ring), explicit `snd_pcm_prepare`/`mmap_begin`/`commit`/`start`/`drain`
+discipline, xrun/recover with an explicit discontinuity policy, and honest
+failure classification (a busy device is never a fabricated hardware verdict).
+- **`backend/cuda/direct.rs`**: `cuMemHostRegister` (DEVICEMAP) of the *exact
+existing mapping* — page-boundary analysis, exact rc + driver-string capture,
+pointer-attribute evidence (`cuPointerGetAttribute`), rc→verdict classifier
+(never guesses: 801/1/800 → `UNSUPPORTED_BY_API` with reason; resource/state
+codes stay `INCONCLUSIVE`). `KernelWorld::render_direct` — fused kernel write
+into a caller device pointer with honest counters (`kernel_launches`,
+`quanta_submitted`, `endpoint_observation_bytes`; **no** `gpu_to_host`/host-
+copy increments — that is the D1 claim). New FFI constants frozen from cuda.h
+13.3 and pinned by the frozen-constants audit (note: `WRITE_COMBINED` no
+longer exists in current headers; `IOMEMORY=0x04`, `READ_ONLY=0x08`).
+- **`court d1`** (registry + CLI; `--emit-audio` opt-in sets
+`VOLE_D1_EMIT_AUDIO`): probes CUDA + the PTX artifact; enumerates `hw:`
+playback endpoints (VOLE_D1_DEVICE overrides the documented preference order:
+HDA analog → other HDA → USB → rest); runs a paced real-time session where
+each contiguous mmap chunk is rendered by the kernel directly into the
+registered region, stream-synchronized, shadow-verified **in place** against
+the scalar oracle, and only then committed; and a controlled **D0-mmap
+baseline** (D0 render → DtoH → CPU copy into the region) on the same endpoint
+shape. Per-device trial rows record open/mmap/format/registration outcomes;
+registration failures are classified exactly and never "fixed" by a
+substitute pinned buffer. Default content is silence-safe (peak codes ≤ 2^16,
+content-rich); `--emit-audio` runs an audible demo.
+
+Measured (RTX 4080 SUPER, driver 610.57.04, Linux 7.2.2-cachyos; receipt
+under `receipts/d1/`):
+
+- **`cuMemHostRegister` on the actual `snd_hda_intel` (ALC897 analog) DMA ring
+succeeded** (8 KiB region, page-aligned; device pointer 0x9800000;
+`memory_type` HOST). The GPU wrote **48 000 frames / 94 chunks directly into
+the ALSA-mapped region**, byte-exact vs the scalar oracle on every chunk
+(`shadow_exact: true`), zero xruns, clean drain; endpoint depth 512–1024
+frames paced by `snd_pcm_avail_update`. Verdict **SUPPORTED**
+(`D1_ENDPOINT_MAPPED` / `HOST_MAPPED`).
+- **The bytes D1 removes, measured**: the D0-mmap baseline on the same
+endpoint moved 192 000 B device→host + 192 000 B host copies for 24 000
+frames; the D1 path moved **0 B** device→host and **0 B** host copies while
+writing the same class of bytes into the endpoint region
+(`endpoint_observation_bytes` = frames × channels × 4).
+- Per-device rows are honest negatives where they occur: the PipeWire-held
+USB interface opened busy (`INCONCLUSIVE`), and devices without an active
+clock stall at `mmap_begin` (recorded, never reported as success).
+- Implementation bugs found and fixed during the court bring-up (recorded
+here because they are exactly what an evidence-driven hardware court is
+for): `snd_pcm_mmap_begin` takes the requested frame count as an *input*
+value in `*frames` (a zero-initialized request returns zero frames with rc 0);
+the stream must be `snd_pcm_prepare`d and explicitly `snd_pcm_start`ed (the
+sw start-threshold does not auto-start on every driver; verified against a C
+probe before trusting the FFI); the mmap area base is only meaningful from
+PREPARED onward.
+- Test count now 198 green (debug + release; +13: registration classifier,
+page rounding, frozen ALSA constants + channel-area layout, /proc/asound
+parsers, failure classification, D1 fixture bounds/parity), clippy
+`-D warnings` clean, `fmt` clean, `no_std` lib check clean.
+
 ## Known blockers
 
-- None for Phases F/G. ROCm hardware absent (evidence row only). ALSA D1
-  court needs a user decision on audible output (courts default to
-  silence-safe probes; `--emit-audio` opt-in flag will gate audible
-  content).
+- None for Phases F/G/H. ROCm hardware absent (evidence row only). The D1
+  result is per-device/per-driver: another host's endpoint may register,
+  refuse registration, or lack mmap — the court records whichever happens.
 
 ## Next work (exact order — the implementation contract is executed in sequence)
 
-Phase G is complete. Phase H begins the direct-endpoint falsification work:
+Phase H is complete (CUDA D1 falsification, SUPPORTED on the on-board HDA
+ring with measured D0→D1 byte elimination). Next:
 
-1. Phase H — CUDA D1 falsification: ALSA `hw:` mmap region registration
-   (`cuMemHostRegister` DEVICEMAP against the actual mapped endpoint
-   region), fused final writes, memory-provenance + synchronization
-   evidence; SUPPORTED or an explicit negative status both complete the
-   court. Never substitute a new pinned buffer for the endpoint region.
-2. Phase I — ROCm (hardware-unavailable evidence + clean amdgcn build).
-3. Phase J — ROCm D1.
-4. Phase K — inverse compiler; Phase L — GPU inverse search;
-5. Phase M — production depth/courts/corpus; Phase N — transport/archive.
+1. Phase I — ROCm (hardware-unavailable evidence + clean amdgcn build).
+2. Phase J — ROCm D1.
+3. Phase K — inverse compiler; Phase L — GPU inverse search;
+4. Phase M — production depth/courts/corpus; Phase N — transport/archive.

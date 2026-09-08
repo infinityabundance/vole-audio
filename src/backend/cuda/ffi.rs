@@ -78,6 +78,46 @@ pub const ATTR_STREAM_PRIORITIES_SUPPORTED: c_int = 78;
 pub const ATTR_GLOBAL_L1_CACHE_SUPPORTED: c_int = 79;
 pub const ATTR_CONCURRENT_MANAGED_ACCESS: c_int = 89;
 pub const ATTR_HOST_REGISTER_SUPPORTED: c_int = 99;
+/// CU_DEVICE_ATTRIBUTE_READ_ONLY_HOST_REGISTER_SUPPORTED = 113 (cuda.h
+/// line 932) — gates the READ_ONLY registration flag.
+pub const ATTR_READ_ONLY_HOST_REGISTER_SUPPORTED: c_int = 113;
+
+// cuMemHostRegister flags (cuda.h lines 3416-3451, CUDA 13.3). Note:
+// CU_MEMHOSTREGISTER_WRITE_COMBINED does **not** exist in current headers
+// (removed); only PORTABLE/DEVICEMAP/IOMEMORY/READ_ONLY remain. Every value
+// is pinned by the `frozen_constants` test.
+pub const CU_MEMHOSTREGISTER_PORTABLE: u32 = 0x01;
+pub const CU_MEMHOSTREGISTER_DEVICEMAP: u32 = 0x02;
+pub const CU_MEMHOSTREGISTER_IOMEMORY: u32 = 0x04;
+pub const CU_MEMHOSTREGISTER_READ_ONLY: u32 = 0x08;
+
+/// CUmemorytype values (cuda.h line 1215-1218) — `cuPointerGetAttribute`
+/// `CU_POINTER_ATTRIBUTE_MEMORY_TYPE` output.
+pub const CU_MEMORYTYPE_HOST: c_int = 0x01;
+pub const CU_MEMORYTYPE_DEVICE: c_int = 0x02;
+pub const CU_MEMORYTYPE_UNIFIED: c_int = 0x04;
+
+// CUpointer_attribute values (cuda.h enum lines 998-1018) used by the D1
+// pointer-attribute evidence probe; the attribute is passed as an int on the
+// wire.
+pub const POINTER_ATTRIBUTE_MEMORY_TYPE: c_int = 2;
+pub const POINTER_ATTRIBUTE_DEVICE_POINTER: c_int = 3;
+pub const POINTER_ATTRIBUTE_HOST_POINTER: c_int = 4;
+pub const POINTER_ATTRIBUTE_RANGE_START_ADDR: c_int = 11;
+pub const POINTER_ATTRIBUTE_RANGE_SIZE: c_int = 12;
+pub const POINTER_ATTRIBUTE_MAPPED: c_int = 13;
+
+// CUDA error codes referenced by the D1 registration classifier (cuda.h
+// lines 2692-3361).
+pub const CUDA_ERROR_INVALID_VALUE: CUresult = 1;
+pub const CUDA_ERROR_OUT_OF_MEMORY: CUresult = 2;
+pub const CUDA_ERROR_NO_DEVICE: CUresult = 100;
+pub const CUDA_ERROR_INVALID_DEVICE: CUresult = 101;
+pub const CUDA_ERROR_INVALID_CONTEXT: CUresult = 201;
+pub const CUDA_ERROR_HOST_MEMORY_ALREADY_REGISTERED: CUresult = 712;
+pub const CUDA_ERROR_HOST_MEMORY_NOT_REGISTERED: CUresult = 713;
+pub const CUDA_ERROR_NOT_PERMITTED: CUresult = 800;
+pub const CUDA_ERROR_NOT_SUPPORTED: CUresult = 801;
 
 macro_rules! fns {
     ($( $name:ident : $fty:ty ),* $(,)?) => {
@@ -192,6 +232,23 @@ type FnGraphExecDestroy = unsafe extern "C" fn(CUgraphExec) -> CUresult;
 type FnGraphDestroy = unsafe extern "C" fn(CUgraph) -> CUresult;
 type FnGetErrorString = unsafe extern "C" fn(CUresult, *mut *const c_char) -> CUresult;
 
+// Phase H (D1) surface — bound as *optional* symbols: a driver predating
+// them (or a hypothetical build without them) still opens for the D0
+// courts, and `court d1` records UNSUPPORTED_BY_API when one is absent.
+// Signatures transcribed from cuda.h:
+//   cuMemHostRegister(void *p, size_t bytesize, unsigned int Flags)  [9773]
+//   cuMemHostUnregister(void *p)                                     [9799]
+//   cuMemHostGetDevicePointer(CUdeviceptr*, void*, unsigned int)     [v2]
+//   cuPointerGetAttribute(void *data, CUpointer_attribute, CUdeviceptr) [15496]
+//   cuMemGetAddressRange(CUdeviceptr*, size_t*, CUdeviceptr)         [8971]
+type FnMemHostRegister = unsafe extern "C" fn(*mut c_void, usize, u32) -> CUresult;
+type FnMemHostUnregister = unsafe extern "C" fn(*mut c_void) -> CUresult;
+type FnMemHostGetDevicePointer =
+    unsafe extern "C" fn(*mut CUdeviceptr, *mut c_void, u32) -> CUresult;
+type FnPointerGetAttribute = unsafe extern "C" fn(*mut c_void, c_int, CUdeviceptr) -> CUresult;
+type FnMemGetAddressRange =
+    unsafe extern "C" fn(*mut CUdeviceptr, *mut usize, CUdeviceptr) -> CUresult;
+
 fns! {
     cuInit: FnInit,
     cuDriverGetVersion: FnDriverGetVersion,
@@ -232,6 +289,11 @@ fns! {
     cuGraphExecDestroy: FnGraphExecDestroy,
     cuGraphDestroy: FnGraphDestroy,
     cuGetErrorString: FnGetErrorString,
+    cuMemHostRegister: FnMemHostRegister,
+    cuMemHostUnregister: FnMemHostUnregister,
+    cuMemHostGetDevicePointer: FnMemHostGetDevicePointer,
+    cuPointerGetAttribute: FnPointerGetAttribute,
+    cuMemGetAddressRange: FnMemGetAddressRange,
 }
 
 /// A loaded driver handle plus its resolved symbols.
@@ -292,6 +354,17 @@ impl Fns {
             cuGraphExecDestroy, cuGraphDestroy, cuGetErrorString,
         }
         out
+    }
+}
+
+impl Fns {
+    /// True when the full Phase H D1 host-registration surface resolved.
+    /// `court d1` requires this; the D0 courts do not.
+    pub fn d1_surface_complete(&self) -> bool {
+        self.cuMemHostRegister.is_some()
+            && self.cuMemHostUnregister.is_some()
+            && self.cuMemHostGetDevicePointer.is_some()
+            && self.cuPointerGetAttribute.is_some()
     }
 }
 
@@ -417,6 +490,90 @@ mod tests {
                 "CU_DEVICE_ATTRIBUTE_HOST_REGISTER_SUPPORTED",
                 i64::from(ATTR_HOST_REGISTER_SUPPORTED),
             ),
+            (
+                "CU_DEVICE_ATTRIBUTE_READ_ONLY_HOST_REGISTER_SUPPORTED",
+                i64::from(ATTR_READ_ONLY_HOST_REGISTER_SUPPORTED),
+            ),
+            // cuMemHostRegister flags (cuda.h lines 3416-3451)
+            (
+                "CU_MEMHOSTREGISTER_PORTABLE",
+                i64::from(CU_MEMHOSTREGISTER_PORTABLE),
+            ),
+            (
+                "CU_MEMHOSTREGISTER_DEVICEMAP",
+                i64::from(CU_MEMHOSTREGISTER_DEVICEMAP),
+            ),
+            (
+                "CU_MEMHOSTREGISTER_IOMEMORY",
+                i64::from(CU_MEMHOSTREGISTER_IOMEMORY),
+            ),
+            (
+                "CU_MEMHOSTREGISTER_READ_ONLY",
+                i64::from(CU_MEMHOSTREGISTER_READ_ONLY),
+            ),
+            // CUmemorytype (cuda.h line 1215-1218)
+            ("CU_MEMORYTYPE_HOST", i64::from(CU_MEMORYTYPE_HOST)),
+            ("CU_MEMORYTYPE_DEVICE", i64::from(CU_MEMORYTYPE_DEVICE)),
+            ("CU_MEMORYTYPE_UNIFIED", i64::from(CU_MEMORYTYPE_UNIFIED)),
+            // CUpointer_attribute (cuda.h lines 998-1018)
+            (
+                "CU_POINTER_ATTRIBUTE_MEMORY_TYPE",
+                i64::from(POINTER_ATTRIBUTE_MEMORY_TYPE),
+            ),
+            (
+                "CU_POINTER_ATTRIBUTE_DEVICE_POINTER",
+                i64::from(POINTER_ATTRIBUTE_DEVICE_POINTER),
+            ),
+            (
+                "CU_POINTER_ATTRIBUTE_HOST_POINTER",
+                i64::from(POINTER_ATTRIBUTE_HOST_POINTER),
+            ),
+            (
+                "CU_POINTER_ATTRIBUTE_RANGE_START_ADDR",
+                i64::from(POINTER_ATTRIBUTE_RANGE_START_ADDR),
+            ),
+            (
+                "CU_POINTER_ATTRIBUTE_RANGE_SIZE",
+                i64::from(POINTER_ATTRIBUTE_RANGE_SIZE),
+            ),
+            (
+                "CU_POINTER_ATTRIBUTE_MAPPED",
+                i64::from(POINTER_ATTRIBUTE_MAPPED),
+            ),
+            // CUDA driver error codes (cuda.h lines 2692-3361)
+            (
+                "CUDA_ERROR_INVALID_VALUE",
+                i64::from(CUDA_ERROR_INVALID_VALUE),
+            ),
+            (
+                "CUDA_ERROR_OUT_OF_MEMORY",
+                i64::from(CUDA_ERROR_OUT_OF_MEMORY),
+            ),
+            ("CUDA_ERROR_NO_DEVICE", i64::from(CUDA_ERROR_NO_DEVICE)),
+            (
+                "CUDA_ERROR_INVALID_DEVICE",
+                i64::from(CUDA_ERROR_INVALID_DEVICE),
+            ),
+            (
+                "CUDA_ERROR_INVALID_CONTEXT",
+                i64::from(CUDA_ERROR_INVALID_CONTEXT),
+            ),
+            (
+                "CUDA_ERROR_HOST_MEMORY_ALREADY_REGISTERED",
+                i64::from(CUDA_ERROR_HOST_MEMORY_ALREADY_REGISTERED),
+            ),
+            (
+                "CUDA_ERROR_HOST_MEMORY_NOT_REGISTERED",
+                i64::from(CUDA_ERROR_HOST_MEMORY_NOT_REGISTERED),
+            ),
+            (
+                "CUDA_ERROR_NOT_PERMITTED",
+                i64::from(CUDA_ERROR_NOT_PERMITTED),
+            ),
+            (
+                "CUDA_ERROR_NOT_SUPPORTED",
+                i64::from(CUDA_ERROR_NOT_SUPPORTED),
+            ),
         ];
         let expected: Vec<(&str, i64)> = vec![
             ("CU_EVENT_DISABLE_TIMING", 0x2),
@@ -440,6 +597,29 @@ mod tests {
             ("CU_DEVICE_ATTRIBUTE_GLOBAL_L1_CACHE_SUPPORTED", 79),
             ("CU_DEVICE_ATTRIBUTE_CONCURRENT_MANAGED_ACCESS", 89),
             ("CU_DEVICE_ATTRIBUTE_HOST_REGISTER_SUPPORTED", 99),
+            ("CU_DEVICE_ATTRIBUTE_READ_ONLY_HOST_REGISTER_SUPPORTED", 113),
+            ("CU_MEMHOSTREGISTER_PORTABLE", 0x1),
+            ("CU_MEMHOSTREGISTER_DEVICEMAP", 0x2),
+            ("CU_MEMHOSTREGISTER_IOMEMORY", 0x4),
+            ("CU_MEMHOSTREGISTER_READ_ONLY", 0x8),
+            ("CU_MEMORYTYPE_HOST", 0x1),
+            ("CU_MEMORYTYPE_DEVICE", 0x2),
+            ("CU_MEMORYTYPE_UNIFIED", 0x4),
+            ("CU_POINTER_ATTRIBUTE_MEMORY_TYPE", 2),
+            ("CU_POINTER_ATTRIBUTE_DEVICE_POINTER", 3),
+            ("CU_POINTER_ATTRIBUTE_HOST_POINTER", 4),
+            ("CU_POINTER_ATTRIBUTE_RANGE_START_ADDR", 11),
+            ("CU_POINTER_ATTRIBUTE_RANGE_SIZE", 12),
+            ("CU_POINTER_ATTRIBUTE_MAPPED", 13),
+            ("CUDA_ERROR_INVALID_VALUE", 1),
+            ("CUDA_ERROR_OUT_OF_MEMORY", 2),
+            ("CUDA_ERROR_NO_DEVICE", 100),
+            ("CUDA_ERROR_INVALID_DEVICE", 101),
+            ("CUDA_ERROR_INVALID_CONTEXT", 201),
+            ("CUDA_ERROR_HOST_MEMORY_ALREADY_REGISTERED", 712),
+            ("CUDA_ERROR_HOST_MEMORY_NOT_REGISTERED", 713),
+            ("CUDA_ERROR_NOT_PERMITTED", 800),
+            ("CUDA_ERROR_NOT_SUPPORTED", 801),
         ];
         assert_eq!(rows.len(), expected.len());
         for ((name, val), (ename, eval)) in rows.iter().zip(expected.iter()) {

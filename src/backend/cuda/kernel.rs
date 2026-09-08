@@ -14,6 +14,7 @@
 //! so window start/frames can still vary by rewriting that buffer).
 
 use crate::backend::cuda::driver::{Cuda, DeviceBuffer, Function, GraphExec, Module, Stream};
+use crate::backend::cuda::ffi::CUdeviceptr;
 use crate::backend::flatten::FlattenedWorld;
 use crate::device::kernel_shared::FlatState;
 use crate::error::{Error, Result};
@@ -100,6 +101,18 @@ impl KernelWorld {
         max_frames: usize,
     ) -> Result<KernelWorld> {
         let cuda = Cuda::open(ordinal)?;
+        KernelWorld::open_with(cuda, ptx_bytes, flat, max_frames)
+    }
+
+    /// Like `open`, but driven by an existing CUDA session (the caller keeps
+    /// one context across registrations and renders — the D1 court path). The
+    /// context becomes owned by the returned world and dies with it.
+    pub fn open_with(
+        cuda: Cuda,
+        ptx_bytes: &[u8],
+        flat: FlattenedWorld,
+        max_frames: usize,
+    ) -> Result<KernelWorld> {
         let module = cuda.load_module(ptx_bytes)?;
         let function = module.function(KERNEL_ENTRY)?;
         let channels = usize::from(flat.output_channels);
@@ -210,6 +223,18 @@ impl KernelWorld {
         ]
     }
 
+    /// Parameters for a render whose final observation lands at `out_dev`
+    /// (D1: the device-visible pointer of a registered endpoint region).
+    fn kernel_params_to(&self, out_dev: CUdeviceptr) -> Vec<u64> {
+        vec![
+            self.d_state.device_ptr(),
+            self.d_voices.device_ptr(),
+            self.d_samples.device_ptr(),
+            self.d_partials.device_ptr(),
+            out_dev,
+        ]
+    }
+
     /// Upload the window state; call before any launch.
     fn push_state(&mut self, start_frame: i64, frames: usize) -> Result<()> {
         let state: FlatState = self.flat.state(start_frame, frames);
@@ -285,6 +310,53 @@ impl KernelWorld {
         let codes: &[i32] =
             unsafe { std::slice::from_raw_parts(self.out_bytes.as_ptr() as *const i32, out.len()) };
         out.copy_from_slice(codes);
+        Ok(())
+    }
+
+    /// D1 fused render: the kernel writes the final interleaved i32 codes
+    /// directly into `out_dev` — the device-visible pointer of a registered
+    /// *endpoint* region — with no D0 observation block, no device->host
+    /// transfer, and no host PCM copy. The caller (court d1) guarantees
+    /// `out_dev` addresses `frames * channels * 4` writable bytes that the
+    /// endpoint consumes only after the caller commits (this function
+    /// returns only after the stream is synchronized, so GPU writes to the
+    /// mapped region are visible per the driver's mapped-host-memory
+    /// coherency contract).
+    ///
+    /// Counters: `kernel_launches` and `quanta_submitted` increment exactly
+    /// as in the D0 path; `endpoint_observation_bytes` accumulates the bytes
+    /// written into the endpoint region. `gpu_to_host_pcm_bytes` and
+    /// `host_pcm_copy_bytes` are NOT incremented — that is the D1 claim.
+    pub fn render_direct(
+        &mut self,
+        start_frame: i64,
+        frames: usize,
+        out_dev: CUdeviceptr,
+    ) -> Result<()> {
+        if frames > self.max_frames {
+            return Err(Error::limit("render frames exceed KernelWorld max"));
+        }
+        if frames == 0 {
+            return Err(Error::malformed("render frames must be nonzero"));
+        }
+        self.push_state(start_frame, frames)?;
+        let channels = self.flat.output_channels;
+        let grid = grid_for(frames, channels);
+        let params = self.kernel_params_to(out_dev);
+        self.function.launch(
+            grid,
+            (BLOCK_THREADS, 1, 1),
+            self.stream_standard.handle,
+            &params,
+        )?;
+        self.stream_standard.synchronize()?;
+        self.counters.kernel_launches += 1;
+        self.counters.quanta_submitted += 1;
+        let bytes = (frames as u64) * u64::from(channels) * 4;
+        self.counters.endpoint_observation_bytes = self
+            .counters
+            .endpoint_observation_bytes
+            .saturating_add(bytes);
         Ok(())
     }
 

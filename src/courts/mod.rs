@@ -16,6 +16,8 @@ pub mod authored;
 #[cfg(feature = "std")]
 pub mod cuda;
 #[cfg(feature = "std")]
+pub mod d1;
+#[cfg(feature = "std")]
 pub mod facts;
 #[cfg(feature = "std")]
 pub mod semantic;
@@ -49,6 +51,12 @@ transform on every host surface",
         "Phase G CUDA D0: scalar == CUDA parity on frozen fixtures + facts on the device\
 surface + strategy comparison + fixture-level throughput",
     ),
+    (
+        "d1",
+        "Phase H CUDA D1 falsification: register the actual ALSA mmap endpoint region with \
+cuMemHostRegister(DEVICEMAP), render final codes directly into it, and measure the bytes D1 \
+removes vs the D0-mmap baseline (default silence-safe; --emit-audio opt-in)",
+    ),
 ];
 
 /// Run `court <name>`; unknown courts are usage errors.
@@ -59,6 +67,7 @@ pub fn run(name: &str, receipts_root: &Path) -> crate::error::Result<Verdict> {
         "simd" => simd::run(receipts_root),
         "facts" => facts::run(receipts_root),
         "cuda" => cuda::run(receipts_root),
+        "d1" => d1::run(receipts_root),
         other => Err(crate::error::Error::malformed(format!(
             "unknown court '{other}' (available: {})",
             COURT_NAMES

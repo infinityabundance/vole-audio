@@ -10,10 +10,12 @@
 //! this module (it is only reachable through `court cuda`/probe paths that
 //! first attempt `Cuda::open`).
 
+pub mod direct;
 pub mod driver;
 pub mod ffi;
 pub mod kernel;
 pub mod probe;
 
+pub use direct::{HostRegistration, PointerEvidence, RegisterRange};
 pub use driver::{Cuda, DeviceBuffer, DeviceInfo, Event, Function, GraphExec, Module, Stream};
 pub use kernel::KernelWorld;
