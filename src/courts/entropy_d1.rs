@@ -271,12 +271,16 @@ fn register_ring(
 }
 
 /// In-place verification of the codes written at `offset`: compare the mapped
-/// region against `expected` without building a shadow sample buffer.
+/// region against `expected` without building a shadow sample buffer. When
+/// `endpoint` is given, the actual mapped bytes read here are fed into it —
+/// an independent accumulation of the endpoint-region digest (verification
+/// instrumentation, not materialization traffic).
 fn region_matches(
     pcm: &AlsaPcm,
     offset: u64,
     frames: u64,
     expected: &[i32],
+    endpoint: Option<&mut crate::hash::sha256::Sha256>,
 ) -> std::result::Result<(), String> {
     let frame_bytes = pcm.request.frame_bytes();
     let addr = pcm.area_base + (offset * frame_bytes) as usize;
@@ -292,6 +296,11 @@ fn region_matches(
     // reads the endpoint region in place — verification instrumentation, not
     // materialization traffic.
     let got: &[i32] = unsafe { std::slice::from_raw_parts(addr as *const i32, len) };
+    if let Some(h) = endpoint {
+        for c in got {
+            h.update(&c.to_le_bytes());
+        }
+    }
     if got != expected {
         let nbad = got
             .iter()
@@ -570,12 +579,15 @@ struct SessionCtx<'a> {
 
 struct SessionCell {
     label: &'static str,
-    /// SHA-256 (hex) over the session's expected endpoint codes (i32 LE) —
-    /// the scalar-expected window digest. Every session verifies the ring
-    /// region against these codes chunk-by-chunk in place, so this digest is
-    /// simultaneously the reference (scalar) hash, the backend (CUDA) hash,
-    /// and the endpoint-region hash of the verdict-bearing content.
+    /// SHA-256 (hex) over the session's scalar-expected endpoint codes (i32
+    /// LE) — the reference (scalar) digest of the full committed window.
     window_sha256: String,
+    /// SHA-256 (hex) independently accumulated from the actual mapped-region
+    /// bytes read during per-chunk in-place verification (`region_matches`),
+    /// in commit order. Equal to `window_sha256` exactly when every committed
+    /// chunk matched the scalar oracle — measured independently, not derived
+    /// from the reference digest.
+    endpoint_sha256: String,
     out: SessionOut,
     traffic: SessionTraffic,
 }
@@ -625,6 +637,7 @@ fn session_json(cell: &SessionCell, verdict: &Verdict, total_frames: u64) -> ser
         "verification_host_read_bytes": cell.traffic.verification_read,
         "verification_shadow_copy_bytes": cell.traffic.verification_shadow_copy,
         "window_sha256": cell.window_sha256,
+        "endpoint_sha256": cell.endpoint_sha256,
         "drain_state": cell.out.drain_state,
         "detail": cell.out.detail,
     })
@@ -663,6 +676,9 @@ fn session_d0_literal(
     };
     let frame_bytes = pcm.request.frame_bytes();
     let channels = u64::from(pcm.request.channels);
+    // Independent endpoint-region digest: accumulates the actual mapped bytes
+    // read by per-chunk in-place verification, in commit order.
+    let mut endpoint_sha = crate::hash::sha256::Sha256::new();
     let out = run_session(&pcm, expected, |pos, offset, frames, expect| {
         if u64::try_from(pos).unwrap_or(u64::MAX) + frames > OBJECT_FRAMES as u64 {
             return Err("d0 position outside object".into());
@@ -678,13 +694,14 @@ fn session_d0_literal(
         let bytes = (expect.len() * 4) as u64;
         traffic.mat_host_copy += bytes;
         traffic.endpoint_obs += bytes;
-        region_matches(&pcm, offset, frames, expect)?;
+        region_matches(&pcm, offset, frames, expect, Some(&mut endpoint_sha))?;
         traffic.verification_read += bytes;
         Ok(())
     });
     Ok(SessionCell {
         label: "d0-literal",
         window_sha256: codes_sha256(expected),
+        endpoint_sha256: crate::hash::sha256::hex(&endpoint_sha.finalize()),
         out,
         traffic,
     })
@@ -727,6 +744,8 @@ fn session_d0_residual(
     };
     let frame_bytes = pcm.request.frame_bytes();
     let channels = u64::from(pcm.request.channels);
+    // Independent endpoint-region digest (see the d0-literal session).
+    let mut endpoint_sha = crate::hash::sha256::Sha256::new();
     let out = run_session(&pcm, expected, |pos, offset, frames, expect| {
         if u64::try_from(pos).unwrap_or(u64::MAX) + frames > OBJECT_FRAMES as u64 {
             return Err("d0 position outside object".into());
@@ -747,13 +766,14 @@ fn session_d0_residual(
         let bytes = (expect.len() * 4) as u64;
         traffic.mat_host_copy += bytes;
         traffic.endpoint_obs += bytes;
-        region_matches(&pcm, offset, frames, expect)?;
+        region_matches(&pcm, offset, frames, expect, Some(&mut endpoint_sha))?;
         traffic.verification_read += bytes;
         Ok(())
     });
     Ok(SessionCell {
         label: "d0-residual",
         window_sha256: codes_sha256(expected),
+        endpoint_sha256: crate::hash::sha256::hex(&endpoint_sha.finalize()),
         out,
         traffic,
     })
@@ -793,7 +813,6 @@ fn session_d1_literal(
         warmup_launches: 10 * worlds.len() as u64,
         ..Default::default()
     };
-    let frame_bytes = pcm.request.frame_bytes();
     // Sustained-clock warm-up (mandatory court methodology, not a pre-decode):
     // the rANS decode kernel is latency-chain bound and its wall time depends
     // on the GPU clock regime: ~20 ms per 512-frame window on an idle-first
@@ -815,6 +834,9 @@ fn session_d1_literal(
         }
     }
 
+    let frame_bytes = pcm.request.frame_bytes();
+    // Independent endpoint-region digest (see the d0-literal session).
+    let mut endpoint_sha = crate::hash::sha256::Sha256::new();
     let out = run_session(&pcm, expected, |pos, offset, frames, expect| {
         if frames != u64::from(PERIOD_FRAMES) {
             return Err(format!(
@@ -832,13 +854,14 @@ fn session_d1_literal(
         traffic.pages_decoded += job.pages.len() as u64;
         let bytes = (expect.len() * 4) as u64;
         traffic.endpoint_obs += bytes;
-        region_matches(&pcm, offset, frames, expect)?;
+        region_matches(&pcm, offset, frames, expect, Some(&mut endpoint_sha))?;
         traffic.verification_read += bytes;
         Ok(())
     });
     Ok(SessionCell {
         label: "d1-literal",
         window_sha256: codes_sha256(expected),
+        endpoint_sha256: crate::hash::sha256::hex(&endpoint_sha.finalize()),
         out,
         traffic,
     })
@@ -903,6 +926,8 @@ fn session_d1_residual(
     };
     let frame_bytes = pcm.request.frame_bytes();
     let upmix = ctx.upmix;
+    // Independent endpoint-region digest (see the d0-literal session).
+    let mut endpoint_sha = crate::hash::sha256::Sha256::new();
     let out = run_session(&pcm, expected, |pos, offset, frames, expect| {
         if frames != u64::from(PERIOD_FRAMES) {
             return Err(format!(
@@ -931,13 +956,14 @@ fn session_d1_residual(
         traffic.pages_decoded += job.pages.len() as u64;
         let bytes = (expect.len() * 4) as u64;
         traffic.endpoint_obs += bytes;
-        region_matches(&pcm, offset, frames, expect)?;
+        region_matches(&pcm, offset, frames, expect, Some(&mut endpoint_sha))?;
         traffic.verification_read += bytes;
         Ok(())
     });
     Ok(SessionCell {
         label: "d1-residual",
         window_sha256: codes_sha256(expected),
+        endpoint_sha256: crate::hash::sha256::hex(&endpoint_sha.finalize()),
         out,
         traffic,
     })
@@ -987,6 +1013,8 @@ fn session_d1_noise(
         ..Default::default()
     };
     let frame_bytes = pcm.request.frame_bytes();
+    // Independent endpoint-region digest (see the d0-literal session).
+    let mut endpoint_sha = crate::hash::sha256::Sha256::new();
     let out = run_session(&pcm, expected, |pos, offset, frames, expect| {
         if frames != u64::from(PERIOD_FRAMES) {
             return Err(format!(
@@ -1004,13 +1032,14 @@ fn session_d1_noise(
         traffic.pages_decoded += job.pages.len() as u64;
         let bytes = (expect.len() * 4) as u64;
         traffic.endpoint_obs += bytes;
-        region_matches(&pcm, offset, frames, expect)?;
+        region_matches(&pcm, offset, frames, expect, Some(&mut endpoint_sha))?;
         traffic.verification_read += bytes;
         Ok(())
     });
     Ok(SessionCell {
         label: "d1-noise",
         window_sha256: codes_sha256(expected),
+        endpoint_sha256: crate::hash::sha256::hex(&endpoint_sha.finalize()),
         out,
         traffic,
     })
@@ -1427,23 +1456,28 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
                 ..Default::default()
             })
             .provenance({
-                // Every session verified its committed ring region against the
-                // scalar-expected window chunk-by-chunk in place, so the
-                // window digest is simultaneously the reference (scalar)
-                // hash, the backend (CUDA) hash, and the endpoint-region hash
-                // of the verdict-bearing content. A direct post-session
-                // re-hash of the ring is impossible (the DMA consumes the
-                // region during drain); the per-chunk in-place equality is
-                // the mechanism that makes the three digests identical, and
-                // each session's window_sha256 is recorded in its row.
-                let verdict_sha = cells
-                    .iter()
-                    .find(|c| c.label == "d1-literal")
+                // Verdict-bearing path: the d1-literal session. reference_hash
+                // is the digest over the scalar-expected window (window_sha256);
+                // backend_hash and endpoint_hash are the digest independently
+                // accumulated from the actual mapped-region bytes read during
+                // per-chunk in-place verification (endpoint_sha256). The two
+                // digests are therefore measured through separate byte streams
+                // (in-memory scalar expected vs live mmap reads) and are equal
+                // exactly because every committed chunk matched the oracle.
+                let verdict_cell = cells.iter().find(|c| c.label == "d1-literal");
+                let reference_sha = verdict_cell
                     .map(|c| c.window_sha256.clone())
                     .unwrap_or_default();
+                let endpoint_sha = verdict_cell
+                    .map(|c| c.endpoint_sha256.clone())
+                    .unwrap_or_default();
+                // Defense in depth: independent digests must agree for the
+                // equality claim to hold (they do iff every chunk matched).
+                let hashes_agree = reference_sha.is_empty() || (reference_sha == endpoint_sha);
                 crate::evidence::receipt::Provenance {
-                    reference_hash: Some(verdict_sha.clone()),
-                    backend_hash: Some(verdict_sha.clone()),
+                    reference_hash: Some(reference_sha.clone()),
+                    backend_hash: Some(endpoint_sha.clone()),
+                    endpoint_hash: Some(endpoint_sha.clone()),
                     gpu_artifact_hash: Some(ptx.1.clone()),
                     benchmark_order: vec![
                         "d0-literal".into(),
@@ -1454,9 +1488,10 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
                     ],
                     // Exact equality of the verdict-bearing path: the CUDA
                     // written ring codes equal the scalar oracle for every
-                    // committed chunk (in-place verification), which makes
-                    // reference_hash == backend_hash == endpoint content.
-                    exact_equality: Some(all_supported),
+                    // committed chunk (in-place verification), so the
+                    // independently accumulated reference and endpoint
+                    // digests are identical.
+                    exact_equality: Some(all_supported && hashes_agree),
                     ..Default::default()
                 }
             })
@@ -1467,10 +1502,25 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
                         .iter()
                         .find(|c| c.label == "d1-literal")
                         .map(|c| c.window_sha256.clone()),
-                    "derivation": "the registered ring is verified chunk-by-chunk in place \
-                        against the scalar window before every commit; the ring is then \
-                        consumed by the DMA during drain, so the endpoint-region digest is \
-                        the verified window digest (per-session window_sha256 in each row)",
+                    "d1_literal_endpoint": cells
+                        .iter()
+                        .find(|c| c.label == "d1-literal")
+                        .map(|c| c.endpoint_sha256.clone()),
+                    "d1_residual_endpoint": cells
+                        .iter()
+                        .find(|c| c.label == "d1-residual")
+                        .map(|c| c.endpoint_sha256.clone()),
+                    "d1_noise_endpoint": cells
+                        .iter()
+                        .find(|c| c.label == "d1-noise")
+                        .map(|c| c.endpoint_sha256.clone()),
+                    "derivation": "reference_hash is the scalar-expected window digest; \
+                        backend_hash and endpoint_hash are independently accumulated from the \
+                        actual mapped-region bytes read during per-chunk in-place verification \
+                        (pre-commit, before the DMA consumes the region at drain). The digests \
+                        are measured through separate byte streams and agree exactly because \
+                        every committed chunk matched the scalar oracle (per-session \
+                        window_sha256 / endpoint_sha256 in each row)",
                 }),
             )
             .extra(

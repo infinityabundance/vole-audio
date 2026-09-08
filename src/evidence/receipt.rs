@@ -47,6 +47,11 @@ pub struct Provenance {
     pub reference_hash: Option<String>,
     /// SHA-256 of this backend's observation, hex.
     pub backend_hash: Option<String>,
+    /// SHA-256 of the actual endpoint-region bytes read back (D1/D2 courts),
+    /// hex — independently accumulated where the endpoint mapping is
+    /// verification-readable; equal to `backend_hash` when the backend wrote
+    /// the endpoint region directly and the readback was byte-exact.
+    pub endpoint_hash: Option<String>,
     /// SHA-256 of the GPU artifact (PTX/cubin/code object) used, hex.
     pub gpu_artifact_hash: Option<String>,
     /// Source-tree hash at run time (git identity + dirty, see Environment).
