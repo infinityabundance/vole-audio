@@ -171,12 +171,62 @@ Seal run (release, `--all-features`, clean tree `c887850`, `git_dirty: false`):
 - PTX artifact unchanged (the lib delta is amdgpu-inert): sha256
   `8b23325d03700847b056b29df4f4d4afd1a0c67386458512986c52f4fca7896b`.
 - Host tests: 292 total (287 passed, 5 ignored) all-features on the pinned
-  nightly (282 total, 277 passed default-features; the +5 are the rocm probe
-  classifier + court-path tests); MSRV 1.89.0 green with the same
-  all-features count; clippy `-D warnings` and `cargo fmt --check` clean.
-  (An earlier intermediate failure under `cargo test` was stale incremental
-  state from mixed toolchains in one target dir; a clean rebuild resolved it
-  and the sealed numbers above are from clean artifacts.)
+  nightly; MSRV 1.89.0 green with the same all-features count; clippy
+  `-D warnings` and `cargo fmt --check` clean.
+
+### Seal 2 — review amendment: evidence binding + hardening (2026-09-08)
+
+Delta since Seal 1 (five external-review items):
+
+1. **Stale-binary receipt binding (repo-wide)** — `build.rs` stamps
+   compile-time source identity into the host binary (compiled-from:
+   commit/tree/dirty/rustc/profile; reruns every build so HEAD moves are
+   tracked); every receipt now records both compiled-from and
+   executed-in-worktree, and this seal is the first in which **every
+   receipt is source-bound** (compiled-from == executed-in-worktree, both
+   clean). `court-all.sh` rebuilds unconditionally and refuses a non-bound
+   battery.
+2. **ROCm probe taxonomy + loader chain** — the probe now dlopens the
+   compute runtime (HIP/HSA) with required symbols (ld cache +
+   `ROCM_LIB_PATH` + `/opt/rocm*` candidates); missing userspace is
+   `UNSUPPORTED_BY_API`, KFD present-but-inaccessible is `INCONCLUSIVE`,
+   rocm-smi is telemetry only.
+3. **`court rocm` two-dimensional + fail-closed** — `compile_surface`
+   (artifact present + ELF-valid AMDGPU code object + required kernel
+   entries + provenance sidecar matching the attested tree) and
+   `runtime_surface`; an unsatisfied compile surface is `INCONCLUSIVE`
+   whatever the runtime says (self-defending `elf` validator, no external
+   tools).
+4. **Build isolation + determinism evidence** — fresh per-toolchain/per-gfx
+   target dirs with exactly-one rlib enforcement;
+   `--verify-deterministic` built twice in isolated dirs and proved
+   `SHA256(A1) == SHA256(A2)` = `5092e129…`
+   (`vole_audio.amdgcn.determinism.json`).
+5. **Launch-geometry guards** — `device::geom` frozen contract with the
+   pathological battery (zero rejected, 1×1, 1×64, non-divisible,
+   blocks>work, page ±1, max geometry); the amdgcn kernels guard-return on
+   invalid geometry.
+
+Seal run (release, `--all-features`, clean tree `087da6b`, `git_dirty: false`):
+
+- 18 receipts, committed separately at `550e7cc`; **every receipt
+  source-bound** (compiled-from == executed-in-worktree == `087da6b`).
+- All pre-existing courts SUPPORTED with frozen hashes unchanged (semantic
+  `1791816f4b93…`, authored `f7e103f3a97d…`); the cuda/entropy artifact
+  extras now consume the PTX provenance sidecar.
+- `court rocm`: `UNSUPPORTED_BY_HARDWARE` with the compile surface
+  **satisfied** — ELF machine AMDGPU, entries
+  `vole_render_d0`/`vole_entropy_decode`/`vole_upmix_mono_dup` found in
+  `.symtab`, sidecar matches the attested tree
+  (`vole_audio.amdgcn.elf`, 93 096 bytes, sha256
+  `5092e129b92c93f08de144058d470afc36b933c7fb908ac738ba4494473bb38e`,
+  byte-deterministic) — and the runtime chain recorded (no AMD GPU; KFD
+  absent; HIP/HSA dlopen attempts with reasons).
+- PTX artifact unchanged: sha256 `8b23325d03700847b056b29df4f4d4afd1a0c67386458512986c52f4fca7896b`.
+- Host tests: 313 total (308 passed, 5 ignored) all-features on the pinned
+  nightly (303 total, 298 passed default-features); MSRV 1.89.0 green with
+  the same all-features count; clippy `-D warnings` and
+  `cargo fmt --check` clean.
 
 ## Execution record (implementation summary)
 
