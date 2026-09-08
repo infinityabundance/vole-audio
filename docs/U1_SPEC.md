@@ -248,13 +248,29 @@ expected observation hashes) freeze in Phase C.
   (enforced by `courts::semantic::tests::fixture_reference_hash_is_frozen`).
 * Resampler table SHA-256 and sine table SHA-256 (see §§5, 9).
 
-### Phase D vectors (frozen)
+### Phase D authored vector — current frozen authority
 
-* `court authored` fixture observation hash (4000 frames, mono; silence,
+* `court authored` fixture observation SHA-256 (4000 frames, mono; silence,
   constant, deterministic noise, oscillator, 8-partial bank, wavetable,
   single-cycle, exact-repeat, and a half-transpose reference to a wavetable):
-  `f91b5b4228022d46a609a2fe7fc862e6e72c4058405c4b72316b202feb14fe87`
-  (enforced by `courts::authored::tests::fixture_reference_hash_is_frozen`).
+
+  `f7e103f3a97d5fafd6988e3bb6551b3c3af62a2e65c6a82898d6c2d4aff9d6db`
+
+  This is the **current** frozen value, enforced by
+  `courts::authored::tests::fixture_reference_hash_is_frozen` (the constant
+  `AUTHORED_COURT_REFERENCE_SHA256` in `src/courts/authored.rs`).
+
+  Freeze history (both values are authoritative for their era; the old value
+  is kept as forensic evidence, not as the current vector):
+
+  * `f91b5b4228022d46a609a2fe7fc862e6e72c4058405c4b72316b202feb14fe87` —
+    original Phase D/E vector;
+  * `f7e103f3a97d5fafd6988e3bb6551b3c3af62a2e65c6a82898d6c2d4aff9d6db` —
+    Phase F correctness re-freeze after fixing the latent
+    endless/periodic-voice natural-end bug.
+
+  Where this spec and the code disagree, the code is wrong — and here they
+  agree: the spec above matches the executable authority.
 
 ## 13. Procedural generators (frozen, Phase D)
 

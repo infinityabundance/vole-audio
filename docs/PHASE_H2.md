@@ -270,7 +270,7 @@ Seal run (release, `--all-features`, clean tree):
   --all-targets --all-features -D warnings` clean; `cargo fmt --check`
   clean.
 
-### Seal 4 — 0.4.2 independent endpoint hashes + v1.1 citations (2026-09-08)
+### Seal 4 — independent endpoint hashes + v1.1 citations, released as 0.4.3 (2026-09-08)
 
 Delta since Seal 3, closing the two items from the post-seal review:
 

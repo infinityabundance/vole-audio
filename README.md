@@ -17,8 +17,8 @@ architecture, currently specified by v1.1.
 > v1.1 is the current architecture paper — it makes the entropy-native layer
 > explicit (persist the deterministic explanation, entropy-code the exact
 > residual, materialize samples only when an observation requires them), and
-> Phase H.2 of this repository implements exactly that layer. v1.0 remains
-> the earlier broad disclosure.
+> Phase H.2 of this repository implements the first concrete entropy-native
+> core of that layer. v1.0 remains the earlier broad disclosure.
 
 > One Cargo package. PCM is an **observation view**. `SampleObject` is
 > authoritative. Literal fallback exists. Everything is measured; nothing is
