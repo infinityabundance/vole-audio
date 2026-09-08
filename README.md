@@ -95,7 +95,11 @@ Phases A–F are complete; Phase G (CUDA) is next. Executable evidence today:
   (`f7e103f3…`);
 - `cargo run -- court simd` — Phase F SIMD parity: scalar == SIMD on every
   available ISA floor (AVX-512 / AVX2 / scalar) over frozen worlds, with
-  fixture-level timing.
+  fixture-level timing;
+- `cargo run -- court facts` — independent semantic facts (F01–F15):
+  first-principles oracles for every representation/transform, verified on
+  every host surface (the Phase G prerequisite coverage; see
+  [SEMANTIC_FACTS.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/SEMANTIC_FACTS.md)).
 
 The exact ledger — completed phases, evidence, blockers, and the next work
 item — is
@@ -144,7 +148,7 @@ see the
 [EVIDENCE.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/EVIDENCE.md)
 measurement-boundary notes (repository-only). Courts arrive with their phases;
 the court list is fixed in the implementation contract (semantic, authored,
-simd, inverse, flattening, cuda, rocm, d1, d2, depth, conventional,
+simd, facts, inverse, flattening, cuda, rocm, d1, d2, depth, conventional,
 random-access, negative, interference, all).
 
 ## Non-claims

@@ -275,6 +275,41 @@ Applied right after the phase commit, before Phase G:
   clean, `fmt` clean, `no_std` host + `nvptx64-nvidia-cuda` device builds
   clean.
 
+### Semantic facts court — Phase G prerequisite (complete)
+
+Committed immediately after the Phase F seal, before Phase G begins:
+
+- **Independent-oracle coverage** (`src/facts.rs`, `court facts`, receipts
+  under `receipts/facts/`). Differential parity proves backend equality only;
+  a bug shared by every backend survives it. Each fact (stable ids F01–F15)
+  is an independent semantic statement about `vole.audio.u1` whose expected
+  samples are derived from first principles — closed-form integer math,
+  hand-enumerated boundary sequences, or an independent implementation — and
+  observed through the full `World` path on every host surface (scalar
+  authority, SIMD scalar floor, AVX2, AVX-512).
+- Coverage: silence (F01), constant identity/half-gain (F02/F03), oscillator
+  exact phase points at 12 kHz (F04), noise frozen vectors from an
+  independent Python `VOLE-SPLITMIX64-STREAM` oracle (F05), wavetable
+  fractional interpolation + periodicity (F06/F07), reverse one-shot and
+  loop-boundary hand-enumeration (F08/F09), pan endpoints/center (F10),
+  envelope exact ADSR/release knots (F11), mix i64-sum/single-final-+
+  voice-bus saturation (F12), residual closure H+R == X_O (F13), reference
+  unity transpose (F14), transpose vs an independent i128 oracle incl.
+  ceiling saturation and out-of-domain rejection (F15).
+- Wiring: `crate::facts` (std-gated), `court facts` in the court registry
+  (verdict `SUPPORTED` only when every fact passes on every available
+  surface; otherwise an honest `FAILED_CORRECTNESS` receipt), CLI usage
+  updated, README current-status updated, `docs/SEMANTIC_FACTS.md` written
+  (coverage + surface matrix, stable-id rule: every new representation must
+  ship a fact).
+- Drafting the facts caught one real wiring defect before commit: the
+  envelope-knot fact originally set `VoiceSpec.note_off` directly, but the
+  world scheduler only honors `VoiceOff` timeline events, so the note never
+  released (sustain forever). The fact world now pushes the timeline event;
+  this is exactly the class of bug the facts are designed to expose.
+- Test count now 177 green (debug + release; +2 facts tests), clippy
+  `-D warnings` clean, `fmt` clean.
+
 ## Known blockers
 
 - None for Phase F. ROCm hardware absent (evidence row only). ALSA D1 court
@@ -283,8 +318,17 @@ Applied right after the phase commit, before Phase G:
 
 ## Next work (exact order — the implementation contract is executed in sequence)
 
+The Phase G prerequisite (semantic-facts coverage, above) is complete. Phase
+G begins with CUDA:
+
 1. Phase G — CUDA (Rust PTX evaluator, GPU-resident world, buffered
-   diagnostic D0; scalar == CUDA differential).
+   diagnostic D0; scalar == SIMD == CUDA differential). The semantic-facts
+   surface matrix extends to the CUDA row as soon as a device surface exists
+   — every fact F01–F15 must pass there before `SUPPORTED` is reported — and
+   the CUDA capability matrix starts from the class split learned in Phase F
+   (Literal/Wavetable/SingleCycle/ExactRepeat/Constant/Noise/Oscillator/
+   PartialBank native; PredictorResidual/Referenced resolved before device
+   execution; filters classified individually).
 2. Phase H — CUDA D1 falsification (ALSA mmap + registration).
 3. Phase I — ROCm (hardware-unavailable evidence + clean amdgcn build).
 4. Phase J — ROCm D1.

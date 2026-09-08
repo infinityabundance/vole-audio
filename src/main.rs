@@ -17,7 +17,7 @@ USAGE:
 
 COMMANDS (current build):
     probe                 Capture environment + hardware evidence summary
-    court <name>          Run an executable court (semantic, authored, simd)
+    court <name>          Run an executable court (semantic, authored, simd, facts)
     receipt show <file>   Verify and print an evidence receipt
     version               Print version and build identity
     help                  Show this help

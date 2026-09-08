@@ -62,6 +62,8 @@ pub mod error;
 #[cfg(feature = "std")]
 pub mod evidence;
 #[cfg(feature = "std")]
+pub mod facts;
+#[cfg(feature = "std")]
 pub mod format;
 #[cfg(feature = "std")]
 pub mod object;
