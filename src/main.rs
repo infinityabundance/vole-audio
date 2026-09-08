@@ -19,8 +19,8 @@ COMMANDS (current build):
     probe                 Capture environment + hardware evidence summary
     court <name>          Run an executable court (semantic, authored, simd, facts,
                           cuda, d1, entropy-rans, entropy-literal, entropy-residual,
-                          entropy-pages, entropy-partial, entropy-cuda, entropy-d1,
-                          entropyfs, dsfb-entropy)
+                          entropy-pages, entropy-partial, entropy-simd, entropy-cuda,
+                          entropy-d1, entropyfs, dsfb-entropy, h2)
                           [--receipts DIR]; court d1 accepts --emit-audio (court
                           entropy-d1 honors VOLE_ENTROPY_D1_EMIT_AUDIO=1)
     receipt show <file>   Verify and print an evidence receipt
