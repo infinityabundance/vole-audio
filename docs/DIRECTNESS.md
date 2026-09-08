@@ -128,3 +128,45 @@ Interpretation discipline: this proves the memory path on one
 hardware/driver combination, not a universal property. A device whose ring
 the CUDA driver cannot register, or that lacks hw:mmap, produces an explicit
 negative row — which is exactly the first-class evidence the paper demands.
+
+## Phase H.2 measured outcome (fused entropy -> CUDA -> D1, `court entropy-d1`)
+
+The H.2 flagship carries the entropy representation over the same D1
+mechanism. Entropy-coded objects stay GPU-resident; per bounded 512-frame
+observation window the `vole_entropy_decode` kernel decodes **only the pages
+intersecting the window** (two 256-frame pages, one thread per page) and the
+exact final S32 codes land in the registered ALSA mmap ring before commit —
+no D0 sample block, no full-object decoded waveform, no GPU->host sample
+materialization, no host PCM copy on the D1 sessions.
+
+- A stereo **rANS delta-lane4 literal** decodes straight into the ring;
+- a **mono procedural + sparse exact residual** object decodes into a
+  window-local transient device arena and is expanded mono -> stereo
+  (L = R) on the device by `vole_upmix_mono_dup` — a sampler transform at
+  the observation boundary, never a host materialization;
+- a **high-entropy control** (RAW/literal pages) exercises the negative
+  control through the same path;
+- an equal-work **D0 baseline** (whole-object device decode -> one DtoH ->
+  per-chunk host copy into the ring) measures the removed bytes per object
+  pair: literal 32 768 B GPU->host + 32 768 B host copies; residual
+  16 384 B + 32 768 B (mono->stereo expansion included). D1 sessions: 0 B /
+  0 B. Verification reads the committed ring in place (32 768 B per
+  session), separately accounted.
+
+Court methodology recorded in the receipt: a 512-frame period paced into a
+4096-frame buffer, plus sustained-clock warm-up decode launches (the serial
+rANS decode is latency-chain bound — ~20 ms per window cold vs ~3 ms warm on
+this GPU — so each session first runs back-to-back decode launches into
+scratch arenas; nothing is pre-decoded for the session). Measured D1 chunk
+walls ~1–3 ms (literal) and ~0.3 ms (residual/RAW) against a 10.67 ms
+period; all sessions shadow-exact, zero xruns, clean drain. Verdict
+SUPPORTED (`D1_ENDPOINT_MAPPED`) on the seal machine: still **D1 /
+HOST_MAPPED** — the GPU writes across the host interconnect into
+system-memory-backed endpoint pages that the HDA controller DMA-reads; this
+is not labeled D2/GPUDirect.
+
+Module-load robustness fix shipped with the phase: the PTX image handed to
+`cuModuleLoadDataEx` is now NUL-terminated (ptxas otherwise parses heap
+garbage past an unterminated buffer, the cause of intermittent rc-218 JIT
+failures), and the artifact build strips the DWARF debug sections rustc
+emits into PTX even at `-C debuginfo=0`.

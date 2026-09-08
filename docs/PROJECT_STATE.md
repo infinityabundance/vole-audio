@@ -634,18 +634,127 @@ buffers).
 5. Stale D0/D1 timing prose refreshed from sealed receipts, including
 run-to-run variance (D1 mean 0.20–0.55 ms vs D0 0.14–0.19 ms per chunk).
 
+### Phase H.2 — Entropy-native audio core (complete)
+
+Inserted between H and I (no renumbering). The phase corrects an architectural
+omission: VOLE-Audio must not be only `procedural state -> PCM -> endpoint`;
+it now embodies
+
+```
+deterministic explanation
++ entropy/configuration state
++ entropy-coded irreducible residual
+ -> bounded observation
+   -> endpoint sample codes
+```
+
+Normative documents (one owner per decision): `docs/PHASE_H2.md` (charter +
+seal ledger), `docs/ENTROPY_NATIVE.md` (representation contract, exposure
+surfaces), `docs/RANS.md` (frozen native codec), `docs/ENTROPY_ACCOUNTING.md`
+(complete cost, declared/unique/physical, methodology), `docs/ENTROPYFS.md`
+(optional persistence boundaries), `docs/DSFB_SEARCH.md` (zero-authority
+search governance). ADRs `0001–0005` record the five normative decisions.
+
+Delivered (all inside the one package):
+
+- `src/entropy/` — native deterministic byte rANS (32-bit state,
+`scale_bits = 14`, `MODEL_TOTAL = 16384`, `STATE_L = 2^23`, checked
+integer arithmetic, division-based scalar authority; byte-parity against
+the ryg-rans-rs oracle in dev-dependencies only), canonical
+largest-remainder model normalization with min-1 present-symbol
+guarantee, reversible symbolizations (identity, lane4 plain/zigzag,
+delta-lane4), self-describing blocks and pages, mandatory complete-cost
+RAW fallback, literal + residual representations (existing Phase-E
+residual semantics untouched), frozen corpus with byte-flat negative
+controls, hostile-input corpus, complete-cost accounting, EmbeddedStore.
+- `src/entropy/entropyfs_store.rs` + feature `entropyfs-store` — adapter to
+the real published entropyfs 0.7.17 engine (default-off; optional).
+- `src/entropy/search/dsfb.rs` + feature `dsfb` — deterministic observer +
+adapter to the published dsfb crate (default-off; encoder search
+governance only, zero decoder authority).
+- `src/backend/entropy_flat.rs` — host flat-job builder (page-aligned
+bounded windows; models deduped by canonical bytes; residual RAW payloads
+rewritten page-local) and the host parity decoder.
+- `src/device/entropy_shared.rs` — the no_std shared decoder (pages decode
+one thread per page on device; repr(C) records size-pinned by tests).
+- `src/backend/cuda/entropy.rs` — `EntropyWorld` GPU runtime: upload once,
+bounded per-window decode jobs, `decode_into` for the fused path.
+- Device entries: `vole_entropy_decode` and `vole_upmix_mono_dup` (mono ->
+stereo duplication at the sampler boundary, on-device) added to the PTX
+artifact (`scripts/build-cuda-device.sh`; artifact also strips the DWARF
+debug sections rustc emits into PTX even at `-C debuginfo=0`).
+
+Courts (all registered; `court h2` runs the aggregate):
+
+- `entropy-rans` — codec battery: canonical determinism, model sweep,
+hostile corpus (796 typed cases).
+- `entropy-literal` — RAW vs native rANS literal vs canonical U1 vs FLAC
+(pinned external tool; `NOT_AVAILABLE` when absent).
+- `entropy-residual` — exact-residual entropy coding, byte-identical
+closure reconstruction, complete costs.
+- `entropy-pages` — page-size Pareto 64..4096, seek latency, corruption
+locality.
+- `entropy-partial` — partial materialization == full-slice equality, pages
+touched, decode halo.
+- `entropy-simd` — CPU parallel decode surface: scalar == page-parallel
+decode (2 and N threads), measured sequential vs parallel wall;
+instruction-level SIMD decode honestly recorded `NOT_IMPLEMENTED`
+(single-state rANS is serial per stream; no fabricated vectorization).
+- `entropy-cuda` — scalar == CUDA on literal delta-lane4, RAW-fallback
+noise, and procedural residual closure jobs.
+- `entropy-d1` — flagship fused path (below).
+- `entropyfs` / `dsfb-entropy` — feature-gated store and search courts
+(`INCONCLUSIVE` + limitation without their features).
+- `h2` — aggregate: SUPPORTED only when all ten H.2 courts are.
+
+Flagship `court entropy-d1` (H.2.18–H.2.20, H.2.53): entropy-coded literal
+(rANS delta-lane4), procedural mono+residual (Periodic hypothesis + sparse
+exact corrections), and a high-entropy RAW control ride the Phase-H D1
+mechanism on the RTX 4080 SUPER + `snd_hda_intel` hw:2,0 ring. Each 512-frame
+observation window decodes only its intersecting pages (two 256-frame pages,
+one thread per page) and writes the exact final S32 codes straight into the
+registered ALSA mmap ring before commit:
+
+- D0-literal: 32 768 B GPU→host + 32 768 B host copies; D1-literal: 0 B / 0 B.
+- D0-residual: 16 384 B GPU→host + 32 768 B host copies (mono->stereo
+expansion included); D1-residual: 0 B / 0 B (device-side expansion via
+`vole_upmix_mono_dup` into the ring).
+- Verification reads the committed ring in place (32 768 B/session,
+separately accounted; never conflated with materialization).
+- All sessions shadow-exact vs the scalar oracle, zero xruns, clean drain;
+the measured D1 chunk walls (~1–3 ms literal, ~0.3 ms residual/RAW) leave
+clear deadline margin against the 10.67 ms period. Methodology recorded in
+the receipt: 512-frame period into a 4096-frame buffer, sustained-clock
+warm-up launches (the serial rANS decode is latency-chain bound: ~20
+ms/window cold vs ~3 ms warm on this GPU), and the PTX module-load fix
+(NUL-terminated image; the driver's ptxas otherwise parses heap garbage
+past an unterminated buffer — the cause of intermittent rc-218 JIT
+failures that reproduced only in-process).
+
+Robustness fix in the CUDA driver layer: `cuModuleLoadDataEx` input is now
+NUL-terminated, eliminating process-state-dependent PTX JIT failures; the
+build script strips DWARF sections from the PTX text (rustc emits them even
+at `-C debuginfo=0`) and drops the matching `debug` target flag.
+
+Seal: see the ledger in `docs/PHASE_H2.md` and `receipts/` (immutable
+receipts under `receipts/<court>/`; negative rows preserved).
+
 ## Known blockers
 
-- None for Phases F/G/H. ROCm hardware absent (evidence row only). The D1
+- None for Phases F/G/H/H.2. ROCm hardware absent (evidence row only). The D1
   result is per-device/per-driver: another host's endpoint may register,
   refuse registration, or lack mmap — the court records whichever happens.
 
 ## Next work (exact order — the implementation contract is executed in sequence)
 
-Phase H is complete (CUDA D1 falsification, SUPPORTED on the on-board HDA
-ring with measured D0→D1 byte elimination). Next:
+Phase H.2 is complete (entropy-native core: all ten H.2 courts SUPPORTED on
+this machine, aggregate `court h2` SUPPORTED; fused entropy->CUDA->D1 endpoint
+path sealed). Next:
 
 1. Phase I — ROCm (hardware-unavailable evidence + clean amdgcn build).
 2. Phase J — ROCm D1.
-3. Phase K — inverse compiler; Phase L — GPU inverse search;
-4. Phase M — production depth/courts/corpus; Phase N — transport/archive.
+3. Phase K — inverse compiler (H.2 is its storage-cost oracle); Phase L — GPU
+   inverse search;
+4. Phase M — production depth/courts/corpus; Phase N — transport/archive
+   (embeds H.2 canonical records); Phase O — learned deterministic prediction
+   addendum (judged by the H.2 complete-cost API).

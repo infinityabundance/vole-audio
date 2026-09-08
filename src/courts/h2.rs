@@ -129,9 +129,5 @@ fn worst_of(a: Verdict, b: Verdict) -> Verdict {
         Verdict::Inconclusive => 1,
         Verdict::Supported => 0,
     };
-    if rank(a) >= rank(b) {
-        a
-    } else {
-        b
-    }
+    if rank(a) >= rank(b) { a } else { b }
 }

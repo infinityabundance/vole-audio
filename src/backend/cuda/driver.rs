@@ -10,16 +10,16 @@
 //! declared last and is also the last field to drop).
 
 use crate::error::{Error, Result};
-use std::ffi::{c_void, CString};
+use std::ffi::{CString, c_void};
 use std::path::Path;
 
 use super::ffi::{
-    cuda_error, CUdeviceptr, CUgraph, CUgraphExec, CUmodule, CUresult, CUstream, Driver, Fns,
     ATTR_CLOCK_RATE, ATTR_CONCURRENT_MANAGED_ACCESS, ATTR_GLOBAL_L1_CACHE_SUPPORTED,
     ATTR_HOST_REGISTER_SUPPORTED, ATTR_KERNEL_EXEC_TIMEOUT, ATTR_MAX_THREADS_PER_BLOCK,
     ATTR_MAX_THREADS_PER_MULTIPROCESSOR, ATTR_MULTIPROCESSOR_COUNT, ATTR_PCI_BUS_ID,
     ATTR_PCI_DEVICE_ID, ATTR_PCI_DOMAIN_ID, ATTR_STREAM_PRIORITIES_SUPPORTED,
-    ATTR_UNIFIED_ADDRESSING,
+    ATTR_UNIFIED_ADDRESSING, CUdeviceptr, CUgraph, CUgraphExec, CUmodule, CUresult, CUstream,
+    Driver, Fns, cuda_error,
 };
 
 // ---------------------------------------------------------------------------

@@ -15,6 +15,23 @@ research architecture.
 > authoritative. Literal fallback exists. Everything is measured; nothing is
 > assumed.
 
+## The central idea (as of Phase H.2)
+
+**Persist deterministic state and entropy-coded innovation. Materialize
+waveform samples only when an observation requires them.**
+
+VOLE-Audio's durable representation of an audio object is a *deterministic
+explanation* (procedural state — or a literal when no explanation wins) plus
+a *native entropy-coded exact residual* for whatever the explanation cannot
+reproduce, organized as block-addressable pages so any bounded observation
+decodes only the pages it touches. PCM — the final sample codes a DAC
+consumes — remains a legitimate observation surface and a literal
+representation is always the mandatory universal fallback; it is simply **not
+universally privileged as authoritative durable state**. The strongest path
+executed in this repository renders entropy-coded objects on the GPU and
+writes the exact final sample codes directly into the registered ALSA mmap
+endpoint region (see the Phase H/H.2 summaries below).
+
 ## What this project is
 
 VOLE-Audio treats pulse-code modulation as a **bounded sample-domain
@@ -62,9 +79,12 @@ src/
   object/             SampleObject model                    (Phase C)
   sampler/            voices/world/scheduler                (Phase C)
   eval/               scalar + SIMD + shared battery   (Phase C/F)
+  entropy/            native rANS + models + pages + residual coding + corpus
+                      + EmbeddedStore + DSFB observer       (Phase H.2)
   device/             flat kernel semantics (no_std); nvptx entry live (G);
                       amdgcn entry (Phase I)
-  backend/            flatten (G); cuda/ host runtime live (G); rocm/ (I)
+  backend/            flatten (G); cuda/ host runtime live (G); rocm/ (I);
+                      entropy_flat (H.2) host flat-job builder
   audio/              ALSA endpoint, directness, topology   (Phase H+)
   format/             canonical archive + WAV ingest        (Phase E)
   inverse/            bounded inverse-proceduralization     (Phase K+)
@@ -88,12 +108,17 @@ scripts/              device build + court drivers (repo only)
 
 ## Current status
 
-Phases A–H are complete: A–E the exact representation model on the scalar
+Phases A–H.2 are complete: A–E the exact representation model on the scalar
 oracle, F the honest SIMD baseline (scalar == AVX2 == AVX-512), G the CUDA D0
 buffered-diagnostic backend (scalar == SIMD == CUDA bit-for-bit; semantic
-facts F01–F14 verified on the device), and H the CUDA D1 falsification court
-against the real ALSA `hw:` mmap endpoint (the first direct-endpoint evidence;
-see the summary below). Executable evidence today:
+facts F01–F15 verified on the device), H the CUDA D1 falsification court
+against the real ALSA `hw:` mmap endpoint (the first direct-endpoint
+evidence), and H.2 the entropy-native core — a deterministic native rANS
+codec with canonical models, block-addressable pages and mandatory RAW
+fallback; literal + exact-residual entropy representations; optional
+EntropyFS persistence and DSFB search governance; CUDA entropy decode; and
+the flagship **fused entropy -> CUDA -> D1 endpoint** court. Executable
+evidence today:
 
 - `cargo run -- court semantic` — scalar oracle determinism battery
   (reference SHA-256 `1791816f…`);
@@ -134,11 +159,32 @@ see the summary below). Executable evidence today:
   (`snd_hda_intel`) and played byte-exact with zero xruns
   (`D1_ENDPOINT_MAPPED`, `HOST_MAPPED`); devices that refuse open, mmap,
   format, or registration stay visible as their own negative rows.
+- Phase H.2 entropy courts — `court entropy-rans` (native codec battery incl.
+  hostile corpus), `court entropy-literal` (RAW vs native rANS vs U1 vs FLAC
+  baselines), `court entropy-residual` (exact-residual entropy coding),
+  `court entropy-pages` (page-size Pareto 64..4096 + seek/corruption),
+  `court entropy-partial` (partial == full slice), `court entropy-simd`
+  (CPU page-parallel surface, exact; instruction-SIMD decode honestly
+  recorded `NOT_IMPLEMENTED`), `court entropy-cuda` (scalar == CUDA decode
+  on literal/RAW/residual jobs), `court entropyfs` / `court dsfb-entropy`
+  (optional store persistence and zero-authority search governance;
+  feature-gated, `INCONCLUSIVE` without), and `court entropy-d1` — the
+  flagship fused path: entropy-coded literal, procedural mono+residual, and
+  a high-entropy control are decoded on the GPU per bounded 512-frame window
+  (only the window's pages) and written directly into the registered ALSA
+  ring beside an equal-work D0 baseline — D1 removes 32 768 B GPU→host +
+  32 768 B host copies (literal) and 16 384 B + 32 768 B (residual) with
+  zero xruns and byte-exact ring codes; verification is separately
+  accounted. `court h2` runs the whole H.2 battery as an aggregate.
 
 The exact ledger — completed phases, evidence, blockers, and the next work
 item — is
 [PROJECT_STATE.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/PROJECT_STATE.md)
-(repository-only). Fixture-level measurements are in
+(repository-only). The H.2 phase charter and seal ledger live in
+[PHASE_H2.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/PHASE_H2.md)
+with its normative documents (`ENTROPY_NATIVE.md`, `RANS.md`,
+`ENTROPY_ACCOUNTING.md`, `ENTROPYFS.md`, `DSFB_SEARCH.md`, ADRs 0001–0005).
+Fixture-level measurements are in
 [PERFORMANCE.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/PERFORMANCE.md);
 the spec is
 [U1_SPEC.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/U1_SPEC.md),
@@ -195,10 +241,14 @@ random-access, negative, interference, all).
 See
 [NON_CLAIMS.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/NON_CLAIMS.md)
 (repository-only). Notably: no *flagship* performance figure exists yet —
-fixture-level Phase F measurements exist and are labeled as such in
+fixture-level Phase F/H.2 measurements exist and are labeled as such in
 [PERFORMANCE.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/PERFORMANCE.md);
-no real-time/deadline claim is made before the Phase M courts. This
-repository is hostile to self-deception by design.
+no real-time/deadline claim is made before the Phase M courts. The entropy
+phase adds its own non-claims: rANS is never presented as a generator, the
+DAC does not "consume compressed audio", D1 is not a latency optimization in
+the Phase-H court, EntropyFS/DSFB are optional and never enter playback, and
+the GPU never owns semantic authority (scalar does). This repository is
+hostile to self-deception by design.
 
 ## License
 

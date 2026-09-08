@@ -48,6 +48,29 @@ assertion.
     PCM. No ALSA endpoint region is written by the GPU, no `cuMemHostRegister`
     of an endpoint mapping exists, and no D1/D2 path exists until Phase H —
     receipts carry the D0 label and the sample-traffic counters.
+16. **The DAC consumes compressed audio / the endpoint understands rANS.** No.
+    The H.2 D1 path decodes entropy pages into exact final sample codes on
+    the GPU and writes those codes into the endpoint region; the endpoint
+    always receives plain S32_LE codes. rANS never leaves the representation
+    layer.
+17. **rANS is a procedural generator.** No (ADR 0001): entropy payloads are
+    representations of exact semantic content; a short coded payload never
+    contains more than its model + residual provably carry.
+18. **EntropyFS or DSFB are required for playback.** No (ADRs 0002/0003): both
+    are default-off optional features — persistence and encoder-side search
+    governance only; they never enter the decoder or the playback path.
+19. **Shared models / deduplication are free.** No: storage accounting always
+    reports declared, unique, and physical bytes separately; shared
+    dependencies are never reported as zero (ENTROPY_ACCOUNTING.md).
+20. **GPU entropy decode is faster than CPU.** Not claimed without a court:
+    the single-thread serial rANS decode is latency-chain bound (measured
+    ~20 ms/window cold vs ~3 ms warm on the seal GPU); the courts report
+    whichever surface wins (page counts, clocks, workload) and the D1 court
+    records that its value is directness/traffic, not latency.
+21. **D1 entropy results are a universal zero-copy claim.** No: the H.2 D1
+    receipt is per-device/per-driver; transient page-local sample state,
+    endpoint ring samples, and FIFO/DMA state always exist and are counted
+    under their own surfaces.
 
 Anything in this list that later gains evidence moves into a claims document
 with its receipt. Until then: **not claimed.**

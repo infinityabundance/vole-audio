@@ -158,3 +158,65 @@ Seals are appended in order as they are produced. Every seal is a clean-tree
 run with immutable receipts committed separately; negative receipts are kept.
 
 <!-- ledger entries are appended chronologically below this line -->
+
+## Execution record (implementation summary)
+
+All H.2.x work items were executed in sequence. Summary of what exists where:
+
+- **H.2.0** — entry freeze captured above (commit `39a349b5…`); the six
+  normative documents were written before code.
+- **H.2.1–H.2.5** — `src/entropy/rans.rs`, `model.rs`, `block.rs`, `symbol.rs`
+  (symbolizations 1 identity, 2 lane4-plain, 3 lane4-zigzag, 4 delta-lane4),
+  `represent.rs` (`RepresentedLiteral`/`RepresentedResidual` with mandatory
+  complete-cost RAW fallback), `corpus.rs` (frozen fixtures incl. byte-flat
+  negative controls), `hostile.rs`, `accounting.rs`.
+- **H.2.6–H.2.8** — block-addressable pages; page-size Pareto; shared models
+  with content-addressable identity (model bytes always counted).
+- **H.2.9–H.2.11** — entropy-coded exact residual with Phase-E closure
+  unchanged; residual symbolization; complete representation cost.
+- **H.2.12** — conventional baselines incl. FLAC via pinned executable when
+  present (`NOT_AVAILABLE` otherwise).
+- **H.2.13–H.2.14** — partial materialization (`partial == full`);
+  reverse/loop/rate/seek via the page architecture.
+- **H.2.15** — additive exposure counters (materialization vs verification
+  surfaces separated).
+- **H.2.16** — CPU parallel decode surface measured (`court entropy-simd`:
+  scalar == page-parallel; instruction-SIMD decode honestly NOT_IMPLEMENTED).
+- **H.2.17–H.2.18** — `src/device/entropy_shared.rs` no_std decoder
+  (one thread per page) + `vole_entropy_decode`; fused GPU entropy +
+  procedural closure without a full-object global waveform.
+- **H.2.19–H.2.20** — `court entropy-d1`: fused entropy -> CUDA -> D1
+  endpoint (literal, procedural mono+residual with device mono->stereo via
+  `vole_upmix_mono_dup`, high-entropy control) beside an equal-work D0
+  entropy baseline; per-session traffic accounting.
+- **H.2.21–H.2.25** — `ObjectStore` (EmbeddedStore) + optional
+  `entropyfs-store` feature (real published engine); declared/unique/physical
+  accounting; standalone materialization independent of EntropyFS.
+- **H.2.26–H.2.29** — `dsfb` feature (real published crate) + deterministic
+  observer; exhaustive/fixed-heuristic/DSFB-guided over one candidate
+  universe; search-work/regret receipted.
+- **H.2.30–H.2.31** — frozen corpus + negative controls.
+- **H.2.32** — courts: `entropy-rans`, `entropy-literal`, `entropy-residual`,
+  `entropy-pages`, `entropy-partial`, `entropy-simd`, `entropy-cuda`,
+  `entropy-d1`, `entropyfs`, `dsfb-entropy`, and the `h2` aggregate.
+- **H.2.33–H.2.34** — hostile-input battery (typed errors only) + decode
+  complexity limits.
+- **H.2.35–H.2.40** — additive receipts; performance/memory-path/D1/
+  EntropyFS/DSFB claim boundaries (see the docs + `NON_CLAIMS.md` items
+  16–21).
+- **H.2.41–H.2.44** — Phase O/K/N preparation: complete-cost APIs
+  (`CompleteCost`/`StorageBytes`/`SharedCost`/`ExposureLedger` in
+  `src/entropy/accounting.rs` — the charter's placeholder names were
+  replaced by these codebase-justified ones); canonical records
+  self-delimiting/versioned for Phase N.
+- **H.2.45–H.2.46** — documentation (README central language; ADRs
+  0001–0005 in `docs/adr/`).
+- **H.2.47–H.2.49** — test matrix (see the seal entries; hostile + property +
+  differential coverage); unsafe confined to FFI/intrinsics; build/release
+  matrix executed at seal.
+- **H.2.50–H.2.55** — clean-tree sealing below; exit criteria checked at the
+  seal entry; flagship demonstration = the positive literal/residual D1 pair
+  with the high-entropy control beside it.
+
+U1 semantics were not modified: existing frozen reference hashes are
+unchanged (exit criterion 1), and entropy is representation only (ADR 0001).
