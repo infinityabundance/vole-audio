@@ -10,31 +10,37 @@
 //! 1. Discover `hw:` playback PCMs (non-`hw:` names are refused: plug
 //!    conversion would answer a different question). Configure the frozen
 //!    shape `MMAP_INTERLEAVED + S32_LE + 48 kHz + stereo + 512-frame period /
-//!    1024-frame buffer` on each candidate.
+//!    1024-frame buffer` on each candidate. The exact 48 kHz rate is
+//!    mandatory (a nearby rate would be a silent resample) and the full
+//!    per-channel area geometry is validated at open before any simplified
+//!    pointer arithmetic is used.
 //! 2. Register the **exact mapped region** (`cuMemHostRegister` +
-//!    `CU_MEMHOSTREGISTER_DEVICEMAP` + `cuMemHostGetDevicePointer`),
-//!    recording base/length/page alignment/flags/rc/pointer attributes. A
-//!    failed registration is recorded exactly and classified — never "fixed"
-//!    by allocating a new pinned buffer.
+//!    `CU_MEMHOSTREGISTER_DEVICEMAP` + `cuMemHostGetDevicePointer`), recording
+//!    base/length/page alignment/flags. Every `cuPointerGetAttribute` query
+//!    records its own rc + driver string + value. A failed registration is
+//!    recorded exactly and classified — never "fixed" by allocating a new
+//!    pinned buffer.
 //! 3. When registered: a paced real-time session where the kernel writes each
 //!    contiguous mmap chunk directly into the registered region's device
 //!    pointer, the stream synchronizes, the written codes are shadow-verified
-//!    in place against the scalar oracle, and only then the chunk is
-//!    committed. xruns are counted and recorded with an explicit
-//!    discontinuity policy (never a silent reset).
-//! 4. A controlled **D0-mmap baseline** runs on the same endpoint shape:
-//!    `KernelWorld::render` (DtoH + host copy) plus a CPU copy into the
-//!    region — the exact bytes D1 removes are measured, not asserted.
+//!    **in place** against the scalar oracle (no shadow sample buffer), and
+//!    only then the chunk is committed — with an exact transferred-frame
+//!    check (a short `snd_pcm_mmap_commit` is an xrun-class event, recorded).
+//!    xruns are counted with an explicit discontinuity policy.
+//! 4. A controlled **D0-mmap baseline** on the same endpoint shape runs the
+//!    **same number of frames** as the D1 session: D0 render (DtoH) → host
+//!    copies → CPU copy into the region. Materialization traffic and
+//!    verification reads are counted under separate named surfaces, so the
+//!    bytes D1 removes are measured, not asserted.
 //!
 //! Default content is silence-safe (peak |code| ≤ 2^16 ≈ −80 dBFS, but
 //! nonzero and content-rich). Audible content requires the opt-in flag (the
 //! CLI sets `VOLE_D1_EMIT_AUDIO=1` for `court d1 --emit-audio`).
 //!
-//! Verdicts: `SUPPORTED` only when a device registered, played the full
-//! window byte-exact with no xrun and a clean drain; `FELL_BACK_TO_D0` when
-//! registration failed everywhere but the D0 baseline ran; explicit per-device
-//! `UNSUPPORTED_BY_HARDWARE` / `UNSUPPORTED_BY_API` rows are recorded
-//! otherwise. Negative results are results.
+//! Every candidate device gets its own trial row. Playback sessions stop at
+//! the first registered device (bounded court); remaining candidates are then
+//! probed for open/mmap/format/registration and recorded with
+//! `playback_attempted: false` so the docs never overstate the sealed rows.
 
 use crate::evidence::receipt::{
     CourtParams, EndpointEvidence, Provenance, ReceiptBuilder, RunTiming,
@@ -138,8 +144,11 @@ mod linux {
             .filter(|s| !s.is_empty())
     }
 
-    fn media_frames(secs_factor: f64) -> usize {
-        ((session_secs() * secs_factor * f64::from(RATE_HZ)).round() as usize).clamp(2400, 480_000)
+    /// Media frames per session. Both the D0 baseline and the D1 session run
+    /// the SAME window so the byte comparison is direct (no half-length
+    /// baseline).
+    fn media_frames() -> usize {
+        ((session_secs() * f64::from(RATE_HZ)).round() as usize).clamp(2400, 480_000)
     }
 
     // ---------------------------------------------------------------------
@@ -165,11 +174,10 @@ mod linux {
 
     fn gains(mode: Mode) -> Gains {
         match mode {
+            // Gains 1: code ≈ obs/2^16 — peak codes stay ≈ −80 dBFS or below
+            // (silence-safe) while remaining nonzero and content-rich (exact
+            // equality is still a full i32-domain statement).
             Mode::Quiet => Gains {
-                // Gains 1: code ≈ obs/2^16 — peak codes stay ≈ −80 dBFS or
-                // below (silence-safe) while remaining nonzero and
-                // content-rich (exact equality is still a full i32-domain
-                // statement).
                 literal: 1,
                 wavetable: 1,
                 osc: 1,
@@ -428,6 +436,11 @@ mod linux {
     // Evidence records
     // ---------------------------------------------------------------------
 
+    /// One playback session (D0-mmap baseline or D1-direct). Materialization
+    /// traffic and verification reads are separate named surfaces: the
+    /// materialization numbers describe the actual path; the verification
+    /// numbers describe the court's instrumentation (reads of already-written
+    /// samples, never additional materialization copies).
     #[derive(Debug, Clone, Serialize, Deserialize)]
     struct PathSession {
         path: String,
@@ -436,17 +449,25 @@ mod linux {
         chunks: u64,
         xruns: u64,
         completed: bool,
-        shadow_exact: Option<bool>,
+        shadow_exact: bool,
         window_hash: Option<String>,
         chunk_wall_mean_ms: Option<f64>,
         chunk_wall_median_ms: Option<f64>,
         chunk_wall_max_ms: Option<f64>,
         depth_min_frames: u64,
         depth_max_frames: u64,
-        gpu_to_host_bytes: u64,
-        host_copy_bytes: u64,
+        // --- materialization traffic (the path) ---
+        materialization_gpu_to_host_bytes: u64,
+        materialization_host_copy_bytes: u64,
+        /// Bytes resident on the host as part of the materialization path
+        /// (D0 render target; 0 for the D1 path).
+        materialization_host_resident_bytes: u64,
+        /// Bytes written into the endpoint-visible region by this path.
         endpoint_observation_bytes: u64,
         kernel_launches: u64,
+        // --- verification instrumentation (the court) ---
+        verification_host_read_bytes: u64,
+        verification_shadow_copy_bytes: u64,
         drain_state: Option<String>,
         detail: Option<String>,
     }
@@ -455,6 +476,9 @@ mod linux {
     struct DeviceTrial {
         device: EndpointInfo,
         opened: bool,
+        /// True when a paced playback session ran on this device (the first
+        /// registered device only; later candidates are probe rows).
+        playback_attempted: bool,
         failure: Option<AlsaFailure>,
         snapshot: Option<EndpointSnapshot>,
         registration_rc: Option<i32>,
@@ -474,6 +498,7 @@ mod linux {
             DeviceTrial {
                 device: dev.clone(),
                 opened: false,
+                playback_attempted: false,
                 failure: Some(f.clone()),
                 snapshot: None,
                 registration_rc: None,
@@ -487,11 +512,59 @@ mod linux {
                 class_detail: d,
             }
         }
+
+        fn probe(dev: &EndpointInfo, pcm: &AlsaPcm, reg: &RegistrationAttempt) -> DeviceTrial {
+            let mut t = DeviceTrial {
+                device: dev.clone(),
+                opened: true,
+                playback_attempted: false,
+                failure: None,
+                snapshot: Some(pcm.snapshot()),
+                registration_rc: None,
+                registration_message: None,
+                registered: false,
+                missing_symbol: None,
+                range: None,
+                device_pointer: None,
+                pointer_evidence: None,
+                class: Verdict::Inconclusive,
+                class_detail: String::new(),
+            };
+            match reg {
+                RegistrationAttempt::Registered(r) => {
+                    let dev_ptr = r.device_ptr.unwrap_or(0);
+                    t.registered = true;
+                    t.device_pointer = Some(format!("0x{dev_ptr:x}"));
+                    t.pointer_evidence =
+                        Some(PointerEvidence::query(&r.fns, r.host_ptr as usize, dev_ptr));
+                    t.class = Verdict::NotApplicable;
+                    t.class_detail =
+                        "registration probe succeeded; playback not attempted (an earlier \
+                         candidate already carried the D1 session)"
+                            .into();
+                }
+                RegistrationAttempt::MissingSymbol(m) => {
+                    t.missing_symbol = Some(m.clone());
+                    t.class = Verdict::UnsupportedByApi;
+                    t.class_detail = "driver lacks the cuMemHostRegister surface".into();
+                }
+                RegistrationAttempt::Failed { rc, message } => {
+                    let (v, reason) = HostRegistration::classify(*rc, true, true);
+                    t.registration_rc = Some(*rc);
+                    t.registration_message = Some(message.clone());
+                    t.class = v;
+                    t.class_detail = reason.to_string();
+                }
+            }
+            t
+        }
     }
 
     /// Outcome of one paced playback session (path-agnostic). The writer
-    /// closure renders one contiguous mmap chunk and returns the codes it
-    /// wrote; the session verifies them against the scalar oracle and commits.
+    /// closure renders one contiguous mmap chunk and verifies it in place
+    /// against the expected oracle codes; it returns Err with a message on
+    /// any failure. The session paces, commits (exact transfer check), counts
+    /// xruns, and drains.
     struct SessionOut {
         frames_committed: u64,
         chunks: u64,
@@ -499,7 +572,8 @@ mod linux {
         wall: Vec<f64>,
         depth_min: u64,
         depth_max: u64,
-        shadow_exact: Option<bool>,
+        /// None until a mismatch is detected.
+        shadow_exact: bool,
         drain_state: Option<String>,
         detail: Option<String>,
     }
@@ -507,25 +581,26 @@ mod linux {
     fn run_session(
         pcm: &AlsaPcm,
         expected: &[i32],
-        mut writer: impl FnMut(i64, u64, u64) -> std::result::Result<Vec<i32>, String>,
+        mut writer: impl FnMut(i64, u64, u64, &[i32]) -> std::result::Result<(), String>,
     ) -> SessionOut {
         let period = pcm.period_frames;
         let buffer = pcm.buffer_frames;
-        let total = expected.len() as u64 / u64::from(pcm.request.channels);
+        let channels = u64::from(pcm.request.channels);
+        let total = expected.len() as u64 / channels;
         let mut frames_committed: u64 = 0;
         let mut chunks = 0u64;
         let mut xruns = 0u64;
         let mut wall: Vec<f64> = Vec::new();
         let mut depth_min = u64::MAX;
         let mut depth_max = 0u64;
-        let mut shadow_exact = Some(true);
+        // Exact until a writer verification says otherwise.
+        let mut shadow_exact = true;
         let mut detail: Option<String> = None;
         let mut drain_state: Option<String> = None;
         let mut expected_pos = 0usize;
-        let mut run = true;
         let mut stalls = 0u32;
         let mut started = false;
-        while run && frames_committed < total {
+        while frames_committed < total {
             let want = (total - frames_committed).min(period);
             let ready = match pcm.wait(WAIT_TIMEOUT_MS) {
                 Ok(true) => true,
@@ -538,8 +613,7 @@ mod linux {
                                 "endpoint stall: no progress after {stalls} waits (state {})",
                                 pcm.state_label()
                             ));
-                            run = false;
-                            false
+                            break;
                         } else {
                             false
                         }
@@ -584,38 +658,13 @@ mod linux {
                 detail = Some("mmap_begin returned 0 frames".into());
                 break;
             }
+            let chunk_codes = (frames * channels) as usize;
+            let expect = &expected[expected_pos..expected_pos + chunk_codes];
+            expected_pos += chunk_codes;
             let t0 = Instant::now();
-            let codes = match writer(frames_committed as i64, offset, frames) {
-                Ok(c) => c,
-                Err(e) => {
-                    shadow_exact = Some(false);
-                    detail = Some(e);
-                    break;
-                }
-            };
-            if codes.len() as u64 != frames * u64::from(pcm.request.channels) {
-                detail = Some("writer returned a wrong code count".into());
-                shadow_exact = Some(false);
-                break;
-            }
-            // Shadow verification against the scalar oracle (in place for
-            // D1; pre-copy for D0).
-            let expect = &expected[expected_pos..expected_pos + codes.len()];
-            expected_pos += codes.len();
-            if codes != expect {
-                let nbad = codes
-                    .iter()
-                    .zip(expect)
-                    .filter(|(a, b)| a != b)
-                    .take(3)
-                    .map(|(a, b)| format!("{a} != {b}"))
-                    .collect::<Vec<_>>()
-                    .join("; ");
-                shadow_exact = Some(false);
-                detail = Some(format!(
-                    "shadow mismatch at frame {}: {nbad} (+ more)",
-                    frames_committed
-                ));
+            if let Err(e) = writer(frames_committed as i64, offset, frames, expect) {
+                shadow_exact = false;
+                detail = Some(e);
                 break;
             }
             match pcm.mmap_commit(offset, frames) {
@@ -625,6 +674,10 @@ mod linux {
                         xruns += 1;
                         let _ = pcm.recover(-libc::EPIPE);
                     } else {
+                        // Includes the exact short-commit check inside
+                        // mmap_commit: a nonnegative-but-short transfer is an
+                        // xrun-class event and aborts with the exact
+                        // requested/transferred counts in the detail.
                         detail = Some(format!("mmap_commit failed: {f}"));
                         break;
                     }
@@ -633,20 +686,16 @@ mod linux {
             frames_committed += frames;
             chunks += 1;
             // Explicit start after the first committed chunk (the sw
-            // start-threshold does not reliably auto-start on every driver;
-            // the C probe confirmed PREPARED persists after one period).
+            // start-threshold does not reliably auto-start on every driver).
             if !started {
                 started = true;
-                match pcm.start() {
-                    Ok(()) => {}
-                    Err(f) => {
-                        if f.rc == Some(-libc::EPIPE) {
-                            xruns += 1;
-                            let _ = pcm.recover(-libc::EPIPE);
-                        } else {
-                            detail = Some(format!("snd_pcm_start failed: {f}"));
-                            break;
-                        }
+                if let Err(f) = pcm.start() {
+                    if f.rc == Some(-libc::EPIPE) {
+                        xruns += 1;
+                        let _ = pcm.recover(-libc::EPIPE);
+                    } else {
+                        detail = Some(format!("snd_pcm_start failed: {f}"));
+                        break;
                     }
                 }
             }
@@ -679,41 +728,51 @@ mod linux {
         }
     }
 
-    fn finish_session(
-        path: &str,
-        pcm: &AlsaPcm,
-        out: SessionOut,
-        expected: &[i32],
-        c: &Counters,
-        launches: u64,
-    ) -> PathSession {
-        let mut wall = out.wall.clone();
+    fn wall_stats(wall: &[f64]) -> (Option<f64>, Option<f64>, Option<f64>) {
+        let mut wall = wall.to_vec();
         wall.sort_by(f64::total_cmp);
         let r3 = |v: f64| (v * 1000.0).round() / 1000.0;
-        PathSession {
-            path: path.into(),
-            endpoint: pcm.snapshot(),
-            frames_committed: out.frames_committed,
-            chunks: out.chunks,
-            xruns: out.xruns,
-            completed: out.detail.is_none() && out.frames_committed >= expected.len() as u64 / 2,
-            shadow_exact: out.shadow_exact,
-            window_hash: out
-                .shadow_exact
-                .unwrap_or(false)
-                .then(|| hex(&observation_sha256(expected))),
-            chunk_wall_mean_ms: (!wall.is_empty())
-                .then(|| r3(wall.iter().sum::<f64>() / wall.len() as f64)),
-            chunk_wall_median_ms: wall.get(wall.len() / 2).copied().map(r3),
-            chunk_wall_max_ms: wall.last().copied().map(r3),
-            depth_min_frames: out.depth_min,
-            depth_max_frames: out.depth_max,
-            gpu_to_host_bytes: c.gpu_to_host_pcm_bytes,
-            host_copy_bytes: c.host_pcm_copy_bytes,
-            endpoint_observation_bytes: c.endpoint_observation_bytes,
-            kernel_launches: launches,
-            drain_state: out.drain_state,
-            detail: out.detail,
+        (
+            (!wall.is_empty()).then(|| r3(wall.iter().sum::<f64>() / wall.len() as f64)),
+            wall.get(wall.len() / 2).copied().map(r3),
+            wall.last().copied().map(r3),
+        )
+    }
+
+    fn verdict_for_session(s: &PathSession) -> (Verdict, String) {
+        if !s.shadow_exact {
+            (
+                Verdict::FailedCorrectness,
+                format!(
+                    "written codes differ from the scalar oracle: {}",
+                    s.detail.clone().unwrap_or_default()
+                ),
+            )
+        } else if s.xruns > 0 {
+            (
+                Verdict::FailedDeadline,
+                format!(
+                    "shadow equality held but {} xrun(s) occurred (explicit discontinuities \
+                     recorded)",
+                    s.xruns
+                ),
+            )
+        } else if s.completed {
+            (
+                Verdict::Supported,
+                "registered the actual ALSA endpoint region; every chunk was written \
+                 byte-exact vs the scalar oracle, committed with an exact transfer check, \
+                 and drained without xrun"
+                    .to_string(),
+            )
+        } else {
+            (
+                Verdict::FailedDeadline,
+                format!(
+                    "session incomplete: {}",
+                    s.detail.clone().unwrap_or_default()
+                ),
+            )
         }
     }
 
@@ -843,17 +902,23 @@ mod linux {
             ));
         }
         let oracle = ScalarOracle::new(world.clone());
+        let frames = media_frames();
+        let expected = match oracle.observe(&store, 0, frames) {
+            Ok(w) => w,
+            Err(e) => {
+                return Err(crate::error::Error::internal(format!(
+                    "oracle window failed: {e}"
+                )));
+            }
+        };
         let mut sessions: Vec<PathSession> = Vec::new();
         let mut trials: Vec<DeviceTrial> = Vec::new();
-        // Devices whose open already failed in pass A are not re-opened in
-        // pass B (one trial per device).
         let mut open_failed: std::collections::HashSet<String> = std::collections::HashSet::new();
 
         // -----------------------------------------------------------------
-        // Pass A — D0-mmap baseline on the first configurable endpoint
-        // (0.5x duration; per-chunk metrics are directly comparable).
+        // Pass A — D0-mmap baseline on the first configurable endpoint. Runs
+        // the SAME number of frames as the D1 session.
         // -----------------------------------------------------------------
-        let d0_frames = media_frames(0.5);
         for dev in &candidates {
             let pcm = match AlsaPcm::open(&device_request(dev)) {
                 Ok(p) => p,
@@ -863,26 +928,17 @@ mod linux {
                     continue;
                 }
             };
-            // Configurable endpoint: run the D0-mmap baseline here and stop.
             if let Err(e) = pcm.set_blocking() {
                 extras.insert(
                     "d0_set_blocking_error".into(),
                     serde_json::json!(e.to_string()),
                 );
             }
-            let expected = match oracle.observe(&store, 0, d0_frames) {
-                Ok(w) => w,
-                Err(e) => {
-                    return Err(crate::error::Error::internal(format!(
-                        "oracle window failed: {e}"
-                    )));
-                }
-            };
             println!(
                 "court d1: D0-mmap baseline on {} (peak |code| {} in {} frames)",
                 dev.pcm_name,
                 peak(&expected),
-                expected.len() as u64 / u64::from(CHANNELS)
+                expected.len() / usize::try_from(CHANNELS).unwrap_or(2)
             );
             let mut kw = match KernelWorld::open(0, &ptx, flat.clone(), PERIOD_FRAMES as usize) {
                 Ok(k) => k,
@@ -892,36 +948,67 @@ mod linux {
                     )));
                 }
             };
-            let mut path_counters = Counters::new();
+            let mut region_copy_bytes = 0u64;
+            let mut verification_read_bytes = 0u64;
             let mut hostbuf: Vec<i32> = Vec::new();
-            let out = run_session(&pcm, &expected, |start, _offset, frames| {
-                // D0 path: render into host (DtoH + host copy), then copy the
-                // codes into the endpoint region ourselves.
+            let mut hostbuf_resident = 0u64;
+            let out = run_session(&pcm, &expected, |start, offset, chunk_frames, expect| {
+                // D0 path: DtoH render into the host buffer, verify it against
+                // the oracle, then copy into the endpoint region.
                 hostbuf.clear();
-                hostbuf.resize((frames * u64::from(CHANNELS)) as usize, 0);
-                kw.render(Strategy::Standard, start, frames as usize, &mut hostbuf)
-                    .map_err(|e| e.to_string())?;
-                let bytes = frames * u64::from(CHANNELS) * 4;
-                path_counters.gpu_to_host_pcm_bytes =
-                    path_counters.gpu_to_host_pcm_bytes.saturating_add(bytes);
-                path_counters.host_pcm_copy_bytes =
-                    path_counters.host_pcm_copy_bytes.saturating_add(bytes);
-                path_counters.endpoint_observation_bytes = path_counters
-                    .endpoint_observation_bytes
-                    .saturating_add(bytes);
-                copy_into_region(&pcm, _offset, frames, &hostbuf).map_err(|e| e.to_string())?;
-                Ok(hostbuf.clone())
+                hostbuf.resize((chunk_frames * u64::from(CHANNELS)) as usize, 0);
+                hostbuf_resident = hostbuf.len() as u64 * 4;
+                kw.render(
+                    Strategy::Standard,
+                    start,
+                    chunk_frames as usize,
+                    &mut hostbuf,
+                )
+                .map_err(|e| e.to_string())?;
+                // Verification read: compare the DtoH buffer in place.
+                verification_read_bytes += chunk_frames * u64::from(CHANNELS) * 4;
+                if hostbuf != expect {
+                    let nbad = hostbuf
+                        .iter()
+                        .zip(expect.iter())
+                        .filter(|(a, b)| a != b)
+                        .take(3)
+                        .map(|(a, b)| format!("{a} != {b}"))
+                        .collect::<Vec<_>>()
+                        .join("; ");
+                    return Err(format!(
+                        "D0 render != oracle at frame {start}: {nbad} (+ more)"
+                    ));
+                }
+                let bytes = chunk_frames * u64::from(CHANNELS) * 4;
+                region_copy_bytes += bytes;
+                copy_into_region(&pcm, offset, chunk_frames, &hostbuf).map_err(|e| e.to_string())
             });
             let launches = kw.counters.kernel_launches;
-            path_counters.kernel_launches = launches;
-            sessions.push(finish_session(
+            // Materialization traffic: the DtoH transfer and the internal
+            // host staging->buffer copy are instrumented inside KernelWorld;
+            // the host buffer->region copy is the one this court performs.
+            let mat_gpu_to_host = kw.counters.gpu_to_host_pcm_bytes;
+            let mat_host_copy = kw
+                .counters
+                .host_pcm_copy_bytes
+                .saturating_add(region_copy_bytes);
+            let d0 = finish_session(
                 "d0-mmap",
                 &pcm,
                 out,
                 &expected,
-                &path_counters,
-                launches,
-            ));
+                SessionTraffic {
+                    mat_gpu_to_host,
+                    mat_host_copy,
+                    mat_host_resident: hostbuf_resident,
+                    endpoint_obs: region_copy_bytes,
+                    verification_read: verification_read_bytes,
+                    verification_shadow_copy: 0,
+                    launches,
+                },
+            );
+            sessions.push(d0);
             drop(kw);
             drop(pcm);
             break;
@@ -929,15 +1016,14 @@ mod linux {
 
         // -----------------------------------------------------------------
         // Pass B — D1 attempt: register the exact region on each candidate;
-        // on the first success run the D1 session. One CUDA context for the
-        // whole pass (registrations + launches share it).
+        // on the first success run the D1 session (one CUDA context for the
+        // whole pass). Devices whose open failed in pass A are skipped here
+        // (their trial row already exists).
         // -----------------------------------------------------------------
-        let d1_frames = media_frames(1.0);
-        let d1_expected = oracle.observe(&store, 0, d1_frames)?;
+        let mut d1_session_device: Option<String> = None;
         let mut d1_cuda: Option<Cuda> = None;
         'd1: for dev in &candidates {
             if open_failed.contains(&dev.pcm_name) {
-                // Open already failed in pass A; the trial is recorded.
                 continue;
             }
             let pcm = match AlsaPcm::open(&device_request(dev)) {
@@ -982,6 +1068,7 @@ mod linux {
             let mut trial = DeviceTrial {
                 device: dev.clone(),
                 opened: true,
+                playback_attempted: false,
                 failure: None,
                 snapshot: Some(pcm.snapshot()),
                 registration_rc: None,
@@ -997,15 +1084,18 @@ mod linux {
             match attempt {
                 RegistrationAttempt::Registered(r) => {
                     let dev_ptr = r.device_ptr.unwrap_or(0);
-                    let pev = PointerEvidence::query(&cuda.fns, dev_ptr);
                     trial.registered = true;
                     trial.device_pointer = Some(format!("0x{dev_ptr:x}"));
-                    trial.pointer_evidence = Some(pev.clone());
+                    trial.pointer_evidence = Some(PointerEvidence::query(
+                        &cuda.fns,
+                        r.host_ptr as usize,
+                        dev_ptr,
+                    ));
                     trial.class = Verdict::Supported;
                     trial.class_detail = "registered the exact endpoint region (DEVICEMAP)".into();
+                    trial.playback_attempted = true;
                     trials.push(trial);
-                    // Run the D1 session on this device (the registration
-                    // moves into the kernel world's context lifetime).
+                    // Run the D1 session on this device.
                     let mut kw = match KernelWorld::open_with(
                         cuda,
                         &ptx,
@@ -1014,9 +1104,11 @@ mod linux {
                     ) {
                         Ok(k) => k,
                         Err(e) => {
-                            trials.last_mut().unwrap().class = Verdict::Inconclusive;
-                            trials.last_mut().unwrap().class_detail =
-                                format!("registered but KernelWorld::open_with failed: {e}");
+                            if let Some(last) = trials.last_mut() {
+                                last.class = Verdict::Inconclusive;
+                                last.class_detail =
+                                    format!("registered but KernelWorld::open_with failed: {e}");
+                            }
                             drop(r);
                             drop(pcm);
                             continue;
@@ -1025,40 +1117,47 @@ mod linux {
                     let dev_base = dev_ptr;
                     let region_base = r.host_ptr as usize;
                     let frame_bytes = pcm.request.frame_bytes();
-                    let mut shadow_counters = Counters::new();
+                    let mut verification_read_bytes = 0u64;
                     println!(
                         "court d1: D1 session on {} (registered 0x{:x}+{}; device ptr 0x{:x})",
                         dev.pcm_name, base, len, dev_ptr
                     );
-                    let out = run_session(&pcm, &d1_expected, |start, offset, frames| {
-                        // Fused direct render: the kernel writes the final
-                        // codes into the registered region at the chunk
-                        // offset. No D0 block, no DtoH, no host copy.
-                        let chunk_dev = dev_base + offset * frame_bytes;
-                        kw.render_direct(start, frames as usize, chunk_dev)
-                            .map_err(|e| e.to_string())?;
-                        // Read the region back in place (the CUDA
-                        // mapped-memory coherency contract makes the GPU
-                        // writes visible after cuStreamSynchronize inside
-                        // render_direct).
-                        read_region(region_base, offset, frames, frame_bytes, CHANNELS as usize)
-                    });
+                    let out =
+                        run_session(&pcm, &expected, |start, offset, chunk_frames, expect| {
+                            // Fused direct render: the kernel writes the final
+                            // codes into the registered region at the chunk
+                            // offset. No D0 block, no DtoH, no host copy.
+                            let chunk_dev = dev_base + offset * frame_bytes;
+                            kw.render_direct(start, chunk_frames as usize, chunk_dev)
+                                .map_err(|e| e.to_string())?;
+                            // In-place shadow verification: read the region (the
+                            // CUDA mapped-memory coherency contract makes the GPU
+                            // writes visible after cuStreamSynchronize inside
+                            // render_direct) and compare against the oracle slice
+                            // WITHOUT creating a shadow sample buffer.
+                            let bytes = chunk_frames * u64::from(CHANNELS) * 4;
+                            verification_read_bytes += bytes;
+                            region_matches(&pcm, region_base, offset, chunk_frames, expect)
+                        });
                     let launches = kw.counters.kernel_launches;
-                    shadow_counters.endpoint_observation_bytes =
-                        kw.counters.endpoint_observation_bytes;
-                    shadow_counters.kernel_launches = launches;
-                    let mut rec = finish_session(
+                    let endpoint_obs = kw.counters.endpoint_observation_bytes;
+                    let d1 = finish_session(
                         "d1-direct",
                         &pcm,
                         out,
-                        &d1_expected,
-                        &shadow_counters,
-                        launches,
+                        &expected,
+                        SessionTraffic {
+                            mat_gpu_to_host: kw.counters.gpu_to_host_pcm_bytes,
+                            mat_host_copy: kw.counters.host_pcm_copy_bytes,
+                            mat_host_resident: 0, // no host materialization buffer
+                            endpoint_obs,
+                            verification_read: verification_read_bytes,
+                            verification_shadow_copy: 0, // in-place compare
+                            launches,
+                        },
                     );
-                    let verdict = verdict_for_session(&rec);
-                    rec.detail = rec.detail.clone().or(Some(verdict.1.to_string()));
-                    sessions.push(rec);
-                    // The device trial is already recorded (registered).
+                    sessions.push(d1);
+                    d1_session_device = Some(dev.pcm_name.clone());
                     drop(kw);
                     drop(r);
                     drop(pcm);
@@ -1089,59 +1188,139 @@ mod linux {
             }
         }
 
+        // -----------------------------------------------------------------
+        // Pass C — capability probe of every remaining candidate so that each
+        // device gets its own trial row even after the first D1 success
+        // (open/mmap/format/registration only; no second playback session).
+        // -----------------------------------------------------------------
+        if d1_session_device.is_some() {
+            let cuda = match Cuda::open(0) {
+                Ok(c) => Some(c),
+                Err(e) => {
+                    extras.insert(
+                        "probe_pass_cuda_error".into(),
+                        serde_json::json!(e.to_string()),
+                    );
+                    None
+                }
+            };
+            if let Some(cuda) = cuda {
+                for dev in &candidates {
+                    if trials.iter().any(|t| t.device.pcm_name == dev.pcm_name) {
+                        continue; // already has a row
+                    }
+                    let pcm = match AlsaPcm::open(&device_request(dev)) {
+                        Ok(p) => p,
+                        Err(f) => {
+                            trials.push(DeviceTrial::failing(dev, &f));
+                            continue;
+                        }
+                    };
+                    let base = pcm.area_base;
+                    let len = region_bytes(&pcm);
+                    // SAFETY: the mapping is live for this probe; registration
+                    // dies before pcm.
+                    let attempt = unsafe {
+                        crate::backend::cuda::direct::attempt_register(
+                            &cuda.fns,
+                            base,
+                            len as usize,
+                        )
+                    };
+                    let trial = DeviceTrial::probe(dev, &pcm, &attempt);
+                    drop(attempt);
+                    drop(pcm);
+                    trials.push(trial);
+                }
+                drop(cuda);
+            }
+        }
+
         extras.insert("device_trials".into(), serde_json::to_value(&trials)?);
         extras.insert("sessions".into(), serde_json::to_value(&sessions)?);
 
-        // Verdict.
+        // Verdict: from the D1 session when present, else the D0 baseline /
+        // per-device rows.
         let d1_session: Option<&PathSession> = sessions.iter().find(|s| s.path == "d1-direct");
         let (verdict, detail): (Verdict, String) = if let Some(s) = d1_session {
             verdict_for_session(s)
-        } else if trials.iter().any(|t| t.registered) {
-            // Registered but the session never ran (shouldn't happen).
-            (
-                Verdict::Inconclusive,
-                "registered but no session recorded".into(),
-            )
-        } else {
-            let d0_ran = sessions.iter().any(|s| s.path == "d0-mmap");
-            let failed_open = trials.iter().find(|t| !t.opened);
+        } else if sessions.iter().any(|s| s.path == "d0-mmap") {
             let reg_fail = trials
                 .iter()
                 .find(|t| t.registration_rc.is_some() || t.missing_symbol.is_some());
-            if d0_ran {
-                let why = reg_fail
-                    .map(|t| format!("{}: {}", t.device.pcm_name, t.class_detail))
-                    .or_else(|| {
-                        failed_open.map(|t| format!("{}: {}", t.device.pcm_name, t.class_detail))
-                    })
-                    .unwrap_or_else(|| "registration failed on every candidate".into());
-                (
-                    Verdict::FellBackToD0,
-                    format!(
-                        "D1 registration failed on every candidate; D0-mmap baseline ran. {why}"
-                    ),
-                )
-            } else if let Some(t) = trials.first() {
-                (t.class, format!("no endpoint usable: {}", t.class_detail))
-            } else {
-                (Verdict::Inconclusive, "no device was attempted".into())
-            }
+            let failed_open = trials.iter().find(|t| !t.opened);
+            let why = reg_fail
+                .map(|t| format!("{}: {}", t.device.pcm_name, t.class_detail))
+                .or_else(|| {
+                    failed_open.map(|t| format!("{}: {}", t.device.pcm_name, t.class_detail))
+                })
+                .unwrap_or_else(|| "registration failed on every candidate".into());
+            (
+                Verdict::FellBackToD0,
+                format!("D1 registration failed on every candidate; D0-mmap baseline ran. {why}"),
+            )
+        } else if let Some(t) = trials.first() {
+            (t.class, format!("no endpoint usable: {}", t.class_detail))
+        } else {
+            (Verdict::Inconclusive, "no device was attempted".into())
         };
 
+        // Top-level receipt counters describe the VERDICT-BEARING path: the
+        // D1 session when present (its gpu->host / host-copy numbers are 0 —
+        // the claim), otherwise the D0 baseline. The other path's numbers
+        // stay in extras.sessions and the experiment aggregate below.
+        let primary = d1_session.or_else(|| sessions.first());
         let mut counters = Counters::new();
-        if let Some(s) = &sessions.first() {
+        if let Some(s) = primary {
+            counters.gpu_to_host_pcm_bytes = s.materialization_gpu_to_host_bytes;
+            counters.host_pcm_copy_bytes = s.materialization_host_copy_bytes;
             counters.endpoint_observation_bytes = s.endpoint_observation_bytes;
-            counters.gpu_to_host_pcm_bytes = s.gpu_to_host_bytes;
-            counters.host_pcm_copy_bytes = s.host_copy_bytes;
             counters.kernel_launches = s.kernel_launches;
             counters.quanta_submitted = s.chunks;
             counters.observe_endpoint_depth(s.depth_max_frames);
         }
+        // Experiment aggregate: an explicitly named third surface summing
+        // both sessions' materialization/verification traffic.
+        let mut agg = serde_json::json!({
+            "sessions": sessions.len(),
+            "frames": frames,
+            "materialization_gpu_to_host_bytes": 0u64,
+            "materialization_host_copy_bytes": 0u64,
+            "endpoint_observation_bytes": 0u64,
+            "verification_host_read_bytes": 0u64,
+        });
+        for s in &sessions {
+            agg["materialization_gpu_to_host_bytes"] = serde_json::json!(
+                agg["materialization_gpu_to_host_bytes"]
+                    .as_u64()
+                    .unwrap_or(0)
+                    + s.materialization_gpu_to_host_bytes
+            );
+            agg["materialization_host_copy_bytes"] = serde_json::json!(
+                agg["materialization_host_copy_bytes"].as_u64().unwrap_or(0)
+                    + s.materialization_host_copy_bytes
+            );
+            agg["endpoint_observation_bytes"] = serde_json::json!(
+                agg["endpoint_observation_bytes"].as_u64().unwrap_or(0)
+                    + s.endpoint_observation_bytes
+            );
+            agg["verification_host_read_bytes"] = serde_json::json!(
+                agg["verification_host_read_bytes"].as_u64().unwrap_or(0)
+                    + s.verification_host_read_bytes
+            );
+        }
+        extras.insert("experiment_aggregate".into(), agg);
+
+        let session_device_trial = d1_session.and_then(|s| {
+            trials
+                .iter()
+                .find(|t| t.registered && t.device.pcm_name == s.endpoint.pcm_name)
+        });
         let ep = EndpointEvidence {
             directness: Some(
                 if d1_session.is_some()
                     && d1_session.unwrap().completed
-                    && d1_session.unwrap().shadow_exact == Some(true)
+                    && d1_session.unwrap().shadow_exact
                     && d1_session.unwrap().xruns == 0
                 {
                     crate::audio::directness::Directness::D1EndpointMapped
@@ -1156,32 +1335,20 @@ mod linux {
                 },
             ),
             topology: Some(crate::audio::topology::Topology::HostMapped.label().into()),
-            registered_range: d1_session.map(|_| {
-                trials
-                    .iter()
-                    .find(|t| t.registered)
-                    .and_then(|t| t.range.as_ref())
-                    .map(|r| r.label())
-                    .unwrap_or_default()
-            }),
-            registration_result: d1_session.map(|_| {
-                trials
-                    .iter()
-                    .find(|t| t.registered)
-                    .and_then(|t| t.registration_message.clone())
-                    .unwrap_or_else(|| "registered".into())
-            }),
-            device_pointer: d1_session
-                .and_then(|_| trials.iter().find(|t| t.registered))
-                .and_then(|t| t.device_pointer.clone()),
+            registered_range: session_device_trial
+                .and_then(|t| t.range.as_ref())
+                .map(|r| r.label()),
+            registration_result: session_device_trial.map(|_| "registered".to_string()),
+            device_pointer: session_device_trial.and_then(|t| t.device_pointer.clone()),
             synchronization_mechanism: Some(
                 "cuStreamSynchronize after each fused kernel write; endpoint commit \
-                 (snd_pcm_mmap_commit) only after sync"
+                 (snd_pcm_mmap_commit with an exact transferred-frame check) only after sync"
                     .into(),
             ),
             fence_sync_evidence: Some(
                 "commit ordering: kernel write -> cuStreamSynchronize -> in-place shadow \
-                 verify -> snd_pcm_mmap_commit -> snd_pcm_drain at session end"
+                 verify (no shadow sample buffer) -> snd_pcm_mmap_commit -> snd_pcm_drain \
+                 at session end"
                     .into(),
             ),
             coherency_assumptions: Some(
@@ -1193,8 +1360,9 @@ mod linux {
             hidden_staging_investigation: Some(
                 "path uses the actual ALSA hw:mmap region (access MMAP_INTERLEAVED on hw: \
                  device, no plug conversion). No application PCM staging exists in the D1 \
-                 path; the region itself is the endpoint's DMA ring. D0-mmap baseline \
-                 measures the exact copy bytes D1 removes"
+                 path; the region itself is the endpoint's DMA ring. The D0-mmap baseline \
+                 runs the same frame count and measures the exact materialization bytes D1 \
+                 removes (DtoH + both host copies)"
                     .into(),
             ),
             endpoint_clock: d1_session.map(|s| {
@@ -1261,20 +1429,24 @@ mod linux {
         }
         for s in &sessions {
             println!(
-                "  {}: {} frames, {} chunks, gpu->host {} B, host copy {} B, endpoint obs {} B",
+                "  {}: {} frames, {} chunks | materialization: {}B dtoh, {}B host copies | \
+                 endpoint obs {}B | verification: {}B reads, {}B shadow copies",
                 s.path,
                 s.frames_committed,
                 s.chunks,
-                s.gpu_to_host_bytes,
-                s.host_copy_bytes,
-                s.endpoint_observation_bytes
+                s.materialization_gpu_to_host_bytes,
+                s.materialization_host_copy_bytes,
+                s.endpoint_observation_bytes,
+                s.verification_host_read_bytes,
+                s.verification_shadow_copy_bytes
             );
         }
         for t in &trials {
             println!(
-                "  {}: {} {}",
+                "  {}: {} (playback {}) {}",
                 t.device.pcm_name,
                 t.class.label(),
+                if t.playback_attempted { "yes" } else { "no" },
                 t.class_detail
             );
         }
@@ -1289,42 +1461,49 @@ mod linux {
         Ok(verdict)
     }
 
-    fn verdict_for_session(s: &PathSession) -> (Verdict, String) {
-        match s.shadow_exact {
-            Some(false) => (
-                Verdict::FailedCorrectness,
-                format!(
-                    "D1 path wrote codes that differ from the scalar oracle: {}",
-                    s.detail.clone().unwrap_or_default()
-                ),
-            ),
-            Some(true) if s.completed && s.xruns == 0 => (
-                Verdict::Supported,
-                "registered the actual ALSA endpoint region; GPU wrote every chunk \
-                 byte-exact vs the scalar oracle; committed; drained without xrun"
-                    .to_string(),
-            ),
-            Some(true) if s.xruns > 0 => (
-                Verdict::FailedDeadline,
-                format!(
-                    "shadow equality held but {} xrun(s) occurred (explicit discontinuities recorded)",
-                    s.xruns
-                ),
-            ),
-            Some(true) => (
-                Verdict::FailedDeadline,
-                format!(
-                    "session incomplete: {}",
-                    s.detail.clone().unwrap_or_default()
-                ),
-            ),
-            None => (
-                Verdict::FailedDeadline,
-                format!(
-                    "session ended before verification: {}",
-                    s.detail.clone().unwrap_or_default()
-                ),
-            ),
+    /// Traffic/verification counters of one session (finish_session input).
+    #[derive(Default, Clone, Copy)]
+    struct SessionTraffic {
+        mat_gpu_to_host: u64,
+        mat_host_copy: u64,
+        mat_host_resident: u64,
+        endpoint_obs: u64,
+        verification_read: u64,
+        verification_shadow_copy: u64,
+        launches: u64,
+    }
+
+    fn finish_session(
+        path: &str,
+        pcm: &AlsaPcm,
+        out: SessionOut,
+        expected: &[i32],
+        traffic: SessionTraffic,
+    ) -> PathSession {
+        let (mean, median, max) = wall_stats(&out.wall);
+        PathSession {
+            path: path.into(),
+            endpoint: pcm.snapshot(),
+            frames_committed: out.frames_committed,
+            chunks: out.chunks,
+            xruns: out.xruns,
+            completed: out.detail.is_none() && out.frames_committed >= expected.len() as u64 / 2,
+            shadow_exact: out.shadow_exact,
+            window_hash: out.shadow_exact.then(|| hex(&observation_sha256(expected))),
+            chunk_wall_mean_ms: mean,
+            chunk_wall_median_ms: median,
+            chunk_wall_max_ms: max,
+            depth_min_frames: out.depth_min,
+            depth_max_frames: out.depth_max,
+            materialization_gpu_to_host_bytes: traffic.mat_gpu_to_host,
+            materialization_host_copy_bytes: traffic.mat_host_copy,
+            materialization_host_resident_bytes: traffic.mat_host_resident,
+            endpoint_observation_bytes: traffic.endpoint_obs,
+            kernel_launches: traffic.launches,
+            verification_host_read_bytes: traffic.verification_read,
+            verification_shadow_copy_bytes: traffic.verification_shadow_copy,
+            drain_state: out.drain_state,
+            detail: out.detail,
         }
     }
 
@@ -1342,29 +1521,49 @@ mod linux {
             return Err("copy length mismatch".into());
         }
         // SAFETY: the region is the live ALSA mapping; `len` i32 slots are
-        // writable at `addr` (mmap_begin returned offset..offset+frames).
+        // writable at `addr` (mmap_begin returned offset..offset+frames; the
+        // interleaved geometry was validated at open).
         unsafe {
             std::ptr::copy_nonoverlapping(codes.as_ptr(), addr as *mut i32, len);
         }
         Ok(())
     }
 
-    /// In-place host read of the codes the GPU wrote at `offset` (D1 shadow
-    /// verification — a read of the registered mapping, not a copy).
-    fn read_region(
+    /// In-place verification of the codes the GPU wrote at `offset`: compare
+    /// the mapped region against `expected` without building a shadow sample
+    /// buffer. Returns Err listing the first mismatches when different.
+    fn region_matches(
+        pcm: &AlsaPcm,
         region_base: usize,
         offset: u64,
         frames: u64,
-        frame_bytes: u64,
-        channels: usize,
-    ) -> std::result::Result<Vec<i32>, String> {
+        expected: &[i32],
+    ) -> std::result::Result<(), String> {
+        let frame_bytes = pcm.request.frame_bytes();
         let addr = region_base + (offset * frame_bytes) as usize;
-        let len = (frames * channels as u64) as usize;
+        let len = (frames * u64::from(pcm.request.channels)) as usize;
+        if expected.len() != len {
+            return Err("expected length mismatch".into());
+        }
         // SAFETY: the registered ALSA mapping is live and readable; the GPU
         // writes are visible after cuStreamSynchronize (recorded coherency
-        // contract).
-        let codes: &[i32] = unsafe { std::slice::from_raw_parts(addr as *const i32, len) };
-        Ok(codes.to_vec())
+        // contract). This reads the endpoint region in place — it is
+        // verification instrumentation, not materialization traffic.
+        let got: &[i32] = unsafe { std::slice::from_raw_parts(addr as *const i32, len) };
+        if got != expected {
+            let nbad = got
+                .iter()
+                .zip(expected.iter())
+                .filter(|(a, b)| a != b)
+                .take(3)
+                .map(|(a, b)| format!("{a} != {b}"))
+                .collect::<Vec<_>>()
+                .join("; ");
+            return Err(format!(
+                "region != oracle at offset {offset}: {nbad} (+ more)"
+            ));
+        }
+        Ok(())
     }
 
     #[cfg(test)]

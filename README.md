@@ -118,14 +118,21 @@ see the summary below). Executable evidence today:
   **actual** ALSA `hw:` mmap region (`cuMemHostRegister` DEVICEMAP + device
   pointer), render each contiguous mmap chunk's final codes directly into
   that region (kernel write → stream sync → in-place shadow verify vs the
-  scalar oracle → `snd_pcm_mmap_commit`), and compare against a D0-mmap
-  baseline on the same endpoint shape — measuring the exact bytes D1
-  removes. Default content is silence-safe; `--emit-audio` opts into an
-  audible demo. Verdicts are per-device and honest: the sealed run registered
-  the on-board HDA ring (`snd_hda_intel`) and played byte-exact with zero
-  xruns (`D1_ENDPOINT_MAPPED`, `HOST_MAPPED`); devices that refuse open,
-  mmap, format, or registration stay visible as their own negative rows.
-  Requires Linux + ALSA + the PTX artifact + a CUDA device.
+  scalar oracle — no shadow sample buffer → `snd_pcm_mmap_commit` with an
+  exact transferred-frame check), and compare against a D0-mmap baseline
+  that runs the **same 48 000-frame window** on the same endpoint shape —
+  measuring the exact materialization bytes D1 removes (D0: 384 KB DtoH +
+  768 KB host copies; D1: 0 B / 0 B). Verification reads are a separately
+  named surface. Default content is silence-safe; `--emit-audio` opts into
+  an audible demo. Every candidate endpoint gets its own trial row (the
+  first registered device runs the session; the rest are probed for
+  open/mmap/format/registration with `playback_attempted: false`), and the
+  endpoint must grant the exact 48 kHz rate with validated interleaved
+  channel geometry. Requires Linux + ALSA + the PTX artifact + a CUDA
+  device; the sealed run registered the on-board HDA ring
+  (`snd_hda_intel`) and played byte-exact with zero xruns
+  (`D1_ENDPOINT_MAPPED`, `HOST_MAPPED`); devices that refuse open, mmap,
+  format, or registration stay visible as their own negative rows.
 
 The exact ledger — completed phases, evidence, blockers, and the next work
 item — is

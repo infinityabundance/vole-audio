@@ -476,20 +476,29 @@ Measured (RTX 4080 SUPER, driver 610.57.04, Linux 7.2.2-cachyos; receipt
 under `receipts/d1/`):
 
 - **`cuMemHostRegister` on the actual `snd_hda_intel` (ALC897 analog) DMA ring
-succeeded** (8 KiB region, page-aligned; device pointer 0x9800000;
-`memory_type` HOST). The GPU wrote **48 000 frames / 94 chunks directly into
-the ALSA-mapped region**, byte-exact vs the scalar oracle on every chunk
-(`shadow_exact: true`), zero xruns, clean drain; endpoint depth 512–1024
+succeeded** (8 KiB region, page-aligned; device pointer 0x9800000). The GPU
+wrote **48 000 frames / 94 chunks directly into the ALSA-mapped region**,
+byte-exact vs the scalar oracle on every chunk (in-place verification, no
+shadow sample buffer), zero xruns, clean drain; endpoint depth 512–1024
 frames paced by `snd_pcm_avail_update`. Verdict **SUPPORTED**
-(`D1_ENDPOINT_MAPPED` / `HOST_MAPPED`).
-- **The bytes D1 removes, measured**: the D0-mmap baseline on the same
-endpoint moved 192 000 B device→host + 192 000 B host copies for 24 000
-frames; the D1 path moved **0 B** device→host and **0 B** host copies while
-writing the same class of bytes into the endpoint region
-(`endpoint_observation_bytes` = frames × channels × 4).
-- Per-device rows are honest negatives where they occur: the PipeWire-held
-USB interface opened busy (`INCONCLUSIVE`), and devices without an active
-clock stall at `mmap_begin` (recorded, never reported as success).
+(`D1_ENDPOINT_MAPPED` / `HOST_MAPPED`). `cuPointerGetAttribute` on the
+registered range returned rc 1 (invalid argument) for every attribute and
+both address targets on this driver — recorded per query; the registration,
+device pointer, and successful direct kernel writes are the evidence (no
+pointer-attribute value is claimed).
+- **The bytes D1 removes, measured on equal frame counts**: the D0-mmap
+baseline on the same endpoint (48 000 frames, the same window as the D1
+session) moved 384 000 B device→host + 768 000 B host copies (the internal
+staging copy and the host buffer→region copy, both counted); the D1 path
+moved **0 B** device→host and **0 B** host copies while writing the same
+window into the endpoint region (`endpoint_observation_bytes` = 384 000 B).
+Top-level receipt counters describe the verdict-bearing D1 path; the D0
+baseline and an `experiment_aggregate` are separate named surfaces.
+- Every candidate device gets its own trial row: after the D1 session,
+remaining endpoints are probed for open/mmap/format/registration
+(`playback_attempted: false`). In the sealed receipt the other HDA rings
+(NVIDIA HDMI 1,3/7/8/9 and ALC897 Digital 2,1) registered but were not
+played, and the PipeWire-held USB interface is `INCONCLUSIVE` (busy).
 - Implementation bugs found and fixed during the court bring-up (recorded
 here because they are exactly what an evidence-driven hardware court is
 for): `snd_pcm_mmap_begin` takes the requested frame count as an *input*
@@ -498,10 +507,54 @@ the stream must be `snd_pcm_prepare`d and explicitly `snd_pcm_start`ed (the
 sw start-threshold does not auto-start on every driver; verified against a C
 probe before trusting the FFI); the mmap area base is only meaningful from
 PREPARED onward.
-- Test count now 198 green (debug + release; +13: registration classifier,
-page rounding, frozen ALSA constants + channel-area layout, /proc/asound
-parsers, failure classification, D1 fixture bounds/parity), clippy
+- Test count now 199 green (debug + release; +14 over the Phase G seal:
+registration classifier, page rounding, frozen ALSA constants + channel-area
+layout, /proc/asound parsers, failure classification incl. rate/geometry,
+interleaved-geometry expectation, D1 fixture bounds/parity), clippy
 `-D warnings` clean, `fmt` clean, `no_std` lib check clean.
+
+### Phase H review amendment (external review, before reseal)
+
+Every finding from the Phase H review was fixed and re-sealed:
+
+1. **Exact commit transfer check**: `snd_pcm_mmap_commit` now verifies the
+driver-reported transferred frame count equals the requested count; a
+short commit (ALSA's documented xrun-class condition) is an explicit
+`FAILED_DEADLINE`-class event with the exact requested/transferred counts
+in the receipt detail.
+2. **Top-level counters describe the verdict-bearing path**: a SUPPORTED D1
+receipt's counters now report the D1 path (0 gpu→host, 0 host copies, 94
+quanta, 94 launches, 384 000 endpoint-observation bytes) instead of the D0
+baseline; the baseline and an explicit `experiment_aggregate` are separate
+named surfaces.
+3. **D0 and D1 run the same 48 000-frame window**, so the byte comparison
+is direct (D0: 384 000 B DtoH + 768 000 B host copies vs D1: 0 B / 0 B).
+4. **D0 host-copy accounting counts both real copies** (the internal
+staging→buffer copy instrumented in `KernelWorld` and the court's
+buffer→region copy).
+5. **Verification is copy-free and named**: the D1 verifier compares the
+mapped endpoint region against the oracle slice in place — no shadow
+sample buffer — and receipts split `verification_host_read_bytes` /
+`verification_shadow_copy_bytes` (0) from materialization traffic.
+6. **Pointer evidence records every query**: each `cuPointerGetAttribute`
+call (attribute × device-pointer/host-pointer target) records rc + driver
+string + value. On this driver every query returns rc 1 (invalid
+argument); the earlier "memory_type HOST" prose was removed — registration
+success, the device pointer, and the working direct writes are the
+claims, nothing more.
+7. **Every candidate gets a trial row**: after the first successful D1
+session the remaining endpoints are probed for open/mmap/format/
+registration (`playback_attempted: false` rows), so the sealed receipt
+covers all seven candidates (five more HDA rings registered-but-not-played;
+the PipeWire-held USB endpoint is busy/`INCONCLUSIVE`).
+8. **Mandatory exact rate**: `AlsaPcm::open` refuses an endpoint that cannot
+grant the exact 48 kHz (a nearby rate would silently resample the frozen
+timeline); the previously-unused `require_exact_rate` helper was removed.
+9. **Full channel-area geometry validation**: at open every channel's area
+is checked (shared `addr`, `first == ch*32`, `step == channels*32` bits)
+before the simplified `base + offset * frame_bytes` arithmetic is used;
+receipts record the per-channel layout (`ch0 first=0 step=64; ch1
+first=32 step=64` on the sealed ALC897 ring).
 
 ## Known blockers
 

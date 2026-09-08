@@ -196,6 +196,14 @@ pub fn classify_failure(f: &AlsaFailure) -> (Verdict, String) {
             Verdict::UnsupportedByHardware,
             format!("hardware rejected the requested configuration ({f})"),
         ),
+        ("rate", _) => (
+            Verdict::UnsupportedByHardware,
+            format!("endpoint would not grant the exact requested rate ({f})"),
+        ),
+        ("mmap_geometry", _) => (
+            Verdict::UnsupportedByHardware,
+            format!("unexpected interleaved channel-area geometry ({f})"),
+        ),
         ("run", Some(rc)) if rc == -libc::EPIPE => (
             Verdict::FailedDeadline,
             "xrun (underrun): endpoint starved; explicit discontinuity recorded".into(),
@@ -260,7 +268,23 @@ pub struct EndpointSnapshot {
     /// evidence.
     pub area_first_bits: Option<u32>,
     pub area_step_bits: Option<u32>,
+    /// Per-channel (first, step) layout in bits, e.g. "ch0 (0,64); ch1 (32,64)".
+    pub area_layout: Option<String>,
+    /// True when the full per-channel interleaved geometry was validated at
+    /// open (addr equal, first == ch*32, step == channels*32).
+    pub area_layout_validated: bool,
     pub state: String,
+}
+
+/// Expected interleaved geometry of channel `c` of a `channels`-channel
+/// S32_LE layout: `(first, step)` in bits — first = c*32, step = channels*32
+/// (samples of one channel are `step` bits apart, all channels share one
+/// contiguous `addr`). Pure function so the expectation is unit-tested.
+pub fn expected_interleaved_first_step(c: u32, channels: u32) -> (u32, u32) {
+    (
+        c * S32_BITS_PER_SAMPLE as u32,
+        channels * S32_BITS_PER_SAMPLE as u32,
+    )
 }
 
 /// An open, configured, prepared ALSA `hw:` PCM (RAII: closes on drop).
@@ -269,8 +293,8 @@ pub struct AlsaPcm {
     _lib: alsa_ffi::AlsaLib,
     handle: SndPcm,
     pub request: EndpointRequest,
-    /// Actual negotiated values (== request for the frozen court or the
-    /// driver's nearest rate — always recorded).
+    /// Actual negotiated values (== request for the frozen court; the exact
+    /// rate is enforced at open).
     pub rate_hz: u32,
     pub period_frames: u64,
     pub buffer_frames: u64,
@@ -278,6 +302,8 @@ pub struct AlsaPcm {
     pub area_base: usize,
     pub area_first_bits: u32,
     pub area_step_bits: u32,
+    /// Per-channel (first, step) in bits, validated at open.
+    pub area_layout: Vec<(u32, u32)>,
 }
 
 impl AlsaPcm {
@@ -338,7 +364,7 @@ impl AlsaPcm {
             unsafe { (fns.snd_pcm_close.expect("bound"))(handle) };
             return Err(f);
         }
-        let area = match mmap_area_base(&fns, handle) {
+        let area = match mmap_area_geometry(&fns, handle, request.channels) {
             Ok(a) => a,
             Err(f) => {
                 // SAFETY: close.
@@ -356,6 +382,7 @@ impl AlsaPcm {
             area_base: area.0,
             area_first_bits: area.1,
             area_step_bits: area.2,
+            area_layout: area.3,
         })
     }
 
@@ -499,7 +526,11 @@ impl AlsaPcm {
         Ok((offset as u64, frames as u64))
     }
 
-    /// Commit `frames` written frames at `offset`.
+    /// Commit `frames` written frames at `offset`. ALSA returns the exact
+    /// number of frames actually transferred; a nonnegative result that is
+    /// not `frames` is a short commit (an xrun-class event) and is refused
+    /// here — the court's claim is "every chunk committed", so the exact
+    /// transferred count is part of the evidence.
     pub fn mmap_commit(&self, offset: u64, frames: u64) -> std::result::Result<(), AlsaFailure> {
         // SAFETY: valid handle; frames must be exactly what was written.
         let rc = unsafe {
@@ -514,6 +545,17 @@ impl AlsaPcm {
                 "run",
                 Some(rc as i32),
                 alsa_ffi::snd_strerror_str(rc as i32),
+            ));
+        }
+        let transferred = rc as u64;
+        if transferred != frames {
+            return Err(AlsaFailure::new(
+                "run",
+                None,
+                format!(
+                    "short mmap_commit: requested {frames} frames, driver transferred {transferred} \
+                     (xrun-class event; explicit discontinuity recorded)"
+                ),
             ));
         }
         Ok(())
@@ -552,6 +594,13 @@ impl AlsaPcm {
     }
 
     pub fn snapshot(&self) -> EndpointSnapshot {
+        let layout = self
+            .area_layout
+            .iter()
+            .enumerate()
+            .map(|(c, (first, step))| format!("ch{c} first={first} step={step}"))
+            .collect::<Vec<_>>()
+            .join("; ");
         EndpointSnapshot {
             pcm_name: self.name(),
             driver: None, // filled by the court from discovery
@@ -565,6 +614,8 @@ impl AlsaPcm {
             area_base: Some(format!("0x{:x}", self.area_base)),
             area_first_bits: Some(self.area_first_bits),
             area_step_bits: Some(self.area_step_bits),
+            area_layout: Some(layout),
+            area_layout_validated: true,
             state: self.state_label().into(),
         }
     }
@@ -668,9 +719,10 @@ fn configure_hw(
         finish(params);
         return Err(f);
     }
-    // SAFETY: rate near (out param updated to the nearest supported rate;
-    // the negotiated value is what we record — the frozen court refuses
-    // nothing silently, it reports the actual rate).
+    // SAFETY: rate near (out param updated to the nearest supported rate).
+    // The *exact* requested rate is mandatory: playing the frozen media
+    // timeline at a nearby rate would be a silent resample, so a driver that
+    // cannot grant it exactly is refused here (never silently accepted).
     let mut rate = req.rate_hz;
     let mut dir = 0;
     let rc = unsafe {
@@ -737,6 +789,18 @@ fn configure_hw(
     // SAFETY: out-param.
     let _ =
         unsafe { (fns.snd_pcm_hw_params_get_buffer_size.expect("bound"))(params, &mut got_buffer) };
+    if got_rate != req.rate_hz {
+        let f = AlsaFailure::new(
+            "rate",
+            None,
+            format!(
+                "negotiated rate {got_rate} != requested {}; refusing a silent resample",
+                req.rate_hz
+            ),
+        );
+        finish(params);
+        return Err(f);
+    }
     finish(params);
     // Switch params to sw params: avail_min = period, start_threshold =
     // period (the stream auto-starts when one full period is committed, so
@@ -789,12 +853,20 @@ fn configure_hw(
     })
 }
 
+/// (base, ch0 first bits, ch0 step bits, per-channel (first, step) layout).
+type AreaGeometry = (usize, u32, u32, Vec<(u32, u32)>);
+
 /// Ask mmap_begin for one frame (without committing) to learn the interleaved
-/// area base + channel-0 bit layout.
-fn mmap_area_base(
+/// area base and validate the **entire** per-channel geometry: every channel
+/// shares one contiguous `addr`, `first == ch * 32` bits and
+/// `step == channels * 32` bits (two packed S32_LE samples are 64 bits
+/// apart). The simplified pointer arithmetic used later
+/// (`base + offset * frame_bytes`) is only sound once this is proved.
+fn mmap_area_geometry(
     fns: &alsa_ffi::AlsaFns,
     handle: SndPcm,
-) -> std::result::Result<(usize, u32, u32), AlsaFailure> {
+    channels: u32,
+) -> std::result::Result<AreaGeometry, AlsaFailure> {
     let mut area_ptr: *const ChannelArea = std::ptr::null();
     let mut offset: Uframes = 0;
     let mut frames: Uframes = 1; // request one frame (input value; see mmap_begin)
@@ -809,29 +881,29 @@ fn mmap_area_base(
             alsa_ffi::snd_strerror_str(rc),
         ));
     }
-    if area_ptr.is_null() {
-        return Err(AlsaFailure::new("mmap_begin", None, "null area"));
+    if area_ptr.is_null() || frames == 0 {
+        return Err(AlsaFailure::new("mmap_begin", None, "null/empty area"));
     }
-    // SAFETY: area array with at least one element (interleaved).
-    let area = unsafe { &*area_ptr };
-    Ok((area.addr as usize, area.first, area.step))
-}
-
-/// Refuse to run when the negotiated rate is not the requested rate: the D1
-/// media timeline is frozen at `req.rate_hz`; playing it at another rate
-/// would be a silent resample. Returns Err(failure) when mismatched.
-pub fn require_exact_rate(pcm: &AlsaPcm, requested: u32) -> std::result::Result<(), AlsaFailure> {
-    if pcm.rate_hz != requested {
-        return Err(AlsaFailure::new(
-            "hw_apply",
-            None,
-            format!(
-                "endpoint negotiated rate {} != requested {requested}; refusing silent resample",
-                pcm.rate_hz
-            ),
-        ));
+    // SAFETY: the area array has one entry per channel (interleaved).
+    let areas = unsafe { std::slice::from_raw_parts(area_ptr, channels as usize) };
+    let base = areas[0].addr as usize;
+    let mut layout = Vec::with_capacity(channels as usize);
+    for (c, area) in areas.iter().enumerate() {
+        let (expect_first, expect_step) = expected_interleaved_first_step(c as u32, channels);
+        if area.addr as usize != base || area.first != expect_first || area.step != expect_step {
+            return Err(AlsaFailure::new(
+                "mmap_geometry",
+                None,
+                format!(
+                    "channel {c}: got addr 0x{:x} first {} step {}; expected addr 0x{base:x} \
+                     first {expect_first} step {expect_step}",
+                    area.addr as usize, area.first, area.step
+                ),
+            ));
+        }
+        layout.push((area.first, area.step));
     }
-    Ok(())
+    Ok((base, layout[0].0, layout[0].1, layout))
 }
 
 #[cfg(test)]
@@ -904,10 +976,29 @@ mod tests {
             classify_failure(&AlsaFailure::new("run", Some(-libc::EPIPE), "xrun")).0,
             Verdict::FailedDeadline
         );
+        // rate refusal / unexpected geometry are hardware-class negatives.
+        assert_eq!(
+            classify_failure(&AlsaFailure::new("rate", None, "negotiated 44100")).0,
+            Verdict::UnsupportedByHardware
+        );
+        assert_eq!(
+            classify_failure(&AlsaFailure::new("mmap_geometry", None, "ch1 step 32")).0,
+            Verdict::UnsupportedByHardware
+        );
         // Unknown stages stay inconclusive.
         assert_eq!(
             classify_failure(&AlsaFailure::new("mystery", None, "?")).0,
             Verdict::Inconclusive
         );
+    }
+
+    #[test]
+    fn expected_interleaved_geometry_is_packed_s32() {
+        // Two channels of S32_LE: ch0 first=0 step=64, ch1 first=32 step=64.
+        assert_eq!(expected_interleaved_first_step(0, 2), (0, 64));
+        assert_eq!(expected_interleaved_first_step(1, 2), (32, 64));
+        assert_eq!(expected_interleaved_first_step(0, 1), (0, 32));
+        // Stereo frame = 64 bits; step scales with channel count.
+        assert_eq!(expected_interleaved_first_step(3, 8), (96, 256));
     }
 }

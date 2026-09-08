@@ -86,21 +86,37 @@ baseline on the same endpoint shape measures the bytes D1 removes. Default
 content is silence-safe; `--emit-audio` opts into audible content.
 
 Measured on the seal machine (RTX 4080 SUPER, driver 610.57.04, on-board
-`ALC897` analog via `snd_hda_intel`):
+`ALC897` analog via `snd_hda_intel`). Both paths run the SAME 48 000-frame
+window; materialization traffic and verification reads are separate named
+surfaces:
 
 ```text
-D0-mmap baseline (24 000 frames):  gpu->host 192 000 B | host copy 192 000 B | endpoint obs 192 000 B
-D1-direct        (48 000 frames):  gpu->host       0 B | host copy       0 B | endpoint obs 384 000 B
+D0-mmap baseline (48 000 frames):  dtoh 384 000 B | host copies 768 000 B | endpoint obs 384 000 B
+D1-direct        (48 000 frames):  dtoh       0 B | host copies       0 B | endpoint obs 384 000 B
 ```
 
+D0's 768 000 B of host copies are the two real copies in that path (the
+instrumented internal staging→buffer copy plus the host buffer→region copy).
+Verification reads (comparing already-written samples against the oracle) are
+counted separately and are 0-shadow-copy: the D1 verifier compares the
+mapped region in place, never building a shadow sample buffer.
+
 D1 verdict **SUPPORTED** (`D1_ENDPOINT_MAPPED` / `HOST_MAPPED`): the GPU
-wrote 94 chunks byte-exact vs the scalar oracle with zero xruns and a clean
-drain; endpoint depth stayed 512–1024 frames. Registration of the actual HDA
-DMA ring succeeded — an important data point, and still one that must be
-re-measured per device: the receipt records every candidate's own row
-(open/mmap/format/registration), and failures are classified exactly
-(`UNSUPPORTED_BY_*` / busy `INCONCLUSIVE`), never replaced by a substitute
-pinned buffer.
+wrote 94 chunks byte-exact vs the scalar oracle with zero xruns, an exact
+`snd_pcm_mmap_commit` transfer check on every chunk, and a clean drain;
+endpoint depth stayed 512–1024 frames. `cuPointerGetAttribute` returned rc 1
+(invalid argument) for every attribute and both address targets on this
+driver — recorded per query; registration + device pointer + the working
+direct kernel writes are the evidence, no pointer-attribute value is claimed.
+The endpoint must grant the exact 48 kHz rate and the full per-channel area
+geometry is validated at open (the sealed ALC897 ring: `ch0 first=0 step=64;
+ch1 first=32 step=64`).
+
+Every candidate device gets its own trial row: after the D1 session the
+remaining endpoints are probed for open/mmap/format/registration
+(`playback_attempted: false`). In the sealed receipt the other HDA rings
+(NVIDIA HDMI 1,3/7/8/9 and ALC897 Digital 2,1) registered but were not
+played, and the PipeWire-held USB interface is `INCONCLUSIVE` (busy).
 
 Interpretation discipline: this proves the memory path on one
 hardware/driver combination, not a universal property. A device whose ring

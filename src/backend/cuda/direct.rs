@@ -86,72 +86,127 @@ impl RegisterRange {
     }
 }
 
-/// Pointer attributes of a registered/mapped pointer (evidence after a
-/// successful registration; `cuPointerGetAttribute`).
+/// One `cuPointerGetAttribute` query result: exact attribute, rc, driver
+/// string, and decoded value. A failed query is evidence, never a silent
+/// `None`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PointerQuery {
+    /// Which address was queried: "device-pointer" or "host-pointer".
+    pub target: String,
+    /// Attribute name, e.g. "MEMORY_TYPE".
+    pub attribute: String,
+    /// Exact driver rc (0 = success).
+    pub rc: i32,
+    /// Driver error string when rc != 0 (else "").
+    pub message: String,
+    /// Decoded value when the query succeeded.
+    pub value: Option<String>,
+}
+
+/// Pointer-attribute evidence for a registered mapping. Every attribute is
+/// queried against both the device pointer (`cuMemHostGetDevicePointer`) and
+/// the original host pointer (unified addressing); every query records its
+/// own rc + driver string + value.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PointerEvidence {
-    /// CU_POINTER_ATTRIBUTE_MEMORY_TYPE as a name ("HOST"/"DEVICE"/"UNIFIED"),
-    /// when queryable.
-    pub memory_type: Option<String>,
-    /// CU_POINTER_ATTRIBUTE_DEVICE_POINTER (hex), when queryable.
-    pub device_pointer: Option<String>,
-    /// CU_POINTER_ATTRIBUTE_MAPPED (1 when the pointer maps to a backing
-    /// allocation).
-    pub mapped: Option<i32>,
+    pub queries: Vec<PointerQuery>,
 }
 
 impl PointerEvidence {
-    /// Query attributes of `ptr` (a device pointer or a host pointer in the
-    /// unified address space) after registration. Best effort: every field is
-    /// `None` when the driver cannot answer; failures are recorded, not fatal.
-    pub fn query(fns: &Fns, ptr: CUdeviceptr) -> PointerEvidence {
-        let mut e = PointerEvidence::default();
-        let attr = |attribute: c_int, data: &mut [u8]| -> bool {
-            // SAFETY: data buffer is sized for the attribute's wire type; the
-            // driver writes at most data.len() bytes.
-            unsafe {
-                (fns.cuPointerGetAttribute.expect("bound"))(
-                    data.as_mut_ptr() as *mut c_void,
-                    attribute,
-                    ptr,
-                ) == 0
+    /// Query attributes of a registered host range: `host_ptr` is the exact
+    /// pointer registered, `dev_ptr` the pointer returned by
+    /// `cuMemHostGetDevicePointer`. Best effort per query: each row records
+    /// rc + driver string + value.
+    pub fn query(fns: &Fns, host_ptr: usize, dev_ptr: CUdeviceptr) -> PointerEvidence {
+        let mut ev = PointerEvidence::default();
+        let attribute_name = |a: c_int| -> &'static str {
+            match a {
+                POINTER_ATTRIBUTE_MEMORY_TYPE => "MEMORY_TYPE",
+                POINTER_ATTRIBUTE_DEVICE_POINTER => "DEVICE_POINTER",
+                POINTER_ATTRIBUTE_MAPPED => "MAPPED",
+                _ => "?",
             }
         };
-        let mut mt: c_int = 0;
-        if attr(POINTER_ATTRIBUTE_MEMORY_TYPE, mt_bytes(&mut mt)) {
-            use crate::backend::cuda::ffi::{
-                CU_MEMORYTYPE_DEVICE, CU_MEMORYTYPE_HOST, CU_MEMORYTYPE_UNIFIED,
-            };
-            e.memory_type = Some(if mt == CU_MEMORYTYPE_HOST {
-                "HOST".to_string()
-            } else if mt == CU_MEMORYTYPE_DEVICE {
-                "DEVICE".to_string()
-            } else if mt == CU_MEMORYTYPE_UNIFIED {
-                "UNIFIED".to_string()
-            } else {
-                format!("UNKNOWN({mt})")
-            });
+        // Each attribute is queried against both addresses (device pointer
+        // from the registration, and the host pointer itself in UVA).
+        for (target, ptr) in [
+            ("device-pointer", dev_ptr),
+            ("host-pointer", host_ptr as CUdeviceptr),
+        ] {
+            for attribute in [
+                POINTER_ATTRIBUTE_MEMORY_TYPE,
+                POINTER_ATTRIBUTE_DEVICE_POINTER,
+                POINTER_ATTRIBUTE_MAPPED,
+            ] {
+                // int- or pointer-sized wire value (8 bytes covers both).
+                let mut data = [0u8; 8];
+                // SAFETY: the driver writes at most 8 bytes (int or device
+                // pointer); `data` outlives the call.
+                let rc = unsafe {
+                    (fns.cuPointerGetAttribute.expect("bound"))(
+                        data.as_mut_ptr() as *mut c_void,
+                        attribute,
+                        ptr,
+                    )
+                };
+                let mut row = PointerQuery {
+                    target: target.to_string(),
+                    attribute: attribute_name(attribute).to_string(),
+                    rc,
+                    message: String::new(),
+                    value: None,
+                };
+                if rc == 0 {
+                    row.value = Some(decode_attr(attribute, &data));
+                } else {
+                    row.message = crate::backend::cuda::ffi::error_string(fns, rc);
+                }
+                ev.queries.push(row);
+            }
         }
-        let mut dp: CUdeviceptr = 0;
-        if attr(POINTER_ATTRIBUTE_DEVICE_POINTER, dp_bytes(&mut dp)) {
-            e.device_pointer = Some(format!("0x{dp:x}"));
-        }
-        let mut mapped: c_int = 0;
-        if attr(POINTER_ATTRIBUTE_MAPPED, mt_bytes(&mut mapped)) {
-            e.mapped = Some(mapped);
-        }
-        e
+        ev
     }
 }
 
-/// Byte view helpers for the two attribute wire types.
-fn mt_bytes(v: &mut c_int) -> &mut [u8] {
-    // SAFETY: c_int is POD.
-    unsafe { std::slice::from_raw_parts_mut(v as *mut c_int as *mut u8, size_of::<c_int>()) }
+/// Decode a successful attribute payload.
+fn decode_attr(attribute: c_int, data: &[u8; 8]) -> String {
+    match attribute {
+        POINTER_ATTRIBUTE_MEMORY_TYPE => {
+            use crate::backend::cuda::ffi::{
+                CU_MEMORYTYPE_DEVICE, CU_MEMORYTYPE_HOST, CU_MEMORYTYPE_UNIFIED,
+            };
+            let v = i32::from_le_bytes(data[..4].try_into().expect("4 bytes"));
+            if v == CU_MEMORYTYPE_HOST {
+                "HOST".into()
+            } else if v == CU_MEMORYTYPE_DEVICE {
+                "DEVICE".into()
+            } else if v == CU_MEMORYTYPE_UNIFIED {
+                "UNIFIED".into()
+            } else {
+                format!("UNKNOWN({v})")
+            }
+        }
+        POINTER_ATTRIBUTE_DEVICE_POINTER => {
+            format!("0x{:x}", u64::from_le_bytes(*data))
+        }
+        _ => {
+            let v = i32::from_le_bytes(data[..4].try_into().expect("4 bytes"));
+            format!("{v}")
+        }
+    }
 }
-fn dp_bytes(v: &mut CUdeviceptr) -> &mut [u8] {
-    // SAFETY: CUdeviceptr is POD (u64).
-    unsafe { std::slice::from_raw_parts_mut(v as *mut u64 as *mut u8, size_of::<u64>()) }
+
+impl PointerEvidence {
+    /// Convenience: first successful MEMORY_TYPE query value, if any.
+    pub fn memory_type(&self) -> Option<&str> {
+        self.queries.iter().find_map(|q| {
+            if q.attribute == "MEMORY_TYPE" && q.rc == 0 {
+                q.value.as_deref()
+            } else {
+                None
+            }
+        })
+    }
 }
 
 /// A registered host-memory range (RAII): unregistered on drop. Drop order is
