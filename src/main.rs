@@ -18,7 +18,9 @@ USAGE:
 COMMANDS (current build):
     probe                 Capture environment + hardware evidence summary
     court <name>          Run an executable court (semantic, authored, simd, facts,
-                          cuda, d1) [--receipts DIR]; court d1 accepts --emit-audio
+                          cuda, d1, entropy-rans, entropy-literal, entropy-residual,
+                          entropy-pages, entropy-partial) [--receipts DIR];
+                          court d1 accepts --emit-audio
     receipt show <file>   Verify and print an evidence receipt
     receipt perf <file>   Render a receipt's throughput_cells as Markdown
     version               Print version and build identity

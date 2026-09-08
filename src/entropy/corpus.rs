@@ -113,8 +113,11 @@ fn build(name: &'static str, kind: &'static str, channels: u8, frames: usize) ->
                 (sine(f * 71) * (1 << 12)) >> 30
             }
             "white-noise" => {
+                // Full 32-bit spread: byte-flat negative control (a limited
+                // amplitude would let byte-lane models compress sign- and
+                // zero-extension bytes — not a true incompressible control).
                 let r = splitmix64(&mut state);
-                ((r >> 41) as i64) - (1 << 22)
+                (r as u32) as i64 - (1i64 << 31)
             }
             "random-control" => {
                 // Full 32-bit spread: every LE byte is near-uniform.

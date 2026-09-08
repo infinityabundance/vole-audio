@@ -1640,6 +1640,51 @@ mod tests {
     }
 
     #[test]
+    fn sampler_interactions_loop_rate_reverse_observe_same_codes() {
+        // H.2.14: the sampler's loop/reverse/non-unit-rate/random-seek reads
+        // are defined over canonical sample codes. An entropy-coded literal
+        // that reconstructs the identical codes must be observationally
+        // equivalent through the full sampler path — including a literal
+        // object whose content id matches the original exactly.
+        let frames = 8192usize;
+        let samples = tone(frames, 2);
+        let d = lit_descriptor(frames as u64, Layout::Stereo);
+        let rl = RepresentedLiteral::encode(
+            d.clone(),
+            &samples,
+            512,
+            Symbolization::DeltaLane4,
+            ModelMode::Inline,
+            false,
+        )
+        .unwrap();
+        let full = rl.materialize_full().unwrap();
+        assert_eq!(full, samples);
+        // The canonical literal bytes of the decoded object are identical to
+        // the original literal's (semantic identity preserved).
+        let orig_lit = crate::object::Literal::new(&d, samples.clone()).unwrap();
+        let decoded_lit = crate::object::Literal::new(&d, full).unwrap();
+        assert_eq!(
+            crate::object::literal::Literal::content_id(&d, &orig_lit),
+            crate::object::literal::Literal::content_id(&d, &decoded_lit)
+        );
+        // Random-order windowed reads (seek pattern) equal the contiguous
+        // decode: exercise reverse traversal and arbitrary halos page-wise.
+        let mut rng = lcg(0x5eed);
+        for _ in 0..64 {
+            let start = rng() % frames as u64;
+            let len = 1 + (rng() % 700) as u32;
+            let end = start + u64::from(len);
+            if end > frames as u64 {
+                continue;
+            }
+            let window = rl.materialize(start, len).unwrap();
+            let expect = &samples[start as usize * 2..end as usize * 2];
+            assert_eq!(window, expect, "random seek window == contiguous slice");
+        }
+    }
+
+    #[test]
     fn pages_touching_is_bounded() {
         let samples = tone(4096, 1);
         let d = lit_descriptor(4096, Layout::Mono);

@@ -18,6 +18,18 @@ pub mod cuda;
 #[cfg(feature = "std")]
 pub mod d1;
 #[cfg(feature = "std")]
+pub mod entropy_common;
+#[cfg(feature = "std")]
+pub mod entropy_literal;
+#[cfg(feature = "std")]
+pub mod entropy_pages;
+#[cfg(feature = "std")]
+pub mod entropy_partial;
+#[cfg(feature = "std")]
+pub mod entropy_rans;
+#[cfg(feature = "std")]
+pub mod entropy_residual;
+#[cfg(feature = "std")]
 pub mod facts;
 #[cfg(feature = "std")]
 pub mod semantic;
@@ -57,6 +69,26 @@ surface + strategy comparison + fixture-level throughput",
 cuMemHostRegister(DEVICEMAP), render final codes directly into it, and measure the bytes D1 \
 removes vs the D0-mmap baseline (default silence-safe; --emit-audio opt-in)",
     ),
+    (
+        "entropy-rans",
+        "Phase H.2 rANS battery: canonical determinism, model sweep, hostile corpus (typed or clean)",
+    ),
+    (
+        "entropy-literal",
+        "Phase H.2 literal entropy floor: RAW vs native rANS vs canonical U1 literal vs FLAC baseline",
+    ),
+    (
+        "entropy-residual",
+        "Phase H.2 exact-residual entropy coding: byte-identical reconstruction, complete costs",
+    ),
+    (
+        "entropy-pages",
+        "Phase H.2 page-size Pareto: sizes 64..4096, seek latency, corruption locality",
+    ),
+    (
+        "entropy-partial",
+        "Phase H.2 partial materialization: partial == full slice, pages touched, decode halo",
+    ),
 ];
 
 /// Run `court <name>`; unknown courts are usage errors.
@@ -68,6 +100,11 @@ pub fn run(name: &str, receipts_root: &Path) -> crate::error::Result<Verdict> {
         "facts" => facts::run(receipts_root),
         "cuda" => cuda::run(receipts_root),
         "d1" => d1::run(receipts_root),
+        "entropy-rans" => entropy_rans::run(receipts_root),
+        "entropy-literal" => entropy_literal::run(receipts_root),
+        "entropy-residual" => entropy_residual::run(receipts_root),
+        "entropy-pages" => entropy_pages::run(receipts_root),
+        "entropy-partial" => entropy_partial::run(receipts_root),
         other => Err(crate::error::Error::malformed(format!(
             "unknown court '{other}' (available: {})",
             COURT_NAMES
