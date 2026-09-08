@@ -1,11 +1,23 @@
 //! Minimal audited CUDA driver-API FFI (Phase G), dynamically loaded.
 //!
-//! Only the exact API surface Phase G uses is bound, with the *legacy* export
-//! names that remain stable across driver generations (e.g. `cuCtxCreate_v2`
-//! for the classic three-argument context create; the CUDA 13 header moved
-//! the macro name to an extended signature, but the classic symbol is still
-//! exported by the driver). Every call site is wrapped by `driver::Cuda`;
-//! no raw CUDA handle ever escapes this module's RAII types.
+//! Only the exact API surface Phase G uses is bound. Every numeric constant
+//! in this module is frozen **from the installed CUDA 13.3 headers**
+//! (`/opt/cuda/include/cuda.h`) and pinned by the `frozen_constants` test
+//! table below, so a manual transcription error cannot silently drift.
+//!
+//! ABI notes (verified against driver 610.57.04 + CUDA 13.3 headers):
+//!
+//! * `cuCtxCreate` maps to `cuCtxCreate_v4` and takes **four** arguments:
+//!   `(CUcontext*, CUctxCreateParams*, unsigned int flags, CUdevice)`.
+//!   `ctxCreateParams` may be `NULL` for a regular context. (The
+//!   five-argument `(…, CUexecAffinityParam*, int, …)` form is
+//!   `cuCtxCreate_v3`, a different API. The legacy `cuCtxCreate_v2` export
+//!   on this driver yields a context that rejects later allocation with
+//!   rc 201 — not used.)
+//! * All symbols are resolved with the exported names and the signatures
+//!   above; `cuGetProcAddress`-style explicit versioning is not needed while
+//!   we bind exactly one documented ABI per symbol, but each binding names
+//!   the header signature it implements.
 //!
 //! Loading is `dlopen` of `libcuda.so.1` (the driver, not the toolkit
 //! runtime): a machine without the NVIDIA driver never loads this module,
@@ -28,38 +40,44 @@ pub type CUgraphExec = usize;
 /// Device memory pointer (64-bit address space).
 pub type CUdeviceptr = u64;
 
-pub const CU_CTX_SCHED_AUTO: u32 = 0x00;
-pub const CU_CTX_SCHED_BLOCKING_SYNC: u32 = 0x04;
-pub const CU_CTX_MAP_HOST: u32 = 0x08;
-pub const CU_STREAM_NON_BLOCKING: u32 = 0x01;
-pub const CU_EVENT_DISABLE_TIMING: u32 = 0x01;
-pub const CU_STREAM_CAPTURE_MODE_RELAXED: u32 = 2;
-pub const CU_LAUNCH_ATTRIBUTE_MAX_ACTIVE_BLOCKS_PER_MULTIPROCESSOR: c_int = 2;
+// ---------------------------------------------------------------------------
+// Frozen constants — values transcribed from /opt/cuda/include/cuda.h
+// (CUDA 13.3). Every value is pinned by the `frozen_constants` test.
+// ---------------------------------------------------------------------------
 
-// Device attributes used by the probe (values frozen from cuda.h).
+/// CU_CTX_SCHED_AUTO = 0x00 (cuCtxCreate flags; we pass 0 and say so).
+pub const CU_CTX_SCHED_AUTO: u32 = 0x00;
+/// CU_STREAM_NON_BLOCKING = 0x1.
+pub const CU_STREAM_NON_BLOCKING: u32 = 0x01;
+/// CU_EVENT_DISABLE_TIMING = 0x2 (CUDA 13 header; 0x1 is CU_EVENT_DEFAULT).
+pub const CU_EVENT_DISABLE_TIMING: u32 = 0x02;
+/// CU_STREAM_CAPTURE_MODE_RELAXED = 2.
+pub const CU_STREAM_CAPTURE_MODE_RELAXED: u32 = 2;
+
+/// CU_JIT_INFO_LOG_BUFFER = 3 (option value: `char*`).
+pub const CU_JIT_INFO_LOG_BUFFER: i32 = 3;
+/// CU_JIT_INFO_LOG_BUFFER_SIZE_BYTES = 4 (option value: `unsigned int`, in/out).
+pub const CU_JIT_INFO_LOG_BUFFER_SIZE_BYTES: i32 = 4;
+/// CU_JIT_ERROR_LOG_BUFFER = 5 (option value: `char*`).
+pub const CU_JIT_ERROR_LOG_BUFFER: i32 = 5;
+/// CU_JIT_ERROR_LOG_BUFFER_SIZE_BYTES = 6 (option value: `unsigned int`, in/out).
+pub const CU_JIT_ERROR_LOG_BUFFER_SIZE_BYTES: i32 = 6;
+
+// Device attributes used by the probe (cuda.h lines 828-917 area).
 pub const ATTR_WARP_SIZE: c_int = 10;
 pub const ATTR_MAX_THREADS_PER_BLOCK: c_int = 1;
+pub const ATTR_CLOCK_RATE: c_int = 13;
 pub const ATTR_MULTIPROCESSOR_COUNT: c_int = 16;
-pub const ATTR_GPU_CLOCK_RATE: c_int = 13;
 pub const ATTR_KERNEL_EXEC_TIMEOUT: c_int = 17;
-pub const ATTR_MEMORY_CLOCK_RATE: c_int = 36;
-pub const ATTR_MAX_THREADS_PER_MULTIPROCESSOR: c_int = 39;
-pub const ATTR_UNIFIED_ADDRESSING: c_int = 41;
 pub const ATTR_PCI_BUS_ID: c_int = 33;
 pub const ATTR_PCI_DEVICE_ID: c_int = 34;
+pub const ATTR_MAX_THREADS_PER_MULTIPROCESSOR: c_int = 39;
+pub const ATTR_UNIFIED_ADDRESSING: c_int = 41;
 pub const ATTR_PCI_DOMAIN_ID: c_int = 50;
-pub const ATTR_COMPUTE_CAPABILITY_MAJOR: c_int = 75;
-pub const ATTR_COMPUTE_CAPABILITY_MINOR: c_int = 76;
 pub const ATTR_STREAM_PRIORITIES_SUPPORTED: c_int = 78;
 pub const ATTR_GLOBAL_L1_CACHE_SUPPORTED: c_int = 79;
 pub const ATTR_CONCURRENT_MANAGED_ACCESS: c_int = 89;
 pub const ATTR_HOST_REGISTER_SUPPORTED: c_int = 99;
-
-// Stream-priority attribute value range is queried via cuCtxGetStreamPriorityRange
-// in older drivers; on modern drivers it is a device attribute pair:
-// CU_DEVICE_ATTRIBUTE_MIN_STREAM_PRIORITY / MAX_STREAM_PRIORITY.
-pub const ATTR_MIN_STREAM_PRIORITY: c_int = 122;
-pub const ATTR_MAX_STREAM_PRIORITY: c_int = 123;
 
 macro_rules! fns {
     ($( $name:ident : $fty:ty ),* $(,)?) => {
@@ -115,10 +133,15 @@ type FnDeviceGet = unsafe extern "C" fn(*mut CUdevice, c_int) -> CUresult;
 type FnDeviceGetName = unsafe extern "C" fn(*mut c_char, c_int, CUdevice) -> CUresult;
 type FnDeviceComputeCapability = unsafe extern "C" fn(*mut c_int, *mut c_int, CUdevice) -> CUresult;
 type FnDeviceGetAttribute = unsafe extern "C" fn(*mut c_int, c_int, CUdevice) -> CUresult;
-type FnCtxCreate =
-    unsafe extern "C" fn(*mut CUcontext, *mut c_void, c_int, u32, CUdevice) -> CUresult;
+/// cuCtxCreate(CUcontext*, CUctxCreateParams*, unsigned int flags, CUdevice)
+/// — the current (v4) four-argument ABI; params may be NULL for a regular
+/// context (cuda.h line 6481).
+type FnCtxCreate = unsafe extern "C" fn(*mut CUcontext, *mut c_void, u32, CUdevice) -> CUresult;
 type FnCtxDestroy = unsafe extern "C" fn(CUcontext) -> CUresult;
 type FnCtxSynchronize = unsafe extern "C" fn() -> CUresult;
+/// cuCtxGetStreamPriorityRange(int* least, int* greatest) — the only
+/// documented way to obtain the meaningful priority range (cuda.h 7176).
+type FnCtxGetStreamPriorityRange = unsafe extern "C" fn(*mut c_int, *mut c_int) -> CUresult;
 type FnModuleLoadData = unsafe extern "C" fn(*mut CUmodule, *const c_void) -> CUresult;
 type FnModuleLoadDataEx = unsafe extern "C" fn(
     *mut CUmodule,
@@ -180,6 +203,7 @@ fns! {
     cuCtxCreate: FnCtxCreate,
     cuCtxDestroy: FnCtxDestroy,
     cuCtxSynchronize: FnCtxSynchronize,
+    cuCtxGetStreamPriorityRange: FnCtxGetStreamPriorityRange,
     cuModuleLoadData: FnModuleLoadData,
     cuModuleLoadDataEx: FnModuleLoadDataEx,
     cuModuleUnload: FnModuleUnload,
@@ -258,15 +282,14 @@ impl Fns {
         probe! {
             cuInit, cuDriverGetVersion, cuDeviceGetCount, cuDeviceGet,
             cuDeviceGetName, cuDeviceComputeCapability, cuDeviceGetAttribute,
-            cuCtxCreate, cuCtxDestroy, cuCtxSynchronize, cuModuleLoadData,
+            cuCtxCreate, cuCtxDestroy, cuCtxSynchronize, cuCtxGetStreamPriorityRange,
             cuModuleLoadDataEx, cuModuleUnload, cuModuleGetFunction, cuMemAlloc, cuMemFree,
-            cuMemcpyHtoD, cuMemcpyDtoH, cuMemcpyHtoDAsync, cuMemcpyDtoHAsync,
-            cuLaunchKernel, cuStreamCreate, cuStreamCreateWithPriority,
-            cuStreamDestroy, cuStreamSynchronize, cuStreamGetPriority,
-            cuEventCreate, cuEventDestroy, cuEventRecord, cuEventSynchronize,
-            cuEventElapsedTime, cuStreamBeginCapture, cuStreamEndCapture,
-            cuGraphInstantiateWithFlags, cuGraphLaunch, cuGraphExecDestroy,
-            cuGraphDestroy, cuGetErrorString,
+            cuMemcpyHtoD, cuMemcpyDtoH, cuLaunchKernel, cuStreamCreate,
+            cuStreamCreateWithPriority, cuStreamDestroy, cuStreamSynchronize,
+            cuStreamGetPriority, cuEventCreate, cuEventDestroy, cuEventRecord,
+            cuEventSynchronize, cuEventElapsedTime, cuStreamBeginCapture,
+            cuStreamEndCapture, cuGraphInstantiateWithFlags, cuGraphLaunch,
+            cuGraphExecDestroy, cuGraphDestroy, cuGetErrorString,
         }
         out
     }
@@ -308,4 +331,123 @@ pub fn error_string(fns: &Fns, rc: CUresult) -> String {
         }
     }
     format!("CUresult {rc}")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Every manually frozen numeric CUDA constant, pinned to its value in
+    /// the CUDA 13.3 headers (/opt/cuda/include/cuda.h). Changing a value
+    /// here without a header citation is a defect.
+    #[test]
+    fn frozen_constants_match_cuda_13_3_headers() {
+        let rows: Vec<(&str, i64)> = vec![
+            // cuEventFlag (cuda.h ~line 474)
+            (
+                "CU_EVENT_DISABLE_TIMING",
+                i64::from(CU_EVENT_DISABLE_TIMING),
+            ),
+            // cuStreamCreateFlags (cuda.h line 445)
+            ("CU_STREAM_NON_BLOCKING", i64::from(CU_STREAM_NON_BLOCKING)),
+            // cuStreamCaptureMode (cuda.h line 2544)
+            (
+                "CU_STREAM_CAPTURE_MODE_RELAXED",
+                i64::from(CU_STREAM_CAPTURE_MODE_RELAXED),
+            ),
+            // cuJitOption (cuda.h lines ~1282-1314)
+            ("CU_JIT_INFO_LOG_BUFFER", i64::from(CU_JIT_INFO_LOG_BUFFER)),
+            (
+                "CU_JIT_INFO_LOG_BUFFER_SIZE_BYTES",
+                i64::from(CU_JIT_INFO_LOG_BUFFER_SIZE_BYTES),
+            ),
+            (
+                "CU_JIT_ERROR_LOG_BUFFER",
+                i64::from(CU_JIT_ERROR_LOG_BUFFER),
+            ),
+            (
+                "CU_JIT_ERROR_LOG_BUFFER_SIZE_BYTES",
+                i64::from(CU_JIT_ERROR_LOG_BUFFER_SIZE_BYTES),
+            ),
+            // cuDeviceAttribute (cuda.h lines 815-917)
+            (
+                "CU_DEVICE_ATTRIBUTE_MAX_THREADS_PER_BLOCK",
+                i64::from(ATTR_MAX_THREADS_PER_BLOCK),
+            ),
+            ("CU_DEVICE_ATTRIBUTE_WARP_SIZE", i64::from(ATTR_WARP_SIZE)),
+            ("CU_DEVICE_ATTRIBUTE_CLOCK_RATE", i64::from(ATTR_CLOCK_RATE)),
+            (
+                "CU_DEVICE_ATTRIBUTE_MULTIPROCESSOR_COUNT",
+                i64::from(ATTR_MULTIPROCESSOR_COUNT),
+            ),
+            (
+                "CU_DEVICE_ATTRIBUTE_KERNEL_EXEC_TIMEOUT",
+                i64::from(ATTR_KERNEL_EXEC_TIMEOUT),
+            ),
+            ("CU_DEVICE_ATTRIBUTE_PCI_BUS_ID", i64::from(ATTR_PCI_BUS_ID)),
+            (
+                "CU_DEVICE_ATTRIBUTE_PCI_DEVICE_ID",
+                i64::from(ATTR_PCI_DEVICE_ID),
+            ),
+            (
+                "CU_DEVICE_ATTRIBUTE_PCI_DOMAIN_ID",
+                i64::from(ATTR_PCI_DOMAIN_ID),
+            ),
+            (
+                "CU_DEVICE_ATTRIBUTE_MAX_THREADS_PER_MULTIPROCESSOR",
+                i64::from(ATTR_MAX_THREADS_PER_MULTIPROCESSOR),
+            ),
+            (
+                "CU_DEVICE_ATTRIBUTE_UNIFIED_ADDRESSING",
+                i64::from(ATTR_UNIFIED_ADDRESSING),
+            ),
+            (
+                "CU_DEVICE_ATTRIBUTE_STREAM_PRIORITIES_SUPPORTED",
+                i64::from(ATTR_STREAM_PRIORITIES_SUPPORTED),
+            ),
+            (
+                "CU_DEVICE_ATTRIBUTE_GLOBAL_L1_CACHE_SUPPORTED",
+                i64::from(ATTR_GLOBAL_L1_CACHE_SUPPORTED),
+            ),
+            (
+                "CU_DEVICE_ATTRIBUTE_CONCURRENT_MANAGED_ACCESS",
+                i64::from(ATTR_CONCURRENT_MANAGED_ACCESS),
+            ),
+            (
+                "CU_DEVICE_ATTRIBUTE_HOST_REGISTER_SUPPORTED",
+                i64::from(ATTR_HOST_REGISTER_SUPPORTED),
+            ),
+        ];
+        let expected: Vec<(&str, i64)> = vec![
+            ("CU_EVENT_DISABLE_TIMING", 0x2),
+            ("CU_STREAM_NON_BLOCKING", 0x1),
+            ("CU_STREAM_CAPTURE_MODE_RELAXED", 2),
+            ("CU_JIT_INFO_LOG_BUFFER", 3),
+            ("CU_JIT_INFO_LOG_BUFFER_SIZE_BYTES", 4),
+            ("CU_JIT_ERROR_LOG_BUFFER", 5),
+            ("CU_JIT_ERROR_LOG_BUFFER_SIZE_BYTES", 6),
+            ("CU_DEVICE_ATTRIBUTE_MAX_THREADS_PER_BLOCK", 1),
+            ("CU_DEVICE_ATTRIBUTE_WARP_SIZE", 10),
+            ("CU_DEVICE_ATTRIBUTE_CLOCK_RATE", 13),
+            ("CU_DEVICE_ATTRIBUTE_MULTIPROCESSOR_COUNT", 16),
+            ("CU_DEVICE_ATTRIBUTE_KERNEL_EXEC_TIMEOUT", 17),
+            ("CU_DEVICE_ATTRIBUTE_PCI_BUS_ID", 33),
+            ("CU_DEVICE_ATTRIBUTE_PCI_DEVICE_ID", 34),
+            ("CU_DEVICE_ATTRIBUTE_PCI_DOMAIN_ID", 50),
+            ("CU_DEVICE_ATTRIBUTE_MAX_THREADS_PER_MULTIPROCESSOR", 39),
+            ("CU_DEVICE_ATTRIBUTE_UNIFIED_ADDRESSING", 41),
+            ("CU_DEVICE_ATTRIBUTE_STREAM_PRIORITIES_SUPPORTED", 78),
+            ("CU_DEVICE_ATTRIBUTE_GLOBAL_L1_CACHE_SUPPORTED", 79),
+            ("CU_DEVICE_ATTRIBUTE_CONCURRENT_MANAGED_ACCESS", 89),
+            ("CU_DEVICE_ATTRIBUTE_HOST_REGISTER_SUPPORTED", 99),
+        ];
+        assert_eq!(rows.len(), expected.len());
+        for ((name, val), (ename, eval)) in rows.iter().zip(expected.iter()) {
+            assert_eq!(
+                val, eval,
+                "{name} frozen value {val} != cuda.h value {eval}; re-verify against the header"
+            );
+            let _ = ename;
+        }
+    }
 }

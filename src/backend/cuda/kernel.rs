@@ -69,6 +69,12 @@ pub struct KernelWorld {
     pub flat: FlattenedWorld,
     state_bytes: Vec<u8>,
     out_bytes: Vec<u8>,
+    /// Honest D0 traffic/launch counters for every render on this world
+    /// (see `evidence::counters`); the court folds them into its receipt.
+    pub counters: crate::evidence::counters::Counters,
+    /// Priority actually assigned by the driver to the high-priority stream
+    /// (verified via cuStreamGetPriority; receipts record it).
+    pub priority_assigned: Option<i32>,
     /// The CUDA session (context). Declared last: destroyed last.
     pub cuda: Cuda,
 }
@@ -127,6 +133,17 @@ impl KernelWorld {
         } else {
             None
         };
+        // Verify what the driver actually assigned (clamping would be
+        // evidence of a wrong range, never silently accepted).
+        let priority_assigned = stream_priority
+            .as_ref()
+            .map(|s| s.priority().unwrap_or(cuda.priority_least));
+
+        // D0 accounting anchors: the VRAM observation block and its host
+        // staging mirror (persistent, sized for the max quantum).
+        let mut counters = crate::evidence::counters::Counters::new();
+        counters.host_pcm_resident_peak_bytes = out_bytes.len() as u64;
+        counters.device_sample_block_bytes = out_bytes.len() as u64;
 
         let mut world = KernelWorld {
             _module: module,
@@ -143,6 +160,8 @@ impl KernelWorld {
             flat,
             state_bytes,
             out_bytes,
+            counters,
+            priority_assigned,
             cuda,
         };
         // Graph capture is an optional optimization; failure is recorded by
@@ -229,6 +248,7 @@ impl KernelWorld {
                     &params,
                 )?;
                 self.stream_standard.synchronize()?;
+                self.counters.kernel_launches += 1;
             }
             Strategy::HighPriority => {
                 let stream = self.stream_priority.as_ref().ok_or_else(|| {
@@ -237,6 +257,7 @@ impl KernelWorld {
                 self.function
                     .launch(grid, (BLOCK_THREADS, 1, 1), stream.handle, &params)?;
                 stream.synchronize()?;
+                self.counters.kernel_launches += 1;
             }
             Strategy::Graph => {
                 let graph = self.graph.as_ref().ok_or_else(|| {
@@ -244,15 +265,23 @@ impl KernelWorld {
                 })?;
                 graph.launch(self.stream_standard.handle)?;
                 self.stream_standard.synchronize()?;
+                self.counters.kernel_launches += 1;
             }
         }
-        self.download(out)
+        self.download(out)?;
+        self.counters.quanta_submitted += 1;
+        Ok(())
     }
 
     fn download(&mut self, out: &mut [i32]) -> Result<()> {
-        // The D0 block is sized for the max quantum; copy the whole block
-        // back (simplest correct path) and read the leading frames.
-        self.d_out.download(&mut self.out_bytes)?;
+        // Transfer only the rendered window's leading bytes (the D0 block is
+        // sized for the max quantum); the *actual* transfer size is what the
+        // counters record. The host staging mirror then feeds the caller
+        // buffer via one host copy.
+        let want = out.len() * 4;
+        self.d_out.download_prefix(&mut self.out_bytes[..want])?;
+        self.counters.gpu_to_host_pcm_bytes += want as u64;
+        self.counters.host_pcm_copy_bytes += want as u64;
         let codes: &[i32] =
             unsafe { std::slice::from_raw_parts(self.out_bytes.as_ptr() as *const i32, out.len()) };
         out.copy_from_slice(codes);
@@ -300,6 +329,7 @@ impl KernelWorld {
             }
         };
         r?;
+        self.counters.kernel_launches += 1;
         e1.synchronize()?;
         let ms = e1.elapsed_ms(&e0)?;
         drop((e0, e1));

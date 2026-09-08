@@ -14,12 +14,12 @@ use std::ffi::{CString, c_void};
 use std::path::Path;
 
 use super::ffi::{
-    ATTR_CONCURRENT_MANAGED_ACCESS, ATTR_GLOBAL_L1_CACHE_SUPPORTED, ATTR_GPU_CLOCK_RATE,
-    ATTR_HOST_REGISTER_SUPPORTED, ATTR_KERNEL_EXEC_TIMEOUT, ATTR_MAX_STREAM_PRIORITY,
-    ATTR_MAX_THREADS_PER_BLOCK, ATTR_MAX_THREADS_PER_MULTIPROCESSOR, ATTR_MIN_STREAM_PRIORITY,
-    ATTR_MULTIPROCESSOR_COUNT, ATTR_PCI_BUS_ID, ATTR_PCI_DEVICE_ID, ATTR_PCI_DOMAIN_ID,
-    ATTR_STREAM_PRIORITIES_SUPPORTED, ATTR_UNIFIED_ADDRESSING, CUdeviceptr, CUgraph, CUgraphExec,
-    CUmodule, CUresult, CUstream, Driver, Fns, cuda_error,
+    ATTR_CLOCK_RATE, ATTR_CONCURRENT_MANAGED_ACCESS, ATTR_GLOBAL_L1_CACHE_SUPPORTED,
+    ATTR_HOST_REGISTER_SUPPORTED, ATTR_KERNEL_EXEC_TIMEOUT, ATTR_MAX_THREADS_PER_BLOCK,
+    ATTR_MAX_THREADS_PER_MULTIPROCESSOR, ATTR_MULTIPROCESSOR_COUNT, ATTR_PCI_BUS_ID,
+    ATTR_PCI_DEVICE_ID, ATTR_PCI_DOMAIN_ID, ATTR_STREAM_PRIORITIES_SUPPORTED,
+    ATTR_UNIFIED_ADDRESSING, CUdeviceptr, CUgraph, CUgraphExec, CUmodule, CUresult, CUstream,
+    Driver, Fns, cuda_error,
 };
 
 // ---------------------------------------------------------------------------
@@ -56,8 +56,6 @@ pub struct DeviceInfo {
     pub max_threads_per_multiprocessor: i32,
     pub unified_addressing: i32,
     pub stream_priorities_supported: i32,
-    pub min_stream_priority: i32,
-    pub max_stream_priority: i32,
     pub concurrent_managed_access: i32,
     pub host_register_supported: i32,
     pub global_l1_cache_supported: i32,
@@ -103,13 +101,11 @@ impl DeviceInfo {
             pci_device_id: get(ATTR_PCI_DEVICE_ID).unwrap_or(-1),
             pci_domain_id: get(ATTR_PCI_DOMAIN_ID).unwrap_or(-1),
             multiprocessor_count: get(ATTR_MULTIPROCESSOR_COUNT)?,
-            clock_rate_khz: get(ATTR_GPU_CLOCK_RATE)?,
+            clock_rate_khz: get(ATTR_CLOCK_RATE)?,
             max_threads_per_block: get(ATTR_MAX_THREADS_PER_BLOCK)?,
             max_threads_per_multiprocessor: get(ATTR_MAX_THREADS_PER_MULTIPROCESSOR)?,
             unified_addressing: get(ATTR_UNIFIED_ADDRESSING)?,
             stream_priorities_supported: get(ATTR_STREAM_PRIORITIES_SUPPORTED)?,
-            min_stream_priority: get(ATTR_MIN_STREAM_PRIORITY)?,
-            max_stream_priority: get(ATTR_MAX_STREAM_PRIORITY)?,
             concurrent_managed_access: get(ATTR_CONCURRENT_MANAGED_ACCESS)?,
             host_register_supported: get(ATTR_HOST_REGISTER_SUPPORTED)?,
             global_l1_cache_supported: get(ATTR_GLOBAL_L1_CACHE_SUPPORTED)?,
@@ -128,6 +124,11 @@ pub struct Cuda {
     pub device: DeviceInfo,
     /// Current context for this thread (created by `open`).
     pub context: usize,
+    /// Least / greatest meaningful stream priority of this context
+    /// (`cuCtxGetStreamPriorityRange`). Lower numbers = higher priority;
+    /// out-of-range requests are clamped by the driver.
+    pub priority_least: i32,
+    pub priority_greatest: i32,
     /// Keep the dlopen handle alive last.
     _driver: Driver,
 }
@@ -189,33 +190,44 @@ impl Cuda {
             ));
         }
         let device = DeviceInfo::probe(&fns, ordinal)?;
-        // Context creation: bind the *exported* `cuCtxCreate` with its modern
-        // driver signature `(CUcontext*, CUexecAffinityParam*, int numParams,
-        // unsigned int flags, CUdevice)` — zero affinity params + default
-        // scheduling. (The legacy `cuCtxCreate_v2` export on current drivers
-        // yields a context that rejects later allocation; verified against
-        // driver 610.57.04.) The created context becomes current for this
-        // thread.
+        // Context creation: bind the exported `cuCtxCreate` (= cuCtxCreate_v4)
+        // with its documented four-argument signature
+        // `(CUcontext*, CUctxCreateParams*, unsigned int flags, CUdevice)`;
+        // `NULL` ctxCreateParams creates a regular context (cuda.h 6481).
+        // Legacy `cuCtxCreate_v2` (three-arg) on this driver yields a context
+        // that rejects later allocation with rc 201 (verified, driver
+        // 610.57.04). The created context becomes current for this thread.
         let mut context: usize = 0;
-        // SAFETY: out-param; no affinity params; default flags.
+        // SAFETY: out-param; NULL params (regular context); default flags.
         let rc = unsafe {
-            (fns.cuCtxCreate.expect("bound"))(&mut context, std::ptr::null_mut(), 0, 0, ordinal)
+            (fns.cuCtxCreate.expect("bound"))(&mut context, std::ptr::null_mut(), 0, ordinal)
         };
         check(&fns, "cuCtxCreate", rc)?;
+        // Stream priority range: context query, the only documented source.
+        let (mut least, mut greatest) = (0, 0);
+        // SAFETY: out-params.
+        let rc =
+            unsafe { (fns.cuCtxGetStreamPriorityRange.expect("bound"))(&mut least, &mut greatest) };
+        check(&fns, "cuCtxGetStreamPriorityRange", rc)?;
         Ok(Cuda {
             fns,
             driver_version: version,
             device,
             context,
+            priority_least: least,
+            priority_greatest: greatest,
             _driver: driver,
         })
     }
 
-    /// Highest available stream priority (0 is the default; negative values
-    /// are higher priority on NVIDIA).
+    /// Highest available stream priority. `cuCtxGetStreamPriorityRange`
+    /// returns (least, greatest) where the *greatest* priority is the
+    /// numerically lowest value (lower numbers = higher priority); 0 is the
+    /// default. Verified on driver 610.57.04: range (0, -5); a stream
+    /// created at -5 reads back -5, while +1 clamps to 0.
     pub fn highest_priority(&self) -> i32 {
         if self.device.stream_priorities_supported != 0 {
-            self.device.min_stream_priority
+            self.priority_greatest
         } else {
             0
         }
@@ -276,23 +288,32 @@ pub struct Module {
 
 impl Module {
     fn load(fns: &Fns, image: &[u8]) -> Result<Module> {
-        // cuModuleLoadDataEx (not plain cuModuleLoadData): on the tested
-        // driver (610.57.04) the plain entry fails PTX JIT with rc 218 while
-        // the Ex entry with an error-log buffer succeeds, and the log makes
-        // any genuine JIT failure diagnosable.
+        // Module load goes through cuModuleLoadDataEx (never the plain entry,
+        // which fails PTX JIT with rc 218 on the tested driver), with the
+        // correct JIT options: CU_JIT_ERROR_LOG_BUFFER (=5) + its required
+        // size option CU_JIT_ERROR_LOG_BUFFER_SIZE_BYTES (=6, type
+        // unsigned int, in/out). Values frozen from cuda.h (ffi constants +
+        // pinned by test).
         let mut handle: CUmodule = 0;
-        const CU_JIT_ERROR_LOG_BUFFER: i32 = 2;
-        const LOG_BYTES: usize = 1 << 15;
-        let mut log = vec![0u8; LOG_BYTES];
-        let mut opts: [i32; 1] = [CU_JIT_ERROR_LOG_BUFFER];
-        let mut vals: [*mut c_void; 1] = [log.as_mut_ptr() as *mut c_void];
+        let log_bytes: usize = 1 << 15;
+        let mut log = vec![0u8; log_bytes];
+        let mut log_used: u32 = log_bytes as u32;
+        let mut opts: [i32; 2] = [
+            super::ffi::CU_JIT_ERROR_LOG_BUFFER,
+            super::ffi::CU_JIT_ERROR_LOG_BUFFER_SIZE_BYTES,
+        ];
+        let mut vals: [*mut c_void; 2] = [
+            log.as_mut_ptr() as *mut c_void,
+            (&mut log_used as *mut u32) as *mut c_void,
+        ];
         // SAFETY: image bytes live for the call (driver copies/JITs them);
-        // the log buffer is written by the JIT and read below.
+        // the log buffer and its size slot are written by the JIT and read
+        // below.
         let rc = unsafe {
             (fns.cuModuleLoadDataEx.expect("bound"))(
                 &mut handle,
                 image.as_ptr() as *const _,
-                1,
+                2,
                 opts.as_mut_ptr(),
                 vals.as_mut_ptr(),
             )
@@ -530,6 +551,22 @@ impl DeviceBuffer {
     pub fn download(&self, host: &mut [u8]) -> Result<()> {
         debug_assert_eq!(host.len(), self.bytes);
         // SAFETY: host buffer length == allocation size.
+        let rc = unsafe {
+            (self.fns.cuMemcpyDtoH.expect("bound"))(
+                host.as_mut_ptr() as *mut _,
+                self.ptr,
+                host.len(),
+            )
+        };
+        check(&self.fns, "cuMemcpyDtoH", rc)
+    }
+
+    /// Download only the leading `host.len()` bytes of the allocation (the
+    /// device block may be sized for a larger maximum quantum; the actual
+    /// transfer size is what the counters must record).
+    pub fn download_prefix(&self, host: &mut [u8]) -> Result<()> {
+        debug_assert!(host.len() <= self.bytes);
+        // SAFETY: host buffer length <= allocation size.
         let rc = unsafe {
             (self.fns.cuMemcpyDtoH.expect("bound"))(
                 host.as_mut_ptr() as *mut _,

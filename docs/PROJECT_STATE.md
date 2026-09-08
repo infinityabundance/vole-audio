@@ -347,41 +347,87 @@ Delivered:
   writes `UNSUPPORTED_BY_HARDWARE`/`INCONCLUSIVE` receipts.
 
 Driver findings recorded (driver 610.57.04 / CUDA 13.3): the legacy
-`cuCtxCreate_v2` and primary-context exports yield contexts that reject later
-allocation with rc 201; the exported `cuCtxCreate` takes the modern
-`(CUcontext*, CUexecAffinityParam*, int, unsigned int, CUdevice)` signature;
+`cuCtxCreate_v2` export yields a context that rejects later allocation with
+rc 201; the exported `cuCtxCreate` maps to `cuCtxCreate_v4` with the
+**four-argument** ABI `(CUcontext*, CUctxCreateParams*, unsigned int flags,
+CUdevice)` (NULL params = regular context); the meaningful stream-priority
+range comes only from `cuCtxGetStreamPriorityRange` (there are no
+MIN/MAX stream-priority device attributes); the JIT error-log options are
+`CU_JIT_ERROR_LOG_BUFFER = 5` + `CU_JIT_ERROR_LOG_BUFFER_SIZE_BYTES = 6`;
 plain `cuModuleLoadData` fails PTX JIT with rc 218 where
-`cuModuleLoadDataEx` + error-log succeeds; the on-disk JIT cache can serve a
-stale entry as a silent rc 218. The runtime therefore sets
-`CUDA_MODULE_LOADING=EAGER` and `CUDA_CACHE_DISABLE=1` (when unset), JITs at
-load (setup, never a real-time path), and routes all loads through
-`cuModuleLoadDataEx` with a JIT log.
+`cuModuleLoadDataEx` + the correct error-log options succeeds. The runtime
+sets `CUDA_MODULE_LOADING=EAGER` and `CUDA_CACHE_DISABLE=1` (when unset),
+JITs at load (setup, never a real-time path), and routes all loads through
+`cuModuleLoadDataEx` with a real JIT log.
 
-Measured (fixture-level, 48 kHz mono, 8192-frame window unless noted; RTX
-4080 SUPER + driver 610.57.04 vs Ryzen 9800X3D; receipts under
-`receipts/cuda/`): mean wall ms per 8192-frame window.
+### Phase G review amendment (external review, before Phase H)
 
-| fixture | scalar | avx2 | avx512 | cuda-d0 wall | cuda kernel |
+Every finding from the Phase G review was fixed, re-sealed, and recorded:
+
+1. **cuCtxCreate ABI corrected** to the documented four-argument v4 form
+   (the earlier five-argument binding was the `cuCtxCreate_v3` ABI and only
+   worked for ordinal 0 by register accident). Binding + header citation in
+   `backend/cuda/ffi.rs`, documented in the ledger.
+2. **JIT option constants corrected** from cuda.h (`ERROR_LOG_BUFFER = 5`,
+   `SIZE_BYTES = 6`, both passed; the earlier `= 2` was `CU_JIT_WALL_TIME`
+   and silently disabled the error log the comments claimed). Every frozen
+   numeric CUDA constant is now pinned by the `frozen_constants` unit test
+   table with header citations.
+3. **Stream priority range** now comes from `cuCtxGetStreamPriorityRange`:
+   on this device the context reports (least 0, greatest −5); the
+   high-priority stream is created at −5 and the driver-assigned value is
+   read back and receipted (assigned −5; a +1 request clamps to 0 — the
+   earlier receipt's `[1, 1]` came from invented attributes and produced a
+   default-priority stream).
+4. **D0 traffic counters now instrument the render path**, not the court:
+   every launch increments `kernel_launches`, every completed observation
+   quantum increments `quanta_submitted`, each DtoH transfers exactly the
+   rendered window's bytes (prefix copy) and increments
+   `gpu_to_host_pcm_bytes`, the host staging→output copy increments
+   `host_pcm_copy_bytes`, and the D0 VRAM block + its host staging mirror
+   are recorded (`device_sample_block_bytes`, resident peak). `staging`
+   stays 0 by definition: the copy engine (not the host) writes the staging
+   region. Sealed receipt: 166 quanta, 243 launches, 2 790 568 gpu→host
+   bytes (host copy identical).
+5. **CPU timing fairness**: CPU evaluators are built once outside the timed
+   interval (the analogue of the GPU world staying resident). Per-observation
+   semantic planning inside the CPU engines remains a documented limitation
+   (a pre-resolved flat CPU baseline is future work).
+6. **Receipt wording exact**: facts on device are F01–F14 (windowed); F15 is
+   authority-level and surface-independent. The random CUDA battery records
+   every seed: compared or skipped with the exact reason (seed 28:
+   "effective rate −251 outside frozen domain after transpose" — a
+   legitimately rejected random draw, preserved).
+7. **Receipt→Markdown renderer**: `vole-audio receipt perf <receipt>`
+   renders a receipt's `throughput_cells` as Markdown, so PERFORMANCE.md
+   tables are generated from the receipt instead of hand-transcribed.
+
+Measured (fixture-level, 48 kHz mono; RTX 4080 SUPER + driver 610.57.04 vs
+Ryzen 9800X3D; receipts under `receipts/cuda/`). Mean wall ms; the full
+cell table is generated in PERFORMANCE.md from the sealed receipt; key rows
+at the 8192-frame window:
+
+| cell | scalar | avx2 | avx512 | cuda-d0 wall | cuda kernel |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| literal 256v | 40.0 | 11.4 | 6.1 | 2.1 | 2.0 |
-| noise 512v | 96.6 | 13.4 | 7.1 | 2.7 | 2.8 |
-| wavetable 256v | 38.3 | 11.4 | 6.1 | 2.6 | 2.5 |
-| oscillator 1024v | 143.3 | 39.8 | 20.9 | 11.0 | 10.3 |
-| partials 32v × 256 | 111.7 | 107.2 | 106.6 | 16.9 | 13.4 |
+| literal-256v-q8192 | 38.9 | 11.4 | 6.1 | 2.1 | 2.1 |
+| noise-512v-q8192 | 97.0 | 13.3 | 7.1 | 3.8 | 3.5 |
+| wavetable-256v-q8192 | 38.3 | 11.4 | 6.0 | 3.2 | 3.1 |
+| oscillator-1024v-q8192 | 143.6 | 39.8 | 21.4 | 12.4 | 11.7 |
+| partials-32v-q8192 | 110.4 | 106.6 | 106.6 | 18.5 | 14.6 |
 
-Crossover cells (mean wall ms): quantum 512 favors CPU everywhere (e.g.
-noise 64v: avx512 0.060 vs cuda 0.193; partials 64v: 13.4 vs 19.7); quantum
-8192 favors CUDA (noise 1024v: 14.1 vs 3.1; noise 64v: 0.88 vs 0.20;
-oscillator 64v: 1.3 vs 0.37; partials 32v: 106.6 vs 16.9 — the class where
-the CPU SIMD floors gain nothing, now a legitimate GPU workload). Every cell
-verified bit-exact (cuda == scalar) before timing; all observations across
-floors hash-identical. These are fixture-level surfaces, not flagship claims
-(Phase M owns the frozen corpus).
+Crossover cells (mean wall ms): quantum 512 favors CPU everywhere (noise
+64v: avx512 0.060 vs cuda 0.193; noise 1024v: 0.945 vs 3.056; partials
+64v: 13.342 vs 19.316); quantum 8192 favors CUDA (noise 1024v: 14.154 vs
+3.065; noise 64v: 0.886 vs 0.245; oscillator 64v: 1.337 vs 0.304; partials
+32v: 106.579 vs 18.486 — the class where the CPU SIMD floors gain nothing,
+now a legitimate GPU workload). Every cell verified bit-exact (cuda ==
+scalar) before timing; all observations across floors hash-identical.
+Fixture-level surfaces only (Phase M owns the flagship corpus).
 
-- Test count now 183 green (debug + release; +6 since the facts commit:
-  device layout/class ×4, flatten parity battery ×2), clippy `-D warnings`
-  clean, `fmt` clean, `no_std` lib check clean, device PTX build clean.
-  GPU-gated smoke tests exist but are `#[ignore]`d (require hardware).
+- Test count now 185 green (debug + release; +2 since the Phase G commit:
+  frozen-constants audit, counters add_from), clippy `-D warnings` clean,
+  `fmt` clean, `no_std` lib check clean, device PTX build clean. GPU-gated
+  smoke tests exist but are `#[ignore]`d (require hardware).
 
 ## Known blockers
 

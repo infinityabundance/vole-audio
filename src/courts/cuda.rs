@@ -92,11 +92,13 @@ fn device_parity_world(
     flat: &FlattenedWorld,
     windows: &[(i64, usize)],
     hashes: &mut Vec<(String, String)>,
-) -> Result<Vec<ParityRow>> {
+    counters: &mut Counters,
+) -> Result<(Vec<ParityRow>, Option<i32>)> {
     let max = windows.iter().map(|(_, f)| *f).max().unwrap_or(0);
     let ptx = ptx_bytes()?
         .ok_or_else(|| Error::new(crate::error::Kind::Unavailable, "PTX artifact absent"))?;
     let kw = KernelWorld::open(0, &ptx.0, flat.clone(), max)?;
+    let assigned = kw.priority_assigned;
     let mut kw = kw;
     let mut strategies = vec![Strategy::Standard];
     if kw.cuda.device.stream_priorities_supported != 0 {
@@ -126,7 +128,8 @@ fn device_parity_world(
             }
         }
     }
-    Ok(rows)
+    counters.add_from(&kw.counters);
+    Ok((rows, assigned))
 }
 
 // ---------------------------------------------------------------------------
@@ -263,7 +266,9 @@ fn timed_world(class: &str, voices: usize, frames: usize) -> Result<(ObjectStore
     Ok((store, world))
 }
 
-/// Wall time for one floor over `frames`; warmup + median-of-runs (ms).
+/// Wall time for one floor over `frames`; evaluator built ONCE outside the
+/// timed interval (the CPU backend's analogue of the GPU world staying
+/// resident), warmup run + median-of-runs (ms).
 fn time_floor(
     label: &str,
     store: &ObjectStore,
@@ -273,17 +278,27 @@ fn time_floor(
     runs: usize,
     hashes: &mut Vec<(String, String)>,
 ) -> Result<serde_json::Value> {
+    // Hoisted evaluator: constructing/cloning it inside the timer would
+    // charge per-run planning costs to the CPU that CUDA paid once at
+    // KernelWorld::open.
+    enum Oracle {
+        Scalar(ScalarOracle),
+        Simd(SimdOracle),
+    }
+    let oracle = match isa {
+        None => Oracle::Scalar(ScalarOracle::new(world.clone())),
+        Some(i) => Oracle::Simd(SimdOracle {
+            world: world.clone(),
+            isa: i,
+        }),
+    };
     let mut samples = Vec::with_capacity(runs);
     let mut out = Vec::new();
     for r in 0..runs {
         let t0 = Instant::now();
-        out = match isa {
-            None => ScalarOracle::new(world.clone()).observe(store, 0, frames)?,
-            Some(i) => SimdOracle {
-                world: world.clone(),
-                isa: i,
-            }
-            .observe(store, 0, frames)?,
+        out = match &oracle {
+            Oracle::Scalar(o) => o.observe(store, 0, frames)?,
+            Oracle::Simd(o) => o.observe(store, 0, frames)?,
         };
         let ms = t0.elapsed().as_secs_f64() * 1e3;
         if r > 0 {
@@ -301,7 +316,7 @@ fn time_floor(
         "mean_ms": round3(mean),
         "median_ms": round3(samples[samples.len() / 2]),
         "min_ms": round3(samples[0]),
-        "method": "fixture-level; host CLOCK_MONOTONIC wall; warmup 1",
+        "method": "fixture-level; host CLOCK_MONOTONIC wall; evaluator built once; warmup 1",
     }))
 }
 
@@ -386,16 +401,20 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
         let world = World::new(RATE_HZ, crate::courts::semantic::CHANNELS, events)?;
         let windows = [(0i64, 2400usize), (700, 900), (1600, 800)];
         let flat = fixture_flat("semantic", &store, &world, &windows, &mut hashes)?;
-        let rows = device_parity_world("semantic", &flat, &windows, &mut hashes)?;
+        let (rows, assigned) =
+            device_parity_world("semantic", &flat, &windows, &mut hashes, &mut counters)?;
+        if let Some(p) = assigned {
+            extras.insert("stream_priority_assigned".to_string(), json!(p));
+        }
         record_rows(rows, &mut extras, &mut failed_rows);
-        counters.device_sample_block_bytes = (2400 * 2 * 4) as u64;
     }
     {
         let (store, events) = crate::courts::authored::authored_court_fixture();
         let world = World::new(RATE_HZ, 1, events)?;
         let windows = [(0i64, 4000usize), (400, 3600), (1600, 2400)];
         let flat = fixture_flat("authored", &store, &world, &windows, &mut hashes)?;
-        let rows = device_parity_world("authored", &flat, &windows, &mut hashes)?;
+        let (rows, _) =
+            device_parity_world("authored", &flat, &windows, &mut hashes, &mut counters)?;
         record_rows(rows, &mut extras, &mut failed_rows);
     }
     {
@@ -403,12 +422,13 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
         let world = World::new(RATE_HZ, 2, events)?;
         let windows = [(0i64, 8192usize), (1234, 700), (7000, 1192)];
         let flat = fixture_flat("mixed", &store, &world, &windows, &mut hashes)?;
-        let rows = device_parity_world("mixed", &flat, &windows, &mut hashes)?;
+        let (rows, _) = device_parity_world("mixed", &flat, &windows, &mut hashes, &mut counters)?;
         record_rows(rows, &mut extras, &mut failed_rows);
     }
 
-    // 3. Semantic facts on the device surface (F01–F15 windows; authority
-    // facts are surface-independent and already enforced by `court facts`).
+    // 3. Semantic facts on the device surface (F01–F14 are windowed facts;
+    // F15 is authority-level and surface-independent — already enforced by
+    // `court facts`).
     {
         let mut fact_rows = BTreeMap::new();
         for f in crate::facts::registry() {
@@ -454,15 +474,19 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
                     }
                 }
                 fact_rows.insert(f.id.to_string(), json!(all_ok));
+                counters.add_from(&kw.counters);
             }
         }
         extras.insert("facts_on_cuda".to_string(), json!(fact_rows));
     }
 
-    // 4. Random-world differential subset on the device.
+    // 4. Random-world differential subset on the device. Every attempted
+    // seed is recorded: compared (bool) or skipped with the exact reason;
+    // a skipped seed is preserved evidence, never a silent disappearance.
     {
         let seeds = 32u64;
         let mut compared = 0u64;
+        let mut not_compared = 0u64;
         let mut seed_rows = BTreeMap::new();
         for seed in 0..seeds {
             let (store, pool) = crate::eval::battery::corpus(seed);
@@ -480,55 +504,68 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
             }
             let start = (next32(&mut rng) % 1600) as i64;
             let frames = 64 + (next32(&mut rng) % 1500) as usize;
-            let world = match World::new(RATE_HZ, 2, events) {
-                Ok(w) => w,
-                Err(_) => continue,
-            };
-            let oracle = ScalarOracle::new(world.clone());
-            let want = match oracle.observe(&store, start, frames) {
-                Ok(a) => a,
-                Err(_) => continue,
-            };
-            let flat = match flatten(&store, &world) {
-                Ok(f) => f,
-                Err(_) => continue,
-            };
-            let kw = match KernelWorld::open(0, &ptx.0, flat, frames) {
-                Ok(k) => k,
-                Err(e) => {
-                    failed_rows.push(format!("random seed {seed}: open failed: {e}"));
-                    break;
-                }
-            };
-            let mut kw = kw;
-            let mut got = vec![0i32; want.len()];
-            match kw.render(Strategy::Standard, start, frames, &mut got) {
-                Ok(()) => {
-                    if got == want {
-                        compared += 1;
-                        seed_rows.insert(seed.to_string(), json!(true));
-                    } else {
-                        seed_rows.insert(seed.to_string(), json!(false));
-                        failed_rows.push(format!("random seed {seed}: device != scalar"));
+            let outcome = 'run: {
+                let world = match World::new(RATE_HZ, 2, events) {
+                    Ok(w) => w,
+                    Err(e) => {
+                        break 'run json!({ "status": "skipped", "reason": format!("world assembly rejected: {e}") });
+                    }
+                };
+                let oracle = ScalarOracle::new(world.clone());
+                let want = match oracle.observe(&store, start, frames) {
+                    Ok(a) => a,
+                    Err(e) => {
+                        break 'run json!({ "status": "skipped", "reason": format!("scalar observe rejected: {e}") });
+                    }
+                };
+                let flat = match flatten(&store, &world) {
+                    Ok(f) => f,
+                    Err(e) => {
+                        break 'run json!({ "status": "skipped", "reason": format!("flatten rejected: {e}") });
+                    }
+                };
+                let kw = match KernelWorld::open(0, &ptx.0, flat, frames) {
+                    Ok(k) => k,
+                    Err(e) => {
+                        failed_rows.push(format!("random seed {seed}: open failed: {e}"));
+                        break 'run json!({ "status": "failed", "reason": format!("kernel open: {e}") });
+                    }
+                };
+                let mut kw = kw;
+                let mut got = vec![0i32; want.len()];
+                match kw.render(Strategy::Standard, start, frames, &mut got) {
+                    Ok(()) => {
+                        if got == want {
+                            compared += 1;
+                            counters.add_from(&kw.counters);
+                            json!(true)
+                        } else {
+                            failed_rows.push(format!("random seed {seed}: device != scalar"));
+                            json!({ "status": "failed", "reason": "device != scalar" })
+                        }
+                    }
+                    Err(e) => {
+                        failed_rows.push(format!("random seed {seed}: render failed: {e}"));
+                        json!({ "status": "failed", "reason": format!("render: {e}") })
                     }
                 }
-                Err(e) => {
-                    seed_rows.insert(seed.to_string(), json!(false));
-                    failed_rows.push(format!("random seed {seed}: render failed: {e}"));
-                }
+            };
+            if outcome.as_bool().is_none() {
+                not_compared += 1;
             }
+            seed_rows.insert(seed.to_string(), outcome);
         }
         extras.insert(
             "random_device_battery".to_string(),
             json!({
                 "seeds_attempted": seeds,
                 "seeds_compared": compared,
+                "seeds_not_compared": not_compared,
                 "per_seed": seed_rows,
             }),
         );
     }
 
-    // 5. Fixture-level throughput surfaces (CPU scalar/AVX2/AVX-512 vs CUDA).
     // 5. Fixture-level throughput surfaces (CPU scalar/AVX2/AVX-512 vs CUDA)
     // and a voice-count x quantum crossover sweep. Every cell first proves
     // scalar == CUDA bit-exactness on that world before timing anything.
@@ -655,6 +692,7 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
             }),
         );
         perf.insert(format!("{class}-{voices}v-q{frames}"), json!(rows));
+        counters.add_from(&kw.counters);
         Ok(())
     };
     for (class, voices) in [
@@ -685,9 +723,14 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
     };
     let detail = if passed {
         format!(
-            "scalar == CUDA bit-exact on frozen fixtures ({}) and facts F01-F15 on device; strategies {:?}",
+            "scalar == CUDA bit-exact on frozen fixtures ({}) and facts F01-F14 on device \
+             (F15 authority-level); strategies {:?}; D0 counters: {} quanta, {} launches, \
+             {} gpu->host bytes",
             hashes.len(),
-            strategies.iter().map(|s| s.label()).collect::<Vec<_>>()
+            strategies.iter().map(|s| s.label()).collect::<Vec<_>>(),
+            counters.quanta_submitted,
+            counters.kernel_launches,
+            counters.gpu_to_host_pcm_bytes
         )
     } else {
         format!(

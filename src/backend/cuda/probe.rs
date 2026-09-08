@@ -1,12 +1,15 @@
 //! CUDA driver/device probe evidence (Phase G).
 //!
 //! Everything a receipt needs about the CUDA environment: driver version,
-//! device identity/compute capability, and the capability attributes that
-//! gate later courts (stream priorities, unified addressing, host-register
-//! support, concurrent managed access, L1 caching, kernel-exec timeout).
-//! Probing never panics and never implies support that is absent.
+//! device identity/compute capability, the capability attributes that gate
+//! later courts (stream priorities, unified addressing, host-register
+//! support, concurrent managed access, L1 caching, kernel-exec timeout), and
+//! the context's **actual** stream-priority range (queried via
+//! `cuCtxGetStreamPriorityRange`, the only documented source — lower numbers
+//! are higher priority, out-of-range requests clamp). Probing never panics
+//! and never implies support that is absent.
 
-use crate::backend::cuda::driver::{Cuda, DeviceInfo};
+use crate::backend::cuda::driver::Cuda;
 use serde::{Deserialize, Serialize};
 
 /// Serialize-able probe snapshot (receipt extras).
@@ -16,6 +19,9 @@ pub struct CudaProbe {
     /// "major.minor" of the CUDA driver (e.g. "13.3").
     pub driver_version_label: String,
     pub device: DeviceInfoProbe,
+    /// (least, greatest) meaningful stream priority of the context from
+    /// `cuCtxGetStreamPriorityRange`. Lower = higher priority.
+    pub stream_priority_range: (i32, i32),
     /// True when the context was created successfully (the probe itself ran).
     pub context_created: bool,
 }
@@ -33,15 +39,15 @@ pub struct DeviceInfoProbe {
     pub max_threads_per_multiprocessor: i32,
     pub unified_addressing: bool,
     pub stream_priorities_supported: bool,
-    pub stream_priority_range: (i32, i32),
     pub concurrent_managed_access: bool,
     pub host_register_supported: bool,
     pub global_l1_cache_supported: bool,
     pub kernel_exec_timeout: bool,
 }
 
-impl From<&DeviceInfo> for DeviceInfoProbe {
-    fn from(d: &DeviceInfo) -> Self {
+impl From<&Cuda> for DeviceInfoProbe {
+    fn from(c: &Cuda) -> Self {
+        let d = &c.device;
         DeviceInfoProbe {
             ordinal: d.ordinal,
             name: d.name.clone(),
@@ -57,7 +63,6 @@ impl From<&DeviceInfo> for DeviceInfoProbe {
             max_threads_per_multiprocessor: d.max_threads_per_multiprocessor,
             unified_addressing: d.unified_addressing != 0,
             stream_priorities_supported: d.stream_priorities_supported != 0,
-            stream_priority_range: (d.min_stream_priority, d.max_stream_priority),
             concurrent_managed_access: d.concurrent_managed_access != 0,
             host_register_supported: d.host_register_supported != 0,
             global_l1_cache_supported: d.global_l1_cache_supported != 0,
@@ -81,7 +86,8 @@ impl CudaProbe {
                 cuda.driver_version / 1000,
                 (cuda.driver_version / 10) % 100
             ),
-            device: (&cuda.device).into(),
+            stream_priority_range: (cuda.priority_least, cuda.priority_greatest),
+            device: (&cuda).into(),
             context_created: true,
         };
         drop(cuda);
