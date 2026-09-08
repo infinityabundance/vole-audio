@@ -270,6 +270,50 @@ Seal run (release, `--all-features`, clean tree):
   --all-targets --all-features -D warnings` clean; `cargo fmt --check`
   clean.
 
+### Seal 4 — 0.4.2 independent endpoint hashes + v1.1 citations (2026-09-08)
+
+Delta since Seal 3, closing the two items from the post-seal review:
+
+1. **Independently measured endpoint-region provenance** (`38fdb7e`):
+   `reference_hash` remains the digest over the scalar-expected window;
+   `backend_hash` and the new additive `endpoint_hash` schema field are
+   accumulated from the **actual mapped-region bytes** read during per-chunk
+   in-place verification (pre-commit, before the DMA consumes the region at
+   drain) — a separate byte stream from the in-memory scalar expected codes.
+   The three digests are equal exactly because every committed chunk matched
+   the oracle: measured, not derived. Per-session rows now carry
+   `endpoint_sha256` beside `window_sha256`; `exact_equality` is gated on the
+   independent digests agreeing.
+2. **Paper citation corrected to v1.1** (`0a3d0cc`): the README lead, the
+   crate-level docs (visible on docs.rs), `docs/ARCHITECTURE.md`, the
+   PHASE_H2 charter preamble, the U1_SPEC source-of-truth anchor (v1.0 stays
+   U1's normative definition; v1.1 does not contradict it) and the README
+   license note now cite v1.1 (DOI 10.5281/zenodo.22666746) as the current
+   architecture paper with v1.0 (DOI 10.5281/zenodo.22649073) as the
+   original broad prior-art disclosure.
+
+Seal run (release, `--all-features`, clean tree):
+
+- Tree: commit `0a3d0cc8`, source-tree `dd4bbe1f4418…`, `git_dirty: false`.
+  17 receipts sealed under `receipts/` (six A–H courts + ten H.2 courts + the
+  `h2` aggregate), committed separately at `8071aee`.
+- All six A–H courts and all ten H.2 courts + `court h2` aggregate re-sealed
+  SUPPORTED; frozen hashes unchanged (semantic `1791816f4b93…`, authored
+  `f7e103f3a97d…`).
+- Flagship `entropy-d1`: five sessions shadow-exact, zero xruns, clean drain;
+  provenance now carries `reference_hash == backend_hash == endpoint_hash` =
+  `82fc9c9f…` (d1-literal window; d1-residual `f03fab…`, d1-noise `ff5db7…`
+  per-session) as three independently accumulated digests.
+- The additive optional `endpoint_hash` field serializes as `null` in courts
+  without endpoint readback; every receipt from this seal reflects the
+  current schema, and older receipts remain parseable (evidence schema
+  extended additively, never rewritten).
+- PTX artifact unchanged (host-side-only delta): sha256
+  `8b23325d03700847b056b29df4f4d4afd1a0c67386458512986c52f4fca7896b`.
+- Host tests: 287 total (282 passed, 5 ignored) all-features on the pinned
+  nightly, debug and release; MSRV 1.89.0 green; clippy `-D warnings` and
+  `cargo fmt --check` clean.
+
 ## Execution record (implementation summary)
 
 All H.2.x work items were executed in sequence. Summary of what exists where:
