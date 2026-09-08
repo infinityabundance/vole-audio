@@ -1,6 +1,6 @@
 [package]
 name = "vole-audio"
-version = "0.5.2"
+version = "0.5.3"
 edition = "2024"
 # Verified MSRV: the full host test suite (all-features; 280+ tests incl.
 # the AVX-512 kernels, which need `stdarch_x86_avx512` stabilized in 1.89)
@@ -9,7 +9,7 @@ edition = "2024"
 # toolchain for device (GPU artifact) cross-compilation — see README
 # "Building".
 rust-version = "1.89"
-description = "VOLE-Audio: procedural sampling and direct audio materialization from deterministic state. One package; PCM is an observation view; SampleObject is authoritative."
+description = "VOLE-Audio: Procedural Sampling and Direct Audio Materialization from Deterministic State — Entropy-Native Layer and Late-Materialization Architecture"
 keywords = ["audio", "sampler", "procedural", "gpu", "deterministic"]
 categories = ["multimedia::audio", "science", "hardware-support"]
 readme = "README.md"
