@@ -109,7 +109,35 @@ rustc 1.99.0-nightly, LLVM 22.1.8):
 Seals are appended in order; every seal is a clean-tree run with immutable
 receipts committed separately; negative receipts are kept.
 
-<!-- ledger entries are appended chronologically below this line -->
+### Seal 1 — Phase I implementation + clean-tree battery (2026-09-08)
+
+Implementation commits (in order): `df2f793` (amdgcn kernels, build script,
+`backend::rocm` probe, `court rocm`, CLI), `c887850` (docs: this charter,
+PROJECT_STATE section, ARCHITECTURE/README/NON_CLAIMS/SEMANTIC_FACTS).
+
+Seal run (release, `--all-features`, clean tree `c887850`, `git_dirty: false`):
+
+- 18 receipts sealed under `receipts/` (six A–H courts + ten H.2 courts +
+  the `h2` aggregate + `rocm`), committed separately at `69838e8`.
+- All pre-existing courts re-sealed SUPPORTED with frozen hashes unchanged
+  (semantic `1791816f4b93…`, authored `f7e103f3a97d…`) — Phase I adds no
+  semantic delta (exit criteria 6).
+- `court rocm`: `UNSUPPORTED_BY_HARDWARE` with typed causes — no AMD display
+  GPU in the sysfs PCI walk; no `/sys/class/kfd` or `/dev/kfd`; no ROCm
+  userspace soname found. The clean-tree code object
+  `scripts/out/vole_audio.amdgcn.elf` (93 040 bytes, sha256
+  `e2ae95d0c15fb9aef4dc8a3f55a7ea11ccd1027d373e18267b256c53603eb69f`,
+  entries `vole_render_d0`/`vole_entropy_decode`/`vole_upmix_mono_dup`,
+  baseline gfx906) is receipted as compile evidence with its SHA-256.
+- PTX artifact unchanged (the lib delta is amdgpu-inert): sha256
+  `8b23325d03700847b056b29df4f4d4afd1a0c67386458512986c52f4fca7896b`.
+- Host tests: 292 total (287 passed, 5 ignored) all-features on the pinned
+  nightly (282 total, 277 passed default-features; the +5 are the rocm probe
+  classifier + court-path tests); MSRV 1.89.0 green with the same
+  all-features count; clippy `-D warnings` and `cargo fmt --check` clean.
+  (An earlier intermediate failure under `cargo test` was stale incremental
+  state from mixed toolchains in one target dir; a clean rebuild resolved it
+  and the sealed numbers above are from clean artifacts.)
 
 ## Execution record (implementation summary)
 
