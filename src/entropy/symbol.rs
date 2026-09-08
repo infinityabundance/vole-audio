@@ -27,7 +27,10 @@
 //! symbolizations: the RAW/literal fallback competes on complete bytes and
 //! wins for incompressible material (H.2.5/H.2.31).
 
+use crate::entropy::transform;
 use crate::error::{Error, Kind, Result};
+
+pub use crate::entropy::transform::{byte_of_le, modular_delta, unzigzag, zigzag};
 
 /// Versioned symbolization ids (frozen; see module docs).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -74,25 +77,6 @@ impl Symbolization {
             Symbolization::DeltaLane4 => "delta_lane4",
         }
     }
-}
-
-/// ZigZag-mapped sample: `i32` -> `u32` bijectively (`0, -1, 1, -2, 2, ...`).
-#[inline]
-pub fn zigzag(v: i32) -> u32 {
-    ((v << 1) ^ (v >> 31)) as u32
-}
-
-/// Inverse ZigZag: `u32` -> `i32`.
-#[inline]
-pub fn unzigzag(z: u32) -> i32 {
-    ((z >> 1) as i32) ^ -((z & 1) as i32)
-}
-
-/// Modular first difference in the code domain (exact under `mod 2^32`);
-/// `s_cur == prev.wrapping_add(delta)` always reconstructs `s_cur`.
-#[inline]
-pub fn modular_delta(prev: i32, cur: i32) -> i32 {
-    cur.wrapping_sub(prev)
 }
 
 /// Symbolize `samples` (canonical interleaved codes, `frames * channels`
@@ -155,61 +139,25 @@ pub fn desymbolize(sym: Symbolization, streams: &[Vec<u8>], channels: usize) -> 
             ),
         ));
     }
-    match sym {
-        Symbolization::Identity => {
-            let bytes = &streams[0];
-            if !bytes.len().is_multiple_of(4) {
-                return Err(Error::new(Kind::Malformed, "identity stream not 4-aligned"));
-            }
-            let mut out = Vec::with_capacity(bytes.len() / 4);
-            for w in bytes.as_chunks::<4>().0 {
-                out.push(i32::from_le_bytes([w[0], w[1], w[2], w[3]]));
-            }
-            Ok(out)
+    // One shared implementation (transform::samples_from_streams) is used by
+    // the host, the SIMD path, and the device kernels: decoded symbols always
+    // reconstruct identical samples everywhere.
+    let refs: Vec<&[u8]> = streams.iter().map(|s| s.as_slice()).collect();
+    let total = match sym {
+        Symbolization::Identity => streams[0].len() / 4,
+        Symbolization::Lane4Plain | Symbolization::Lane4ZigZag | Symbolization::DeltaLane4 => {
+            streams[0].len()
         }
-        Symbolization::Lane4Plain => {
-            let mut values = Vec::with_capacity(streams[0].len());
-            // k indexes all four lane streams in lockstep (see module docs).
-            #[allow(clippy::needless_range_loop)]
-            for k in 0..streams[0].len() {
-                let b = [streams[0][k], streams[1][k], streams[2][k], streams[3][k]];
-                values.push(i32::from_le_bytes(b));
-            }
-            Ok(values)
-        }
-        Symbolization::Lane4ZigZag => {
-            let mut values = Vec::with_capacity(streams[0].len());
-            // k indexes all four lane streams in lockstep (see module docs).
-            #[allow(clippy::needless_range_loop)]
-            for k in 0..streams[0].len() {
-                let b = [streams[0][k], streams[1][k], streams[2][k], streams[3][k]];
-                values.push(unzigzag(u32::from_le_bytes(b)));
-            }
-            Ok(values)
-        }
-        Symbolization::DeltaLane4 => {
-            // Per-channel modular first-difference inversion. Each lane holds
-            // channel c's zz-coded stream concatenated channel-major; every
-            // channel contributes `frames` symbols per lane.
-            let total = streams[0].len();
-            let (frames, ch) = split_frames_channels_total(total, channels)?;
-            let mut out = vec![0i32; frames * channels];
-            for c in 0..ch {
-                let mut prev = 0i32;
-                for f in 0..frames {
-                    let k = c * frames + f;
-                    let b = [streams[0][k], streams[1][k], streams[2][k], streams[3][k]];
-                    let d = unzigzag(u32::from_le_bytes(b));
-                    let s = if f == 0 { d } else { prev.wrapping_add(d) };
-                    out[f * channels + c] = s;
-                    prev = s;
-                }
-            }
-            Ok(out)
-        }
+    };
+    let mut out = vec![0i32; total];
+    if !transform::samples_from_streams(sym.code(), &refs, channels, &mut out) {
+        return Err(Error::new(
+            Kind::Malformed,
+            "stream shape invalid for symbolization",
+        ));
     }
+    Ok(out)
 }
-
 fn lane_bytes(samples: &[i32], map: impl Fn(&i32) -> u32) -> Vec<Vec<u8>> {
     let mut out = vec![Vec::new(); 4];
     for s in samples {
@@ -219,27 +167,6 @@ fn lane_bytes(samples: &[i32], map: impl Fn(&i32) -> u32) -> Vec<Vec<u8>> {
         }
     }
     out
-}
-
-/// Split a flat symbol count `total` into `(frames, channels)`; validates
-/// against the caller-declared channel count (`total % channels == 0`).
-fn split_frames_channels_total(total: usize, channels: usize) -> Result<(usize, usize)> {
-    if channels == 0 || channels > crate::limits::MAX_CHANNELS as usize {
-        return Err(Error::new(Kind::Malformed, "channel count out of domain"));
-    }
-    if !total.is_multiple_of(channels) {
-        return Err(Error::new(
-            Kind::Malformed,
-            format!("stream length {total} not divisible by {channels} channels"),
-        ));
-    }
-    Ok((total / channels, channels))
-}
-
-/// Extract one byte lane from a u32 LE value at byte position `p`.
-#[inline]
-pub fn byte_of_le(v: u32, p: usize) -> u8 {
-    ((v >> (8 * p)) & 0xff) as u8
 }
 
 #[cfg(test)]

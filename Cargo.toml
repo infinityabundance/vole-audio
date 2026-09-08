@@ -47,12 +47,27 @@ default = ["std"]
 # and never see the std-only modules (backend, audio, format archive
 # readers, evidence serialization, courts, CLI).
 std = ["dep:libc", "dep:serde", "dep:serde_json"]
+# Optional persistence adapter (H.2.21-H.2.25): the real published EntropyFS
+# engine behind StoreBackend. Default-off; encoder/store governance only —
+# never in the decoder or playback path (owner: docs/ENTROPYFS.md).
+entropyfs-store = ["std", "dep:entropyfs"]
+# Optional DSFB zero-authority search governance (H.2.26-H.2.29): the
+# published drift-slew-fusion observer + the minimum deterministic observer
+# in src/entropy/search/dsfb.rs. Default-off; encoder/search governance only.
+dsfb = ["std", "dep:dsfb"]
 
 [dependencies]
 # Host-only. Never enabled on device targets (feature-gated above).
 libc = { version = "0.2.172", optional = true }
 serde = { version = "1.0", features = ["derive"], optional = true }
 serde_json = { version = "1.0", optional = true }
+# Real published EntropyFS engine (feature `entropyfs-store`, default-off).
+# default-features = false drops the fuse/ublk/uring/tracing frontends: the
+# embeddable kernel-free Engine facade (content-addressed blobs over the
+# persistent store, sync IO backend) needs none of them.
+entropyfs = { version = "=0.7.17", default-features = false, optional = true }
+# Real published DSFB drift-slew-fusion observer (feature `dsfb`, default-off).
+dsfb = { version = "=0.1.2", optional = true }
 
 [dev-dependencies]
 serde_json = "1.0"

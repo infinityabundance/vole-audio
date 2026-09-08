@@ -18,6 +18,8 @@ pub mod cuda;
 #[cfg(feature = "std")]
 pub mod d1;
 #[cfg(feature = "std")]
+pub mod dsfb_entropy;
+#[cfg(feature = "std")]
 pub mod entropy_common;
 #[cfg(feature = "std")]
 pub mod entropy_literal;
@@ -29,6 +31,8 @@ pub mod entropy_partial;
 pub mod entropy_rans;
 #[cfg(feature = "std")]
 pub mod entropy_residual;
+#[cfg(feature = "std")]
+pub mod entropyfs;
 #[cfg(feature = "std")]
 pub mod facts;
 #[cfg(feature = "std")]
@@ -89,6 +93,18 @@ removes vs the D0-mmap baseline (default silence-safe; --emit-audio opt-in)",
         "entropy-partial",
         "Phase H.2 partial materialization: partial == full slice, pages touched, decode halo",
     ),
+    (
+        "entropyfs",
+        "Phase H.2 optional persistence: embedded == EntropyFS adapter roundtrip, integrity \
+reverify, declared/unique/physical accounting, exact shared model once physically \
+(feature entropyfs-store; INCONCLUSIVE + limitation without it)",
+    ),
+    (
+        "dsfb-entropy",
+        "Phase H.2 zero-authority search governance: exhaustive vs fixed-heuristic vs \
+DSFB-guided over ONE frozen candidate universe; N and J per strategy (feature dsfb; \
+INCONCLUSIVE + limitation without it)",
+    ),
 ];
 
 /// Run `court <name>`; unknown courts are usage errors.
@@ -105,6 +121,8 @@ pub fn run(name: &str, receipts_root: &Path) -> crate::error::Result<Verdict> {
         "entropy-residual" => entropy_residual::run(receipts_root),
         "entropy-pages" => entropy_pages::run(receipts_root),
         "entropy-partial" => entropy_partial::run(receipts_root),
+        "entropyfs" => entropyfs::run(receipts_root),
+        "dsfb-entropy" => dsfb_entropy::run(receipts_root),
         other => Err(crate::error::Error::malformed(format!(
             "unknown court '{other}' (available: {})",
             COURT_NAMES

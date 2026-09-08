@@ -32,7 +32,10 @@
 //! * `represent` (std) — physical SampleObject representations with partial
 //!   (page-bounded) materialization.
 //! * `store` (std) — content-addressed persistence abstraction
-//!   (EmbeddedStore; EntropyFS behind the default-off `entropyfs` feature).
+//!   (EmbeddedStore; EntropyFS behind the default-off `entropyfs-store` feature).
+//! * `search` (std) — zero-authority candidate-search governance for the
+//!   frozen entropy universe (H.2.26–H.2.29; DSFB behind the default-off
+//!   `dsfb` feature).
 //! * `hostile` (std) — deterministic hostile-input corpus for parser/decoder
 //!   hardening.
 //! * `corpus` (std) — the frozen entropy development corpus (H.2.30).
@@ -42,6 +45,7 @@
 
 pub mod model;
 pub mod rans;
+pub mod transform;
 
 #[cfg(feature = "std")]
 pub mod accounting;
@@ -49,10 +53,14 @@ pub mod accounting;
 pub mod block;
 #[cfg(feature = "std")]
 pub mod corpus;
+#[cfg(feature = "entropyfs-store")]
+pub mod entropyfs_store;
 #[cfg(feature = "std")]
 pub mod hostile;
 #[cfg(feature = "std")]
 pub mod represent;
+#[cfg(feature = "std")]
+pub mod search;
 #[cfg(feature = "std")]
 pub mod store;
 #[cfg(feature = "std")]
