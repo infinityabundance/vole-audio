@@ -59,6 +59,11 @@ pub mod universe;
 // device ABI entries are target-gated inside `device`.
 pub mod device;
 
+// Entropy-native core (Phase H.2): shared `no_std`-clean rANS/model core;
+// the std-gated submodules (blocks, symbolization, stores, corpus, courts)
+// are declared inside `entropy::mod`.
+pub mod entropy;
+
 #[cfg(feature = "std")]
 pub mod audio;
 #[cfg(feature = "std")]

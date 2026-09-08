@@ -107,6 +107,59 @@ pub const GAIN_Q: u32 = 16;
 /// Oscillator phase width: u64 modulo 2^64.
 pub const PHASE_BITS: u32 = 64;
 
+// ---------------------------------------------------------------------------
+// Entropy layer bounds (Phase H.2; part of the `vole.entropy.p1` profile
+// contract — see docs/RANS.md and docs/ENTROPY_NATIVE.md). Parsers and
+// decoders enforce these ceilings so hostile input cannot produce unbounded
+// allocation/expansion/CPU (H.2.34).
+// ---------------------------------------------------------------------------
+
+/// rANS scale bits of the audio profile (frozen, see docs/RANS.md).
+pub const RANS_SCALE_BITS: u32 = 14;
+
+/// rANS total normalized frequency per model: `1 << RANS_SCALE_BITS`.
+pub const RANS_MODEL_TOTAL: u32 = 1 << RANS_SCALE_BITS;
+
+/// rANS lower bound of the normalized state interval (frozen).
+pub const RANS_STATE_L: u32 = 1 << 23;
+
+/// Maximum distinct present symbols in one entropy model (u8-valued
+/// alphabets; canonical order = ascending symbol value).
+pub const MAX_MODEL_ALPHABET: usize = 256;
+
+/// Maximum intrinsic frames declared by one entropy page.
+pub const MAX_ENTROPY_PAGE_FRAMES: u32 = 1 << 16;
+
+/// Maximum pages in one entropy-coded object.
+pub const MAX_ENTROPY_PAGES_PER_OBJECT: u32 = 1 << 20;
+
+/// Maximum encoded bytes per entropy page payload (rANS/RAW body).
+pub const MAX_ENTROPY_PAGE_BODY_BYTES: u32 = 1 << 26;
+
+/// Maximum decoded bytes a single page may reconstruct (symbol count cap).
+pub const MAX_ENTROPY_PAGE_DECODED_BYTES: u32 = 1 << 26;
+
+/// Maximum inline model bytes in one page/block.
+pub const MAX_ENTROPY_INLINE_MODEL_BYTES: u32 = 1 << 16;
+
+/// Maximum shared models referenced by one object.
+pub const MAX_ENTROPY_SHARED_MODELS: u32 = 1 << 16;
+
+/// Maximum model bytes across an object's shared model pool.
+pub const MAX_ENTROPY_MODEL_POOL_BYTES: u32 = 1 << 22;
+
+/// Maximum page-index bytes in one object index.
+pub const MAX_ENTROPY_INDEX_BYTES: u32 = 1 << 28;
+
+/// Maximum entropy dependency depth (model/page references).
+pub const MAX_ENTROPY_DEPENDENCY_DEPTH: u32 = 8;
+
+/// Maximum transient sample-domain scratch bytes for one observation.
+pub const MAX_ENTROPY_SCRATCH_BYTES: u32 = 1 << 26;
+
+/// Worst-case rANS encoded bytes per symbol (renorm bytes + slack).
+pub const RANS_MAX_BYTES_PER_SYMBOL: u32 = 4;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -119,6 +172,17 @@ mod tests {
         assert!(worst < (1i128 << 62));
         // Half of i64 magnitude is 2^62; we demand an order of magnitude margin.
         assert!(worst < (1i128 << 53));
+    }
+
+    #[test]
+    fn entropy_profile_constants_are_consistent() {
+        const {
+            assert!(RANS_MODEL_TOTAL == (1u32 << RANS_SCALE_BITS));
+            assert!(RANS_MODEL_TOTAL == 16_384);
+            assert!(RANS_STATE_L == (1 << 23));
+            assert!(MAX_MODEL_ALPHABET <= RANS_MODEL_TOTAL as usize);
+            assert!(MAX_ENTROPY_PAGE_DECODED_BYTES >= 4 * MAX_ENTROPY_PAGE_FRAMES);
+        }
     }
 
     #[test]
