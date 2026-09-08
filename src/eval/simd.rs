@@ -1181,7 +1181,7 @@ mod tests {
     #[test]
     fn random_battery_floor_parity() {
         use crate::sampler::scheduler::TimelineEvent;
-        let seeds = 900u64;
+        let seeds = 5000u64;
         let mut compared = 0u64;
         let mut audible = 0u64;
         for seed in 0..seeds {
@@ -1325,7 +1325,7 @@ mod tests {
             return;
         }
         use crate::sampler::scheduler::TimelineEvent;
-        let seeds = 400u64;
+        let seeds = 2000u64;
         let mut compared = [0u64; 8];
         for seed in 0..seeds {
             let (store, pool) = corpus(seed);
