@@ -52,21 +52,32 @@ pub fn byte_of_le(v: u32, p: usize) -> u8 {
 /// Writes exactly `frames * channels` interleaved codes into `out`.
 /// Returns `false` on shape mismatch (hostile input).
 pub fn samples_from_streams(sym: u8, streams: &[&[u8]], channels: usize, out: &mut [i32]) -> bool {
+    let mut lanes = [&[][..]; 4];
+    for (i, slot) in lanes.iter_mut().enumerate() {
+        if let Some(s) = streams.get(i) {
+            *slot = s;
+        }
+    }
+    samples_from_lanes(sym, lanes, channels, out)
+}
+
+/// No-alloc reconstruction core (device kernels): up to four lane streams.
+/// See [`samples_from_streams`] for the stream conventions.
+pub fn samples_from_lanes(sym: u8, lanes: [&[u8]; 4], channels: usize, out: &mut [i32]) -> bool {
     if channels == 0 || channels > MAX_CHANNELS as usize {
         return false;
     }
     match sym {
         1 => {
             // Identity: raw LE sample bytes.
-            let want = streams.len() == 1 && streams[0].len().is_multiple_of(4);
-            if !want {
+            let b = lanes[0];
+            if !b.len().is_multiple_of(4) {
                 return false;
             }
-            let n = streams[0].len() / 4;
+            let n = b.len() / 4;
             if out.len() != n {
                 return false;
             }
-            let b = streams[0];
             for (i, s) in out.iter_mut().enumerate() {
                 *s = i32::from_le_bytes([b[i * 4], b[i * 4 + 1], b[i * 4 + 2], b[i * 4 + 3]]);
             }
@@ -74,11 +85,8 @@ pub fn samples_from_streams(sym: u8, streams: &[&[u8]], channels: usize, out: &m
         }
         2 | 3 => {
             // Four byte-position lanes (plain or zigzag).
-            if streams.len() != 4 {
-                return false;
-            }
-            let n = streams[0].len();
-            if streams[1].len() != n || streams[2].len() != n || streams[3].len() != n {
+            let n = lanes[0].len();
+            if lanes[1].len() != n || lanes[2].len() != n || lanes[3].len() != n {
                 return false;
             }
             if out.len() != n {
@@ -86,21 +94,12 @@ pub fn samples_from_streams(sym: u8, streams: &[&[u8]], channels: usize, out: &m
             }
             if sym == 2 {
                 for (i, s) in out.iter_mut().enumerate() {
-                    *s = i32::from_le_bytes([
-                        streams[0][i],
-                        streams[1][i],
-                        streams[2][i],
-                        streams[3][i],
-                    ]);
+                    *s = i32::from_le_bytes([lanes[0][i], lanes[1][i], lanes[2][i], lanes[3][i]]);
                 }
             } else {
                 for (i, s) in out.iter_mut().enumerate() {
-                    let z = u32::from_le_bytes([
-                        streams[0][i],
-                        streams[1][i],
-                        streams[2][i],
-                        streams[3][i],
-                    ]);
+                    let z =
+                        u32::from_le_bytes([lanes[0][i], lanes[1][i], lanes[2][i], lanes[3][i]]);
                     *s = unzigzag(z);
                 }
             }
@@ -108,16 +107,12 @@ pub fn samples_from_streams(sym: u8, streams: &[&[u8]], channels: usize, out: &m
         }
         4 => {
             // Per-channel modular first difference. Streams are four lanes;
-            // within a lane, channel streams concatenate channel-major, each
-            // channel contributing `frames` symbols.
-            if streams.len() != 4 {
+            // within a lane, channel streams concatenate channel-major.
+            let total = lanes[0].len();
+            if lanes[1].len() != total || lanes[2].len() != total || lanes[3].len() != total {
                 return false;
             }
-            let total = streams[0].len();
             if !total.is_multiple_of(channels) {
-                return false;
-            }
-            if streams[1].len() != total || streams[2].len() != total || streams[3].len() != total {
                 return false;
             }
             if out.len() != total {
@@ -128,12 +123,8 @@ pub fn samples_from_streams(sym: u8, streams: &[&[u8]], channels: usize, out: &m
                 let mut prev = 0i32;
                 for f in 0..frames {
                     let k = c * frames + f;
-                    let z = u32::from_le_bytes([
-                        streams[0][k],
-                        streams[1][k],
-                        streams[2][k],
-                        streams[3][k],
-                    ]);
+                    let z =
+                        u32::from_le_bytes([lanes[0][k], lanes[1][k], lanes[2][k], lanes[3][k]]);
                     let d = unzigzag(z);
                     let s = if f == 0 { d } else { prev.wrapping_add(d) };
                     out[f * channels + c] = s;

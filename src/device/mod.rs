@@ -18,6 +18,7 @@
 //! (`backend::cuda`) and every launch is differential-tested against the
 //! scalar oracle (`court cuda`).
 
+pub mod entropy_shared;
 pub mod kernel_shared;
 
 // Device ABI entries exist only when actually compiling for a GPU target.
