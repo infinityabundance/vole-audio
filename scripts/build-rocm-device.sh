@@ -39,8 +39,9 @@
 #   vole_audio.amdgcn.elf     AMDGPU code object (entry: vole_render_d0,
 #                             vole_entropy_decode, vole_upmix_mono_dup)
 #   vole_audio.amdgcn.sha256  artifact SHA-256
-#   vole_audio.amdgcn.json    provenance metadata (rustc/LLVM, target, gfx,
-#                             source hash, entries)
+#   vole_audio.amdgcn.elf.json  provenance metadata (rustc/LLVM, target,
+#                             gfx, source hash, entries; legacy
+#                             vole_audio.amdgcn.json copy for migration)
 set -eu
 
 cd "$(dirname "$0")/.."
@@ -139,11 +140,14 @@ EOF
     [ "$EQUAL" = true ] || exit 1
 fi
 
-# Provenance sidecar.
+# Provenance sidecar. Canonical name (frozen): <artifact filename>.json
+# = vole_audio.amdgcn.elf.json; a legacy <stem>.json copy is written during
+# migration for older consumers.
 RUSTC_VER=$("$RUSTC" --version | sed 's/ (.*//')
 LLVM_VER=$("$RUSTC" -vV | grep -oE 'LLVM version: [0-9.]+' | sed 's/LLVM version: //')
 SHA=$SHA1
-cat > "$OUT/vole_audio.amdgcn.json" <<EOF
+SIDECAR=$OUT/vole_audio.amdgcn.elf.json
+cat > "$SIDECAR" <<EOF
 {
   "artifact": "vole_audio.amdgcn.elf",
   "sha256": "$SHA",
@@ -167,7 +171,9 @@ cat > "$OUT/vole_audio.amdgcn.json" <<EOF
   "created_unix_ms": $(date +%s%3N)
 }
 EOF
+# Legacy migration copy (older consumers looked for <stem>.json).
+cp "$SIDECAR" "$OUT/vole_audio.amdgcn.json"
 echo "$SHA  $OUT/vole_audio.amdgcn.elf" > "$OUT/vole_audio.amdgcn.sha256"
 
 echo "  artifact: $OUT/vole_audio.amdgcn.elf ($(wc -c < "$OUT/vole_audio.amdgcn.elf") bytes, sha256 $SHA)"
-echo "  provenance: $OUT/vole_audio.amdgcn.json"
+echo "  provenance: $SIDECAR (+ legacy vole_audio.amdgcn.json copy)"

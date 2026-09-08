@@ -33,10 +33,11 @@ cargo build --release --all-features
 # different tree than the one the receipts would attest.
 BIN_VERSION=$(./target/release/vole-audio version)
 echo "$BIN_VERSION"
-if ! echo "$BIN_VERSION" | grep -q "source_bound: true"; then
-    echo "error: release binary is not source-bound to this work tree;" >&2
-    echo "rebuild before running a court battery (receipts must attest the" >&2
-    echo "tree the binary was actually built from)." >&2
+if ! echo "$BIN_VERSION" | grep -q "source_binding: bound"; then
+    echo "error: release binary is not source-bound to this work tree (a seal" >&2
+    echo "requires source_binding = bound); rebuild before running a court" >&2
+    echo "battery (receipts must attest the tree the binary was actually" >&2
+    echo "built from)." >&2
     exit 1
 fi
 
