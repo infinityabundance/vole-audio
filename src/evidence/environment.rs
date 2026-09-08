@@ -270,8 +270,8 @@ mod tests {
         assert!(env.os.release.is_some());
         // CPU model should exist.
         assert!(env.cpu.model.is_some());
-        // Crate version comes from Cargo.
-        assert_eq!(env.crate_version, "0.1.0");
+        // Crate version comes from Cargo (never hardcode the number here).
+        assert_eq!(env.crate_version, env!("CARGO_PKG_VERSION"));
         // On x86_64 CI/dev boxes either avx2 or none is fine; the fields must
         // be consistent with the flag list.
         if env.cpu.has_avx2 {
