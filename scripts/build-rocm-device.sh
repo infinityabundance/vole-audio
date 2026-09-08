@@ -126,7 +126,7 @@ if [ "$VERIFY" = 1 ]; then
         EQUAL=false
         echo "  error: builds differ ($SHA1 != $SHA2) — artifact is NOT byte-deterministic" >&2
     fi
-    cat > "$OUT/vole_audio.amdgcn.determinism.json" <<EOF
+    cat > "$OUT/vole_audio.amdgcn.elf.determinism.json" <<EOF
 {
   "artifact": "vole_audio.amdgcn.elf",
   "build_a_sha256": "$SHA1",
@@ -137,6 +137,8 @@ if [ "$VERIFY" = 1 ]; then
   "created_unix_ms": $(date +%s%3N)
 }
 EOF
+# Legacy migration copy (older consumers looked for the stem-based name).
+cp "$OUT/vole_audio.amdgcn.elf.determinism.json" "$OUT/vole_audio.amdgcn.determinism.json"
     [ "$EQUAL" = true ] || exit 1
 fi
 

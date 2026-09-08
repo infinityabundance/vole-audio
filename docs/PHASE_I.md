@@ -107,6 +107,28 @@ rustc 1.99.0-nightly, LLVM 22.1.8):
   `/dev/kfd` read-write (the mode Phase J needs), and derives compute
   candidacy from display OR processing-accelerator class OR amdgpu binding
   (a headless Instinct-class device is a candidate).
+- **I.8 Review-3 closure: frozen ABI contract + executable seal gate** —
+  (a) the direct-HSA fallback table was rebuilt from the current ROCR ABI
+  (`hsa_iterate_agents`, `hsa_executable_create_alt` →
+  `hsa_code_object_reader_create_from_memory` →
+  `hsa_executable_load_agent_code_object` → `hsa_executable_freeze` →
+  `hsa_executable_get_symbol_by_name` → `hsa_executable_symbol_get_info`);
+  (b) runtime readiness is split **D0 vs D1**: `HIP_D0_REQUIRED` (init/
+  device/module/launch/malloc/memcpy/sync) and `HIP_D1_ADDITIONAL`
+  (host-register set; same split for HSA) — a stack that runs the D0
+  battery but refuses host registration reports "ROCm D0 READY; D1 not
+  ready", never "runtime unavailable"; (c) `vole-audio seal verify` is the
+  executable phase-seal gate (explicit expected-verdict matrix,
+  `source_binding == bound`, single seal tree, frozen semantic/authored
+  hashes, rocm compile-surface rule); (d) `SourceBinding::Partial` covers
+  one-sided identity and unknown dirty states (Bound requires both dirty
+  states explicitly false); build.rs no longer maps a failed `git status`
+  to "clean" — the stamp is simply absent when unmeasured;
+  (e) determinism evidence follows the artifact
+  (`<artifact>.determinism.json`, `VOLE_ROCM_DETERMINISM` override);
+  (f) `/opt/rocm*` is scanned by soname prefix
+  (`libamdhip64.so*`/`libhsa-runtime64.so*`) so future ROCm versioned
+  SONAMEs are discovered rather than frozen version numbers.
 
 ## Claim boundary (what Phase I does NOT claim)
 

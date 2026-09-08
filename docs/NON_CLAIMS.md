@@ -88,18 +88,26 @@ assertion.
 24. **A receipt can attest a tree its binary was not built from.** No:
     receipts record both compiled-from (build.rs stamp) and
     executed-in-worktree (runtime capture); `source_binding` is `bound` only
-    when they match and both are clean (`unavailable`/`mismatch`/`dirty`
-    otherwise — a non-git tarball run reports `unavailable`, never
-    "bound"), and a seal requires `bound`. GPU artifacts are bound back to
-    their source tree through their provenance sidecars (artifact sha ==
-    sidecar sha == both determinism repro shas for `court rocm`).
+    when they match and both dirty states are explicitly false
+    (`unavailable`/`partial`/`mismatch`/`dirty` otherwise — a non-git
+    tarball run reports `unavailable`, never "bound"), and a seal requires
+    `bound`. GPU artifacts are bound back to their source tree through their
+    provenance sidecars (artifact sha == sidecar sha == both determinism
+    repro shas for `court rocm`).
 25. **A headless AMD accelerator is not a ROCm candidate / probing
     `hipInit` proves the Phase-J runtime.** No: compute candidacy includes
     processing-accelerator-class (0x12) and amdgpu-bound devices, not just
-    display class; and the probe resolves the full frozen Phase-J ABI
-    symbol tables (HIP module/launch/memory/host-register and the
-    direct-HSA fallback), not a single init symbol — a runtime that loads
-    but lacks required symbols is `UNSUPPORTED_BY_API`.
+    display class; and the probe resolves the frozen Phase-J ABI surface
+    split by capability — the D0 set (module/launch/memory/sync) for the
+    scalar == ROCm battery and the D1-additional set (host registration)
+    for the endpoint path — a runtime that loads but lacks required symbols
+    is `UNSUPPORTED_BY_API`, and "D0 READY; D1 not ready" is a distinct,
+    reportable state.
+26. **A court battery run is a phase seal.** No: `court-all.sh` collects
+    evidence (courts exit 0 after writing any verdict). A seal is
+    `vole-audio seal verify`: an executable gate over an explicit
+    expected-verdict matrix with `source_binding == bound`, a single seal
+    tree, frozen reference hashes, and the rocm compile-surface rule.
 
 Anything in this list that later gains evidence moves into a claims document
 with its receipt. Until then: **not claimed.**
