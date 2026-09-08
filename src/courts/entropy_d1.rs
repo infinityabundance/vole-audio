@@ -1341,6 +1341,34 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
             continue;
         }
 
+        // Verdict-bearing cell: logically mandatory once every session is
+        // SUPPORTED. Fail closed — a missing d1-literal cell, an empty
+        // digest, or disagreeing independently accumulated digests is an
+        // internal evidence error that must never become a SUPPORTED
+        // receipt (defense in depth; the digests agree iff every committed
+        // chunk matched the oracle).
+        let Some(verdict_cell) = cells.iter().find(|c| c.label == "d1-literal") else {
+            return fail(
+                Verdict::FailedCorrectness,
+                "internal evidence error: successful session set lacks d1-literal",
+            );
+        };
+        if verdict_cell.window_sha256.is_empty() || verdict_cell.endpoint_sha256.is_empty() {
+            return fail(
+                Verdict::FailedCorrectness,
+                "internal evidence error: empty reference/endpoint digest on d1-literal",
+            );
+        }
+        let reference_sha = verdict_cell.window_sha256.clone();
+        let endpoint_sha = verdict_cell.endpoint_sha256.clone();
+        if reference_sha != endpoint_sha {
+            return fail(
+                Verdict::FailedCorrectness,
+                "internal evidence error: independently accumulated endpoint digest != \
+                 scalar reference digest",
+            );
+        }
+
         // Success: build the sealed receipt and stop probing.
         let lit = cells
             .iter()
@@ -1395,11 +1423,7 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
         counters.host_pcm_copy_bytes = d1.mat_host_copy;
         counters.endpoint_observation_bytes = d1.endpoint_obs;
         counters.kernel_launches = d1.launches;
-        let dl = cells
-            .iter()
-            .find(|c| c.label == "d1-literal")
-            .map(|c| &c.out)
-            .unwrap();
+        let dl = &verdict_cell.out;
         if dl.chunks > 0 {
             counters.quanta_submitted = dl.chunks;
             counters.observe_endpoint_depth(dl.depth_min);
@@ -1456,24 +1480,15 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
                 ..Default::default()
             })
             .provenance({
-                // Verdict-bearing path: the d1-literal session. reference_hash
-                // is the digest over the scalar-expected window (window_sha256);
-                // backend_hash and endpoint_hash are the digest independently
-                // accumulated from the actual mapped-region bytes read during
-                // per-chunk in-place verification (endpoint_sha256). The two
-                // digests are therefore measured through separate byte streams
-                // (in-memory scalar expected vs live mmap reads) and are equal
-                // exactly because every committed chunk matched the oracle.
-                let verdict_cell = cells.iter().find(|c| c.label == "d1-literal");
-                let reference_sha = verdict_cell
-                    .map(|c| c.window_sha256.clone())
-                    .unwrap_or_default();
-                let endpoint_sha = verdict_cell
-                    .map(|c| c.endpoint_sha256.clone())
-                    .unwrap_or_default();
-                // Defense in depth: independent digests must agree for the
-                // equality claim to hold (they do iff every chunk matched).
-                let hashes_agree = reference_sha.is_empty() || (reference_sha == endpoint_sha);
+                // reference_hash is the digest over the scalar-expected
+                // window; backend_hash and endpoint_hash are the digest
+                // independently accumulated from the actual mapped-region
+                // bytes read during per-chunk in-place verification
+                // (pre-commit, before the DMA consumes the region at drain) —
+                // separate byte streams (in-memory scalar expected vs live
+                // mmap reads). Equal because every committed chunk matched
+                // the oracle; the gate above fails the court closed if the
+                // verdict cell is missing or the digests disagree.
                 crate::evidence::receipt::Provenance {
                     reference_hash: Some(reference_sha.clone()),
                     backend_hash: Some(endpoint_sha.clone()),
@@ -1486,12 +1501,7 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
                         "d1-residual".into(),
                         "d1-noise".into(),
                     ],
-                    // Exact equality of the verdict-bearing path: the CUDA
-                    // written ring codes equal the scalar oracle for every
-                    // committed chunk (in-place verification), so the
-                    // independently accumulated reference and endpoint
-                    // digests are identical.
-                    exact_equality: Some(all_supported && hashes_agree),
+                    exact_equality: Some(true),
                     ..Default::default()
                 }
             })
