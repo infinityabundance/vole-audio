@@ -27,3 +27,7 @@ pub mod kernel_shared;
 pub mod amdgcn_entry;
 #[cfg(target_arch = "nvptx64")]
 pub mod nvptx_entry;
+
+/// Launch geometry for grid-stride device loops (host-tested; AMDGCN kernels
+/// take it as explicit parameters, see `amdgcn_entry`).
+pub mod geom;

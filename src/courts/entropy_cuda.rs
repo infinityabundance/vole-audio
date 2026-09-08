@@ -292,7 +292,11 @@ pub fn run(receipts_root: &Path) -> crate::error::Result<Verdict> {
         .extra("cells", serde_json::Value::Array(cells))
         .extra(
             "artifact",
-            serde_json::json!({ "path": DEFAULT_PTX, "sha256": ptx.1 }),
+            crate::evidence::artifact::artifact_evidence(
+                &std::env::var("VOLE_CUDA_PTX")
+                    .map(std::path::PathBuf::from)
+                    .unwrap_or_else(|_| std::path::PathBuf::from(DEFAULT_PTX)),
+            ),
         );
     let (_, path) = builder.finish_write(receipts_root)?;
     println!("court entropy-cuda: SUPPORTED");

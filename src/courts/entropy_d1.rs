@@ -1680,7 +1680,9 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
             )
             .extra(
                 "artifact",
-                serde_json::json!({ "path": DEFAULT_PTX, "sha256": ptx.1 }),
+                crate::evidence::artifact::artifact_evidence(&std::env::var("VOLE_CUDA_PTX")
+                    .map(std::path::PathBuf::from)
+                    .unwrap_or_else(|_| std::path::PathBuf::from(DEFAULT_PTX))),
             );
         builder.limitation(if audible {
             "audible content emitted (opt-in VOLE_ENTROPY_D1_EMIT_AUDIO=1)"

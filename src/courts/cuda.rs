@@ -349,9 +349,12 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
         }
     };
     let artifact_sha = ptx.1.clone();
+    let artifact_path = std::env::var("VOLE_CUDA_PTX")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| PathBuf::from(DEFAULT_PTX));
     extras.insert(
         "artifact".to_string(),
-        json!({"path": DEFAULT_PTX, "sha256": artifact_sha}),
+        crate::evidence::artifact::artifact_evidence(&artifact_path),
     );
 
     // 1. Probe / availability.

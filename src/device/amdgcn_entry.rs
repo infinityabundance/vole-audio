@@ -23,8 +23,25 @@
 #![cfg(target_arch = "amdgpu")]
 
 use crate::device::entropy_shared::{EntropyJobDesc, FlatPage, FlatStream};
+use crate::device::geom::Grid;
 use crate::device::kernel_shared::{FlatState, FlatVoice, render_sample};
 use crate::sampler::procedural::Partial;
+
+/// Defensive entry guard shared by every kernel: invalid launch geometry
+/// (a zero dimension) would make the grid-stride loops non-progressing
+/// (`g += 0`), so the kernel returns immediately. The frozen launch contract
+/// (see `device::geom`) requires `blocks_x > 0 && threads_x > 0` with the
+/// declared values equal to the actual launch geometry.
+#[inline]
+fn guard(grid: Grid) -> Option<(u64, u64)> {
+    if !grid.valid() {
+        return None;
+    }
+    let tid = core::arch::amdgpu::workitem_id_x() as u64;
+    let bid = core::arch::amdgpu::workgroup_id_x() as u64;
+    grid.first(bid as u32, tid as u32)
+        .map(|first| (first, grid.stride()))
+}
 
 /// Decode entropy pages into a bounded output arena (Phase H.2 semantics on
 /// the AMD surface).
@@ -58,12 +75,13 @@ pub extern "gpu-kernel" fn vole_entropy_decode(
     blocks_x: u32,
     threads_x: u32,
 ) {
+    let grid = Grid::new(blocks_x, threads_x);
+    // Defensive: zero geometry must not hang the grid-stride loop.
+    let Some((mut g, stride)) = guard(grid) else {
+        return;
+    };
     unsafe {
-        let tid = core::arch::amdgpu::workitem_id_x() as u64;
-        let bid = core::arch::amdgpu::workgroup_id_x() as u64;
-        let stride = u64::from(blocks_x) * u64::from(threads_x);
         let d = &*desc;
-        let mut g = bid * u64::from(threads_x) + tid;
         while g < d.page_count as u64 {
             let ok = d.decode_page_raw(
                 g as u32, pages, streams, payload, mvalues, mstarts, mfreqs, mranges, cycle, out,
@@ -95,11 +113,12 @@ pub extern "gpu-kernel" fn vole_upmix_mono_dup(
     blocks_x: u32,
     threads_x: u32,
 ) {
+    let grid = Grid::new(blocks_x, threads_x);
+    // Defensive: zero geometry must not hang the grid-stride loop.
+    let Some((mut g, stride)) = guard(grid) else {
+        return;
+    };
     unsafe {
-        let tid = core::arch::amdgpu::workitem_id_x() as u64;
-        let bid = core::arch::amdgpu::workgroup_id_x() as u64;
-        let stride = u64::from(blocks_x) * u64::from(threads_x);
-        let mut g = bid * u64::from(threads_x) + tid;
         while g < frames {
             let v = *src.add(g as usize);
             let base = (g * channels) as usize;
@@ -113,8 +132,11 @@ pub extern "gpu-kernel" fn vole_upmix_mono_dup(
 
 /// Render one window into the final interleaved observation block (D0).
 ///
-/// Grid/block mapping: `g = workgroup_id_x * threads_x + workitem_id_x`
-/// indexes output sample slots; grid-stride so any window size is legal.
+/// Grid/block mapping: the executing workitem's global index
+/// (`workgroup_id_x * threads_x + workitem_id_x`, via `geom::Grid`) indexes
+/// output sample slots; grid-stride so any window size is legal. Zero or
+/// mismatched geometry is rejected defensively (`guard`); the frozen launch
+/// contract is `device::geom`.
 ///
 /// # Safety
 /// All five pointers must reference allocations that live for the kernel
@@ -132,12 +154,12 @@ pub extern "gpu-kernel" fn vole_render_d0(
     blocks_x: u32,
     threads_x: u32,
 ) {
+    let grid = Grid::new(blocks_x, threads_x);
+    // Defensive: zero geometry must not hang the grid-stride loop.
+    let Some((first, stride)) = guard(grid) else {
+        return;
+    };
     unsafe {
-        let tid = core::arch::amdgpu::workitem_id_x() as usize;
-        let bid = core::arch::amdgpu::workgroup_id_x() as usize;
-        let nthreads = threads_x as usize;
-        let nblocks = blocks_x as usize;
-
         let st = &*state;
         debug_assert!(st.check_layout().is_some());
         let total = st.total_samples();
@@ -145,10 +167,10 @@ pub extern "gpu-kernel" fn vole_render_d0(
         let samples_slice = core::slice::from_raw_parts(samples, st.samples_len as usize);
         let partials_slice = core::slice::from_raw_parts(partials, st.partials_len as usize);
 
-        let stride = nthreads * nblocks;
-        let mut g = bid * nthreads + tid;
-        while g < total {
-            *out.add(g) = render_sample(&st, voices_slice, samples_slice, partials_slice, g);
+        let mut g = first;
+        while g < total as u64 {
+            *out.add(g as usize) =
+                render_sample(&st, voices_slice, samples_slice, partials_slice, g as usize);
             g += stride;
         }
     }

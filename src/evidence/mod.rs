@@ -5,6 +5,7 @@
 //! Everything in this module is host (`std`) only; device kernels emit plain
 //! status bytes from the shared vocabulary in `crate::status`.
 
+pub mod artifact;
 pub mod counters;
 pub mod energy;
 pub mod environment;

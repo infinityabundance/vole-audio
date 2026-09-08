@@ -69,6 +69,51 @@ pub struct Environment {
     /// stable regardless of uncommitted changes).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub git_tree_sha: Option<String>,
+    /// ---- Compile-time identity (stamped by build.rs; compiled-from) ----
+    /// Commit the host binary was built from. Together with the runtime
+    /// fields above (executed-in-worktree), this binds receipts to the
+    /// source tree: a seal requires compiled-from == executed-in-worktree.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub build_git_commit: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub build_tree_sha: Option<String>,
+    /// Build-time dirty state (receipts/ excluded, as in the runtime field).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub build_dirty: Option<bool>,
+    /// rustc that compiled this binary.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub build_rustc: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub build_profile: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub build_target: Option<String>,
+}
+
+/// Compile-time stamped constants (set by build.rs).
+pub const BUILD_GIT_COMMIT: Option<&str> = option_env!("VOLE_BUILD_GIT_COMMIT");
+pub const BUILD_TREE_SHA: Option<&str> = option_env!("VOLE_BUILD_TREE_SHA");
+/// "true"/"false" as stamped by build.rs (parsed at capture time — const
+/// str matching is not stable).
+pub const BUILD_GIT_DIRTY: Option<&str> = option_env!("VOLE_BUILD_GIT_DIRTY");
+pub const BUILD_RUSTC: Option<&str> = option_env!("VOLE_BUILD_RUSTC");
+pub const BUILD_PROFILE: Option<&str> = option_env!("VOLE_BUILD_PROFILE");
+pub const BUILD_TARGET: Option<&str> = option_env!("VOLE_BUILD_TARGET");
+
+impl Environment {
+    /// True when the binary's compile-time identity matches the work tree it
+    /// is running in (a seal precondition: receipts must not be bound to a
+    /// tree the binary was not built from).
+    pub fn source_bound(&self) -> bool {
+        match (&self.build_git_commit, &self.git_commit) {
+            (Some(b), Some(r)) => {
+                b == r && self.build_dirty == Some(false) && self.git_dirty == Some(false)
+            }
+            // Both absent: not a git work tree (e.g. the crates.io tarball)
+            // — nothing to bind against; the evidence stays unbounded.
+            (None, None) => true,
+            _ => false,
+        }
+    }
 }
 
 fn read_first_line(path: &str) -> Option<String> {
@@ -224,6 +269,13 @@ impl Environment {
             cpu,
             memory,
             git_tree_sha: git(&["rev-parse", "HEAD^{tree}"]),
+            // Compile-time (compiled-from) identity stamped by build.rs.
+            build_git_commit: BUILD_GIT_COMMIT.map(str::to_string),
+            build_tree_sha: BUILD_TREE_SHA.map(str::to_string),
+            build_dirty: BUILD_GIT_DIRTY.map(|s| s == "true"),
+            build_rustc: BUILD_RUSTC.map(str::to_string),
+            build_profile: BUILD_PROFILE.map(str::to_string),
+            build_target: BUILD_TARGET.map(str::to_string),
         }
     }
 
@@ -293,5 +345,39 @@ mod tests {
             ..Environment::default()
         };
         assert_eq!(clean.git_identity(), Some("abc123".into()));
+    }
+
+    #[test]
+    fn source_bound_matches_only_clean_same_tree() {
+        let bound = Environment {
+            git_commit: Some("abc123".into()),
+            git_dirty: Some(false),
+            build_git_commit: Some("abc123".into()),
+            build_dirty: Some(false),
+            ..Environment::default()
+        };
+        assert!(bound.source_bound());
+        // Compiled from an older commit while running at a newer one: not
+        // bound (the exact stale-binary case a seal must reject).
+        let stale = Environment {
+            git_commit: Some("def456".into()),
+            git_dirty: Some(false),
+            build_git_commit: Some("abc123".into()),
+            build_dirty: Some(false),
+            ..Environment::default()
+        };
+        assert!(!stale.source_bound());
+        // Either side dirty: not bound.
+        let dirty_tree = Environment {
+            git_commit: Some("abc123".into()),
+            git_dirty: Some(true),
+            build_git_commit: Some("abc123".into()),
+            build_dirty: Some(false),
+            ..Environment::default()
+        };
+        assert!(!dirty_tree.source_bound());
+        // Non-git tarball build (both absent): nothing to bind, no claim.
+        let tarball = Environment::default();
+        assert!(tarball.source_bound());
     }
 }

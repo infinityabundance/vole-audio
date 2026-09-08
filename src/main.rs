@@ -60,6 +60,22 @@ fn run(args: &[String]) -> Result<u8> {
         "version" | "--version" | "-V" => {
             println!("vole-audio {}", env!("CARGO_PKG_VERSION"));
             println!("evidence schema: vole.audio.evidence.v1");
+            let e = vole_audio::evidence::environment::Environment::capture();
+            if let Some(c) = e.git_identity() {
+                println!("executed in worktree: {c}");
+            }
+            if let Some(b) = &e.build_git_commit {
+                println!(
+                    "compiled from commit:   {}{}",
+                    b,
+                    if e.build_dirty == Some(true) {
+                        "-dirty"
+                    } else {
+                        ""
+                    }
+                );
+            }
+            println!("source_bound: {}", e.source_bound());
             Ok(0)
         }
         "probe" => cmd_probe(&args[2..]),
@@ -89,6 +105,11 @@ fn cmd_probe(args: &[String]) -> Result<u8> {
         let json = args.iter().any(|a| a == "--json");
         let p = vole_audio::backend::rocm::probe::RocmProbe::capture()?;
         let (v, detail) = p.classify();
+        let kfd_label = match p.kfd {
+            vole_audio::backend::rocm::KfdState::Absent => "absent",
+            vole_audio::backend::rocm::KfdState::PresentNotAccessible => "present_not_accessible",
+            vole_audio::backend::rocm::KfdState::Accessible => "accessible",
+        };
         if json {
             let doc = serde_json::json!({
                 "schema": "vole.audio.evidence.v1",
@@ -98,9 +119,13 @@ fn cmd_probe(args: &[String]) -> Result<u8> {
                 "amd_gpus": p.amd_gpus.iter().map(|g| serde_json::json!({
                     "bdf": g.bdf, "vendor": g.vendor, "device": g.device, "driver": g.driver,
                 })).collect::<Vec<_>>(),
-                "kfd_class_present": p.kfd_class_present,
-                "kfd_dev_present": p.kfd_dev_present,
-                "libs": p.libs.iter().map(|(n, f)| serde_json::json!({ "soname": n, "found": f })).collect::<Vec<_>>(),
+                "kfd": kfd_label,
+                "compute_runtime": p.compute.iter().map(|a| serde_json::json!({
+                    "soname": a.soname,
+                    "loaded": a.loaded.is_ok(),
+                    "detail": a.loaded.as_ref().err(),
+                })).collect::<Vec<_>>(),
+                "telemetry_rocmsmi": p.telemetry.iter().any(|(_, f)| *f),
             });
             println!(
                 "{}",
@@ -124,13 +149,16 @@ fn cmd_probe(args: &[String]) -> Result<u8> {
             if p.amd_gpus.is_empty() {
                 println!("amd gpu pci:    (none found in sysfs)");
             }
-            println!(
-                "kfd:            class={} dev={}",
-                p.kfd_class_present, p.kfd_dev_present
-            );
-            for (n, found) in &p.libs {
+            println!("kfd:            {kfd_label}");
+            for a in &p.compute {
+                match &a.loaded {
+                    Ok(_) => println!("compute:        {} loaded (symbols resolve)", a.soname),
+                    Err(e) => println!("compute:        {} not loadable ({e})", a.soname),
+                }
+            }
+            for (n, found) in &p.telemetry {
                 println!(
-                    "lib:            {n:<24} {}",
+                    "telemetry:      {n:<24} {}",
                     if *found { "found" } else { "absent" }
                 );
             }
