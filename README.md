@@ -130,9 +130,11 @@ EntropyFS persistence and DSFB search governance; CUDA entropy decode; the
 flagship **fused entropy -> CUDA -> D1 endpoint** court — and I the ROCm
 device surface: a clean `amdgcn-amd-amdhsa` code-object build
 (`scripts/build-rocm-device.sh`, thin kernels over the same shared no_std
-semantics) plus the `backend::rocm` presence probe and `court rocm` /
-`probe rocm` evidence (hardware-unavailable on this host; the differential
-scalar == ROCm battery is Phase J on ROCm hardware). Executable
+semantics; byte-deterministic across isolated builds), the `backend::rocm`
+loader probe (GPU -> amdgpu -> KFD -> HIP/HSA) and `court rocm` /
+`probe rocm` evidence (two-dimensional, fail-closed; hardware-unavailable
+on this host; the differential scalar == ROCm battery is Phase J on ROCm
+hardware). Executable
 evidence today:
 
 - `cargo run -- court semantic` — scalar oracle determinism battery
@@ -192,14 +194,19 @@ evidence today:
   32 768 B host copies (literal) and 16 384 B + 32 768 B (residual) with
   zero xruns and byte-exact ring codes; verification is separately
   accounted. `court h2` runs the whole H.2 battery as an aggregate.
-  `court rocm` (Phase I) records the ROCm/AMD evidence: presence probe
-  (AMD GPUs from the sysfs PCI walk, KFD nodes, ROCm userspace sonames) plus
-  the clean `amdgcn` code-object artifact state built by
-  `scripts/build-rocm-device.sh` — hardware-unavailable evidence on this
-  host (`UNSUPPORTED_BY_HARDWARE` with the typed cause); no kernel is
-  executed by the Phase I court, and the differential scalar == ROCm battery
-  is Phase J on ROCm hardware. `vole-audio probe rocm` prints the same
-  classification.
+  `court rocm` (Phase I) is two-dimensional and fails closed: the
+  `compile_surface` (artifact present + ELF-valid AMDGPU code object with the
+  required kernel entries + provenance sidecar matching the attested source
+  tree; built by `scripts/build-rocm-device.sh`, byte-deterministic across
+  isolated builds) and the `runtime_surface` (AMD GPU -> amdgpu driver ->
+  KFD -> HIP/HSA dlopen + symbols; missing userspace is `UNSUPPORTED_BY_API`,
+  never a hardware verdict). An unsatisfied compile surface is
+  `INCONCLUSIVE`; with it satisfied, this host reports
+  `UNSUPPORTED_BY_HARDWARE` with the typed cause. No kernel is executed by
+  the Phase I court; the differential scalar == ROCm battery is Phase J on
+  ROCm hardware. `vole-audio probe rocm` prints the same classification.
+  Receipts bind the binary to its source (compiled-from ==
+  executed-in-worktree) and the GPU artifacts to their provenance sidecars.
 
 The exact ledger — completed phases, evidence, blockers, and the next work
 item — is

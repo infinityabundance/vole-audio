@@ -80,6 +80,16 @@ assertion.
     real device is Phase J evidence, never assumed. `court rocm` never
     reports device `SUPPORTED`; the scalar == ROCm differential battery is
     Phase J on ROCm hardware.
+23. **Missing ROCm userspace is a hardware deficiency.** No: when the AMD
+    GPU and KFD are present but the HIP/HSA compute runtime is not loadable,
+    the probe classifies `UNSUPPORTED_BY_API` (runtime/library level), never
+    `UNSUPPORTED_BY_HARDWARE`. `librocm_smi64` is telemetry, not evidence of
+    a compute runtime.
+24. **A receipt can attest a tree its binary was not built from.** No:
+    receipts record both compiled-from (build.rs stamp) and
+    executed-in-worktree (runtime capture); a seal requires them to match
+    and both to be clean (`Environment::source_bound`). GPU artifacts are
+    bound back to their source tree through their provenance sidecars.
 
 Anything in this list that later gains evidence moves into a claims document
 with its receipt. Until then: **not claimed.**

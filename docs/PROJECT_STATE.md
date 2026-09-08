@@ -767,14 +767,32 @@ executed to the same evidence standard as every earlier phase.
   `scripts/out/vole_audio.amdgcn.elf` (ELF AMDGPU code object) + sha256 +
   provenance sidecar; per-ISA (`-C target-cpu=$VOLE_ROCM_GFX`, baseline
   gfx906) — code objects are not portable like PTX text.
-- `backend/rocm/` (`mod.rs`, `probe.rs`): filesystem/sysfs presence probe
-  (AMD display GPUs, KFD nodes, ROCm userspace sonames) with a pure,
-  unit-tested classifier. The launch/direct-path runtime is Phase J scope,
-  where ROCm hardware can validate it.
-- `court rocm` + `probe rocm`: typed evidence. On this host:
-  `UNSUPPORTED_BY_HARDWARE` (no AMD GPU in sysfs; no KFD; no ROCm
-  userspace). Full-stack classification is `INCONCLUSIVE` with the Phase-J
-  reason — never a manufactured device result.
+- `backend/rocm/` (`mod.rs`, `loader.rs`, `probe.rs`, `elf.rs`): a loader
+  probe walking the Phase-J runtime chain (AMD GPU -> amdgpu driver ->
+  `/dev/kfd` accessible -> HIP/HSA dlopen + symbols) with the corrected
+  taxonomy (userspace absence = `UNSUPPORTED_BY_API`, never hardware), plus
+  self-defending ELF validation of the code object (magic/machine/entries
+  from the bytes, no external tools). `court rocm` is two-dimensional and
+  fails closed: an unsatisfied compile surface (artifact missing/malformed/
+  unverifiable) is `INCONCLUSIVE` whatever the runtime says; with the
+  surface satisfied, this host reports `UNSUPPORTED_BY_HARDWARE` (typed
+  cause). The launch/direct-path runtime is Phase J scope, where ROCm
+  hardware can validate it.
+- Evidence-binding amendment (repo-wide, review): `build.rs` stamps
+  compile-time source identity into the host binary; receipts record both
+  compiled-from and executed-in-worktree, and a seal requires them to match
+  (`Environment::source_bound`; `court-all.sh` rebuilds unconditionally and
+  refuses a non-bound battery). PTX/AMDGPU provenance sidecars are consumed
+  into the CUDA/entropy/rocm court receipts. `device::geom` holds the
+  frozen launch contract with zero-geometry rejection and the pathological
+  geometry unit battery.
+- `scripts/build-rocm-device.sh` builds in a fresh isolated per-toolchain/
+  per-gfx target dir (`target/vole-rocm/<rustc-commit>/<gfx>`, removed
+  first, exactly-one rlib enforced); `--verify-deterministic` proves
+  `SHA256(A1) == SHA256(A2)` across two isolated builds
+  (`vole_audio.amdgcn.determinism.json`). Artifact:
+  `scripts/out/vole_audio.amdgcn.elf` sha256 `5092e129…` (gfx906;
+  byte-deterministic).
 
 ## Known blockers
 

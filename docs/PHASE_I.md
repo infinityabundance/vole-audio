@@ -49,58 +49,97 @@ rustc 1.99.0-nightly, LLVM 22.1.8):
   surface exactly — `vole_render_d0`, `vole_entropy_decode`,
   `vole_upmix_mono_dup` — over the same shared `kernel_shared` /
   `entropy_shared` semantics; grid-stride loops with AMDGCN intrinsics and
-  explicit launch geometry.
+  explicit launch geometry (`device::geom`).
 - **I.2 Build script** — `scripts/build-rocm-device.sh` (was
-  `NOT_IMPLEMENTED`): preflight checks (rust-src), `-Z build-std=core`
-  rlib, direct-rustc cdylib link with `-C target-cpu=$VOLE_ROCM_GFX`,
-  DWARF-free opt profile, artifact + `sha256` + provenance sidecar
-  (entries, rustc/LLVM, target/gfx, source-tree hash, dirty flag,
-  loadability disclaimer). Deterministic: same tree + toolchain + gfx ⇒
-  same artifact bytes.
-- **I.3 Backend probe** — `src/backend/rocm/` (`mod.rs`, `probe.rs`):
-  filesystem/sysfs presence probe (AMD display GPUs from the sysfs PCI
-  walk, `/sys/class/kfd` + `/dev/kfd`, ROCm userspace sonames under the
-  standard roots) with a **pure, unit-tested classifier** that never
-  manufactures a verdict.
-- **I.4 Court + CLI** — `court rocm` (registered in the court table and
-  dispatcher) and `probe rocm`: typed evidence receipt (probe rows,
-  artifact state + SHA, verdict). No kernel is executed by either path.
+  `NOT_IMPLEMENTED`): clean code-object build. Every build runs in a **fresh
+  isolated per-toolchain/per-gfx target dir**
+  (`target/vole-rocm/<rustc-commit>/<gfx>`, removed first), so stale
+  core/compiler_builtins rlibs can never be linked and the glob is enforced
+  to resolve to exactly one rlib. `--verify-deterministic` builds twice in
+  two isolated dirs and requires `SHA256(A1) == SHA256(A2)`, writing
+  `scripts/out/vole_audio.amdgcn.determinism.json` — byte-determinism is
+  measured evidence. Artifact + `sha256` + provenance sidecar (entries,
+  rustc/LLVM + commit hash, target/gfx, source-tree hash, dirty flag,
+  determinism state, loadability disclaimer).
+- **I.3 Backend probe** — `src/backend/rocm/` (`mod.rs`, `loader.rs`,
+  `probe.rs`, `elf.rs`): a **loader probe** walking the exact Phase-J chain
+  — AMD display GPU (sysfs) → bound to `amdgpu` → `/dev/kfd` accessible →
+  HIP/HSA actually dlopen (ld cache + `ROCM_LIB_PATH` + `/opt/rocm*`
+  candidates) with the required symbols → `INCONCLUSIVE_PENDING_EXECUTION`.
+  Corrected taxonomy: userspace absence is `UNSUPPORTED_BY_API`, KFD
+  present-but-inaccessible is `INCONCLUSIVE`, only device/driver absence is
+  `UNSUPPORTED_BY_HARDWARE`; rocm-smi is auxiliary telemetry only.
+  `elf.rs` validates code-object images from their bytes (ELF magic,
+  ELF64 LE, `EM_AMDGPU`, required FUNC entries in `.symtab`) with hostile-
+  file safety and no external tools.
+- **I.4 Court + CLI** — `court rocm` is **two-dimensional and fails
+  closed**: `compile_surface` (artifact present + ELF-valid + entries +
+  provenance sidecar + artifact↔source-tree correspondence) and
+  `runtime_surface` (the loader chain). A missing/malformed/unverifiable
+  artifact is incapable of satisfying Phase I → `INCONCLUSIVE` regardless of
+  the runtime verdict; an arbitrary file at `VOLE_ROCM_ARTIFACT` is never
+  merely hashed. `probe rocm` prints the same classification.
 - **I.5 Docs** — this charter; `PROJECT_STATE` Phase I section + next-work
   renumbering; `ARCHITECTURE` module map; `README`; `NON_CLAIMS`;
   `SEMANTIC_FACTS` rocm row note.
+- **I.6 Evidence-binding amendment (review)** — repo-wide: `build.rs`
+  stamps **compile-time** source identity into the host binary
+  (compiled-from commit/tree/dirty/rustc/profile; `Environment.source_bound`
+  requires compiled-from == executed-in-worktree, both clean — receipts
+  record both and a seal requires them to match; `court-all.sh` rebuilds
+  unconditionally and refuses a non-bound battery); `evidence::artifact`
+  consumes the PTX/AMDGPU provenance sidecars into the CUDA/entropy court
+  receipts; launch-geometry guards (`device::geom`) with the pathological
+  battery (zero rejected, 1×1, 1×64, non-divisible, blocks>work, page ±1,
+  max geometry).
 
 ## Claim boundary (what Phase I does NOT claim)
 
 - No ROCm kernel was executed anywhere; no device observation exists.
 - The code object is **compile evidence**: ELF AMDGPU code object for the
-  recorded baseline `gfx`; loadability on a real device is **Phase J**
-  evidence (needs ROCm runtime + matching hardware) and is never assumed.
+  recorded baseline `gfx`, byte-deterministic across isolated builds
+  (measured by `--verify-deterministic`); loadability on a real device is
+  **Phase J** evidence (needs ROCm runtime + matching hardware) and is never
+  assumed.
 - `court rocm` on a full ROCm stack classifies `INCONCLUSIVE` with the
   Phase-J reason — it does not run the differential battery, and Phase I
-  never reports device `SUPPORTED`.
+  never reports device `SUPPORTED`. Missing userspace is `UNSUPPORTED_BY_API`,
+  never a hardware verdict.
 - AMDGCN kernels share the scalar semantics exactly by construction (thin
   wrappers over the same no_std core); the scalar == ROCm *proof* is the
   Phase-J differential battery, not this phase's word count.
+- Receipts bind the binary to its source: compiled-from (build.rs) must
+  equal executed-in-worktree for a seal; artifact sidecars bind the GPU
+  artifact back to the tree/toolchain that built it.
 
 ## Exit criteria (Phase I complete only when ALL hold)
 
 1. `docs/PHASE_I.md` exists; the entry-freeze toolchain facts above are
    measured, not assumed.
 2. `device/amdgcn_entry.rs` implements the three kernels as pure wrappers
-   over shared semantics (no duplicated math, no per-backend forks).
-3. `scripts/build-rocm-device.sh` emits a real AMDGPU code object with
-   provenance sidecar + sha file on the pinned nightly from a clean tree
-   (`git_dirty: false`), and is byte-deterministic for the recorded inputs.
-4. `backend/rocm` probe + classifier compile under `--all-features`,
-   classify the four probe states correctly (unit-tested), and report
-   typed causes on this host.
-5. `court rocm` writes an honest receipt on this host
-   (`UNSUPPORTED_BY_HARDWARE` with cause) and never a manufactured result;
-   `probe rocm` reports the same classification.
+   over shared semantics (no duplicated math, no per-backend forks),
+   guarded by the host-tested `device::geom` launch contract (zero geometry
+   rejected; pathological cases in the unit battery).
+3. `scripts/build-rocm-device.sh` emits a real AMDGPU code object from a
+   fresh isolated per-toolchain/per-gfx target dir on the pinned nightly
+   from a clean tree (`git_dirty: false`), with exactly-one
+   core/compiler_builtins enforcement, and `--verify-deterministic` proves
+   byte-equality of two isolated builds (recorded in
+   `vole_audio.amdgcn.determinism.json`).
+4. `backend/rocm` loader/probe/elf modules compile under `--all-features`;
+   the probe walks the runtime chain with the corrected taxonomy
+   (unit-tested: no-GPU / not-amdgpu-bound / no-KFD → hardware; KFD
+   inaccessible → inconclusive; HIP/HSA not loadable → API; full chain →
+   inconclusive-pending-execution; rocm-smi alone is not a compute
+   runtime).
+5. `court rocm` fails closed: unsatisfied compile surface → `INCONCLUSIVE`;
+   satisfied surface + hardware absence → typed runtime verdict; never a
+   manufactured result. `probe rocm` reports the same classification.
 6. All pre-existing A–H / H.2 courts remain SUPPORTED with frozen hashes
-   unchanged; the full battery + `court rocm` re-seal clean-tree receipts.
+   unchanged; the full battery + `court rocm` re-seal clean-tree receipts
+   with compiled-from == executed-in-worktree.
 7. Host tests green (all-features), clippy `-D warnings` clean, fmt clean;
-   MSRV 1.89.0 green (the additions use no post-1.89 language features).
+   MSRV 1.89.0 green.
 8. Docs (`PROJECT_STATE`, `ARCHITECTURE`, `README`, `NON_CLAIMS`,
    `SEMANTIC_FACTS`, usage text) describe the phase without overclaiming.
 
@@ -142,4 +181,5 @@ Seal run (release, `--all-features`, clean tree `c887850`, `git_dirty: false`):
 ## Execution record (implementation summary)
 
 - Entry freeze captured above; artifact baseline
-  `scripts/out/vole_audio.amdgcn.elf` sha256 `e2ae95d0…` (gfx906).
+  `scripts/out/vole_audio.amdgcn.elf` sha256 `5092e129…` (gfx906,
+  byte-deterministic across isolated builds).
