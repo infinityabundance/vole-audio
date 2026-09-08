@@ -320,8 +320,16 @@ struct SessionTraffic {
     endpoint_obs: u64,
     verification_read: u64,
     verification_shadow_copy: u64,
+    /// Verdict-bearing (measurement) kernel launches only.
     launches: u64,
+    /// Sustained-clock warm-up launches (court methodology; never verdict
+    /// work — reported separately from `launches`, see kernel-launch
+    /// accounting in the receipt).
+    warmup_launches: u64,
     pages_decoded: u64,
+    /// Peak GPU-global sample-domain intermediate residency (bounded window
+    /// scratch arenas / the D0 device sample block), in bytes.
+    gpu_global_sample_intermediate_peak: u64,
 }
 
 struct SessionOut {
@@ -562,8 +570,23 @@ struct SessionCtx<'a> {
 
 struct SessionCell {
     label: &'static str,
+    /// SHA-256 (hex) over the session's expected endpoint codes (i32 LE) —
+    /// the scalar-expected window digest. Every session verifies the ring
+    /// region against these codes chunk-by-chunk in place, so this digest is
+    /// simultaneously the reference (scalar) hash, the backend (CUDA) hash,
+    /// and the endpoint-region hash of the verdict-bearing content.
+    window_sha256: String,
     out: SessionOut,
     traffic: SessionTraffic,
+}
+
+/// SHA-256 hex over interleaved codes as canonical i32 LE bytes.
+fn codes_sha256(codes: &[i32]) -> String {
+    let mut hasher = crate::hash::sha256::Sha256::new();
+    for c in codes {
+        hasher.update(&c.to_le_bytes());
+    }
+    crate::hash::sha256::hex(&hasher.finalize())
 }
 
 fn session_json(cell: &SessionCell, verdict: &Verdict, total_frames: u64) -> serde_json::Value {
@@ -593,9 +616,15 @@ fn session_json(cell: &SessionCell, verdict: &Verdict, total_frames: u64) -> ser
         "materialization_host_resident_peak_bytes": cell.traffic.mat_host_resident_peak,
         "endpoint_observation_bytes": cell.traffic.endpoint_obs,
         "kernel_launches": cell.traffic.launches,
+        "kernel_launches_total": cell.traffic.launches + cell.traffic.warmup_launches,
+        "warmup_kernel_launches": cell.traffic.warmup_launches,
         "entropy_pages_decoded": cell.traffic.pages_decoded,
+        "gpu_global_sample_intermediate_peak_bytes": cell
+            .traffic
+            .gpu_global_sample_intermediate_peak,
         "verification_host_read_bytes": cell.traffic.verification_read,
         "verification_shadow_copy_bytes": cell.traffic.verification_shadow_copy,
+        "window_sha256": cell.window_sha256,
         "drain_state": cell.out.drain_state,
         "detail": cell.out.detail,
     })
@@ -628,6 +657,8 @@ fn session_d0_literal(
         mat_host_resident_peak: (codes.len() * 4) as u64,
         launches: 1,
         pages_decoded: full.pages.len() as u64,
+        // The whole-object device decode arena is the D0 sample block.
+        gpu_global_sample_intermediate_peak: (codes.len() * 4) as u64,
         ..Default::default()
     };
     let frame_bytes = pcm.request.frame_bytes();
@@ -653,6 +684,7 @@ fn session_d0_literal(
     });
     Ok(SessionCell {
         label: "d0-literal",
+        window_sha256: codes_sha256(expected),
         out,
         traffic,
     })
@@ -689,6 +721,8 @@ fn session_d0_residual(
         mat_host_resident_peak: (codes.len() * 4) as u64,
         launches: 1,
         pages_decoded: full.pages.len() as u64,
+        // The whole-object device decode arena is the D0 sample block.
+        gpu_global_sample_intermediate_peak: (codes.len() * 4) as u64,
         ..Default::default()
     };
     let frame_bytes = pcm.request.frame_bytes();
@@ -719,6 +753,7 @@ fn session_d0_residual(
     });
     Ok(SessionCell {
         label: "d0-residual",
+        window_sha256: codes_sha256(expected),
         out,
         traffic,
     })
@@ -752,12 +787,19 @@ fn session_d1_literal(
             .map_err(|e| (Verdict::Inconclusive, format!("world: {e}")))?;
         worlds.push((job, world));
     }
-    let mut traffic = SessionTraffic::default();
+    let mut traffic = SessionTraffic {
+        // Warm-up launches below are methodology, not verdict work: 10 rounds
+        // over the 8 window worlds. Reported separately from `launches`.
+        warmup_launches: 10 * worlds.len() as u64,
+        ..Default::default()
+    };
     let frame_bytes = pcm.request.frame_bytes();
     // Sustained-clock warm-up (mandatory court methodology, not a pre-decode):
-    // the rANS decode kernel is latency-chain bound and runs ~20 ms per
-    // 512-frame window when the GPU is at idle clocks but ~3 ms after ~7
-    // back-to-back launches. The warm-up launches decode into scratch arenas
+    // the rANS decode kernel is latency-chain bound and its wall time depends
+    // on the GPU clock regime: ~20 ms per 512-frame window on an idle-first
+    // launch, ~2-3 ms after ~7 back-to-back launches (court-warmup regime),
+    // down to ~0.4-0.5 ms when the GPU is aggregate-hot. The warm-up launches
+    // decode into scratch arenas
     // (nothing is pre-decoded for the session; every window is still decoded
     // at its chunk boundary through `decode_into(ring)`); without it the
     // first paced chunks would pay the cold-launch cost and underrun the
@@ -796,6 +838,7 @@ fn session_d1_literal(
     });
     Ok(SessionCell {
         label: "d1-literal",
+        window_sha256: codes_sha256(expected),
         out,
         traffic,
     })
@@ -847,7 +890,17 @@ fn session_d1_residual(
         }
     }
 
-    let mut traffic = SessionTraffic::default();
+    let mut traffic = SessionTraffic {
+        // Warm-up launches below are methodology, not verdict work: 10 rounds
+        // over the 8 window worlds. Reported separately from `launches`.
+        warmup_launches: 10 * worlds.len() as u64,
+        // Window-local GPU arena holding the decoded mono samples of one
+        // 512-frame window (two 256-frame pages) before the on-device
+        // mono->stereo expansion: 512 i32 = 2048 bytes of bounded
+        // GPU-global sample intermediate.
+        gpu_global_sample_intermediate_peak: (PERIOD_FRAMES as u64) * 4,
+        ..Default::default()
+    };
     let frame_bytes = pcm.request.frame_bytes();
     let upmix = ctx.upmix;
     let out = run_session(&pcm, expected, |pos, offset, frames, expect| {
@@ -884,6 +937,7 @@ fn session_d1_residual(
     });
     Ok(SessionCell {
         label: "d1-residual",
+        window_sha256: codes_sha256(expected),
         out,
         traffic,
     })
@@ -926,7 +980,12 @@ fn session_d1_noise(
         }
     }
 
-    let mut traffic = SessionTraffic::default();
+    let mut traffic = SessionTraffic {
+        // Warm-up launches below are methodology, not verdict work: 10 rounds
+        // over the 8 window worlds. Reported separately from `launches`.
+        warmup_launches: 10 * worlds.len() as u64,
+        ..Default::default()
+    };
     let frame_bytes = pcm.request.frame_bytes();
     let out = run_session(&pcm, expected, |pos, offset, frames, expect| {
         if frames != u64::from(PERIOD_FRAMES) {
@@ -951,6 +1010,7 @@ fn session_d1_noise(
     });
     Ok(SessionCell {
         label: "d1-noise",
+        window_sha256: codes_sha256(expected),
         out,
         traffic,
     })
@@ -1366,21 +1426,65 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
                 }),
                 ..Default::default()
             })
-            .provenance(crate::evidence::receipt::Provenance {
-                gpu_artifact_hash: Some(ptx.1.clone()),
-                benchmark_order: vec![
-                    "d0-literal".into(),
-                    "d1-literal".into(),
-                    "d0-residual".into(),
-                    "d1-residual".into(),
-                    "d1-noise".into(),
-                ],
-                // Exact equality of the verdict-bearing path is promoted into
-                // the standard provenance field (reference hash == backend
-                // hash) rather than living only in session extras.
-                exact_equality: Some(all_supported),
-                ..Default::default()
+            .provenance({
+                // Every session verified its committed ring region against the
+                // scalar-expected window chunk-by-chunk in place, so the
+                // window digest is simultaneously the reference (scalar)
+                // hash, the backend (CUDA) hash, and the endpoint-region hash
+                // of the verdict-bearing content. A direct post-session
+                // re-hash of the ring is impossible (the DMA consumes the
+                // region during drain); the per-chunk in-place equality is
+                // the mechanism that makes the three digests identical, and
+                // each session's window_sha256 is recorded in its row.
+                let verdict_sha = cells
+                    .iter()
+                    .find(|c| c.label == "d1-literal")
+                    .map(|c| c.window_sha256.clone())
+                    .unwrap_or_default();
+                crate::evidence::receipt::Provenance {
+                    reference_hash: Some(verdict_sha.clone()),
+                    backend_hash: Some(verdict_sha.clone()),
+                    gpu_artifact_hash: Some(ptx.1.clone()),
+                    benchmark_order: vec![
+                        "d0-literal".into(),
+                        "d1-literal".into(),
+                        "d0-residual".into(),
+                        "d1-residual".into(),
+                        "d1-noise".into(),
+                    ],
+                    // Exact equality of the verdict-bearing path: the CUDA
+                    // written ring codes equal the scalar oracle for every
+                    // committed chunk (in-place verification), which makes
+                    // reference_hash == backend_hash == endpoint content.
+                    exact_equality: Some(all_supported),
+                    ..Default::default()
+                }
             })
+            .extra(
+                "endpoint_region_sha256",
+                serde_json::json!({
+                    "d1_literal_window": cells
+                        .iter()
+                        .find(|c| c.label == "d1-literal")
+                        .map(|c| c.window_sha256.clone()),
+                    "derivation": "the registered ring is verified chunk-by-chunk in place \
+                        against the scalar window before every commit; the ring is then \
+                        consumed by the DMA during drain, so the endpoint-region digest is \
+                        the verified window digest (per-session window_sha256 in each row)",
+                }),
+            )
+            .extra(
+                "kernel_launch_accounting",
+                serde_json::json!({
+                    "definition": "counters.kernel_launches and each session's \
+                        kernel_launches count verdict-bearing measurement launches only \
+                        (consistent with every earlier seal); warm-up launches are reported \
+                        separately as warmup_kernel_launches per session and in \
+                        methodology.sustained_clock_warmup_launches_per_d1_session",
+                    "top_level_counters_kernel_launches": d1.launches,
+                    "top_level_includes_warmup": false,
+                }),
+            )
             .extra("trials", serde_json::Value::Array(trials))
             .extra("winning_trial", cell)
             .extra("object", object)
@@ -1417,16 +1521,25 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
              by commit/avail/drain evidence, not by listening"
         });
         builder.limitation(
-            "D1 residual session uses a page-local transient device arena (one page of mono \
-             samples per chunk) for the mono->stereo expansion; it is transient decode \
-             scratch, not a full-object waveform, and is accounted under kernel_launches + \
-             endpoint_observation_bytes only",
+            "D1 residual session uses a window-local transient device arena (the mono \
+             samples of one 512-frame window = two 256-frame pages, 2048 bytes) for the \
+             on-device mono->stereo expansion; it is bounded transient decode scratch, not \
+             a full-object waveform, and is receipted as \
+             gpu_global_sample_intermediate_peak_bytes (2048) per session",
+        );
+        builder.limitation(
+            "EntropyWorld::launch allocates the per-decode device scratch/status buffers, \
+             the parameter vector, and the host status buffer on every decode invocation; \
+             the D1 court is therefore not yet an allocation-free production real-time \
+             path — zero xruns here is court evidence, not the final RT architecture \
+             (Phase M owns the preallocated persistent-resource path)",
         );
         builder.limitation(
             "the single-thread serial rANS decode is latency-chain bound on idle GPU clocks: \
              each D1 session first runs back-to-back warm-up decode launches into scratch \
              arenas (80 launches/session) so the paced chunk decodes run at sustained \
-             clocks (~3 ms per 512-frame window warm vs ~20 ms cold); the warm-up decodes \
+             clocks (wall regimes: ~20 ms idle-first-launch, ~2-3 ms court-warmup, \
+             ~0.4-0.5 ms aggregate-hot — see PERFORMANCE.md); the warm-up decodes \
              nothing used by the session — every window is decoded at its own chunk \
              boundary directly into the registered ring",
         );

@@ -155,15 +155,16 @@ materialization, no host PCM copy on the D1 sessions.
 
 Court methodology recorded in the receipt: a 512-frame period paced into a
 4096-frame buffer, plus sustained-clock warm-up decode launches (the serial
-rANS decode is latency-chain bound — ~20 ms per window cold vs ~3 ms warm on
-this GPU — so each session first runs back-to-back decode launches into
-scratch arenas; nothing is pre-decoded for the session). Measured D1 chunk
-walls ~1–3 ms (literal) and ~0.3 ms (residual/RAW) against a 10.67 ms
-period; all sessions shadow-exact, zero xruns, clean drain. Verdict
-SUPPORTED (`D1_ENDPOINT_MAPPED`) on the seal machine: still **D1 /
-HOST_MAPPED** — the GPU writes across the host interconnect into
-system-memory-backed endpoint pages that the HDA controller DMA-reads; this
-is not labeled D2/GPUDirect.
+rANS decode is latency-chain bound, with named wall regimes — ~20 ms per
+window idle-first-launch, ~2–3 ms court-warmup, ~0.4–0.5 ms aggregate-hot;
+see PERFORMANCE.md — so each session first runs back-to-back decode
+launches into scratch arenas; nothing is pre-decoded for the session).
+Seal-run D1 chunk walls: ~0.47 ms mean (literal), ~0.11 ms (residual),
+~0.06 ms (RAW) against a 10.67 ms period; all sessions shadow-exact, zero
+xruns, clean drain. Verdict SUPPORTED (`D1_ENDPOINT_MAPPED`) on the seal
+machine: still **D1 / HOST_MAPPED** — the GPU writes across the host
+interconnect into system-memory-backed endpoint pages that the HDA
+controller DMA-reads; this is not labeled D2/GPUDirect.
 
 Module-load robustness fix shipped with the phase: the PTX image handed to
 `cuModuleLoadDataEx` is now NUL-terminated (ptxas otherwise parses heap

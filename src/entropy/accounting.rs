@@ -11,8 +11,8 @@ use serde::{Deserialize, Serialize};
 /// Complete byte cost of one representation candidate.
 ///
 /// `complete_bytes == metadata + hypothesis + model + payload + index +
-/// dependency + integrity` (see `CompleteCost::compute`). The three reporting
-/// baselines (`raw_sample_bytes`, `canonical_literal_bytes`,
+/// checkpoint + dependency + integrity` (see `CompleteCost::compute`). The
+/// three reporting baselines (`raw_sample_bytes`, `canonical_literal_bytes`,
 /// `source_wav_bytes`) are never part of the sum — they are comparison
 /// baselines.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -30,11 +30,17 @@ pub struct CompleteCost {
     pub payload_bytes: u64,
     /// Page-index bytes.
     pub index_bytes: u64,
+    /// Checkpoint bytes (explicit seek/resume state records; 0 when a
+    /// representation carries none). Named by the normative accounting doc
+    /// (H.2.11) even though no H.2 representation emits checkpoints yet —
+    /// Phase K/N candidates will, and the frozen cost API must not need
+    /// semantic surgery then.
+    pub checkpoint_bytes: u64,
     /// Dependency bytes (referenced content id prefixes etc.).
     pub dependency_bytes: u64,
     /// Integrity digest bytes (32 per protected record; 0 when disabled).
     pub integrity_bytes: u64,
-    /// Computed sum of the seven fields above.
+    /// Computed sum of the eight fields above.
     pub complete_bytes: u64,
     // --- comparison baselines (never part of the sum) ---
     /// Canonical i32 LE sample codes, `frames * channels * 4`.
@@ -54,6 +60,7 @@ impl CompleteCost {
             .saturating_add(self.model_bytes)
             .saturating_add(self.payload_bytes)
             .saturating_add(self.index_bytes)
+            .saturating_add(self.checkpoint_bytes)
             .saturating_add(self.dependency_bytes)
             .saturating_add(self.integrity_bytes);
     }
@@ -67,8 +74,12 @@ pub struct StorageBytes {
     pub declared_bytes: u64,
     /// Content-unique canonical payload bytes across the store.
     pub unique_bytes: u64,
-    /// Actual backing bytes of the store engine (incl. its metadata).
-    pub physical_bytes: u64,
+    /// Actual backing bytes of the store engine (incl. its metadata), when
+    /// the engine can measure them. `None` = physical measurement
+    /// unavailable (e.g. engine metrics failed) — it is never substituted
+    /// with logical `unique_bytes`, which would understate real backing
+    /// storage.
+    pub physical_bytes: Option<u64>,
 }
 
 /// Standalone vs marginal cost of a shared dependency (H.2.8).
@@ -132,6 +143,7 @@ mod tests {
             model_bytes: 512,
             payload_bytes: 100,
             index_bytes: 24,
+            checkpoint_bytes: 16,
             dependency_bytes: 0,
             integrity_bytes: 0,
             complete_bytes: 0,
@@ -140,7 +152,7 @@ mod tests {
             source_wav_bytes: 0,
         };
         c.compute();
-        assert_eq!(c.complete_bytes, 40 + 8 + 512 + 100 + 24);
+        assert_eq!(c.complete_bytes, 40 + 8 + 512 + 100 + 24 + 16);
         assert_eq!(c.raw_sample_bytes, 8192);
     }
 

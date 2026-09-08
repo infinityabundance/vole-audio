@@ -111,7 +111,8 @@ scripts/              device build + court drivers (repo only)
 Phases A–H.2 are complete: A–E the exact representation model on the scalar
 oracle, F the honest SIMD baseline (scalar == AVX2 == AVX-512), G the CUDA D0
 buffered-diagnostic backend (scalar == SIMD == CUDA bit-for-bit; semantic
-facts F01–F15 verified on the device), H the CUDA D1 falsification court
+facts F01–F14 verified on the device; F15 is authority-level and
+surface-independent), H the CUDA D1 falsification court
 against the real ALSA `hw:` mmap endpoint (the first direct-endpoint
 evidence), and H.2 the entropy-native core — a deterministic native rANS
 codec with canonical models, block-addressable pages and mandatory RAW
@@ -129,7 +130,8 @@ evidence today:
   fixture-level timing;
 - `cargo run -- court facts` — independent semantic facts (F01–F15):
   first-principles oracles for every representation/transform, verified on
-  every host surface (see
+  every host surface (F01–F14 additionally device-verified in `court cuda`;
+  F15 is authority-level and surface-independent — see
   [SEMANTIC_FACTS.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/SEMANTIC_FACTS.md));
 - `cargo run -- court cuda` — Phase G CUDA D0: `scalar == CUDA` bit-exact on
   the frozen fixture worlds across standard / high-priority / captured-graph

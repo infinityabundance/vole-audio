@@ -134,16 +134,24 @@ oracle, zero xruns.
 + one DtoH happened before the paced session and is counted in the traffic
 columns). D1 removes literal 32 768 B GPU->host + 32 768 B host copies and
 residual 16 384 B + 32 768 B; verification reads (32 768 B/session) are a
-separate named surface. (These rows are from the seal run where the GPU was
-already at sustained clocks from the aggregate; a standalone cold run shows
-~2–3 ms/chunk literal decode — see the receipt methodology note.)
+separate named surface. (These rows are the aggregate-hot regime of the
+seal runs; the standalone court-warmup regime shows ~2–3 ms/chunk literal
+decode — see the named-regime note below and the receipt methodology.)
 
-Read honestly: the D1 rANS decode (under 0.5 ms/512-frame window once the
-GPU is at sustained clocks) leaves ample margin against the 10.67 ms period,
-but the serial single-thread-per-page decode is latency-chain bound — ~20
-ms/window cold — which is why the court records its sustained-clock warm-up
-methodology and why decode-side speedup is explicitly not claimed. D1 here
-is a directness/traffic result (as in Phase H), not a latency optimization.
+Read honestly: the D1 rANS decode leaves ample margin against the 10.67 ms
+period, but the serial single-thread-per-page decode is latency-chain bound
+and its wall time depends on the GPU clock regime. Named regimes (each bound
+to a receipt, never a freehand figure):
+- `idle-first-launch`: ~20 ms per 512-frame window (dev measurements during
+  court bring-up; a cold single launch on an idle GPU);
+- `court-warmup`: ~2-3 ms per window (standalone court runs after the
+  receipted 80-launch sustained-clock warm-up);
+- `aggregate-hot`: ~0.4-0.5 ms per window (seal-1/2 runs where the h2
+  aggregate had already warmed the GPU).
+That spread is clock state, not measurement error; the court receipts record
+the per-run methodology. Decode-side speedup is explicitly not claimed, and
+D1 here is a directness/traffic result (as in Phase H), not a latency
+optimization.
 
 ### GPU entropy decode vs host (court entropy-cuda, whole-object jobs)
 

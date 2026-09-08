@@ -643,7 +643,7 @@ it now embodies
 ```
 deterministic explanation
 + entropy/configuration state
-+ entropy-coded irreducible residual
++ entropy-coded residual not reproduced by the chosen deterministic explanation
  -> bounded observation
    -> endpoint sample codes
 ```
@@ -722,14 +722,16 @@ expansion included); D1-residual: 0 B / 0 B (device-side expansion via
 - Verification reads the committed ring in place (32 768 B/session,
 separately accounted; never conflated with materialization).
 - All sessions shadow-exact vs the scalar oracle, zero xruns, clean drain;
-the measured D1 chunk walls (~1–3 ms literal, ~0.3 ms residual/RAW) leave
-clear deadline margin against the 10.67 ms period. Methodology recorded in
-the receipt: 512-frame period into a 4096-frame buffer, sustained-clock
-warm-up launches (the serial rANS decode is latency-chain bound: ~20
-ms/window cold vs ~3 ms warm on this GPU), and the PTX module-load fix
-(NUL-terminated image; the driver's ptxas otherwise parses heap garbage
-past an unterminated buffer — the cause of intermittent rc-218 JIT
-failures that reproduced only in-process).
+the measured D1 chunk walls (seal runs: ~0.47 ms mean literal, ~0.11 ms
+residual, ~0.06 ms RAW) leave clear deadline margin against the 10.67 ms
+period. Methodology recorded in the receipt: 512-frame period into a
+4096-frame buffer, sustained-clock warm-up launches (the serial rANS
+decode is latency-chain bound; named wall regimes — ~20 ms/window
+idle-first-launch, ~2–3 ms court-warmup, ~0.4–0.5 ms aggregate-hot — see
+PERFORMANCE.md), and the PTX module-load fix (NUL-terminated image; the
+driver's ptxas otherwise parses heap garbage past an unterminated buffer —
+the cause of intermittent rc-218 JIT failures that reproduced only
+in-process).
 
 Robustness fix in the CUDA driver layer: `cuModuleLoadDataEx` input is now
 NUL-terminated, eliminating process-state-dependent PTX JIT failures; the

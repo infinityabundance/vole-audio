@@ -177,12 +177,11 @@ impl StoreBackend for EntropyFsStore {
 
     fn accounting(&self) -> StorageBytes {
         // Physical bytes: the engine's own actual backing store (segment-file
-        // lengths incl. engine metadata/framing). Collected lazily; a metrics
-        // failure degrades to unique bytes rather than inventing a number.
-        let physical = self
-            .engine_accounting()
-            .map(|a| a.physical_used_bytes)
-            .unwrap_or(self.unique_bytes);
+        // lengths incl. engine metadata/framing). Collected lazily. A metrics
+        // failure reports `None` (physical measurement unavailable) — it is
+        // never substituted with logical unique bytes, which would understate
+        // real backing storage.
+        let physical = self.engine_accounting().ok().map(|a| a.physical_used_bytes);
         StorageBytes {
             declared_bytes: self.declared_bytes,
             unique_bytes: self.unique_bytes,
@@ -234,7 +233,7 @@ mod tests {
         let acc = s.accounting();
         assert_eq!(acc.declared_bytes, (payload.len() * 2 + other.len()) as u64);
         assert_eq!(acc.unique_bytes, (payload.len() + other.len()) as u64);
-        assert!(acc.physical_bytes >= acc.unique_bytes);
+        assert!(acc.physical_bytes.is_some() && acc.physical_bytes.unwrap() >= acc.unique_bytes);
         s.close().unwrap();
         cleanup(&dir);
     }

@@ -123,7 +123,7 @@ impl StoreBackend for EmbeddedStore {
         StorageBytes {
             declared_bytes: self.declared_bytes,
             unique_bytes: unique,
-            physical_bytes: unique,
+            physical_bytes: Some(unique),
         }
     }
 }
@@ -149,7 +149,7 @@ mod tests {
             acc.declared_bytes,
             (a_payload.len() * 2 + b_payload.len()) as u64
         );
-        assert_eq!(acc.physical_bytes, acc.unique_bytes);
+        assert_eq!(acc.physical_bytes, Some(acc.unique_bytes));
         assert_eq!(s.get(&a, 1024).unwrap().as_deref(), Some(a_payload));
         assert!(s.get(&a, 4).is_err(), "bounded retrieval enforced");
         assert!(s.contains(&b));
@@ -162,7 +162,7 @@ mod tests {
         let _id = s.put(b"payload").unwrap();
         let acc = s.accounting();
         assert_eq!(acc.declared_bytes, 7);
-        assert_eq!(acc.physical_bytes, 7);
+        assert_eq!(acc.physical_bytes, Some(7));
         // Tamper the map directly (simulating corruption); retrieval fails.
         let corrupted = StoreId([0u8; 32]);
         s.objects.insert(corrupted, b"tampered!".to_vec());

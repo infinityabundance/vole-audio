@@ -63,8 +63,10 @@ assertion.
     reports declared, unique, and physical bytes separately; shared
     dependencies are never reported as zero (ENTROPY_ACCOUNTING.md).
 20. **GPU entropy decode is faster than CPU.** Not claimed without a court:
-    the single-thread serial rANS decode is latency-chain bound (measured
-    ~20 ms/window cold vs ~3 ms warm on the seal GPU); the courts report
+    the single-thread serial rANS decode is latency-chain bound (named wall
+    regimes on the seal GPU: ~20 ms/window idle-first-launch, ~2–3 ms
+    court-warmup, ~0.4–0.5 ms aggregate-hot — see PERFORMANCE.md); the
+    courts report
     whichever surface wins (page counts, clocks, workload) and the D1 court
     records that its value is directness/traffic, not latency.
 21. **D1 entropy results are a universal zero-copy claim.** No: the H.2 D1

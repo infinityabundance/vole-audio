@@ -20,7 +20,7 @@ Its deeper architecture is
 ```
 deterministic explanation
   + entropy/configuration state
-  + entropy-coded irreducible residual
+  + entropy-coded residual not reproduced by the chosen deterministic explanation
     -> bounded observation
       -> endpoint sample codes
 ```

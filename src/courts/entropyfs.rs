@@ -231,7 +231,10 @@ pub fn run(receipts_root: &Path) -> crate::error::Result<Verdict> {
             "exact_shared_model": true,
             "declared_grew": declared_grew,
             "unique_grew_once": unique_grew,
-            "physical_grew_once": after.physical_bytes - before.physical_bytes == unique_grew,
+            "physical_grew_once": match (before.physical_bytes, after.physical_bytes) {
+                (Some(b), Some(a)) => serde_json::Value::Bool(a - b == unique_grew),
+                _ => serde_json::Value::Null,
+            },
             "declared_bytes_after": after.declared_bytes,
             "unique_bytes_after": after.unique_bytes,
             "physical_bytes_after": after.physical_bytes,
