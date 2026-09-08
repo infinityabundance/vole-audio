@@ -255,11 +255,14 @@ Applied right after the phase commit, before Phase G:
   omitted when absent, so archived receipts still self-verify
   byte-identically. Seal receipts are produced on a clean committed tree
   (commit SHA + tree hash + `git_dirty: false`).
-- **MSRV**: `rust-version = "1.89"` in Cargo.toml, verified by running the
-  full suite (175 tests, incl. the AVX-512 kernels that need
+- **MSRV**: `rust-version = "1.89"` in Cargo.toml, verified at that seal by
+  running the full suite (175 tests then, incl. the AVX-512 kernels that need
   `stdarch_x86_avx512`, stabilized in 1.89) on 1.89.0 and on stable 1.98.0.
   Host builds are stable-only; the pinned nightly is used for device/GPU
-  artifact cross-compilation only (README documents the split).
+  artifact cross-compilation only (README documents the split). Suite size
+  grows with each phase — the current verified count is recorded in each
+  phase seal ledger (`docs/PHASE_H2.md` seal 3: 287 total all-features,
+  debug and release, on the pinned nightly and on MSRV 1.89.0).
 - **Resampler wording corrected**: the frozen 64×1024 Q15 table's response is
   now measured and reported separately from the continuous pre-quantization
   prototype. The rows are critically sampled (cutoff == source Nyquist), so
