@@ -16,5 +16,7 @@ pub mod flatten;
 pub mod cuda;
 #[cfg(feature = "std")]
 pub mod entropy_flat;
+#[cfg(feature = "std")]
+pub mod rocm;
 
 pub use flatten::{FlattenedWorld, flatten};

@@ -43,6 +43,8 @@ pub mod facts;
 #[cfg(feature = "std")]
 pub mod h2;
 #[cfg(feature = "std")]
+pub mod rocm;
+#[cfg(feature = "std")]
 pub mod semantic;
 #[cfg(feature = "std")]
 pub mod simd;
@@ -134,6 +136,12 @@ INCONCLUSIVE + limitation without it)",
         "aggregate Phase H.2 seal: runs every H.2 court in sequence; SUPPORTED only when \
 all sub-courts are SUPPORTED (--all-features on supported hardware)",
     ),
+    (
+        "rocm",
+        "Phase I ROCm evidence: AMD/ROCm presence probe + amdgcn code-object artifact state; \
+no kernel is executed (hardware-unavailable evidence; the differential device battery is \
+Phase J on ROCm hardware)",
+    ),
 ];
 
 /// Run `court <name>`; unknown courts are usage errors.
@@ -156,6 +164,7 @@ pub fn run(name: &str, receipts_root: &Path) -> crate::error::Result<Verdict> {
         "entropyfs" => entropyfs::run(receipts_root),
         "dsfb-entropy" => dsfb_entropy::run(receipts_root),
         "h2" => h2::run(receipts_root),
+        "rocm" => rocm::run(receipts_root),
         other => Err(crate::error::Error::malformed(format!(
             "unknown court '{other}' (available: {})",
             COURT_NAMES

@@ -18,9 +18,10 @@ USAGE:
 COMMANDS (current build):
     probe                 Capture environment + hardware evidence summary
     court <name>          Run an executable court (semantic, authored, simd, facts,
-                          cuda, d1, entropy-rans, entropy-literal, entropy-residual,
-                          entropy-pages, entropy-partial, entropy-simd, entropy-cuda,
-                          entropy-d1, entropyfs, dsfb-entropy, h2)
+                          cuda, d1, rocm, entropy-rans, entropy-literal,
+                          entropy-residual, entropy-pages, entropy-partial,
+                          entropy-simd, entropy-cuda, entropy-d1, entropyfs,
+                          dsfb-entropy, h2)
                           [--receipts DIR]; court d1 accepts --emit-audio (court
                           entropy-d1 honors VOLE_ENTROPY_D1_EMIT_AUDIO=1)
     receipt show <file>   Verify and print an evidence receipt
@@ -82,6 +83,61 @@ fn run(args: &[String]) -> Result<u8> {
 }
 
 fn cmd_probe(args: &[String]) -> Result<u8> {
+    // `probe rocm`: ROCm/AMD presence evidence (Phase I). Other probe
+    // targets (cuda/alsa/d1/d2) arrive with their phases.
+    if args.first().map(String::as_str) == Some("rocm") {
+        let json = args.iter().any(|a| a == "--json");
+        let p = vole_audio::backend::rocm::probe::RocmProbe::capture()?;
+        let (v, detail) = p.classify();
+        if json {
+            let doc = serde_json::json!({
+                "schema": "vole.audio.evidence.v1",
+                "kind": "probe-rocm",
+                "verdict": v.label(),
+                "detail": detail,
+                "amd_gpus": p.amd_gpus.iter().map(|g| serde_json::json!({
+                    "bdf": g.bdf, "vendor": g.vendor, "device": g.device, "driver": g.driver,
+                })).collect::<Vec<_>>(),
+                "kfd_class_present": p.kfd_class_present,
+                "kfd_dev_present": p.kfd_dev_present,
+                "libs": p.libs.iter().map(|(n, f)| serde_json::json!({ "soname": n, "found": f })).collect::<Vec<_>>(),
+            });
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&doc)
+                    .map_err(|e| Error::new(Kind::Io, e.to_string()))?
+            );
+        } else {
+            println!("vole-audio probe rocm (Phase I evidence)");
+            println!("------------------------------------------------");
+            println!("verdict:        {}", v.label());
+            println!("detail:         {detail}");
+            for g in &p.amd_gpus {
+                println!(
+                    "amd gpu pci:    {} vendor={} device={} driver={}",
+                    g.bdf,
+                    g.vendor.clone().unwrap_or_default(),
+                    g.device.clone().unwrap_or_default(),
+                    g.driver.clone().unwrap_or_default(),
+                );
+            }
+            if p.amd_gpus.is_empty() {
+                println!("amd gpu pci:    (none found in sysfs)");
+            }
+            println!(
+                "kfd:            class={} dev={}",
+                p.kfd_class_present, p.kfd_dev_present
+            );
+            for (n, found) in &p.libs {
+                println!(
+                    "lib:            {n:<24} {}",
+                    if *found { "found" } else { "absent" }
+                );
+            }
+            println!("------------------------------------------------");
+        }
+        return Ok(0);
+    }
     let json = args.iter().any(|a| a == "--json");
     let env = vole_audio::evidence::environment::Environment::capture();
     let hw = vole_audio::evidence::hardware::Hardware::capture();

@@ -37,6 +37,7 @@
 #![cfg_attr(target_arch = "nvptx64", feature(abi_ptx))]
 #![cfg_attr(target_arch = "nvptx64", feature(stdarch_nvptx))]
 #![cfg_attr(target_arch = "amdgpu", feature(abi_gpu_kernel))]
+#![cfg_attr(target_arch = "amdgpu", feature(stdarch_amdgpu))]
 #![cfg_attr(
     any(target_arch = "nvptx64", target_arch = "amdgpu"),
     feature(asm_experimental_arch)
