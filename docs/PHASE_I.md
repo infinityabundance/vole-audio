@@ -84,14 +84,29 @@ rustc 1.99.0-nightly, LLVM 22.1.8):
   `SEMANTIC_FACTS` rocm row note.
 - **I.6 Evidence-binding amendment (review)** — repo-wide: `build.rs`
   stamps **compile-time** source identity into the host binary
-  (compiled-from commit/tree/dirty/rustc/profile; `Environment.source_bound`
-  requires compiled-from == executed-in-worktree, both clean — receipts
-  record both and a seal requires them to match; `court-all.sh` rebuilds
-  unconditionally and refuses a non-bound battery); `evidence::artifact`
-  consumes the PTX/AMDGPU provenance sidecars into the CUDA/entropy court
-  receipts; launch-geometry guards (`device::geom`) with the pathological
-  battery (zero rejected, 1×1, 1×64, non-divisible, blocks>work, page ±1,
-  max geometry).
+  (compiled-from commit/tree/dirty/rustc/profile; reruns on source changes
+  AND git-metadata moves via `git rev-parse --git-path` tracking —
+  `Environment::source_binding` distinguishes `bound` / `unavailable` /
+  `mismatch` / `dirty`, and a seal requires `bound`; `court-all.sh`
+  rebuilds unconditionally and refuses a non-bound battery);
+  `evidence::artifact` consumes the PTX/AMDGPU provenance sidecars into the
+  CUDA/entropy court receipts; launch-geometry guards (`device::geom`) with
+  the pathological battery.
+- **I.7 Evidence-contract closure (review 2)** — (a) the rocm compile-surface
+  predicate now binds the whole chain: artifact sha == sidecar sha == both
+  determinism repro-build shas, determinism `byte_deterministic`, and
+  sidecar/determinism source tree == attested tree — a substituted artifact
+  beside an old same-tree sidecar can no longer satisfy the surface;
+  (b) sidecar naming normalized on `<full artifact filename>.json`
+  (`vole_audio.amdgcn.elf.json`) with the legacy `<stem>.json` accepted as
+  a migration fallback in `evidence::artifact` and `court rocm`;
+  (c) `SourceBinding` enum replaces the boolean: non-git builds are
+  `unavailable`, never "bound"; (d) the ROCm probe freezes the full
+  Phase-J ABI symbol tables (HIP module/launch/memory/host-register set;
+  direct-HSA fallback set), probes unversioned sonames too, opens
+  `/dev/kfd` read-write (the mode Phase J needs), and derives compute
+  candidacy from display OR processing-accelerator class OR amdgpu binding
+  (a headless Instinct-class device is a candidate).
 
 ## Claim boundary (what Phase I does NOT claim)
 

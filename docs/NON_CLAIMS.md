@@ -87,9 +87,19 @@ assertion.
     a compute runtime.
 24. **A receipt can attest a tree its binary was not built from.** No:
     receipts record both compiled-from (build.rs stamp) and
-    executed-in-worktree (runtime capture); a seal requires them to match
-    and both to be clean (`Environment::source_bound`). GPU artifacts are
-    bound back to their source tree through their provenance sidecars.
+    executed-in-worktree (runtime capture); `source_binding` is `bound` only
+    when they match and both are clean (`unavailable`/`mismatch`/`dirty`
+    otherwise — a non-git tarball run reports `unavailable`, never
+    "bound"), and a seal requires `bound`. GPU artifacts are bound back to
+    their source tree through their provenance sidecars (artifact sha ==
+    sidecar sha == both determinism repro shas for `court rocm`).
+25. **A headless AMD accelerator is not a ROCm candidate / probing
+    `hipInit` proves the Phase-J runtime.** No: compute candidacy includes
+    processing-accelerator-class (0x12) and amdgpu-bound devices, not just
+    display class; and the probe resolves the full frozen Phase-J ABI
+    symbol tables (HIP module/launch/memory/host-register and the
+    direct-HSA fallback), not a single init symbol — a runtime that loads
+    but lacks required symbols is `UNSUPPORTED_BY_API`.
 
 Anything in this list that later gains evidence moves into a claims document
 with its receipt. Until then: **not claimed.**
