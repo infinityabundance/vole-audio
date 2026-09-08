@@ -156,9 +156,10 @@ is a directness/traffic result (as in Phase H), not a latency optimization.
 ### CPU page-parallel decode surface (court entropy-simd)
 
 Measured over the frozen corpus + a sparse residual job (16 threads):
-scalar == page-parallel decode byte-exact on every fixture; mean
-page-parallel speedup over the sequential host decoder ~1.99–3.36× across
-runs (fixture- and page-count dependent). Instruction-level AVX2/AVX-512
+scalar == page-parallel decode byte-exact on every fixture; the sealed
+receipt measures a mean page-parallel speedup of 2.08× over the sequential
+host decoder (16 threads; fixture- and page-count dependent — 2-thread runs
+and per-fixture cells are in the receipt). Instruction-level AVX2/AVX-512
 entropy decode is honestly recorded `NOT_IMPLEMENTED` (single-state rANS is
 serial per stream) — no fabricated vectorization (H.2.16).
 

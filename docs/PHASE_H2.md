@@ -191,6 +191,24 @@ Seal run (release, `--all-features`, clean tree):
 - 17 receipts sealed under `receipts/` (16 courts + the h2 aggregate),
   committed separately at `1a4c3a1`.
 
+### Seal 2 — 0.4.1 post-fuzz re-seal (2026-09-08)
+
+Test-only delta since Seal 1: `decoder_mutational_fuzz_never_panics`
+(H.2.47 — a seeded 6000-round mutational fuzz over payload bytes,
+truncations/extensions, and the plain-data page/stream/cycle records of
+literal rANS, RAW-fallback, and procedural-residual flat jobs; decode runs
+under `catch_unwind` and must fail typed, never panic or trap). The
+harness itself was corrected during development (record mutations must
+target the element slice, not the Vec header).
+
+- Implementation commit `7083d404` (version 0.4.1; seal receipts committed
+  separately at `2a94941`).
+- All six A–H courts and all ten H.2 courts re-sealed SUPPORTED on the
+  clean tree (semantic `1791816f…` and authored `f7e103f3…` unchanged).
+- Host tests: 284 (279 passed, 5 ignored) debug + release,
+  `--all-features`, on the pinned nightly; MSRV 1.89.0 also green
+  (278 passed with default features, 279 with all features).
+
 ## Execution record (implementation summary)
 
 All H.2.x work items were executed in sequence. Summary of what exists where:
