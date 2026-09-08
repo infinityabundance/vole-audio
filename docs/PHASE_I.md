@@ -243,6 +243,56 @@ Seal run (release, `--all-features`, clean tree `087da6b`, `git_dirty: false`):
   the same all-features count; clippy `-D warnings` and
   `cargo fmt --check` clean.
 
+### Seal 3 — review-2 evidence-contract closure (2026-09-08)
+
+Delta since Seal 2 (five review-2 items + the portability edge):
+
+1. **Full binding predicate** (`69d13d1`): `court rocm`'s compile surface is
+   satisfied only when the whole chain binds to the actual artifact bytes —
+   artifact sha256 == sidecar sha256 == determinism `build_a` ==
+   `build_b`, determinism `byte_deterministic`, and sidecar + determinism
+   source tree == attested tree. A substituted artifact beside an old
+   same-tree sidecar cannot satisfy the surface.
+2. **Sidecar naming normalized** on `<full artifact filename>.json`
+   (`vole_audio.amdgcn.elf.json`; build script writes it plus a legacy
+   `<stem>.json` copy); `evidence::artifact` and `court rocm` accept the
+   legacy name as a migration fallback (previously the helper's convention
+   and implementation disagreed).
+3. **`SourceBinding` enum** (`bound`/`unavailable`/`mismatch`/`dirty`):
+   non-git tarball runs report `unavailable`, never “bound”; a seal
+   requires `bound`. Every receipt in this seal records `bound`.
+4. **build.rs git-metadata tracking**: HEAD / resolved branch ref /
+   packed-refs (via `git rev-parse --git-path`) are rerun-if-changed
+   targets, so history-only HEAD moves refresh the compiled-from stamp.
+5. **Phase-J ABI tables + probe edges**: the ROCm probe resolves the frozen
+   full HIP surface (module/launch/memory/host-register) and the direct-HSA
+   fallback set per soname; a runtime that loads without its required
+   symbols is `UNSUPPORTED_BY_API`; unversioned sonames are probed too;
+   `/dev/kfd` is opened read-write (the Phase-J mode); compute candidacy
+   includes processing-accelerator-class (0x12) and amdgpu-bound devices,
+   not just display class (headless Instinct devices are candidates).
+
+Seal run (release, `--all-features`, clean tree `a948294`):
+
+- 18 receipts, committed separately at `312b5de`; **every receipt
+  `source_binding: bound`** (compiled-from == executed-in-worktree ==
+  `a948294`, both clean).
+- All pre-existing courts SUPPORTED with frozen hashes unchanged (semantic
+  `1791816f4b93…`, authored `f7e103f3a97d…`).
+- `court rocm`: `UNSUPPORTED_BY_HARDWARE` with the compile surface
+  **fully satisfied and bound** — artifact sha `5092e129…` == sidecar sha
+  == determinism `build_a` == `build_b` (`byte_deterministic: true`),
+  sidecar/determinism source tree == attested tree, entries
+  `vole_render_d0`/`vole_entropy_decode`/`vole_upmix_mono_dup` present;
+  runtime chain: no AMD compute candidate, KFD absent, HIP/HSA rows
+  (versioned + unversioned sonames) with per-symbol detail.
+- PTX artifact unchanged: sha256
+  `8b23325d03700847b056b29df4f4d4afd1a0c67386458512986c52f4fca7896b`.
+- Host tests: 316 total (311 passed, 5 ignored) all-features on the pinned
+  nightly (306 total, 301 passed default-features); MSRV 1.89.0 green with
+  the same all-features count; clippy `-D warnings` and
+  `cargo fmt --check` clean.
+
 ## Execution record (implementation summary)
 
 - Entry freeze captured above; artifact baseline
