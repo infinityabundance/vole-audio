@@ -37,9 +37,9 @@
 //! then). GPU/ALSA absent -> honest receipts.
 
 use crate::audio::alsa::{
-    classify_failure, list_playback_endpoints, AlsaPcm, EndpointInfo, EndpointRequest,
+    AlsaPcm, EndpointInfo, EndpointRequest, classify_failure, list_playback_endpoints,
 };
-use crate::backend::cuda::direct::{attempt_register, HostRegistration, RegistrationAttempt};
+use crate::backend::cuda::direct::{HostRegistration, RegistrationAttempt, attempt_register};
 use crate::backend::cuda::driver::{Cuda, DeviceBuffer, Function};
 use crate::backend::cuda::entropy::EntropyWorld;
 use crate::backend::entropy_flat::{flatten_literal_range, flatten_residual_range};
@@ -140,11 +140,7 @@ fn noise_stereo(audible: bool) -> Vec<i32> {
         .map(|_| {
             lcg(&mut s);
             let full = (s as u32) as i32;
-            if audible {
-                full
-            } else {
-                full >> 11
-            }
+            if audible { full } else { full >> 11 }
         })
         .collect()
 }

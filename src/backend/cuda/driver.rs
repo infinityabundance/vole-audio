@@ -10,16 +10,16 @@
 //! declared last and is also the last field to drop).
 
 use crate::error::{Error, Result};
-use std::ffi::{CString, c_void};
+use std::ffi::{c_void, CString};
 use std::path::Path;
 
 use super::ffi::{
+    cuda_error, CUdeviceptr, CUgraph, CUgraphExec, CUmodule, CUresult, CUstream, Driver, Fns,
     ATTR_CLOCK_RATE, ATTR_CONCURRENT_MANAGED_ACCESS, ATTR_GLOBAL_L1_CACHE_SUPPORTED,
     ATTR_HOST_REGISTER_SUPPORTED, ATTR_KERNEL_EXEC_TIMEOUT, ATTR_MAX_THREADS_PER_BLOCK,
     ATTR_MAX_THREADS_PER_MULTIPROCESSOR, ATTR_MULTIPROCESSOR_COUNT, ATTR_PCI_BUS_ID,
     ATTR_PCI_DEVICE_ID, ATTR_PCI_DOMAIN_ID, ATTR_STREAM_PRIORITIES_SUPPORTED,
-    ATTR_UNIFIED_ADDRESSING, CUdeviceptr, CUgraph, CUgraphExec, CUmodule, CUresult, CUstream,
-    Driver, Fns, cuda_error,
+    ATTR_UNIFIED_ADDRESSING,
 };
 
 // ---------------------------------------------------------------------------
@@ -294,6 +294,16 @@ impl Module {
         // size option CU_JIT_ERROR_LOG_BUFFER_SIZE_BYTES (=6, type
         // unsigned int, in/out). Values frozen from cuda.h (ffi constants +
         // pinned by test).
+        //
+        // PTX text input must be NUL-terminated: cuModuleLoadDataEx treats the
+        // image as a C string and ptxas parses past the buffer end otherwise.
+        // The heap bytes that follow an unterminated Vec<u8> decide whether
+        // the parse happens to succeed or fails with a tail-located ptxas
+        // error ("Unexpected non-ASCII character" / "Parsing error near '['"
+        // at a line near the module end) — process-state dependent and
+        // intermittent. Terminate explicitly so the parse is deterministic.
+        let mut terminated = image.to_vec();
+        terminated.push(0);
         let mut handle: CUmodule = 0;
         let log_bytes: usize = 1 << 15;
         let mut log = vec![0u8; log_bytes];
@@ -306,13 +316,13 @@ impl Module {
             log.as_mut_ptr() as *mut c_void,
             (&mut log_used as *mut u32) as *mut c_void,
         ];
-        // SAFETY: image bytes live for the call (driver copies/JITs them);
-        // the log buffer and its size slot are written by the JIT and read
-        // below.
+        // SAFETY: terminated bytes live for the call (driver copies/JITs
+        // them); the log buffer and its size slot are written by the JIT and
+        // read below.
         let rc = unsafe {
             (fns.cuModuleLoadDataEx.expect("bound"))(
                 &mut handle,
-                image.as_ptr() as *const _,
+                terminated.as_ptr() as *const _,
                 2,
                 opts.as_mut_ptr(),
                 vals.as_mut_ptr(),

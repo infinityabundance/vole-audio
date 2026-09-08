@@ -47,6 +47,46 @@ DIRTY=$(git status --porcelain --untracked-files=all -- . ':(exclude)receipts' 2
     src/lib.rs \
     -o "$OUT/vole_audio.ptx"
 
+# Strip DWARF debug sections from the PTX text: rustc's NVPTX backend emits
+# .debug_abbrev/.debug_info/.debug_macinfo blocks even at -C debuginfo=0, and
+# the driver's ptxas JIT intermittently fails parsing them on the tested
+# driver (rc 218 "Unexpected non-ASCII character", observed inside
+# .debug_info) — a process-state-dependent flake that disappears when the
+# debug metadata is absent. The metadata is never needed for execution.
+python3 - "$OUT/vole_audio.ptx" <<'EOF'
+import sys
+path = sys.argv[1]
+lines = open(path, encoding='utf-8').read().split('\n')
+out = []
+i = 0
+n = len(lines)
+while i < n:
+    line = lines[i]
+    stripped = line.strip()
+    if stripped.startswith('.target '):
+        # rustc's NVPTX backend marks the target `debug` when any inlined
+        # precompiled core/std code carries DWARF (even at -C debuginfo=0);
+        # with the debug sections stripped below, ptxas rejects a `debug`
+        # target that has no debug data, so request a plain target.
+        line = line.replace(', debug', '')
+        out.append(line)
+        i += 1
+        continue
+    if stripped.startswith('.section\t.debug_') or stripped.startswith('.section .debug_'):
+        # Skip the section header; if it does not open a brace inline, skip
+        # until the matching close brace at line start.
+        if '{' not in line:
+            i += 1
+            while i < n and lines[i].strip() != '}':
+                i += 1
+        i += 1
+        continue
+    out.append(line)
+    i += 1
+open(path, 'w', encoding='utf-8').write('\n'.join(out))
+EOF
+echo "  stripped DWARF debug sections from PTX"
+
 # Artifact hash + provenance sidecar.
 SHA=$(sha256sum "$OUT/vole_audio.ptx" | cut -d' ' -f1)
 RUSTC_VER=$("$RUSTC" --version | sed 's/ (.*//')

@@ -35,9 +35,13 @@ pub mod entropy_rans;
 #[cfg(feature = "std")]
 pub mod entropy_residual;
 #[cfg(feature = "std")]
+pub mod entropy_simd;
+#[cfg(feature = "std")]
 pub mod entropyfs;
 #[cfg(feature = "std")]
 pub mod facts;
+#[cfg(feature = "std")]
+pub mod h2;
 #[cfg(feature = "std")]
 pub mod semantic;
 #[cfg(feature = "std")]
@@ -102,6 +106,11 @@ removes vs the D0-mmap baseline (default silence-safe; --emit-audio opt-in)",
 jobs (one thread per page; artifact scripts/out/vole_audio.ptx)",
     ),
     (
+        "entropy-simd",
+        "Phase H.2 CPU parallel decode surface: scalar == page-parallel decode (exact); \
+instruction-SIMD decode honestly NOT_IMPLEMENTED (H.2.16: no fabricated vectorization)",
+    ),
+    (
         "entropy-d1",
         "Phase H.2 flagship fused entropy -> CUDA -> D1 endpoint: per-window bounded page \
 decode writes exact final S32 codes directly into the registered ALSA ring for literal, \
@@ -120,6 +129,11 @@ reverify, declared/unique/physical accounting, exact shared model once physicall
 DSFB-guided over ONE frozen candidate universe; N and J per strategy (feature dsfb; \
 INCONCLUSIVE + limitation without it)",
     ),
+    (
+        "h2",
+        "aggregate Phase H.2 seal: runs every H.2 court in sequence; SUPPORTED only when \
+all sub-courts are SUPPORTED (--all-features on supported hardware)",
+    ),
 ];
 
 /// Run `court <name>`; unknown courts are usage errors.
@@ -137,9 +151,11 @@ pub fn run(name: &str, receipts_root: &Path) -> crate::error::Result<Verdict> {
         "entropy-pages" => entropy_pages::run(receipts_root),
         "entropy-partial" => entropy_partial::run(receipts_root),
         "entropy-cuda" => entropy_cuda::run(receipts_root),
+        "entropy-simd" => entropy_simd::run(receipts_root),
         "entropy-d1" => entropy_d1::run(receipts_root),
         "entropyfs" => entropyfs::run(receipts_root),
         "dsfb-entropy" => dsfb_entropy::run(receipts_root),
+        "h2" => h2::run(receipts_root),
         other => Err(crate::error::Error::malformed(format!(
             "unknown court '{other}' (available: {})",
             COURT_NAMES

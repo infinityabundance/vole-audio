@@ -1,9 +1,10 @@
 #!/bin/sh
 # Run the full court battery of the CURRENT build.
 #
-# Courts arrive by phase; `court-all.sh` runs every court this build ships
-# (semantic, authored, simd, facts, cuda, d1, entropy-rans, entropy-literal,
-# entropy-residual, entropy-pages, entropy-partial) and reports their verdicts.
+# Courts arrive by phase; `court-all.sh` runs every always-runnable court this
+# build ships (semantic, authored, simd, facts, cuda, d1, entropy-rans,
+# entropy-literal, entropy-residual, entropy-pages, entropy-partial,
+# entropy-simd) and reports their verdicts.
 # Each court writes its own immutable receipt under receipts/<court>/ and
 # exits 0 whether its verdict is SUPPORTED or an honest negative — this
 # script fails only on operational errors, never on a negative result.
@@ -30,12 +31,16 @@ run_court() {
 
 rc=0
 for court in semantic authored simd facts cuda d1 entropy-rans entropy-literal \
-    entropy-residual entropy-pages entropy-partial; do
+    entropy-residual entropy-pages entropy-partial entropy-simd; do
     if ! run_court "$court"; then
         echo "court $court: operational failure" >&2
         rc=1
     fi
 done
+
+# Hardware/feature-gated courts (entropy-cuda, entropy-d1, entropyfs,
+# dsfb-entropy, h2) are run by the phase seal with --all-features; the
+# baseline above is always runnable.
 
 echo
 echo "court-all.sh: done (verdicts above; receipts under receipts/<court>/)."
