@@ -19,8 +19,10 @@ COMMANDS (current build):
     probe                 Capture environment + hardware evidence summary
     court <name>          Run an executable court (semantic, authored, simd, facts,
                           cuda, d1, entropy-rans, entropy-literal, entropy-residual,
-                          entropy-pages, entropy-partial, entropy-cuda, entropyfs, dsfb-entropy)
-                          [--receipts DIR]; court d1 accepts --emit-audio
+                          entropy-pages, entropy-partial, entropy-cuda, entropy-d1,
+                          entropyfs, dsfb-entropy)
+                          [--receipts DIR]; court d1 accepts --emit-audio (court
+                          entropy-d1 honors VOLE_ENTROPY_D1_EMIT_AUDIO=1)
     receipt show <file>   Verify and print an evidence receipt
     receipt perf <file>   Render a receipt's throughput_cells as Markdown
     version               Print version and build identity
@@ -189,15 +191,20 @@ fn cmd_court(args: &[String]) -> Result<u8> {
             }
             "--emit-audio" => {
                 // Court-specific opt-in: audible content is never the
-                // default (courts are silence-safe probes). Only `court d1`
-                // understands it today; the flag is rejected elsewhere.
-                if name != "d1" {
+                // default (courts are silence-safe probes). `court d1` and
+                // `court entropy-d1` understand it today; the flag is
+                // rejected elsewhere.
+                if name == "d1" {
+                    // SAFETY: single-threaded CLI setup before any court work.
+                    unsafe { std::env::set_var("VOLE_D1_EMIT_AUDIO", "1") };
+                } else if name == "entropy-d1" {
+                    // SAFETY: single-threaded CLI setup before any court work.
+                    unsafe { std::env::set_var("VOLE_ENTROPY_D1_EMIT_AUDIO", "1") };
+                } else {
                     return Err(Error::malformed(format!(
-                        "--emit-audio is only valid for court d1 (got court '{name}')"
+                        "--emit-audio is only valid for court d1 / entropy-d1 (got court '{name}')"
                     )));
                 }
-                // SAFETY: single-threaded CLI setup before any court work.
-                unsafe { std::env::set_var("VOLE_D1_EMIT_AUDIO", "1") };
             }
             other => {
                 return Err(Error::malformed(format!("unknown court flag '{other}'")));

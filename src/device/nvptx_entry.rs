@@ -68,6 +68,44 @@ pub extern "ptx-kernel" fn vole_entropy_decode(
         }
     }
 }
+/// Expand a mono sample arena into an interleaved multi-channel endpoint
+/// region by duplication (L = R = ... = sample) — the sampler/mix transform
+/// at the observation boundary for mono objects played on a multi-channel
+/// endpoint (H.2.19: the fused entropy->D1 path must not materialize the
+/// expansion on the host).
+///
+/// Grid/block mapping: one thread per source frame, grid-stride; each thread
+/// writes `channels` identical interleaved codes at `dst[frame*channels..]`.
+///
+/// # Safety
+/// `src` must hold at least `frames` i32 samples and `dst` at least
+/// `frames * channels` i32 slots. The host builds both exactly
+/// (`court entropy-d1`); nothing here is user input.
+#[unsafe(no_mangle)]
+pub extern "ptx-kernel" fn vole_upmix_mono_dup(
+    src: *const i32,
+    dst: *mut i32,
+    frames: u64,
+    channels: u64,
+) {
+    unsafe {
+        let tid = core::arch::nvptx::_thread_idx_x() as u64;
+        let nthreads = core::arch::nvptx::_block_dim_x() as u64;
+        let bid = core::arch::nvptx::_block_idx_x() as u64;
+        let nblocks = core::arch::nvptx::_grid_dim_x() as u64;
+        let stride = nthreads * nblocks;
+        let mut g = bid * nthreads + tid;
+        while g < frames {
+            let v = *src.add(g as usize);
+            let base = (g * channels) as usize;
+            for c in 0..channels as usize {
+                *dst.add(base + c) = v;
+            }
+            g += stride;
+        }
+    }
+}
+
 /// Render one window into the final interleaved observation block (D0).
 ///
 /// Grid/block mapping: `g = blockIdx.x * blockDim.x + threadIdx.x` indexes

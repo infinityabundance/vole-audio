@@ -213,7 +213,7 @@ pub fn run(receipts_root: &Path) -> crate::error::Result<Verdict> {
         Ok(o) => o,
         Err(e) => return fail(Verdict::FailedCorrectness, &format!("kernel decode: {e}")),
     };
-    let mut sw = Stopwatch::start();
+    let sw = Stopwatch::start();
     for _ in 0..10 {
         dev_out = world.decode()?;
     }

@@ -491,6 +491,7 @@ impl EntropyJobDesc {
     /// declared in this descriptor (bytes for byte arenas, elements for the
     /// i32/u16 arenas); `scratch` must have `scratch_stride` bytes available
     /// at `page_id * scratch_stride`.
+    #[allow(clippy::too_many_arguments)]
     pub unsafe fn decode_page_raw(
         &self,
         page_id: u32,

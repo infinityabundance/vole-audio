@@ -2,13 +2,13 @@
 //!
 //! Loads the same PTX module as the render kernel and drives
 //! `vole_entropy_decode` (one thread per entropy page). The entropy object
-//! (payloads/models/page records) is uploaded once and stays GPU-resident;
-//! a decode job covers a bounded page range (an observation window), and the
+//! (payloads/models/page records) is uploaded and stays GPU-resident; a
+//! decode job covers a bounded page range (an observation window), and the
 //! decoded samples land in a GPU output arena — never a full-object decoded
 //! waveform (H.2.17/H.2.18).
 //!
 //! Exactness: the kernel runs the same `device::entropy_shared` functions as
-//! the host flat decoder on the identical job; the court compares the
+//! the host flat decoder on the identical job; the courts compare the
 //! downloaded arena byte-for-byte with the host decode.
 
 use super::driver::{Cuda, DeviceBuffer, Function, Module, Stream};
@@ -31,18 +31,16 @@ fn pod_bytes<T: Sized>(v: &[T]) -> &[u8] {
 
 /// GPU-resident entropy state + decode launch.
 ///
-/// Does not own the CUDA session: it borrows an existing context (the
-/// entropy-d1 fused path shares the render world's context). The caller must
-/// keep the session alive longer than this world (drop order: entropy world
-/// first).
+/// The world either owns its CUDA session (`EntropyWorld::open`) or borrows
+/// one (`open_shared` — used by the fused entropy->D1 endpoint path). The
+/// session must outlive a shared world; drop order: entropy world first.
 pub struct EntropyWorld {
-    /// Driver function table (copy; the owning session stays alive via the
-    /// caller).
+    /// Driver function table (copy; the session keeps the driver alive).
     fns: Fns,
-    /// Owning session when this world opened its own context (None when
-    /// sharing a caller session).
+    /// Owning session (None when sharing a caller session).
     session: Option<Cuda>,
-    _module: Module,
+    /// Module handle (None when the caller keeps the module alive).
+    module: Option<Module>,
     function: Function,
     stream: Stream,
     d_pages: DeviceBuffer,
@@ -67,46 +65,90 @@ impl EntropyWorld {
         Ok(world)
     }
 
-    /// Build a decode world over an existing CUDA session (the session must
-    /// outlive this world).
+    /// Build a decode world over an existing CUDA session (session must
+    /// outlive this world); loads the module from `ptx_bytes`.
     pub fn open_shared(
         cuda: &Cuda,
         ptx_bytes: &[u8],
         job: &FlatEntropyJob,
     ) -> Result<EntropyWorld> {
-        let fns = cuda.fns;
         let module = cuda.load_module(ptx_bytes)?;
         let function = module.function(ENTROPY_KERNEL_ENTRY)?;
-        let stream = cuda.create_stream()?;
+        let mut world = EntropyWorld::build(&cuda.fns, function, cuda.create_stream()?, job)?;
+        world.module = Some(module);
+        Ok(world)
+    }
+
+    /// Build a decode world reusing an already-loaded module + function and
+    /// the caller's stream (per-window D1 jobs). The module must outlive
+    /// this world.
+    pub fn open_preloaded(
+        fns: &Fns,
+        function: Function,
+        stream: Stream,
+        job: &FlatEntropyJob,
+    ) -> Result<EntropyWorld> {
+        EntropyWorld::build(fns, function, stream, job)
+    }
+
+    fn build(
+        fns: &Fns,
+        function: Function,
+        stream: Stream,
+        job: &FlatEntropyJob,
+    ) -> Result<EntropyWorld> {
+        let mut world = EntropyWorld {
+            fns: *fns,
+            session: None,
+            module: None,
+            function,
+            stream,
+            d_pages: DeviceBuffer::alloc(fns, 1)?,
+            d_streams: DeviceBuffer::alloc(fns, 1)?,
+            d_payload: DeviceBuffer::alloc(fns, 1)?,
+            d_mvalues: DeviceBuffer::alloc(fns, 2)?,
+            d_mstarts: DeviceBuffer::alloc(fns, 1)?,
+            d_mfreqs: DeviceBuffer::alloc(fns, 1)?,
+            d_mranges: DeviceBuffer::alloc(fns, 1)?,
+            d_cycle: DeviceBuffer::alloc(fns, 1)?,
+            d_desc: DeviceBuffer::alloc(fns, 52)?,
+            desc: EntropyJobDesc::zeroed(),
+        };
+        world.upload(job)?;
+        Ok(world)
+    }
+
+    /// Upload a (possibly new) flat job: pages/streams/payload/models/cycle
+    /// are re-uploaded and the descriptor updated. Bounded observation jobs
+    /// reuse one world across windows.
+    pub fn upload(&mut self, job: &FlatEntropyJob) -> Result<()> {
+        let fns = self.fns;
         let upload = |buf: &DeviceBuffer, bytes: &[u8]| -> Result<()> {
             if bytes.is_empty() {
                 return Ok(());
             }
             buf.upload(bytes)
         };
-
-        let d_pages = DeviceBuffer::alloc(&fns, job.pages.len().max(1) * 56)?;
-        upload(&d_pages, pod_bytes(&job.pages))?;
-        let d_streams = DeviceBuffer::alloc(&fns, job.streams.len().max(1) * 24)?;
-        upload(&d_streams, pod_bytes(&job.streams))?;
-        let d_payload = DeviceBuffer::alloc(&fns, job.payload.len().max(1))?;
-        upload(&d_payload, &job.payload)?;
-
+        let pages = DeviceBuffer::alloc(&fns, job.pages.len().max(1) * 56)?;
+        upload(&pages, pod_bytes(&job.pages))?;
+        let streams = DeviceBuffer::alloc(&fns, job.streams.len().max(1) * 24)?;
+        upload(&streams, pod_bytes(&job.streams))?;
+        let payload = DeviceBuffer::alloc(&fns, job.payload.len().max(1))?;
+        upload(&payload, &job.payload)?;
         let mut mvalue_bytes = Vec::with_capacity(job.model_values.len() * 2);
         for v in &job.model_values {
             mvalue_bytes.extend_from_slice(&v.to_le_bytes());
         }
-        let d_mvalues = DeviceBuffer::alloc(&fns, mvalue_bytes.len().max(2))?;
-        upload(&d_mvalues, &mvalue_bytes)?;
-        let d_mstarts = DeviceBuffer::alloc(&fns, job.model_starts.len().max(1) * 4)?;
-        upload(&d_mstarts, pod_bytes(&job.model_starts))?;
-        let d_mfreqs = DeviceBuffer::alloc(&fns, job.model_freqs.len().max(1) * 4)?;
-        upload(&d_mfreqs, pod_bytes(&job.model_freqs))?;
-        let d_mranges = DeviceBuffer::alloc(&fns, job.model_ranges.len().max(1) * 4)?;
-        upload(&d_mranges, pod_bytes(&job.model_ranges))?;
-        let d_cycle = DeviceBuffer::alloc(&fns, job.cycle.len().max(1) * 4)?;
-        upload(&d_cycle, pod_bytes(&job.cycle))?;
-
+        let mvalues = DeviceBuffer::alloc(&fns, mvalue_bytes.len().max(2))?;
+        upload(&mvalues, &mvalue_bytes)?;
+        let mstarts = DeviceBuffer::alloc(&fns, job.model_starts.len().max(1) * 4)?;
+        upload(&mstarts, pod_bytes(&job.model_starts))?;
+        let mfreqs = DeviceBuffer::alloc(&fns, job.model_freqs.len().max(1) * 4)?;
+        upload(&mfreqs, pod_bytes(&job.model_freqs))?;
+        let mranges = DeviceBuffer::alloc(&fns, job.model_ranges.len().max(1) * 4)?;
+        upload(&mranges, pod_bytes(&job.model_ranges))?;
+        let cycle = DeviceBuffer::alloc(&fns, job.cycle.len().max(1) * 4)?;
+        upload(&cycle, pod_bytes(&job.cycle))?;
         let mut desc = EntropyJobDesc::zeroed();
         desc.page_count = job.pages.len() as u32;
         desc.arena_samples = job.arena_samples as u32;
@@ -121,81 +163,27 @@ impl EntropyWorld {
         desc.statuses_len = job.pages.len() as u32;
         let d_desc = DeviceBuffer::alloc(&fns, 52)?;
         upload(&d_desc, pod_bytes(&[desc]))?;
-
-        Ok(EntropyWorld {
-            fns,
-            session: None,
-            _module: module,
-            function,
-            stream,
-            d_pages,
-            d_streams,
-            d_payload,
-            d_mvalues,
-            d_mstarts,
-            d_mfreqs,
-            d_mranges,
-            d_cycle,
-            d_desc,
-            desc,
-        })
+        self.d_pages = pages;
+        self.d_streams = streams;
+        self.d_payload = payload;
+        self.d_mvalues = mvalues;
+        self.d_mstarts = mstarts;
+        self.d_mfreqs = mfreqs;
+        self.d_mranges = mranges;
+        self.d_cycle = cycle;
+        self.d_desc = d_desc;
+        self.desc = desc;
+        Ok(())
     }
 
-    /// Decode the uploaded job (one thread per page). Returns the decoded
-    /// i32 sample arena after synchronization. A kernel status 0 on any page
-    /// is an internal inconsistency (host validation precedes upload).
-    pub fn decode(&self) -> Result<Vec<i32>> {
-        let desc = &self.desc;
-        let d_out = DeviceBuffer::alloc(&self.fns, desc.arena_samples as usize * 4)?;
-        let scratch_len = desc.page_count as usize * desc.scratch_stride as usize;
-        let d_scratch = DeviceBuffer::alloc(&self.fns, scratch_len.max(1))?;
-        let d_status = DeviceBuffer::alloc(&self.fns, desc.page_count as usize)?;
-        let params = vec![
-            self.d_desc.device_ptr(),
-            self.d_pages.device_ptr(),
-            self.d_streams.device_ptr(),
-            self.d_payload.device_ptr(),
-            self.d_mvalues.device_ptr(),
-            self.d_mstarts.device_ptr(),
-            self.d_mfreqs.device_ptr(),
-            self.d_mranges.device_ptr(),
-            self.d_cycle.device_ptr(),
-            d_out.device_ptr(),
-            d_scratch.device_ptr(),
-            d_status.device_ptr(),
-        ];
-        let grid_blocks = desc.page_count.div_ceil(BLOCK_THREADS).max(1);
-        self.function.launch(
-            (grid_blocks, 1, 1),
-            (BLOCK_THREADS, 1, 1),
-            self.stream.handle,
-            &params,
-        )?;
-        self.stream.synchronize()?;
-        let mut status = vec![0u8; desc.page_count as usize];
-        d_status.download_prefix(&mut status)?;
-        if let Some(bad) = status.iter().position(|&s| s == 0) {
-            return Err(Error::new(
-                crate::error::Kind::Internal,
-                format!("entropy decode kernel failed on page {bad}"),
-            ));
-        }
-        let mut bytes = vec![0u8; desc.arena_samples as usize * 4];
-        d_out.download_prefix(&mut bytes)?;
-        Ok(bytes
-            .chunks_exact(4)
-            .map(|w| i32::from_le_bytes([w[0], w[1], w[2], w[3]]))
-            .collect())
+    /// Device pointer of the decode output arena start (for `decode_into`
+    /// callers targeting the registered endpoint region).
+    pub fn desc(&self) -> &EntropyJobDesc {
+        &self.desc
     }
 
-    /// Launch the decode kernel writing directly into a caller-provided
-    /// device pointer (used by the fused entropy->D1 endpoint path where the
-    /// arena is the registered endpoint region or a bounded device arena).
-    pub fn decode_into(&self, out_dev: u64, out_samples: u32) -> Result<()> {
+    fn launch(&self, out_dev: u64) -> Result<()> {
         let desc = &self.desc;
-        if out_samples < desc.arena_samples {
-            return Err(Error::limit("decode_into arena smaller than job arena"));
-        }
         let scratch_len = desc.page_count as usize * desc.scratch_stride as usize;
         let d_scratch = DeviceBuffer::alloc(&self.fns, scratch_len.max(1))?;
         let d_status = DeviceBuffer::alloc(&self.fns, desc.page_count as usize)?;
@@ -231,6 +219,27 @@ impl EntropyWorld {
         }
         Ok(())
     }
+
+    /// Decode the uploaded job into a fresh device arena and download it.
+    pub fn decode(&self) -> Result<Vec<i32>> {
+        let out = DeviceBuffer::alloc(&self.fns, self.desc.arena_samples as usize * 4)?;
+        self.launch(out.device_ptr())?;
+        let mut bytes = vec![0u8; self.desc.arena_samples as usize * 4];
+        out.download_prefix(&mut bytes)?;
+        Ok(bytes
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .map(|w| i32::from_le_bytes(*w))
+            .collect())
+    }
+
+    /// Launch the decode kernel writing directly into `out_dev`
+    /// (`out_samples >= desc.arena_samples`). Used by the fused
+    /// entropy->endpoint D1 path where the arena is the registered region.
+    pub fn decode_into(&self, out_dev: u64) -> Result<()> {
+        self.launch(out_dev)
+    }
 }
 
 #[cfg(test)]
@@ -239,9 +248,7 @@ mod tests {
     use crate::device::entropy_shared::FlatPage;
 
     #[test]
-    fn descriptor_bytes_are_stable() {
-        // A tiny job descriptor round-trips through the pod encoding at the
-        // exact 52-byte size the device expects.
+    fn pod_sizes_match_device_records() {
         let page = FlatPage {
             frames: 512,
             channels: 1,
@@ -262,25 +269,15 @@ mod tests {
             hyp_phase: 0,
             scratch_off: 0,
         };
-        let mut job = FlatEntropyJob {
+        let job = FlatEntropyJob {
             pages: vec![page],
             arena_samples: 512,
             max_page_scratch: 8,
             channels: 1,
             ..Default::default()
         };
-        let _ = job.scratch_stride();
-        let mut desc = EntropyJobDesc::zeroed();
-        desc.page_count = job.pages.len() as u32;
-        desc.arena_samples = job.arena_samples as u32;
-        desc.scratch_stride = job.scratch_stride() as u32;
-        desc.statuses_len = job.pages.len() as u32;
-        let desc_arr = [desc];
-        let bytes = pod_bytes(&desc_arr);
-        assert_eq!(bytes.len(), 52);
-        // Page pod size matches the device record.
         assert_eq!(pod_bytes(&job.pages).len(), 56);
-        job.pages.clear();
-        let _ = job;
+        assert_eq!(pod_bytes(&job.streams).len(), 0);
+        assert_eq!(core::mem::size_of::<EntropyJobDesc>(), 52);
     }
 }
