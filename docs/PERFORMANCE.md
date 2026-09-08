@@ -4,9 +4,9 @@ This file contains actual measurements only. Every row names its method,
 hardware, backend, and workload; receipts under `receipts/` bind each run to
 its environment. Flagship measurements (the frozen-corpus ladder, real-time
 deadlines, interference) arrive with Phase M; rows below are **fixture-level**
-evidence from the Phase F SIMD courts and the Phase G CUDA D0 court and are
-labeled as such — they are indicative of the backend shape, not a claim about
-the flagship corpus.
+evidence from the Phase F SIMD courts, the Phase G CUDA D0 court, and the
+Phase H.2 entropy courts, and are labeled as such — they are indicative of
+the backend shape, not a claim about the flagship corpus.
 
 Terms that will not appear here: *revolutionary*, *10x*, *near-zero latency*,
 *orders of magnitude*, *GPU is faster* (before the GPU courts run).
@@ -107,6 +107,68 @@ result. This is the shape of the surface the Phase M corpus will measure
 properly — the numbers above are fixture-level only, not a claim about
 real-time deadlines or endpoint directness (no D1 path exists until
 Phase H).
+
+## Phase H.2 fixture-level evidence (2026-09, same host + RTX 4080 SUPER)
+
+All rows are generated from the sealed clean-tree receipts (commit
+`f90eca5c`, `receipts/`); no hand transcription of the entropy numbers. The
+H.2 courts measure **representation** surfaces, not flagship throughput;
+Phase M owns the frozen-corpus ladder.
+
+### D1 fused path (court entropy-d1, `snd_hda_intel` hw:2,0, 48 kHz S32_LE)
+
+Same 4096-frame window per session; 512-frame period into a 4096-frame
+buffer; per-chunk wall = window decode (+ device mono->stereo where noted) +
+in-place ring verification + commit. All sessions byte-exact vs the scalar
+oracle, zero xruns.
+
+| session | mean ms/chunk | median | max | pages decoded | GPU->host B | host copy B |
+|---|---:|---:|---:|---:|---:|---:|
+| d0-literal (baseline) | 0.000 | 0.000 | 0.001 | 16 | 32 768 | 32 768 |
+| d1-literal (rANS delta-lane4) | 0.466 | 0.467 | 0.482 | 16 | 0 | 0 |
+| d0-residual (baseline) | 0.001 | 0.001 | 0.001 | 16 | 16 384 | 32 768 |
+| d1-residual (mono->stereo on device) | 0.114 | 0.114 | 0.120 | 16 | 0 | 0 |
+| d1-noise (RAW control) | 0.062 | 0.062 | 0.063 | 16 | 0 | 0 |
+
+\* D0 rows time only the per-chunk host copy (the whole-object device decode
++ one DtoH happened before the paced session and is counted in the traffic
+columns). D1 removes literal 32 768 B GPU->host + 32 768 B host copies and
+residual 16 384 B + 32 768 B; verification reads (32 768 B/session) are a
+separate named surface. (These rows are from the seal run where the GPU was
+already at sustained clocks from the aggregate; a standalone cold run shows
+~2–3 ms/chunk literal decode — see the receipt methodology note.)
+
+Read honestly: the D1 rANS decode (under 0.5 ms/512-frame window once the
+GPU is at sustained clocks) leaves ample margin against the 10.67 ms period,
+but the serial single-thread-per-page decode is latency-chain bound — ~20
+ms/window cold — which is why the court records its sustained-clock warm-up
+methodology and why decode-side speedup is explicitly not claimed. D1 here
+is a directness/traffic result (as in Phase H), not a latency optimization.
+
+### GPU entropy decode vs host (court entropy-cuda, whole-object jobs)
+
+| job | pages | scalar == CUDA |
+|---|---|---|
+| literal delta-lane4 stereo, 4096 frames | 8 | yes (bit-exact) |
+| literal noise RAW-fallback, 2048 frames | 4 | yes |
+| procedural residual closure, 4096 frames | 8 | yes |
+
+### CPU page-parallel decode surface (court entropy-simd)
+
+Measured over the frozen corpus + a sparse residual job (16 threads):
+scalar == page-parallel decode byte-exact on every fixture; mean
+page-parallel speedup over the sequential host decoder ~1.99–3.36× across
+runs (fixture- and page-count dependent). Instruction-level AVX2/AVX-512
+entropy decode is honestly recorded `NOT_IMPLEMENTED` (single-state rANS is
+serial per stream) — no fabricated vectorization (H.2.16).
+
+### Storage-side evidence
+
+Representation/page/model costs, RAW fallback behavior on the byte-flat
+negative controls, FLAC comparison (when the pinned tool is present), and
+EntropyFS declared/unique/physical bytes are sealed in the `entropy-literal`,
+`entropy-residual`, `entropy-pages`, `entropy-partial`, and `entropyfs`
+receipts — read those receipts, not this prose, for the exact cells.
 
 ## Real-time and deadline evidence
 

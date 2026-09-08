@@ -159,6 +159,38 @@ run with immutable receipts committed separately; negative receipts are kept.
 
 <!-- ledger entries are appended chronologically below this line -->
 
+### Seal 1 — Phase H.2 implementation + clean-tree battery (2026-09-08)
+
+Implementation commits (in order): `c2524c1` entropy core, `c8745ed` scalar
+courts, `28e6138` EntropyFS + DSFB, `16a8ad7` shared flat decode,
+`4142dd5` CUDA entropy decoder + `court entropy-cuda`, `992a65f` fused
+entropy->D1 endpoint court, `cde3f4c` `entropy-simd` + `h2` aggregate + PTX
+module-load robustness, `f90eca5` documentation (ADRs 0001–0005, README
+central language, PROJECT_STATE/DIRECTNESS/NON_CLAIMS).
+
+Seal run (release, `--all-features`, clean tree):
+
+- Tree: commit `f90eca5c17…`, source-tree `c9217e9422…`, `git_dirty: false`.
+- All six A–H courts re-sealed SUPPORTED with frozen hashes unchanged:
+  semantic `1791816f4b93…`, authored `f7e103f3a97d…` (exit criterion 1).
+- All ten H.2 courts SUPPORTED + `court h2` aggregate SUPPORTED: `entropy-rans`,
+  `entropy-literal`, `entropy-residual`, `entropy-pages`, `entropy-partial`,
+  `entropy-simd`, `entropy-cuda`, `entropy-d1`, `entropyfs`, `dsfb-entropy`.
+- Flagship `entropy-d1` on RTX 4080 SUPER + `snd_hda_intel` hw:2,0: five
+  sessions (d0-literal, d1-literal, d0-residual, d1-residual, d1-noise)
+  shadow-exact, zero xruns, clean drain; D1 removes literal 32 768 B GPU->host
+  + 32 768 B host copies and residual 16 384 B + 32 768 B vs the equal-work
+  D0 baseline; verification reads (32 768 B/session) separately accounted.
+- PTX artifact `scripts/out/vole_audio.ptx` sha256
+  `d3f661d51979d497cf57e05e9af545b1df89162eb20d10a83200d26f66983510`
+  (entries `vole_render_d0`, `vole_entropy_decode`, `vole_upmix_mono_dup`;
+  DWARF stripped; provenance sidecar records the source tree).
+- Host tests: 283 (278 passed, 5 ignored) debug and release with
+  `--all-features`; `clippy --all-targets --all-features -D warnings` clean;
+  `cargo fmt --check` clean.
+- 17 receipts sealed under `receipts/` (16 courts + the h2 aggregate),
+  committed separately at `1a4c3a1`.
+
 ## Execution record (implementation summary)
 
 All H.2.x work items were executed in sequence. Summary of what exists where:
