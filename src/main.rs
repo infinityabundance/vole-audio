@@ -17,13 +17,19 @@ USAGE:
 
 COMMANDS (current build):
     probe                 Capture environment + hardware evidence summary
+    court <name>          Run an executable court (semantic, authored, simd)
     receipt show <file>   Verify and print an evidence receipt
     version               Print version and build identity
     help                  Show this help
 
 Planned commands arrive with their phases (inspect/verify/encode/observe/play,
-bench/court/corpus and probe cuda|rocm|alsa|d1|d2). Until implemented they
-exit with NOT_IMPLEMENTED (3); the CLI never implies support that is absent.
+bench/corpus, court inverse|flattening|cuda|rocm|d1|d2|depth|conventional|
+random-access|negative|interference, and probe cuda|rocm|alsa|d1|d2). Until
+implemented they exit with NOT_IMPLEMENTED (3); the CLI never implies support
+that is absent.
+
+example:
+    vole-audio court simd          # Phase F SIMD parity battery
 ";
 
 fn main() -> ExitCode {

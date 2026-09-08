@@ -123,13 +123,25 @@ pub const MAX_ACCUMULATED_TRANSPOSE_Q24: i64 = 1 << 47;
 
 /// Compose two Q24 multipliers with one round and saturation at the
 /// accumulated-transpose ceiling.
+///
+/// The product is formed in i128 so the composition *saturates* at the
+/// ceiling instead of ever wrapping (i64 product of in-domain inputs can
+/// reach 2^40 · 2^47 = 2^87). A composed rate that still exceeds the frozen
+/// rate domain is rejected later by `rate::checked_rate` during voice
+/// resolution — never silently wrapped.
 #[inline]
 pub fn compose_transpose(a_q24: i64, b_q24: i64) -> i64 {
-    let v = crate::universe::arithmetic::rnd_shift(a_q24.wrapping_mul(b_q24), 24);
-    v.clamp(
-        -MAX_ACCUMULATED_TRANSPOSE_Q24,
-        MAX_ACCUMULATED_TRANSPOSE_Q24,
-    )
+    let prod = i128::from(a_q24) * i128::from(b_q24);
+    let half = 1i128 << 23;
+    let q = if prod >= 0 {
+        (prod + half) >> 24
+    } else {
+        -(((-prod) + half) >> 24)
+    };
+    q.clamp(
+        -i128::from(MAX_ACCUMULATED_TRANSPOSE_Q24),
+        i128::from(MAX_ACCUMULATED_TRANSPOSE_Q24),
+    ) as i64
 }
 
 impl SampleObject {
@@ -367,6 +379,36 @@ mod tests {
 
     fn lit_descriptor(frames: u64) -> ObjectDescriptor {
         ObjectDescriptor::new(Representation::Literal, frames, Layout::Mono, None).unwrap()
+    }
+
+    /// Regression: composition must saturate at the documented ceiling, never
+    /// wrap (an i64 product of in-domain inputs reaches 2^87).
+    #[test]
+    fn compose_transpose_saturates_instead_of_wrapping() {
+        // Max |rate| × max accumulated transpose saturates at the ceiling.
+        assert_eq!(
+            compose_transpose(1 << 40, MAX_ACCUMULATED_TRANSPOSE_Q24),
+            MAX_ACCUMULATED_TRANSPOSE_Q24
+        );
+        assert_eq!(
+            compose_transpose(-(1 << 40), MAX_ACCUMULATED_TRANSPOSE_Q24),
+            -MAX_ACCUMULATED_TRANSPOSE_Q24
+        );
+        // A composed value inside the ceiling is exact rounding.
+        assert_eq!(compose_transpose(1 << 24, 1 << 24), 1 << 24);
+        assert_eq!(
+            compose_transpose((1 << 24) + (1 << 12), 1 << 23),
+            (1 << 23) + (1 << 11)
+        );
+        // Extreme transpose with unity rate stays at the ceiling (never wraps).
+        assert_eq!(
+            compose_transpose(1 << 24, i64::MAX),
+            MAX_ACCUMULATED_TRANSPOSE_Q24
+        );
+        assert_eq!(
+            compose_transpose(1 << 24, i64::MIN),
+            -MAX_ACCUMULATED_TRANSPOSE_Q24
+        );
     }
 
     #[test]

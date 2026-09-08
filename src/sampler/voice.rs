@@ -27,7 +27,6 @@ use crate::limits::FIXED_Q;
 use crate::object::{LoopRegion, ObjectData, ObjectId, ObjectStore, SampleObject};
 use crate::sampler::envelope::EnvelopeParams;
 use crate::sampler::gain;
-use crate::sampler::mix::Mixer;
 use crate::sampler::pan::{Route, pan_gains};
 use crate::sampler::procedural;
 use crate::sampler::rate;
@@ -227,7 +226,7 @@ impl ResolvedVoice {
 
     /// Natural end frame. Only one-shot literal content ends; cycles and
     /// procedural sources sustain until note-off.
-    fn end_frame(&self) -> Option<i64> {
+    pub(crate) fn end_frame(&self) -> Option<i64> {
         if self.endless || self.periodic || self.loop_region.is_some() {
             return None;
         }
@@ -248,44 +247,44 @@ impl ResolvedVoice {
             .wrapping_add(rate::advance(self.eff_rate_q24, d))
     }
 
-    /// Render this voice into the mixer for one frame `t` (output frame index
-    /// `frame_idx`). The observation is fully determined by the resolved voice
-    /// and `t` (pure; order of calls across frames/voices never matters).
-    pub fn render_frame(&self, store: &ObjectStore, mixer: &mut Mixer, t: i64, frame_idx: usize) {
+    /// The exact contribution of this voice at media frame `t` — the single
+    /// semantic source of truth shared by the scalar world engine, the SIMD
+    /// engine, and (later) flattened GPU evaluation. `None` slots mean the
+    /// voice is silent at `t` (not yet triggered, ended, envelope zero, or
+    /// fully released). The two slots are the routed output channels
+    /// (mono: `a` only; stereo pair: `a` = left base, `b` = base+1).
+    pub fn contribution_at(&self, store: &ObjectStore, t: i64) -> Contribution {
         let spec = &self.spec;
         if self.end_frame().is_some_and(|end| t >= end) {
-            return;
+            return Contribution::default();
         }
         let env = spec.envelope.level_at(spec.trigger_frame, spec.note_off, t);
         if env == 0 {
-            return;
+            return Contribution::default();
         }
         if spec
             .envelope
             .silent_at(spec.trigger_frame, spec.note_off, t)
         {
-            return;
+            return Contribution::default();
         }
 
         let obj = match store.get(self.target_id) {
             Ok(o) => o,
-            Err(_) => return, // store validated; unreachable
+            Err(_) => return Contribution::default(), // store validated; unreachable
         };
         let channels = usize::from(obj.descriptor.layout.count());
         let obj_ch = usize::from(spec.object_channel);
-
-        // Observation of one object channel at this frame (code domain, pre
-        // gain/env/pan). Content and generator classes both dispatch here.
         let obs_of = |ch: usize| -> i32 { self.observe_channel(&obj.data, channels, ch, t) };
 
+        let mut out = Contribution::default();
         match spec.route {
             Route::Mono(out_ch) => {
                 let m = gain::channel_multiplier(
                     gain::env_gain_multiplier(env, spec.gain_q16),
                     1 << 16,
                 );
-                let c = gain::contribution(obs_of(obj_ch), m);
-                mixer.add(frame_idx, out_ch, c);
+                out.a = Some((out_ch, gain::contribution(obs_of(obj_ch), m)));
             }
             Route::StereoPair(base) => {
                 let (gl, gr) = pan_gains(spec.pan_q16);
@@ -295,15 +294,34 @@ impl ResolvedVoice {
                     gain::channel_multiplier(gain::env_gain_multiplier(env, spec.gain_q16), gl);
                 let mr =
                     gain::channel_multiplier(gain::env_gain_multiplier(env, spec.gain_q16), gr);
-                mixer.add(frame_idx, base, gain::contribution(l_obs, ml));
-                mixer.add(frame_idx, base + 1, gain::contribution(r_obs, mr));
+                out.a = Some((base, gain::contribution(l_obs, ml)));
+                out.b = Some((base + 1, gain::contribution(r_obs, mr)));
             }
         }
+        out
     }
+}
 
-    /// Sample one object channel at media frame `t`.
+/// One voice's routed contributions at a frame (exact per-frame semantics).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Contribution {
+    /// First routed contribution: `(output channel, voice-bus value)`.
+    pub a: Option<(u8, i32)>,
+    /// Second routed contribution (stereo pair right side).
+    pub b: Option<(u8, i32)>,
+}
+
+impl ResolvedVoice {
+    /// Sample one object channel at media frame `t` (exact class dispatch;
+    /// the single source also used by the scalar world engine).
     #[inline]
-    fn observe_channel(&self, data: &ObjectData, channels: usize, ch: usize, t: i64) -> i32 {
+    pub(crate) fn observe_channel(
+        &self,
+        data: &ObjectData,
+        channels: usize,
+        ch: usize,
+        t: i64,
+    ) -> i32 {
         match data {
             ObjectData::Silence => 0,
             ObjectData::Constant(c) => c.level,
@@ -339,7 +357,13 @@ impl ResolvedVoice {
     /// neighbor frames, so integer-frame reads reproduce the intrinsic
     /// exactly.
     #[inline]
-    fn read_content(&self, data: &ObjectData, channels: usize, ch: usize, w_q24: i64) -> i32 {
+    pub(crate) fn read_content(
+        &self,
+        data: &ObjectData,
+        channels: usize,
+        ch: usize,
+        w_q24: i64,
+    ) -> i32 {
         let is_cycle = matches!(
             data,
             ObjectData::Wavetable(_) | ObjectData::SingleCycle(_) | ObjectData::ExactRepeat(_)

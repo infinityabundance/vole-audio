@@ -29,11 +29,22 @@ use crate::universe::layout::Layout;
 use crate::universe::observation::observation_sha256;
 use std::path::Path;
 
-const RATE_HZ: u32 = 48_000;
+pub(crate) const RATE_HZ: u32 = 48_000;
 
 /// Frozen reference vector for the authored fixture observation hash.
+///
+/// Freeze history: `f91b5b42...` (Phases D/E) -> `f7e103f3...` (Phase F,
+/// correctness re-freeze). The change is the Phase D latent-bug fix: the world
+/// natural-end pre-check now uses the canonical `ResolvedVoice::end_frame`
+/// (endless/periodic sources sustain instead of being treated as already
+/// ended), so the fixture's oscillator/noise/partial-bank/constant voices are
+/// audible again. See docs/PROJECT_STATE.md Phase F ledger entry.
 pub const AUTHORED_COURT_REFERENCE_SHA256: &str =
-    "f91b5b4228022d46a609a2fe7fc862e6e72c4058405c4b72316b202feb14fe87";
+    "f7e103f3a97d5fafd6988e3bb6551b3c3af62a2e65c6a82898d6c2d4aff9d6db";
+
+pub(crate) fn authored_court_fixture() -> (ObjectStore, Vec<TimelineEvent>) {
+    build_fixture()
+}
 
 fn build_fixture() -> (ObjectStore, Vec<TimelineEvent>) {
     let mut store = ObjectStore::new();
@@ -315,7 +326,10 @@ mod tests {
         let oracle = crate::eval::ScalarOracle::new(world);
         let out = oracle.observe(&store, 0, 4000).unwrap();
         let h = hex(&observation_sha256(&out));
-        assert_eq!(h, AUTHORED_COURT_REFERENCE_SHA256);
+        assert_eq!(
+            h, AUTHORED_COURT_REFERENCE_SHA256,
+            "reference hash changed (actual {h}); re-freeze only with a documented profile reason"
+        );
     }
 
     #[test]

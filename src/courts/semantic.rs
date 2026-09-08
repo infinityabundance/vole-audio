@@ -26,8 +26,8 @@ use crate::universe::layout::Layout;
 use crate::universe::observation::observation_sha256;
 use std::path::Path;
 
-const RATE_HZ: u32 = 48_000;
-const CHANNELS: u8 = 2;
+pub(crate) const RATE_HZ: u32 = 48_000;
+pub(crate) const CHANNELS: u8 = 2;
 
 /// Frozen reference vector for the court fixture observation hash. Changing
 /// sampler semantics, fixture content, or u1 arithmetic changes this hash and
@@ -36,7 +36,12 @@ pub const SEMANTIC_COURT_REFERENCE_SHA256: &str =
     "1791816f4b938375cc4298b2587ce19eef260d063d9ed88c597e04d31837f6d0";
 
 /// Build the deterministic court world: a ramp object, a reference to it, and
-/// a small score that exercises the transform surface.
+/// a small score that exercises the transform surface. Shared with the
+/// Phase F parity tests (`eval::simd`) and `court simd`.
+pub(crate) fn semantic_court_fixture() -> (ObjectStore, Vec<TimelineEvent>) {
+    build_fixture()
+}
+
 fn build_fixture() -> (ObjectStore, Vec<TimelineEvent>) {
     let mut store = ObjectStore::new();
     // Mono ramp, 512 frames, ±0.5 full scale.

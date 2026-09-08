@@ -37,45 +37,6 @@ Directness is measured and proven or rejected per hardware.
 
 ### Phase A — Evidence constitution (complete)
 
-Exit criteria: one-package repo; docs; exact status ledger; evidence schema;
-environment capture; non-claims; corpus manifest; limits; `cargo test`;
-`cargo clippy -D warnings`; no fake performance claims.
-
-Delivered:
-
-- One Cargo package `vole-audio` (lib + bin), pinned toolchain, no workspace,
-  no internal crates. Host `std` feature gates host-only modules; device
-  targets compile the same crate `--no-default-features`.
-- Evidence constitution: `vole.audio.evidence.v1` receipts (immutable,
-  self-hashing, `create_new` writes), verdict vocabulary
-  (`status.rs` — the nine classes + `NOT_IMPLEMENTED`, shared `u8` codes with
-  device kernels), counters with defined measurement boundary, monotonic
-  timing + percentile policy (p99.9 needs N ≥ 20 000), environment/hardware
-  capture (uname, os-release, cpuinfo, meminfo, sysfs PCI scan, git
-  identity, rustc version), trace files with incremental SHA-256, energy
-  adapter interface (honest `none` default).
-- Hostile-input ceilings (`limits.rs`, no_std): frames ≤ 2^40, voices ≤ 4096,
-  channels ≤ 32, objects ≤ 2^20, events ≤ 2^20, dependency depth ≤ 64, graph
-  nodes ≤ 2^16, file ≤ 2^40 bytes, etc. Mixing-bound proof test
-  (|mix| < 2^43 « 2^63).
-- In-repo SHA-256 validated against FIPS 180-4 vectors.
-- Directness (D0..D3) and Topology vocabularies (audio/), docs set, corpus
-  manifest (empty-draft, honest), receipts dir, scripts (device builds +
-  court driver exit `NOT_IMPLEMENTED` until their phases).
-- CLI: `probe`, `receipt show`, `version`, `help`; unimplemented commands
-  exit with explicit `NOT_IMPLEMENTED`-style errors (exit code 3 semantics),
-  never implying support.
-- Verified: `cargo test` 27 passing; `cargo clippy --all-targets
-  --all-features -- -D warnings` clean; library compiles `no_std` for host and
-  for `nvptx64-nvidia-cuda` with `-Z build-std=core`.
-
-Current evidence files: (probe receipts are produced by `vole-audio probe`;
-first court receipts arrive with Phase C.)
-
-## Completed phases
-
-### Phase A — Evidence constitution (complete)
-
 _... see git history / earlier ledger entries ..._ (Phase A summary retained in
 `PROJECT_STATE` at commit `efaebf7`.)
 
@@ -205,21 +166,93 @@ Delivered:
 
 Verified: 154 tests green; clippy/fmt clean; device no_std compile clean.
 
+### Phase F — SIMD (complete)
+
+Exit criteria: scalar == SIMD (bit parity on every floor); serious CPU
+baseline exists (measured, not asserted); runtime dispatch; docs/ledger.
+
+Correctness ledger entry — Phase D latent bug fixed during Phase F:
+
+- `World::observe` used a standalone `voice_end_frame` pre-check that ignored
+  `endless`/`periodic` voices (it only honored loop regions). Endless
+  procedural voices have extent 0, so `one_shot_end_frame(0, extent 0)`
+  returned `Some(t0)` and every constant/oscillator/noise/partial-bank voice
+  was skipped as "already ended" — silent since Phase D, and no test asserted
+  endless audibility. Fixed: the world loop now uses the canonical
+  `ResolvedVoice::end_frame` (pub(crate)). Regression test
+  `endless_procedural_voices_are_audible_and_class_distinct` added. The
+  authored court fixture contains these classes, so its frozen reference hash
+  (`f91b5b42...` → `f7e103f3...`, documented in `courts/authored.rs`
+  and re-frozen with fresh receipts). Semantic court hash unchanged
+  (`1791816f...`).
+
+Second correctness fix (same phase): `object::compose_transpose` formed its
+product in i64 before the documented saturation clamp, so in-domain inputs at
+the top of the rate × accumulated-transpose ranges (up to 2^40 · 2^47 = 2^87)
+could wrap and produce an in-domain-looking *garbage* effective rate in
+release builds (debug asserted first). It now composes in i128 and saturates
+at `MAX_ACCUMULATED_TRANSPOSE_Q24` exactly as documented; out-of-domain
+composed rates are rejected by `rate::checked_rate` at voice resolution.
+Regression: `compose_transpose_saturates_instead_of_wrapping`.
+
+Delivered:
+
+- `eval/backend.rs` — `Backend` (scalar/simd/auto) + `Isa` (scalar/avx2/
+  avx512) runtime detection via `is_x86_feature_detected`; concrete backend
+  resolution; evidence-facing labels. Selection is never semantic.
+- `eval/simd.rs` — planned engine: per-voice window plans decomposed into
+  envelope segments (`plan_window`, segment level formulas property-tested
+  against `EnvelopeParams::level_at`); hoisted per-voice object handle, end
+  clamp, release window. Bit-identical to the scalar oracle by construction
+  for the scalar floor (parity batteries: 900-seed random worlds + frozen
+  fixtures).
+- `eval/x86.rs` + `eval/x86_ops.rs` (x86-64 only) — frame-blocked vector
+  kernels (lanes = frames) generated from one macro source per floor:
+  `avx512` (8 lanes, native `vpmullq`) and `avx2` (4 lanes, 64-bit ops
+  emulated: mul via 32-bit multiplies, arithmetic shift / min / max via
+  select). Content (literal/cycle, linear + nearest, loop/cycle wrap incl.
+  single-correction fast path and exact Euclidean fallback) and endless
+  (oscillator DDS + table, vectorized VOLE-SPLITMIX64-STREAM noise,
+  constant, silence) classes. Partial banks and residual-governed voices
+  stay on the exact shared scalar path (documented; measured 1.0×). Envelope
+  division remains scalar-per-lane (no vector integer division); loads and
+  mix extraction are scalar-per-lane by design. Ops emulations are
+  unit-tested against scalar references (random + edge vectors, cross-floor
+  agreement).
+- Tail frames (< block width) render through the scalar oracle's own
+  `contribution_at` — partial blocks never read past a segment boundary.
+- Differential tests: frozen fixture hashes reproduced through every floor
+  (`vector_floors_reproduce_frozen_fixture_hashes`), fixture-window parity,
+  and a 400-seed random-world battery per vector floor. All green on this
+  host (avx2 + avx512 both exercised).
+- `court simd` — parity battery over semantic/authored/mixed worlds on every
+  available floor + fixture-level timing; immutable receipts under
+  `receipts/simd/`; verdict SUPPORTED.
+- CLI help updated; `docs/PERFORMANCE.md` now contains the measured Phase F
+  fixture-level rows (scalar/avx2/avx512, exact-parity enforced).
+
+Verified: 173 tests green; `clippy --all-targets --all-features -D warnings`
+clean (lib+bin+tests; example probe removed after measurement); `fmt` clean;
+device `no_std` compile clean; `court semantic`, `court authored`,
+`court simd` SUPPORTED with fresh receipts.
+
+Measured (Phase F fixture-level; method in docs/PERFORMANCE.md): AVX-512
+kernels 2.0–5.3× faster than the planned scalar floor (literal-interp 256v
+2.9×; noise 512v 5.3×; wavetable 256v 2.6×; osc/env churn 2.0×); AVX2
+1.1–2.8×; partial-bank class 1.0× (exact shared scalar path, documented).
+
 ## Known blockers
 
-- None for Phase D. ROCm hardware absent (evidence row only). ALSA D1 court
+- None for Phase F. ROCm hardware absent (evidence row only). ALSA D1 court
   needs a user decision on audible output (courts default to silence-safe
   probes; `--emit-audio` opt-in flag will gate audible content).
 
 ## Next work (exact order — the implementation contract is executed in sequence)
 
-1. **Phase F — SIMD (AVX2 baseline; scalar == SIMD)** on the host: the same
-   frozen semantics vectorized with runtime dispatch; differential parity
-   tests vs the scalar oracle.
-2. Phase G — CUDA (Rust PTX evaluator, GPU-resident world, buffered
+1. Phase G — CUDA (Rust PTX evaluator, GPU-resident world, buffered
    diagnostic D0; scalar == CUDA differential).
-3. Phase H — CUDA D1 falsification (ALSA mmap + registration).
-4. Phase I — ROCm (hardware-unavailable evidence + clean amdgcn build).
-5. Phase J — ROCm D1.
-6. Phase K — inverse compiler; Phase L — GPU inverse search;
-7. Phase M — production depth/courts/corpus; Phase N — transport/archive.
+2. Phase H — CUDA D1 falsification (ALSA mmap + registration).
+3. Phase I — ROCm (hardware-unavailable evidence + clean amdgcn build).
+4. Phase J — ROCm D1.
+5. Phase K — inverse compiler; Phase L — GPU inverse search;
+6. Phase M — production depth/courts/corpus; Phase N — transport/archive.

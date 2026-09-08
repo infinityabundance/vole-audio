@@ -87,6 +87,20 @@ impl World {
         &self.score.voices
     }
 
+    /// Resolve every voice in this world against a store (single source of
+    /// resolution; engines render from the result).
+    pub fn resolve_all(&self, store: &ObjectStore) -> Result<Vec<ResolvedVoice>> {
+        self.score
+            .voices
+            .iter()
+            .map(|v| {
+                let mut spec = v.spec.clone();
+                spec.note_off = v.note_off;
+                ResolvedVoice::resolve(store, spec, self.nominal_rate_hz)
+            })
+            .collect::<Result<Vec<_>>>()
+    }
+
     /// Observe `[start, start+frames)` into canonical interleaved output.
     ///
     /// Voices triggered before the window contribute from their trigger; the
@@ -101,41 +115,23 @@ impl World {
         if frames > crate::limits::MAX_QUANTUM_FRAMES as usize {
             return Err(Error::limit("observation window exceeds quantum ceiling"));
         }
-        let resolved: Vec<ResolvedVoice> = self
-            .score
-            .voices
-            .iter()
-            .map(|v| {
-                let mut spec = v.spec.clone();
-                spec.note_off = v.note_off;
-                ResolvedVoice::resolve(store, spec, self.nominal_rate_hz)
-            })
-            .collect::<Result<Vec<_>>>()?;
+        let resolved = self.resolve_all(store)?;
 
         let channels = usize::from(self.output_channels);
         let mut mixer = Mixer::new(channels, frames);
-        // Fast path: skip voices whose entire life is outside the window.
+        // Skip voices whose entire life is outside the window.
         let end_frame = start_frame + frames as i64;
         for voice in &resolved {
             let spec = &voice.spec;
-            // Contribution possible only if trigger < window end and the voice
-            // is not already silent/ended before the window start.
             if spec.trigger_frame >= end_frame {
                 continue;
             }
-            let first = start_frame.max(spec.trigger_frame).max(0) as usize;
-            let last = end_frame.min(voice_end_frame(voice).unwrap_or(end_frame)) as usize;
-            for f in first..last.min(start_frame as usize + frames).max(first) {
-                // recompute actual frame index
-                let _ = f;
-            }
-            // Straightforward, correct loop (bounds above are advisory):
             for fi in 0..frames {
                 let t = start_frame + fi as i64;
                 if t < spec.trigger_frame {
                     continue;
                 }
-                if voice_end_frame(voice).is_some_and(|end| t >= end) {
+                if voice.end_frame().is_some_and(|end| t >= end) {
                     continue;
                 }
                 if spec
@@ -144,26 +140,19 @@ impl World {
                 {
                     continue;
                 }
-                voice.render_frame(store, &mut mixer, t, fi);
+                let c = voice.contribution_at(store, t);
+                if let Some((ch, v)) = c.a {
+                    mixer.add(fi, ch, v);
+                }
+                if let Some((ch, v)) = c.b {
+                    mixer.add(fi, ch, v);
+                }
             }
         }
         let mut out = vec![0i32; frames * channels];
         mixer.finalize_interleaved(&mut out);
         Ok(out)
     }
-}
-
-/// Natural end frame of a resolved voice (one-shot only).
-fn voice_end_frame(v: &ResolvedVoice) -> Option<i64> {
-    if v.loop_region.is_some() {
-        return None;
-    }
-    crate::sampler::rate::one_shot_end_frame(
-        v.spec.start_pos_q24,
-        v.eff_rate_q24,
-        v.extent_frames,
-        v.spec.trigger_frame,
-    )
 }
 
 /// Convenience: build a world with a single voice spec.
@@ -269,6 +258,88 @@ mod tests {
         let seeked = world.observe(&store, 100, 256).unwrap();
         assert_eq!(&contig[100..356], &seeked[..]);
         let _ = seq;
+    }
+
+    /// Regression: endless procedural voices (constant/oscillator/noise/
+    /// partial bank) must be *audible* — the world's natural-end pre-check
+    /// used to treat extent-0 sources as already ended, silencing every
+    /// endless class (Phase D latent bug surfaced during Phase F work). Each
+    /// class must produce a distinct nonzero observation.
+    #[test]
+    fn endless_procedural_voices_are_audible_and_class_distinct() {
+        let mut store = ObjectStore::new();
+        let mut mk_obj = |rep, data| {
+            let d = ObjectDescriptor::new(rep, 0, Layout::Mono, None).unwrap();
+            store.insert(d.clone(), data).unwrap()
+        };
+        let cst = mk_obj(
+            Representation::Constant,
+            ObjectData::Constant(crate::object::Constant::new(65_536)),
+        );
+        let osc = mk_obj(
+            Representation::Oscillator,
+            ObjectData::Oscillator(crate::object::Oscillator::checked(440, 1 << 16).unwrap()),
+        );
+        let nse = mk_obj(
+            Representation::Noise,
+            ObjectData::Noise(crate::object::Noise::new(0x5EED_2026)),
+        );
+        let bank = mk_obj(
+            Representation::PartialBank,
+            ObjectData::PartialBank(
+                crate::object::PartialBank::checked(
+                    55,
+                    vec![
+                        Partial {
+                            harmonic: 1,
+                            amp_q16: 1 << 15,
+                        },
+                        Partial {
+                            harmonic: 3,
+                            amp_q16: 1 << 14,
+                        },
+                        Partial {
+                            harmonic: 5,
+                            amp_q16: 1 << 13,
+                        },
+                    ],
+                )
+                .unwrap(),
+            ),
+        );
+
+        let mut class_hash = std::collections::BTreeMap::new();
+        for id in [cst, osc, nse, bank] {
+            // Include windows that start at the trigger (the old bug ended the
+            // voice at exactly t0) and later windows (sustain must persist).
+            for start in [0i64, 333, 5000] {
+                let world = world_with_one_voice(48_000, 1, voice(id, 0, 1 << 24)).unwrap();
+                let out = world.observe(&store, start, 512).unwrap();
+                assert!(
+                    out.iter().any(|&x| x != 0),
+                    "object {id:?} silent in window [{start}, {})",
+                    start + 512
+                );
+                let h = crate::hash::sha256::hex(
+                    &crate::universe::observation::observation_sha256(&out),
+                );
+                class_hash.insert(id, h);
+            }
+        }
+        // Every class must have a distinct observation fingerprint (none of
+        // them collapses to silence or to another class's signal).
+        let mut seen = std::collections::BTreeSet::new();
+        for (id, h) in &class_hash {
+            assert!(
+                seen.insert(h.clone()),
+                "object {id:?} observation collides with another class"
+            );
+        }
+        assert_eq!(class_hash.len(), 4);
+        // Sustain: an endless voice must still be audible deep after trigger.
+        let world = world_with_one_voice(48_000, 1, voice(cst, 0, 1 << 24)).unwrap();
+        let out = world.observe(&store, 100_000, 64).unwrap();
+        assert!(out.iter().any(|&x| x != 0), "constant must sustain");
     }
 
     #[test]
