@@ -354,7 +354,10 @@ struct SessionOut {
 }
 
 impl SessionOut {
-    fn verdict(&self, total_frames: u64) -> (Verdict, String) {
+    /// Verdict + detail. `direct_to_ring` selects the path-specific success
+    /// sentence: receipt prose must never contradict the traffic counters
+    /// (D0 materializes GPU->host + host copy; D1 writes the ring directly).
+    fn verdict(&self, total_frames: u64, direct_to_ring: bool) -> (Verdict, String) {
         if !self.shadow_exact {
             (
                 Verdict::FailedCorrectness,
@@ -373,12 +376,16 @@ impl SessionOut {
                 ),
             )
         } else if self.detail.is_none() && self.frames_committed >= total_frames {
-            (
-                Verdict::Supported,
-                "entropy state evaluated on the GPU; exact final codes written into the \
-                 registered ALSA ring and committed without discontinuity"
-                    .to_string(),
-            )
+            let sentence = if direct_to_ring {
+                "entropy decoded on GPU; final sample codes written directly into the \
+                 registered ALSA ring; endpoint codes matched scalar oracle; committed \
+                 without discontinuity"
+            } else {
+                "entropy decoded on GPU; sample block transferred to host and copied into \
+                 the ALSA ring; endpoint codes matched scalar oracle; committed without \
+                 discontinuity"
+            };
+            (Verdict::Supported, sentence.to_string())
         } else {
             (
                 Verdict::FailedDeadline,
@@ -577,6 +584,21 @@ struct SessionCtx<'a> {
     upmix: Function,
 }
 
+/// Registration evidence captured from the mapping a D1 session actually
+/// wrote through — verdict-bearing provenance. Never taken from a post-hoc
+/// re-open of the endpoint: the receipt's `registered_range` must describe
+/// the same mapping whose bytes produced `endpoint_hash`.
+struct RegistrationEvidence {
+    /// Host address passed to cuMemHostRegister (the ALSA mmap area base).
+    host_ptr: usize,
+    /// Byte length passed to cuMemHostRegister (buffer_frames * frame_bytes).
+    bytes: usize,
+    /// Whether cuMemHostGetDevicePointer produced a device pointer.
+    device_ptr_present: bool,
+    pcm_name: String,
+    area_layout: String,
+}
+
 struct SessionCell {
     label: &'static str,
     /// SHA-256 (hex) over the session's scalar-expected endpoint codes (i32
@@ -588,6 +610,9 @@ struct SessionCell {
     /// chunk matched the scalar oracle — measured independently, not derived
     /// from the reference digest.
     endpoint_sha256: String,
+    /// The session's own ring registration (D1 sessions only; `None` for the
+    /// D0 baselines, which never register the ring).
+    registration: Option<RegistrationEvidence>,
     out: SessionOut,
     traffic: SessionTraffic,
 }
@@ -638,6 +663,13 @@ fn session_json(cell: &SessionCell, verdict: &Verdict, total_frames: u64) -> ser
         "verification_shadow_copy_bytes": cell.traffic.verification_shadow_copy,
         "window_sha256": cell.window_sha256,
         "endpoint_sha256": cell.endpoint_sha256,
+        "registered_range": cell.registration.as_ref().map(|r| {
+            format!("{:#x}+{}", r.host_ptr, r.bytes)
+        }),
+        "registered_device_ptr_present": cell
+            .registration
+            .as_ref()
+            .map(|r| r.device_ptr_present),
         "drain_state": cell.out.drain_state,
         "detail": cell.out.detail,
     })
@@ -702,6 +734,7 @@ fn session_d0_literal(
         label: "d0-literal",
         window_sha256: codes_sha256(expected),
         endpoint_sha256: crate::hash::sha256::hex(&endpoint_sha.finalize()),
+        registration: None,
         out,
         traffic,
     })
@@ -774,6 +807,7 @@ fn session_d0_residual(
         label: "d0-residual",
         window_sha256: codes_sha256(expected),
         endpoint_sha256: crate::hash::sha256::hex(&endpoint_sha.finalize()),
+        registration: None,
         out,
         traffic,
     })
@@ -791,6 +825,19 @@ fn session_d1_literal(
 ) -> std::result::Result<SessionCell, (Verdict, String)> {
     let pcm = open_validated(&ctx.request)?;
     let reg = register_ring(ctx.cuda, &pcm)?;
+    // Capture the verdict-bearing registration evidence from THIS mapping
+    // (the one the session actually writes through) — never from a post-hoc
+    // re-open of the endpoint.
+    let registration = {
+        let s = pcm.snapshot();
+        Some(RegistrationEvidence {
+            host_ptr: pcm.area_base,
+            bytes: region_bytes(&pcm) as usize,
+            device_ptr_present: reg.device_ptr.is_some(),
+            pcm_name: s.pcm_name,
+            area_layout: s.area_layout.clone().unwrap_or_default(),
+        })
+    };
     let Some(ring_dev) = reg.device_ptr else {
         return Err((Verdict::UnsupportedByApi, "no device pointer".into()));
     };
@@ -862,6 +909,7 @@ fn session_d1_literal(
         label: "d1-literal",
         window_sha256: codes_sha256(expected),
         endpoint_sha256: crate::hash::sha256::hex(&endpoint_sha.finalize()),
+        registration,
         out,
         traffic,
     })
@@ -877,6 +925,19 @@ fn session_d1_residual(
 ) -> std::result::Result<SessionCell, (Verdict, String)> {
     let pcm = open_validated(&ctx.request)?;
     let reg = register_ring(ctx.cuda, &pcm)?;
+    // Capture the verdict-bearing registration evidence from THIS mapping
+    // (the one the session actually writes through) — never from a post-hoc
+    // re-open of the endpoint.
+    let registration = {
+        let s = pcm.snapshot();
+        Some(RegistrationEvidence {
+            host_ptr: pcm.area_base,
+            bytes: region_bytes(&pcm) as usize,
+            device_ptr_present: reg.device_ptr.is_some(),
+            pcm_name: s.pcm_name,
+            area_layout: s.area_layout.clone().unwrap_or_default(),
+        })
+    };
     let Some(ring_dev) = reg.device_ptr else {
         return Err((Verdict::UnsupportedByApi, "no device pointer".into()));
     };
@@ -964,6 +1025,7 @@ fn session_d1_residual(
         label: "d1-residual",
         window_sha256: codes_sha256(expected),
         endpoint_sha256: crate::hash::sha256::hex(&endpoint_sha.finalize()),
+        registration,
         out,
         traffic,
     })
@@ -978,6 +1040,19 @@ fn session_d1_noise(
 ) -> std::result::Result<SessionCell, (Verdict, String)> {
     let pcm = open_validated(&ctx.request)?;
     let reg = register_ring(ctx.cuda, &pcm)?;
+    // Capture the verdict-bearing registration evidence from THIS mapping
+    // (the one the session actually writes through) — never from a post-hoc
+    // re-open of the endpoint.
+    let registration = {
+        let s = pcm.snapshot();
+        Some(RegistrationEvidence {
+            host_ptr: pcm.area_base,
+            bytes: region_bytes(&pcm) as usize,
+            device_ptr_present: reg.device_ptr.is_some(),
+            pcm_name: s.pcm_name,
+            area_layout: s.area_layout.clone().unwrap_or_default(),
+        })
+    };
     let Some(ring_dev) = reg.device_ptr else {
         return Err((Verdict::UnsupportedByApi, "no device pointer".into()));
     };
@@ -1040,6 +1115,7 @@ fn session_d1_noise(
         label: "d1-noise",
         window_sha256: codes_sha256(expected),
         endpoint_sha256: crate::hash::sha256::hex(&endpoint_sha.finalize()),
+        registration,
         out,
         traffic,
     })
@@ -1268,7 +1344,7 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
                 "detail": format!("{name}: {why}"),
                 "snapshot": snap_json,
                 "sessions": cells.iter().map(|c| {
-                    let (cv, _) = c.out.verdict(total_frames);
+                    let (cv, _) = c.out.verdict(total_frames, c.label.starts_with("d1"));
                     session_json(c, &cv, total_frames)
                 }).collect::<Vec<_>>(),
             }));
@@ -1280,7 +1356,7 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
         let mut verdicts = Vec::new();
         let mut all_supported = true;
         for cell in &cells {
-            let (v, detail) = cell.out.verdict(total_frames);
+            let (v, detail) = cell.out.verdict(total_frames, cell.label.starts_with("d1"));
             if v != Verdict::Supported {
                 all_supported = false;
             }
@@ -1291,35 +1367,26 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
             }));
         }
 
-        // Reopen to capture the endpoint snapshot + the exact registered
-        // range for the receipt evidence (register, read, unregister).
-        let (snap, reg_evidence) = match open_validated(&request) {
+        // Post-session reprobe: endpoint state after the sessions (snapshot
+        // row only). Deliberately NOT re-registered: the receipt's
+        // registered-range / device-pointer evidence comes from the
+        // verdict-bearing d1-literal session's own HostRegistration (below),
+        // never from a fresh open/register invented afterward.
+        let snap = match open_validated(&request) {
             Ok(p) => {
                 let s = p.snapshot();
-                let range = match register_ring(&cuda, &p) {
-                    Ok(reg) => {
-                        let r = format!("{:#x}+{}", reg.host_ptr as usize, reg.bytes);
-                        let dp = reg.device_ptr.is_some();
-                        drop(reg);
-                        (Some(r), dp)
-                    }
-                    Err((_, why)) => (Some(format!("register-for-evidence failed: {why}")), false),
-                };
-                drop(p);
-                (
-                    serde_json::json!({
-                        "pcm_name": s.pcm_name, "access": s.access, "format": s.format,
-                        "rate_hz": s.rate_hz, "channels": s.channels,
-                        "period_frames": s.period_frames, "buffer_frames": s.buffer_frames,
-                        "area_layout": s.area_layout,
-                        "area_layout_validated": s.area_layout_validated,
-                    }),
-                    range,
-                )
+                serde_json::json!({
+                    "post_session_reprobe": true,
+                    "pcm_name": s.pcm_name, "access": s.access, "format": s.format,
+                    "rate_hz": s.rate_hz, "channels": s.channels,
+                    "period_frames": s.period_frames, "buffer_frames": s.buffer_frames,
+                    "area_layout": s.area_layout,
+                    "area_layout_validated": s.area_layout_validated,
+                    "state": s.state,
+                })
             }
-            Err((_, why)) => (serde_json::json!({ "detail": why }), (None, false)),
+            Err((_, why)) => serde_json::json!({ "post_session_reprobe": true, "detail": why }),
         };
-        let _ = &reg_evidence;
 
         let cell = serde_json::json!({
             "device": dev.pcm_name,
@@ -1328,7 +1395,7 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
             "result": if all_supported { "SUPPORTED" } else { "FAILED" },
             "snapshot": snap,
             "sessions": cells.iter().map(|c| {
-                let (cv, _) = c.out.verdict(total_frames);
+                let (cv, _) = c.out.verdict(total_frames, c.label.starts_with("d1"));
                 session_json(c, &cv, total_frames)
             }).collect::<Vec<_>>(),
             "session_verdicts": verdicts,
@@ -1368,6 +1435,16 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
                  scalar reference digest",
             );
         }
+        // The verdict-bearing registration must have been captured from the
+        // d1-literal session's own HostRegistration (a SUPPORTED D1 session
+        // always registered; missing evidence here is an internal error).
+        let Some(verdict_reg) = verdict_cell.registration.as_ref() else {
+            return fail(
+                Verdict::FailedCorrectness,
+                "internal evidence error: verdict-bearing d1-literal session lacks \
+                 registration evidence",
+            );
+        };
 
         // Success: build the sealed receipt and stop probing.
         let lit = cells
@@ -1470,9 +1547,19 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
             .counters(counters)
             .endpoint(EndpointEvidence {
                 directness: Some("D1_ENDPOINT_MAPPED".into()),
-                registered_range: reg_evidence.0,
-                registration_result: Some("cuMemHostRegister(DEVICEMAP) succeeded".into()),
-                device_pointer: Some(if reg_evidence.1 {
+                // From the verdict-bearing d1-literal session's own
+                // HostRegistration (the mapping whose bytes produced
+                // endpoint_hash) — never a post-hoc re-open.
+                registered_range: Some(format!(
+                    "{:#x}+{}",
+                    verdict_reg.host_ptr, verdict_reg.bytes
+                )),
+                registration_result: Some(
+                    "cuMemHostRegister(DEVICEMAP) succeeded — captured from the verdict-bearing \
+                     d1-literal session's own HostRegistration"
+                        .into(),
+                ),
+                device_pointer: Some(if verdict_reg.device_ptr_present {
                     "present (registered host memory, DEVICEMAP)".into()
                 } else {
                     "absent".into()
@@ -1531,6 +1618,27 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
                         are measured through separate byte streams and agree exactly because \
                         every committed chunk matched the scalar oracle (per-session \
                         window_sha256 / endpoint_sha256 in each row)",
+                }),
+            )
+            .extra(
+                "endpoint_registration_provenance",
+                serde_json::json!({
+                    "source": "the d1-literal session's own HostRegistration \
+                        (cuMemHostRegister over the ALSA mmap mapping the verdict-bearing \
+                        GPU writes went through); captured at session setup, not from a \
+                        post-hoc re-open",
+                    "registered_range": format!("{:#x}+{}", verdict_reg.host_ptr, verdict_reg.bytes),
+                    "device_ptr_present": verdict_reg.device_ptr_present,
+                    "pcm_name": verdict_reg.pcm_name,
+                    "area_layout": verdict_reg.area_layout,
+                    "chain": "scalar expected bytes -> reference_hash; the verdict-bearing \
+                        ALSA mmap region (registered by the d1-literal session) <- actual \
+                        CUDA device pointer <- GPU writes -> per-chunk in-place mmap readback \
+                        -> endpoint_hash == backend_hash == reference_hash",
+                    "post_session_reprobe": "the trial-row snapshot re-opens the endpoint \
+                        for endpoint state only (labeled post_session_reprobe); it is never \
+                        registered and never supplies registered_range / device_pointer \
+                        evidence",
                 }),
             )
             .extra(
