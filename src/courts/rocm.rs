@@ -44,18 +44,33 @@ const DEFAULT_ARTIFACT: &str = "scripts/out/vole_audio.amdgcn.elf";
 /// Determinism evidence written by `build-rocm-device.sh --verify-deterministic`.
 const DEFAULT_DETERMINISM: &str = "scripts/out/vole_audio.amdgcn.determinism.json";
 
-/// Compile-surface assessment. Satisfied only when the artifact is a valid
-/// AMDGPU code object carrying every required kernel entry AND its
-/// provenance sidecar matches the attested source tree.
-fn compile_surface(path: &Path, sidecar: &Path, env: &Environment) -> (serde_json::Value, bool) {
-    let bytes = match std::fs::read(path) {
+/// Compile-surface assessment. Satisfied only when every link of the chain
+/// is bound to the actual artifact bytes:
+///
+/// ```text
+/// source <-> sidecar(source_tree, dirty) <-> repro builds (determinism)
+///         <-> actual artifact bytes (sha256)
+/// ```
+///
+/// Concretely: the artifact parses as an AMDGPU code object carrying every
+/// required kernel entry, its provenance sidecar matches the attested
+/// source tree AND records the actual artifact sha256, and the determinism
+/// evidence (present, byte_deterministic) binds both repro builds to the
+/// same sha256 and the attested tree. Anything less is unsatisfied.
+fn compile_surface(
+    artifact_path: &Path,
+    sidecar_path: &Path,
+    determinism_path: &Path,
+    env: &Environment,
+) -> (serde_json::Value, bool) {
+    let bytes = match std::fs::read(artifact_path) {
         Ok(b) => b,
         Err(_) => {
             return (
                 serde_json::json!({
                     "satisfied": false,
                     "artifact_present": false,
-                    "build_step": "sh scripts/build-rocm-device.sh (requires the pinned nightly + rust-src; see docs/PHASE_I.md)",
+                    "build_step": "sh scripts/build-rocm-device.sh --verify-deterministic (requires the pinned nightly + rust-src; see docs/PHASE_I.md)",
                 }),
                 false,
             );
@@ -77,11 +92,15 @@ fn compile_surface(path: &Path, sidecar: &Path, env: &Environment) -> (serde_jso
             );
         }
     };
-    let sidecar_json = std::fs::read_to_string(sidecar)
-        .ok()
+    // Provenance sidecar (canonical <file>.json, legacy fallback).
+    let sidecar_file = sidecar_path.exists().then_some(sidecar_path);
+    let sidecar_json = sidecar_file
+        .and_then(|p| std::fs::read_to_string(p).ok())
         .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok());
-    let (source_matches, build_dirty, sidecar_summary) = match &sidecar_json {
+    let mut sidecar_missing: Vec<String> = Vec::new();
+    let (sidecar_sha_ok, source_matches, build_dirty, sidecar_summary) = match &sidecar_json {
         Some(sj) => {
+            let sidecar_sha = sj.get("sha256").and_then(|v| v.as_str());
             let sidecar_tree = sj.get("source_tree_sha").and_then(|v| v.as_str());
             let dirty = sj.get("source_dirty").and_then(|v| v.as_bool());
             // None when one side has no tree identity: unverifiable.
@@ -90,10 +109,13 @@ fn compile_surface(path: &Path, sidecar: &Path, env: &Environment) -> (serde_jso
                 _ => None,
             };
             (
+                // The sidecar must describe THESE artifact bytes.
+                sidecar_sha == Some(sha.as_str()),
                 matches,
                 dirty,
                 serde_json::json!({
                     "sidecar_present": true,
+                    "sha256_matches_artifact": sidecar_sha == Some(sha.as_str()),
                     "matches_runtime_tree": matches,
                     "build_dirty": dirty,
                     "target_cpu": sj.get("target_cpu"),
@@ -102,12 +124,59 @@ fn compile_surface(path: &Path, sidecar: &Path, env: &Environment) -> (serde_jso
                 }),
             )
         }
-        None => (None, None, serde_json::json!({ "sidecar_present": false })),
+        None => {
+            sidecar_missing.push("provenance sidecar".into());
+            (
+                false,
+                None,
+                None,
+                serde_json::json!({ "sidecar_present": false }),
+            )
+        }
     };
-    let determinism = std::fs::read_to_string(DEFAULT_DETERMINISM)
+    // Determinism evidence: both isolated repro builds must equal the actual
+    // artifact sha and come from the attested tree.
+    let determinism_json = std::fs::read_to_string(determinism_path)
         .ok()
         .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok());
-    let satisfied = elf.valid() && source_matches == Some(true) && build_dirty == Some(false);
+    let (determinism_ok, determinism) = match &determinism_json {
+        Some(dj) => {
+            let byte_det = dj
+                .get("byte_deterministic")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            let a = dj.get("build_a_sha256").and_then(|v| v.as_str());
+            let b = dj.get("build_b_sha256").and_then(|v| v.as_str());
+            let tree = dj.get("source_tree_sha").and_then(|v| v.as_str());
+            let ok = byte_det
+                && a == Some(sha.as_str())
+                && b == Some(sha.as_str())
+                && tree == env.git_tree_sha.as_deref();
+            if !ok && byte_det {
+                sidecar_missing.push("determinism binds to this artifact/tree".into());
+            }
+            (
+                ok,
+                serde_json::json!({
+                    "present": true,
+                    "byte_deterministic": byte_det,
+                    "build_a_sha256_matches_artifact": a == Some(sha.as_str()),
+                    "build_b_sha256_matches_artifact": b == Some(sha.as_str()),
+                    "source_tree_matches": tree == env.git_tree_sha.as_deref(),
+                    "ok": ok,
+                }),
+            )
+        }
+        None => {
+            sidecar_missing.push("determinism evidence (run --verify-deterministic)".into());
+            (false, serde_json::json!({ "present": false }))
+        }
+    };
+    let satisfied = elf.valid()
+        && sidecar_sha_ok
+        && source_matches == Some(true)
+        && build_dirty == Some(false)
+        && determinism_ok;
     let value = serde_json::json!({
         "satisfied": satisfied,
         "artifact_present": true,
@@ -119,6 +188,7 @@ fn compile_surface(path: &Path, sidecar: &Path, env: &Environment) -> (serde_jso
         "entries_missing": elf.entries_missing,
         "provenance": sidecar_summary,
         "determinism": determinism,
+        "unsatisfied_reasons": sidecar_missing,
     });
     (value, satisfied)
 }
@@ -127,13 +197,29 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
     let artifact_path = std::env::var("VOLE_ROCM_ARTIFACT")
         .map(PathBuf::from)
         .unwrap_or_else(|_| PathBuf::from(DEFAULT_ARTIFACT));
-    // The build script writes the provenance sidecar as "<artifact>.json"
-    // (vole_audio.amdgcn.elf -> vole_audio.amdgcn.json).
-    let sidecar_path = artifact_path.with_extension("json");
+    // Sidecar: canonical <full artifact filename>.json
+    // (vole_audio.amdgcn.elf.json); legacy <stem>.json accepted as fallback
+    // (mirrors evidence::artifact::sidecar_path).
+    let dir = artifact_path
+        .parent()
+        .unwrap_or_else(|| std::path::Path::new("."))
+        .to_path_buf();
+    let file = artifact_path
+        .file_name()
+        .map(|f| f.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let canonical_sidecar = dir.join(format!("{file}.json"));
+    let sidecar_path = if canonical_sidecar.exists() {
+        canonical_sidecar
+    } else {
+        artifact_path.with_extension("json")
+    };
+    let determinism_path = PathBuf::from(DEFAULT_DETERMINISM);
     let env = Environment::capture();
 
     // 1. Compile surface (fail closed).
-    let (compile, compile_satisfied) = compile_surface(&artifact_path, &sidecar_path, &env);
+    let (compile, compile_satisfied) =
+        compile_surface(&artifact_path, &sidecar_path, &determinism_path, &env);
     let artifact_sha = compile
         .get("sha256")
         .and_then(|v| v.as_str())
@@ -145,6 +231,7 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
     let runtime = serde_json::json!({
         "amd_gpus": probe.amd_gpus.iter().map(|g| serde_json::json!({
             "bdf": g.bdf, "vendor": g.vendor, "device": g.device, "driver": g.driver,
+            "class": g.class,
         })).collect::<Vec<_>>(),
         "kfd": match probe.kfd {
             KfdState::Absent => "absent",
@@ -153,8 +240,15 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
         },
         "compute_runtime": probe.compute.iter().map(|a| serde_json::json!({
             "soname": a.soname,
-            "loaded": a.loaded.is_ok(),
-            "detail": a.loaded.as_ref().err().cloned(),
+            "ready": a.ready(),
+            "detail": match &a.loaded {
+                Ok(missing) => if missing.is_empty() {
+                    None
+                } else {
+                    Some(format!("loaded, missing required symbols: {}", missing.join(",")))
+                },
+                Err(e) => Some(e.clone()),
+            },
         })).collect::<Vec<_>>(),
         "telemetry_rocmsmi": probe.telemetry.iter().any(|(_, f)| *f),
         "classification": runtime_detail,

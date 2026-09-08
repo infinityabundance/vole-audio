@@ -91,9 +91,13 @@ impl Drop for Lib {
 }
 
 /// Load a runtime soname (via ld cache + custom-install candidate paths)
-/// and resolve a required entry symbol.
-/// Returns `Ok(lib_name)` when both succeed, `Err(reason)` otherwise.
-pub fn probe_soname_symbol(soname: &str, symbol: &str) -> Result<String, String> {
+/// and resolve every required entry symbol.
+/// Returns `Ok((lib_name, missing_symbols))` — `Ok` with an empty missing
+/// list means the full required ABI surface resolved.
+pub fn probe_soname_symbols<'a>(
+    soname: &str,
+    required: &[&'a str],
+) -> Result<(String, Vec<&'a str>), String> {
     let mut candidates = vec![soname.to_string()];
     // ROCM_LIB_PATH override (colon-separated absolute dirs).
     if let Ok(p) = std::env::var("ROCM_LIB_PATH") {
@@ -120,16 +124,16 @@ pub fn probe_soname_symbol(soname: &str, symbol: &str) -> Result<String, String>
     }
     let names = candidates.iter().map(String::as_str).collect::<Vec<_>>();
     let lib = Lib::open_candidates(names)?;
-    // SAFETY: the symbol pointer is used only to prove resolvability inside
-    // this function while `lib` is alive.
-    let found = unsafe { lib.symbol::<unsafe extern "C" fn()>(symbol) }.is_some();
-    if found {
-        Ok(lib.name.clone())
-    } else {
-        Err(format!(
-            "{soname} loaded but missing required symbol {symbol}"
-        ))
+    // SAFETY: the symbol pointers are used only to prove resolvability
+    // inside this function while `lib` is alive.
+    let mut missing = Vec::new();
+    for sym in required {
+        let found = unsafe { lib.symbol::<unsafe extern "C" fn()>(sym) }.is_some();
+        if !found {
+            missing.push(*sym);
+        }
     }
+    Ok((lib.name.clone(), missing))
 }
 
 #[cfg(test)]

@@ -87,6 +87,10 @@ pub struct Environment {
     pub build_profile: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub build_target: Option<String>,
+    /// Computed source-binding state (bound / unavailable / mismatch /
+    /// dirty). A seal requires `bound`.
+    #[serde(default)]
+    pub source_binding: SourceBinding,
 }
 
 /// Compile-time stamped constants (set by build.rs).
@@ -99,20 +103,58 @@ pub const BUILD_RUSTC: Option<&str> = option_env!("VOLE_BUILD_RUSTC");
 pub const BUILD_PROFILE: Option<&str> = option_env!("VOLE_BUILD_PROFILE");
 pub const BUILD_TARGET: Option<&str> = option_env!("VOLE_BUILD_TARGET");
 
-impl Environment {
-    /// True when the binary's compile-time identity matches the work tree it
-    /// is running in (a seal precondition: receipts must not be bound to a
-    /// tree the binary was not built from).
-    pub fn source_bound(&self) -> bool {
-        match (&self.build_git_commit, &self.git_commit) {
-            (Some(b), Some(r)) => {
-                b == r && self.build_dirty == Some(false) && self.git_dirty == Some(false)
-            }
-            // Both absent: not a git work tree (e.g. the crates.io tarball)
-            // — nothing to bind against; the evidence stays unbounded.
-            (None, None) => true,
-            _ => false,
+/// Source-binding state of a receipt: how the executing binary relates to
+/// the tree the receipt attests. One meaning everywhere: a **seal** requires
+/// `Bound`; a crates.io tarball run reports `Unavailable` (it can still run
+/// courts and emit receipts — it just says the evidence is unbounded).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SourceBinding {
+    /// Compiled-from == executed-in-worktree, both clean.
+    Bound,
+    /// No git identity on either side (e.g. the crates.io tarball): the
+    /// evidence is genuinely unbounded.
+    #[default]
+    Unavailable,
+    /// Compiled-from commit != executed-in-worktree commit.
+    Mismatch,
+    /// Compiled-from and/or work tree is dirty.
+    Dirty,
+}
+
+impl SourceBinding {
+    pub fn label(self) -> &'static str {
+        match self {
+            SourceBinding::Bound => "bound",
+            SourceBinding::Unavailable => "unavailable",
+            SourceBinding::Mismatch => "mismatch",
+            SourceBinding::Dirty => "dirty",
         }
+    }
+}
+
+impl Environment {
+    /// Compute the source-binding state from the recorded identities.
+    pub fn source_binding(&self) -> SourceBinding {
+        match (&self.build_git_commit, &self.git_commit) {
+            (Some(b), Some(r)) if b == r => {
+                if self.build_dirty == Some(false) && self.git_dirty == Some(false) {
+                    SourceBinding::Bound
+                } else {
+                    SourceBinding::Dirty
+                }
+            }
+            (Some(_), Some(_)) => SourceBinding::Mismatch,
+            // One side has a git identity and the other does not: the
+            // binary was not built from this tree — cannot be bound.
+            _ => SourceBinding::Unavailable,
+        }
+    }
+
+    /// True only when the evidence is genuinely bound: compiled-from ==
+    /// executed-in-worktree, both clean. (Non-git builds are *not* "bound".)
+    pub fn source_bound(&self) -> bool {
+        self.source_binding() == SourceBinding::Bound
     }
 }
 
@@ -255,7 +297,7 @@ impl Environment {
         let dirty = git_source_dirty();
         let gov = read_first_line("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor");
         let bios = read_first_line("/sys/class/dmi/id/bios_version");
-        Self {
+        let mut env = Self {
             git_commit: git(&["rev-parse", "HEAD"]),
             git_dirty: dirty,
             git_branch: git(&["rev-parse", "--abbrev-ref", "HEAD"]),
@@ -276,7 +318,10 @@ impl Environment {
             build_rustc: BUILD_RUSTC.map(str::to_string),
             build_profile: BUILD_PROFILE.map(str::to_string),
             build_target: BUILD_TARGET.map(str::to_string),
-        }
+            source_binding: SourceBinding::Unavailable,
+        };
+        env.source_binding = env.source_binding();
+        env
     }
 
     /// True if running inside a git work tree with a known commit.
@@ -348,7 +393,8 @@ mod tests {
     }
 
     #[test]
-    fn source_bound_matches_only_clean_same_tree() {
+    fn source_binding_states_are_distinct() {
+        use SourceBinding::*;
         let bound = Environment {
             git_commit: Some("abc123".into()),
             git_dirty: Some(false),
@@ -356,9 +402,10 @@ mod tests {
             build_dirty: Some(false),
             ..Environment::default()
         };
+        assert_eq!(bound.source_binding(), Bound);
         assert!(bound.source_bound());
-        // Compiled from an older commit while running at a newer one: not
-        // bound (the exact stale-binary case a seal must reject).
+        // Compiled from an older commit while running at a newer one: the
+        // exact stale-binary case a seal must reject.
         let stale = Environment {
             git_commit: Some("def456".into()),
             git_dirty: Some(false),
@@ -366,8 +413,9 @@ mod tests {
             build_dirty: Some(false),
             ..Environment::default()
         };
+        assert_eq!(stale.source_binding(), Mismatch);
         assert!(!stale.source_bound());
-        // Either side dirty: not bound.
+        // Either side dirty.
         let dirty_tree = Environment {
             git_commit: Some("abc123".into()),
             git_dirty: Some(true),
@@ -375,9 +423,20 @@ mod tests {
             build_dirty: Some(false),
             ..Environment::default()
         };
+        assert_eq!(dirty_tree.source_binding(), Dirty);
         assert!(!dirty_tree.source_bound());
-        // Non-git tarball build (both absent): nothing to bind, no claim.
+        // Non-git tarball build (both absent): evidence is unbounded, and
+        // "unbounded" must not masquerade as "bound".
         let tarball = Environment::default();
-        assert!(tarball.source_bound());
+        assert_eq!(tarball.source_binding(), Unavailable);
+        assert!(!tarball.source_bound());
+        // One side only: cannot be bound.
+        let one_side = Environment {
+            git_commit: Some("abc123".into()),
+            build_git_commit: None,
+            ..Environment::default()
+        };
+        assert_eq!(one_side.source_binding(), Unavailable);
+        assert!(!one_side.source_bound());
     }
 }

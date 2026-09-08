@@ -11,11 +11,14 @@
 //!
 //! The seal procedure requires compiled-from == executed-in-worktree.
 //!
-//! The build script reruns whenever any source file changes (cheap), so the
+//! The build script reruns whenever any source file changes or the git
+//! metadata moves (HEAD / branch ref / packed-refs are tracked explicitly,
+//! resolved through `git rev-parse --git-path` for linked worktrees), so the
 //! stamped identity always matches the tree the binary was actually built
-//! from. Outside a git work tree (e.g. the crates.io tarball) the fields are
-//! empty and receipts simply carry `None` — the evidence is "not a git
-//! work tree", which the runtime capture already reports.
+//! from — including history-only HEAD moves that change no file. Outside a
+//! git work tree (e.g. the crates.io tarball) the fields are empty and
+//! receipts simply carry `None` — the evidence reports
+//! `source_binding = UNAVAILABLE`, and a seal requires `BOUND`.
 
 use std::process::Command;
 
@@ -28,10 +31,37 @@ fn git(args: &[&str]) -> Option<String> {
 }
 
 fn main() {
-    // No rerun-if-changed declarations: build.rs then reruns on every build
-    // (trivial cost), so the stamped compiled-from identity always tracks
-    // the current git state — including HEAD moves that change no file
-    // (commit/checkout), which file-change watchers would miss.
+    // Rerun when sources change…
+    println!("cargo:rerun-if-changed=src");
+    println!("cargo:rerun-if-changed=Cargo.toml");
+    // …and when the git identity moves. File-change tracking alone misses
+    // history-only HEAD moves (commit/checkout changes no file), which
+    // would leave the compiled-from stamp stale. Track the git metadata
+    // itself: .git/HEAD, the resolved branch ref, and packed-refs. Paths
+    // are resolved through `git rev-parse --git-path` so linked worktrees
+    // work too. (Without rerun-if-* cargo may not rerun on every build, so
+    // this explicit tracking is what keeps the stamp honest.)
+    let git_path = |arg: &str| {
+        Command::new("git")
+            .args(["rev-parse", "--git-path", arg])
+            .output()
+            .ok()
+            .filter(|o| o.status.success())
+            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+            .filter(|s| !s.is_empty())
+    };
+    for tracked in ["HEAD", "packed-refs"] {
+        if let Some(p) = git_path(tracked) {
+            println!("cargo:rerun-if-changed={p}");
+        }
+    }
+    let branch = git(&["rev-parse", "--abbrev-ref", "HEAD"]);
+    if let Some(b) = branch
+        .filter(|b| b != "HEAD")
+        .and_then(|b| git_path(&format!("refs/heads/{b}")))
+    {
+        println!("cargo:rerun-if-changed={b}");
+    }
 
     // Compiled-from identity. `--no-optional-locks` and the receipts/
     // pathspec exclusion mirror Environment::capture's runtime measurement:

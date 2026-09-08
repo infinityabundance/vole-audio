@@ -75,7 +75,7 @@ fn run(args: &[String]) -> Result<u8> {
                     }
                 );
             }
-            println!("source_bound: {}", e.source_bound());
+            println!("source_binding: {}", e.source_binding().label());
             Ok(0)
         }
         "probe" => cmd_probe(&args[2..]),

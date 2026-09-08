@@ -1,25 +1,35 @@
 //! Artifact evidence helper: bind a GPU artifact's bytes AND its provenance
 //! sidecar into one receipt value.
 //!
-//! The build scripts write `<artifact>.json` sidecars next to the PTX and
-//! AMDGPU artifacts (source-tree identity, toolchain, gfx/ISA, dirty flag).
-//! Courts must consume the sidecar into the receipt rather than recording
-//! only the artifact SHA-256: the hash binds the bytes, the sidecar binds
-//! the artifact back to the source tree and toolchain that produced it.
+//! The build scripts write sidecars next to the PTX and AMDGPU artifacts
+//! (source-tree identity, toolchain, gfx/ISA, dirty flag). Courts must
+//! consume the sidecar into the receipt rather than recording only the
+//! artifact SHA-256: the hash binds the bytes, the sidecar binds the
+//! artifact back to the source tree and toolchain that produced it.
 
 use serde_json::{Value, json};
 
-/// The provenance sidecar for an artifact is `<artifact>.json`
-/// (vole_audio.ptx -> vole_audio.ptx.json; vole_audio.amdgcn.elf ->
-/// vole_audio.amdgcn.json).
+/// The provenance sidecar for an artifact. Canonical convention (frozen):
+/// `<full artifact filename>.json` — `vole_audio.ptx` ->
+/// `vole_audio.ptx.json`, `vole_audio.amdgcn.elf` ->
+/// `vole_audio.amdgcn.elf.json`. Unambiguous for any artifact name. The
+/// legacy AMD name (`vole_audio.amdgcn.json`, `<stem>.json`) is still
+/// accepted as a migration fallback until every producer has moved.
 fn sidecar_path(path: &std::path::Path) -> std::path::PathBuf {
+    let dir = path.parent().unwrap_or_else(|| std::path::Path::new("."));
     let file = path
         .file_name()
         .map(|f| f.to_string_lossy().into_owned())
         .unwrap_or_default();
-    path.parent()
-        .unwrap_or_else(|| std::path::Path::new("."))
-        .join(format!("{file}.json"))
+    let canonical = dir.join(format!("{file}.json"));
+    if canonical.exists() {
+        return canonical;
+    }
+    let legacy = path.with_extension("json");
+    if legacy.exists() {
+        return legacy;
+    }
+    canonical
 }
 
 /// Read an artifact (bytes + sha256 + sidecar when present) into a JSON
@@ -90,6 +100,7 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         let art = dir.join("vole_audio.amdgcn.elf");
         std::fs::write(&art, b"\x7fELFfake").unwrap();
+        // Canonical convention: <full artifact filename>.json.
         std::fs::write(
             dir.join("vole_audio.amdgcn.elf.json"),
             r#"{"sha256":"x","source_tree_sha":"abc123","source_dirty":false,"rustc":"r1","target_cpu":"gfx906"}"#,
@@ -100,6 +111,24 @@ mod tests {
         assert_eq!(v["sidecar_present"], json!(true));
         assert_eq!(v["build_source_tree"], json!("abc123"));
         assert_eq!(v["build_dirty"], json!(false));
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn legacy_amd_sidecar_name_is_a_migration_fallback() {
+        let dir = std::env::temp_dir().join(format!("vole-art-legacy-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let art = dir.join("vole_audio.amdgcn.elf");
+        std::fs::write(&art, b"\x7fELFfake").unwrap();
+        // Legacy Phase-I name (no canonical present): still accepted.
+        std::fs::write(
+            dir.join("vole_audio.amdgcn.json"),
+            r#"{"source_tree_sha":"abc123","source_dirty":false}"#,
+        )
+        .unwrap();
+        let v = artifact_evidence(&art);
+        assert_eq!(v["sidecar_present"], json!(true));
+        assert_eq!(v["build_source_tree"], json!("abc123"));
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }

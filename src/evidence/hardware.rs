@@ -82,6 +82,14 @@ impl PciDevice {
         self.class.as_deref().is_some_and(|c| c.starts_with("0x03"))
     }
 
+    /// PCI processing-accelerator class (0x12): headless compute devices
+    /// (e.g. Instinct-class accelerators without a display function) are
+    /// legitimate ROCm candidates and must not disappear from the probe
+    /// merely because they are not VGA/display class.
+    pub fn is_accelerator(&self) -> bool {
+        self.class.as_deref().is_some_and(|c| c.starts_with("0x12"))
+    }
+
     /// Vendor id 0x10de = NVIDIA, 0x1002/0x1022 = AMD.
     pub fn is_nvidia(&self) -> bool {
         self.vendor.as_deref() == Some("0x10de")
