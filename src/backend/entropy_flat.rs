@@ -553,4 +553,182 @@ mod tests {
         // Unused import guard for the compiler's dead-code lints in tests.
         let _ = HYP_ZERO;
     }
+
+    /// Deterministic mutational fuzz of the flat decoder (H.2.47): valid
+    /// jobs are seeded, then their payload bytes and plain-data records are
+    /// mutated (flips / truncations / extensions / splicing) across a seeded
+    /// space. The decoder must never panic, never trap, and return only
+    /// `false` or bounded output — hostile input fails typed, exactly as the
+    /// hostile-input court requires. Runs under `catch_unwind` so any panic
+    /// fails the test with the seed recorded.
+    #[test]
+    fn decoder_mutational_fuzz_never_panics() {
+        let mut seed = 0x_0bad_c0de_f00d_d00du64;
+        let mut rng = move || {
+            seed = seed
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            seed
+        };
+        let jobs = [
+            flatten_literal_range(
+                &RepresentedLiteral::encode(
+                    ObjectDescriptor::new(Representation::Literal, 4096, Layout::Stereo, None)
+                        .unwrap(),
+                    &tone(4096, 2),
+                    512,
+                    Symbolization::DeltaLane4,
+                    ModelMode::Inline,
+                    false,
+                )
+                .unwrap(),
+                0,
+                4096,
+            )
+            .unwrap(),
+            flatten_literal_range(
+                &RepresentedLiteral::encode(
+                    ObjectDescriptor::new(Representation::Literal, 2048, Layout::Stereo, None)
+                        .unwrap(),
+                    &noise(2048, 2),
+                    512,
+                    Symbolization::DeltaLane4,
+                    ModelMode::Inline,
+                    false,
+                )
+                .unwrap(),
+                0,
+                2048,
+            )
+            .unwrap(),
+            {
+                // Procedural residual with sparse corrections (periodic
+                // hypothesis), mono — exercises the residual decoder paths.
+                let frames = 4096usize;
+                let cycle: Vec<i32> = (0..64).map(|i| ((i as i64 - 32) * 128) as i32).collect();
+                let model = crate::object::residual::ResidualModel::Periodic { cycle };
+                let mut intrinsic = vec![0i32; frames];
+                let mut rs = 0x1234_5678_9abc_def0u64;
+                for (f, slot) in intrinsic.iter_mut().enumerate() {
+                    *slot = model.model_sample(f as u64);
+                }
+                for _ in 0..256 {
+                    rs = rs
+                        .wrapping_mul(6364136223846793005)
+                        .wrapping_add(1442695040888963407);
+                    let f = (rs % frames as u64) as usize;
+                    let delta = (((rs >> 33) as i64) % 2048) - 1024;
+                    intrinsic[f] =
+                        crate::universe::arithmetic::sat_i32(i64::from(intrinsic[f]) + delta);
+                }
+                let d = ObjectDescriptor::new(
+                    Representation::PredictorResidual,
+                    frames as u64,
+                    Layout::Mono,
+                    None,
+                )
+                .unwrap();
+                let records =
+                    crate::object::residual::Residual::closing_residual(&intrinsic, 1, &model)
+                        .unwrap();
+                let residual = crate::object::residual::Residual::new(&d, model, records).unwrap();
+                let rr = crate::entropy::represent::RepresentedResidual::encode(
+                    d,
+                    &residual,
+                    512,
+                    ModelMode::Inline,
+                    false,
+                )
+                .unwrap();
+                flatten_residual_range(&rr, 0, frames as u32).unwrap()
+            },
+        ];
+        const MUTATIONS: usize = 6000;
+        for round in 0..MUTATIONS {
+            let job = &jobs[round % jobs.len()];
+            let mut mutant = job.clone();
+            let r = rng();
+            let op = (r >> 32) % 7;
+            match op {
+                // Byte flips inside the payload.
+                0 | 1 => {
+                    if !mutant.payload.is_empty() {
+                        let n = (r as usize) % mutant.payload.len().min(64) + 1;
+                        for _ in 0..n {
+                            let at = (rng() as usize) % mutant.payload.len();
+                            mutant.payload[at] ^= 1 << ((rng() >> 40) % 8);
+                        }
+                    }
+                }
+                // Truncations at assorted boundaries.
+                2 => {
+                    let cut = (r as usize) % (mutant.payload.len() + 1);
+                    mutant.payload.truncate(cut);
+                }
+                // Extensions with garbage.
+                3 => {
+                    let extra = (r as usize) % 128;
+                    for _ in 0..extra {
+                        mutant.payload.push((rng() >> 24) as u8);
+                    }
+                }
+                // Record-structure bit flips (pages/streams records).
+                4 => {
+                    if mutant.pages.is_empty() {
+                        continue;
+                    }
+                    let arena: &mut [u8] = unsafe {
+                        core::slice::from_raw_parts_mut(
+                            mutant.pages.as_mut_ptr() as *mut u8,
+                            core::mem::size_of_val(&mut mutant.pages[..] as &mut [FlatPage]),
+                        )
+                    };
+                    for _ in 0..8 {
+                        let at = (rng() as usize) % arena.len();
+                        arena[at] ^= 1 << ((rng() >> 40) % 8);
+                    }
+                }
+                // Record-structure bit flips over streams.
+                5 => {
+                    if mutant.streams.is_empty() {
+                        continue;
+                    }
+                    let arena: &mut [u8] = unsafe {
+                        core::slice::from_raw_parts_mut(
+                            mutant.streams.as_mut_ptr() as *mut u8,
+                            core::mem::size_of_val(&mut mutant.streams[..] as &mut [FlatStream]),
+                        )
+                    };
+                    for _ in 0..8 {
+                        let at = (rng() as usize) % arena.len();
+                        arena[at] ^= 1 << ((rng() >> 40) % 8);
+                    }
+                }
+                // Hypothesis-cycle mutations (residual periodic pages).
+                _ => {
+                    if !mutant.cycle.is_empty() {
+                        let at = (rng() as usize) % mutant.cycle.len();
+                        mutant.cycle[at] = ((rng() as i64) % (1 << 40)) as i32;
+                    }
+                }
+            }
+            // Cap declared geometry so oversized claims stay bounded (the
+            // decoder also enforces its own ceilings; this keeps the fuzz in
+            // the interesting region without trivially failing the first
+            // check).
+            for p in &mut mutant.pages {
+                p.frames %= 4096;
+                p.channels %= 8;
+            }
+            let mut out = vec![0i32; mutant.arena_samples.max(1)];
+            let mut scratch = vec![0u8; mutant.max_page_scratch.max(64)];
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                mutant.decode_pages_host(&mut out, &mut scratch, 0..mutant.pages.len())
+            }));
+            assert!(
+                result.is_ok(),
+                "decoder panicked on mutation round {round} (op {op})"
+            );
+        }
+    }
 }
