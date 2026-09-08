@@ -206,8 +206,67 @@ target the element slice, not the Vec header).
 - All six A–H courts and all ten H.2 courts re-sealed SUPPORTED on the
   clean tree (semantic `1791816f…` and authored `f7e103f3…` unchanged).
 - Host tests: 284 (279 passed, 5 ignored) debug + release,
-  `--all-features`, on the pinned nightly; MSRV 1.89.0 also green
-  (278 passed with default features, 279 with all features).
+  `--all-features`, on the pinned nightly; MSRV 1.89.0 also green.
+
+### Seal 3 — 0.4.1 review-amendment re-seal (2026-09-08)
+
+Delta since Seal 2: the Phase-H.2 review amendment (`bf3a03a` canonical
+rANS decode enforcement, `1508ab1` accounting/provenance/wording fixes)
+closing all ten external-review findings:
+
+1. **Normative decoder fix** — both the host `decode_rans_stream`
+   (`src/entropy/block.rs`) and the shared host/GPU `decode_stream`
+   (`src/device/entropy_shared.rs`) now reject initial states below
+   `RANS_STATE_L` and require terminal `state == STATE_L` with exact byte
+   consumption; arbitrary trailing bytes and noncanonical terminal states
+   fail typed. Adversarial append/truncation/mutation tests added (the
+   256-value per-byte append sweeps are retained).
+2. **Launch accounting** — `kernel_launches` counts verdict-bearing
+   measurement launches only; `warmup_kernel_launches` (80 per D1 session)
+   and cumulative `kernel_launches_total` are reported separately, with the
+   `kernel_launch_accounting` extra defining the top-level counter.
+3. **Exposure accounting** — `gpu_global_sample_intermediate_peak_bytes`
+   per session: D0 literal 32 768 / D0 residual 16 384 / D1 residual window
+   arena 2 048 (two 256-frame pages) / D1 literal and noise 0.
+4. **Provenance hashes** — `reference_hash == backend_hash` now carry the
+   real per-window SHA-256 of the expected S32 LE codes, with the
+   `endpoint_region_sha256` extra documenting the in-place ring
+   verification → DMA drain derivation.
+5. **CompleteCost** — `checkpoint_bytes` added to the frozen cost API.
+6. **EntropyFS physical accounting** — `physical_bytes` is `Option`;
+   engine metrics failure yields `null`, never a unique-bytes substitute
+   (the engine-reported `engine_physical_used_bytes` is receipted where the
+   engine API supplies it); EmbeddedStore reports `Some(unique)`.
+7. Latency prose bound to named clock regimes (idle-first-launch,
+   court-warmup, aggregate-hot); F01–F14 device-verified wording fixed;
+   “irreducible residual” corrected to “residual not reproduced by the
+   chosen deterministic explanation”.
+
+Seal run (release, `--all-features`, clean tree):
+
+- Tree: commit `1508ab1d0124…`, source-tree `bd4d789caf86…`,
+  `git_dirty: false`. 17 receipts sealed under `receipts/` (six A–H courts
+  + ten H.2 courts + the `h2` aggregate), committed separately at
+  `62063b7`.
+- All six A–H courts re-sealed SUPPORTED with frozen hashes unchanged:
+  semantic `1791816f4b93…`, authored `f7e103f3a97d…` (exit criterion 1).
+- All ten H.2 courts + `court h2` aggregate SUPPORTED: `entropy-rans`,
+  `entropy-literal`, `entropy-residual`, `entropy-pages`, `entropy-partial`,
+  `entropy-simd`, `entropy-cuda`, `entropy-d1`, `entropyfs`, `dsfb-entropy`.
+- Flagship `entropy-d1` (RTX 4080 SUPER + `snd_hda_intel` hw:2,0): five
+  sessions (d0-literal, d1-literal, d0-residual, d1-residual, d1-noise),
+  all shadow-exact with zero xruns and clean drain under the now-canonical
+  decoder; D1 materialization traffic remains 0 GPU→host / 0 host-copy
+  bytes; verification reads separately accounted.
+- PTX artifact `scripts/out/vole_audio.ptx` sha256
+  `8b23325d03700847b056b29df4f4d4afd1a0c67386458512986c52f4fca7896b`
+  (rebuilt after the shared-decoder fix; entries `vole_render_d0`,
+  `vole_entropy_decode`, `vole_upmix_mono_dup`).
+- Host tests: nightly pinned 287 total (282 passed, 5 ignored) with
+  `--all-features` (277 total, 272 passed with default features), debug and
+  release identical; MSRV 1.89.0 green with the same counts; `clippy
+  --all-targets --all-features -D warnings` clean; `cargo fmt --check`
+  clean.
 
 ## Execution record (implementation summary)
 
