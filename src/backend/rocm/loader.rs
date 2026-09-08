@@ -90,14 +90,14 @@ impl Drop for Lib {
     }
 }
 
-/// Load a runtime soname (via ld cache + custom-install candidate paths)
-/// and resolve every required entry symbol.
-/// Returns `Ok((lib_name, missing_symbols))` — `Ok` with an empty missing
-/// list means the full required ABI surface resolved.
-pub fn probe_soname_symbols<'a>(
+/// Load a runtime soname (via ld cache + custom-install candidate paths +
+/// a /opt/rocm* prefix scan for future versioned SONAMEs) and resolve a D0
+/// table and a D1-additional table.
+pub fn probe_soname_surfaces<'a>(
     soname: &str,
-    required: &[&'a str],
-) -> Result<(String, Vec<&'a str>), String> {
+    d0: &[&'a str],
+    d1: &[&'a str],
+) -> Result<(String, Vec<&'a str>, Vec<&'a str>), String> {
     let mut candidates = vec![soname.to_string()];
     // ROCM_LIB_PATH override (colon-separated absolute dirs).
     if let Ok(p) = std::env::var("ROCM_LIB_PATH") {
@@ -105,7 +105,11 @@ pub fn probe_soname_symbols<'a>(
             candidates.push(format!("{dir}/{soname}"));
         }
     }
-    // /opt/rocm* installs the ld cache may not know (auto-discovered).
+    // /opt/rocm* installs the ld cache may not know. Scan each lib dir for
+    // the soname's prefix (`libamdhip64.so*` / `libhsa-runtime64.so*`) so a
+    // future ROCm with a newer versioned SONAME is discovered instead of
+    // frozen version numbers forever.
+    let prefix = soname.rsplit_once('.').map(|(p, _)| p).unwrap_or(soname);
     if let Ok(entries) = std::fs::read_dir("/opt") {
         let mut rocm_dirs = entries
             .filter_map(|e| e.ok())
@@ -115,9 +119,17 @@ pub fn probe_soname_symbols<'a>(
         rocm_dirs.sort();
         for dir in rocm_dirs {
             for sub in ["lib", "lib64"] {
-                let p = dir.join(sub).join(soname);
-                if p.exists() {
-                    candidates.push(p.to_string_lossy().into_owned());
+                let libdir = dir.join(sub);
+                if let Ok(files) = std::fs::read_dir(&libdir) {
+                    let mut found = files
+                        .filter_map(|e| e.ok())
+                        .filter(|e| e.file_name().to_string_lossy().starts_with(prefix))
+                        .map(|e| e.path())
+                        .collect::<Vec<_>>();
+                    found.sort();
+                    for p in found {
+                        candidates.push(p.to_string_lossy().into_owned());
+                    }
                 }
             }
         }
@@ -126,14 +138,19 @@ pub fn probe_soname_symbols<'a>(
     let lib = Lib::open_candidates(names)?;
     // SAFETY: the symbol pointers are used only to prove resolvability
     // inside this function while `lib` is alive.
-    let mut missing = Vec::new();
-    for sym in required {
-        let found = unsafe { lib.symbol::<unsafe extern "C" fn()>(sym) }.is_some();
-        if !found {
-            missing.push(*sym);
+    let resolve = |table: &[&'a str]| -> Vec<&'a str> {
+        let mut missing = Vec::new();
+        for sym in table {
+            let found = unsafe { lib.symbol::<unsafe extern "C" fn()>(sym) }.is_some();
+            if !found {
+                missing.push(*sym);
+            }
         }
-    }
-    Ok((lib.name.clone(), missing))
+        missing
+    };
+    let d0_missing = resolve(d0);
+    let d1_missing = resolve(d1);
+    Ok((lib.name.clone(), d0_missing, d1_missing))
 }
 
 #[cfg(test)]

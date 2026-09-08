@@ -35,14 +35,15 @@
 //! `librocm_smi64` is auxiliary telemetry only (energy/clock source for
 //! Phase M), never evidence that the compute runtime exists.
 
-use crate::backend::rocm::loader::{Lib, probe_soname_symbols};
+use crate::backend::rocm::loader::{Lib, probe_soname_surfaces};
 use crate::error::Result;
 use crate::evidence::hardware::Hardware;
 use crate::status::Verdict;
 
-/// Frozen Phase-J HIP ABI surface (the module/launch path mirroring the CUDA
-/// driver API this repository already runs). Every symbol must resolve.
-pub const HIP_REQUIRED_SYMBOLS: &[&str] = &[
+/// Frozen Phase-J HIP **D0** ABI surface (the module/launch path mirroring
+/// the CUDA driver API this repository already runs — scalar == ROCm
+/// differential battery). Every symbol must resolve for D0 readiness.
+pub const HIP_D0_REQUIRED: &[&str] = &[
     "hipInit",
     "hipGetDeviceCount",
     "hipSetDevice",
@@ -54,40 +55,66 @@ pub const HIP_REQUIRED_SYMBOLS: &[&str] = &[
     "hipMemcpy",
     "hipDeviceSynchronize",
     "hipStreamSynchronize",
+];
+
+/// Frozen Phase-J HIP **D1 additional** ABI surface (direct endpoint
+/// mapping). D1 readiness = D0 readiness AND every symbol here. A stack that
+/// runs the D0 battery but refuses host registration must report
+/// "ROCm D0 READY; D1 UNSUPPORTED_BY_API" — never "runtime unavailable".
+pub const HIP_D1_ADDITIONAL: &[&str] = &[
     "hipHostRegister",
     "hipHostGetDevicePointer",
     "hipHostUnregister",
 ];
 
-/// Frozen direct-HSA fallback surface (used only if Phase J goes HSA-native
-/// rather than HIP).
-pub const HSA_REQUIRED_SYMBOLS: &[&str] = &[
+/// Frozen direct-HSA **D0** ABI surface (used only if Phase J goes
+/// HSA-native rather than HIP). Symbol names follow the current ROCR ABI
+/// (AMD's tracing examples: hsa_executable_create_alt ->
+/// hsa_code_object_reader_create_from_memory ->
+/// hsa_executable_load_agent_code_object -> hsa_executable_freeze ->
+/// hsa_executable_get_symbol_by_name -> hsa_executable_symbol_get_info).
+pub const HSA_D0_REQUIRED: &[&str] = &[
     "hsa_init",
     "hsa_shut_down",
-    "hsa_agent_iterate_agents",
+    "hsa_iterate_agents",
     "hsa_agent_get_info",
     "hsa_queue_create",
+    "hsa_signal_create",
+    "hsa_signal_store_relaxed",
+    "hsa_signal_store_release",
+    "hsa_signal_wait_acquire",
+    "hsa_queue_store_write_index_relaxed",
     "hsa_memory_allocate",
     "hsa_memory_free",
     "hsa_memory_copy",
-    "hsa_signal_create",
-    "hsa_signal_store_relaxed",
-    "hsa_signal_wait_acquire",
-    "hsa_executable_create",
+    "hsa_executable_create_alt",
+    "hsa_code_object_reader_create_from_memory",
+    "hsa_code_object_reader_destroy",
     "hsa_executable_load_agent_code_object",
     "hsa_executable_freeze",
-    "hsa_executable_get_symbol",
+    "hsa_executable_get_symbol_by_name",
+    "hsa_executable_symbol_get_info",
 ];
 
-/// Compute-runtime sonames probed in order (name, required symbol table).
-/// Both versioned and unversioned/current sonames are probed so a future
-/// ROCm install is not mislabeled absent.
-pub const COMPUTE_SONAMES: &[(&str, &[&str])] = &[
-    ("libamdhip64.so.6", HIP_REQUIRED_SYMBOLS),
-    ("libamdhip64.so.5", HIP_REQUIRED_SYMBOLS),
-    ("libamdhip64.so", HIP_REQUIRED_SYMBOLS),
-    ("libhsa-runtime64.so.1", HSA_REQUIRED_SYMBOLS),
-    ("libhsa-runtime64.so", HSA_REQUIRED_SYMBOLS),
+/// Frozen direct-HSA **D1 additional** ABI surface (host-memory mapping for
+/// the endpoint region).
+pub const HSA_D1_ADDITIONAL: &[&str] = &[
+    "hsa_host_malloc",
+    "hsa_host_free",
+    "hsa_amd_agent_memory_pool_get_info",
+];
+
+/// Compute-runtime sonames probed in order: (name, D0 table, D1 table).
+/// Versioned and unversioned sonames are probed, and /opt/rocm* installs
+/// are additionally scanned for `libamdhip64.so*` / `libhsa-runtime64.so*`
+/// by prefix, so a future ROCm layout with a newer versioned SONAME is
+/// discovered rather than mislabeled absent.
+pub const COMPUTE_SONAMES: &[(&str, &[&str], &[&str])] = &[
+    ("libamdhip64.so.6", HIP_D0_REQUIRED, HIP_D1_ADDITIONAL),
+    ("libamdhip64.so.5", HIP_D0_REQUIRED, HIP_D1_ADDITIONAL),
+    ("libamdhip64.so", HIP_D0_REQUIRED, HIP_D1_ADDITIONAL),
+    ("libhsa-runtime64.so.1", HSA_D0_REQUIRED, HSA_D1_ADDITIONAL),
+    ("libhsa-runtime64.so", HSA_D0_REQUIRED, HSA_D1_ADDITIONAL),
 ];
 
 /// Auxiliary telemetry soname (energy/clock source only; not evidence of a
@@ -120,19 +147,25 @@ pub enum KfdState {
     Accessible,
 }
 
-/// One compute-runtime probe attempt outcome.
+/// One compute-runtime probe attempt outcome, split by readiness surface.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RuntimeAttempt {
     pub soname: String,
-    /// Ok(required_symbols_still_missing) — Ok(empty) means the full ABI
-    /// surface resolved.
-    pub loaded: std::result::Result<Vec<String>, String>,
+    /// D0-required symbols still missing (empty => D0 ready).
+    pub d0_missing: std::result::Result<Vec<String>, String>,
+    /// D1-additional symbols still missing (empty => D1 ready given D0).
+    pub d1_missing: std::result::Result<Vec<String>, String>,
 }
 
 impl RuntimeAttempt {
-    /// The full required ABI surface resolved.
-    pub fn ready(&self) -> bool {
-        matches!(&self.loaded, Ok(missing) if missing.is_empty())
+    /// The full D0 ABI surface resolved (scalar == ROCm battery readiness).
+    pub fn d0_ready(&self) -> bool {
+        matches!(&self.d0_missing, Ok(m) if m.is_empty())
+    }
+
+    /// D0 + D1 additional resolved (direct endpoint mapping readiness).
+    pub fn d1_ready(&self) -> bool {
+        self.d0_ready() && matches!(&self.d1_missing, Ok(m) if m.is_empty())
     }
 }
 
@@ -178,10 +211,23 @@ impl RocmProbe {
         let kfd = kfd_state();
         let compute = COMPUTE_SONAMES
             .iter()
-            .map(|(soname, required)| RuntimeAttempt {
-                soname: (*soname).to_string(),
-                loaded: probe_soname_symbols(soname, required)
-                    .map(|(_name, missing)| missing.iter().map(|s| (*s).to_string()).collect()),
+            .map(|(soname, d0, d1)| {
+                let r = probe_soname_surfaces(soname, d0, d1);
+                let (name, m0, m1) = match r {
+                    Ok(t) => t,
+                    Err(e) => {
+                        return RuntimeAttempt {
+                            soname: (*soname).to_string(),
+                            d0_missing: Err(e.clone()),
+                            d1_missing: Err(e),
+                        };
+                    }
+                };
+                RuntimeAttempt {
+                    soname: name,
+                    d0_missing: Ok(m0.iter().map(|s| (*s).to_string()).collect()),
+                    d1_missing: Ok(m1.iter().map(|s| (*s).to_string()).collect()),
+                }
             })
             .collect::<Vec<_>>();
         let telemetry = TELEMETRY_SONAMES
@@ -238,36 +284,54 @@ impl RocmProbe {
             }
             KfdState::Accessible => {}
         }
-        // A compute runtime must load AND resolve its full frozen Phase-J
-        // ABI surface. Missing/incomplete userspace is a runtime/library
-        // condition: UNSUPPORTED_BY_API, never a hardware verdict.
-        let ready = self.compute.iter().find(|a| a.ready());
-        match ready {
-            Some(ok) => (
-                Verdict::Inconclusive,
-                format!(
-                    "ROCm device + compute runtime present ({}; full required ABI surface \
-                     resolves); the scalar == ROCm differential battery and D1 surface \
-                     require the Phase J runtime and are not executed by this court \
-                     (INCONCLUSIVE_PENDING_EXECUTION)",
-                    ok.soname
-                ),
-            ),
+        // D0/D1 readiness split: the scalar == ROCm D0 battery and the D1
+        // direct-endpoint path have separate ABI requirements. A stack that
+        // runs D0 but cannot register host memory is "D0 READY; D1
+        // UNSUPPORTED_BY_API", never "runtime unavailable".
+        let d0_ready = self.compute.iter().find(|a| a.d0_ready());
+        match d0_ready {
+            Some(ok) => {
+                let d1_state = if ok.d1_ready() {
+                    "D1 READY".to_string()
+                } else {
+                    format!(
+                        "D1 not ready (missing: {})",
+                        ok.d1_missing
+                            .as_ref()
+                            .map(|m| m.join(","))
+                            .unwrap_or_default()
+                    )
+                };
+                (
+                    Verdict::Inconclusive,
+                    format!(
+                        "ROCm D0 runtime READY ({}; full D0 ABI surface resolves; {}); the \
+                         scalar == ROCm differential battery is the Phase J evidence target \
+                         and is not executed by this court (INCONCLUSIVE_PENDING_EXECUTION)",
+                        ok.soname, d1_state
+                    ),
+                )
+            }
             None => {
                 let why = self
                     .compute
                     .iter()
-                    .map(|a| match &a.loaded {
-                        Ok(missing) => format!(
-                            "{}: loaded, missing {}",
+                    .map(|a| match (&a.d0_missing, &a.d1_missing) {
+                        (Ok(m0), Ok(m1)) => format!(
+                            "{}: loaded; D0 missing {}, D1 missing {}",
                             a.soname,
-                            if missing.is_empty() {
-                                "nothing".to_string()
+                            if m0.is_empty() {
+                                "nothing".into()
                             } else {
-                                missing.join(",")
-                            }
+                                m0.join(",")
+                            },
+                            if m1.is_empty() {
+                                "nothing".into()
+                            } else {
+                                m1.join(",")
+                            },
                         ),
-                        Err(e) => format!("{}: {e}", a.soname),
+                        (Err(e), _) | (_, Err(e)) => format!("{}: {e}", a.soname),
                     })
                     .collect::<Vec<_>>()
                     .join("; ");
@@ -275,7 +339,7 @@ impl RocmProbe {
                     Verdict::UnsupportedByApi,
                     format!(
                         "AMD compute candidate + KFD present but no ROCm compute runtime \
-                         resolves its full required ABI surface (HIP/HSA): {why}"
+                         resolves its full D0 ABI surface (HIP/HSA): {why}"
                     ),
                 )
             }
@@ -319,11 +383,18 @@ mod tests {
         }
     }
 
-    fn attempt(soname: &str, ready: bool) -> RuntimeAttempt {
+    fn attempt(soname: &str, d0_ready: bool, d1_ready: bool) -> RuntimeAttempt {
         RuntimeAttempt {
             soname: soname.into(),
-            loaded: if ready {
+            d0_missing: if d0_ready {
                 Ok(vec![])
+            } else {
+                Err(format!("dlopen {soname} failed"))
+            },
+            d1_missing: if d1_ready {
+                Ok(vec![])
+            } else if d0_ready {
+                Ok(vec!["hipHostRegister".into()])
             } else {
                 Err(format!("dlopen {soname} failed"))
             },
@@ -349,7 +420,7 @@ mod tests {
         let p = RocmProbe {
             amd_gpus: vec![g],
             kfd: KfdState::Accessible,
-            compute: vec![attempt("libamdhip64.so.6", true)],
+            compute: vec![attempt("libamdhip64.so.6", true, true)],
             ..Default::default()
         };
         assert_eq!(p.classify().0, Verdict::Inconclusive); // full chain
@@ -360,7 +431,7 @@ mod tests {
         let p = RocmProbe {
             amd_gpus: vec![gpu(Some("radeon"), "0x030000")],
             kfd: KfdState::Accessible,
-            compute: vec![attempt("libamdhip64.so.6", true)],
+            compute: vec![attempt("libamdhip64.so.6", true, true)],
             ..Default::default()
         };
         assert_eq!(p.classify().0, Verdict::UnsupportedByHardware);
@@ -395,24 +466,26 @@ mod tests {
             amd_gpus: vec![gpu(Some("amdgpu"), "0x030000")],
             kfd: KfdState::Accessible,
             compute: vec![
-                attempt("libamdhip64.so.6", false),
-                attempt("libhsa-runtime64.so.1", false),
+                attempt("libamdhip64.so.6", false, false),
+                attempt("libhsa-runtime64.so.1", false, false),
             ],
             ..Default::default()
         };
         assert_eq!(p.classify().0, Verdict::UnsupportedByApi);
-        assert!(p.classify().1.contains("required ABI surface"));
+        assert!(p.classify().1.contains("D0 ABI surface"));
     }
 
     #[test]
-    fn partial_symbol_surface_is_not_ready() {
-        // A runtime that loads but is missing a required symbol must not be
-        // treated as ready.
+    fn partial_symbol_surface_is_not_d0_ready() {
+        // A runtime that loads but is missing a D0 symbol must not be D0
+        // ready — and a D1-only gap must not hide D0 readiness.
         let a = RuntimeAttempt {
             soname: "libamdhip64.so.6".into(),
-            loaded: Ok(vec!["hipModuleLaunchKernel".into()]),
+            d0_missing: Ok(vec!["hipModuleLaunchKernel".into()]),
+            d1_missing: Ok(vec![]),
         };
-        assert!(!a.ready());
+        assert!(!a.d0_ready());
+        assert!(!a.d1_ready());
         let p = RocmProbe {
             amd_gpus: vec![gpu(Some("amdgpu"), "0x030000")],
             kfd: KfdState::Accessible,
@@ -423,11 +496,35 @@ mod tests {
     }
 
     #[test]
+    fn d1_gap_does_not_hide_d0_readiness() {
+        // D0 ready but host-registration symbols missing: the runtime is NOT
+        // "unavailable" — it is D0 READY with D1 blocked (the exact case
+        // Phase J must distinguish).
+        let a = RuntimeAttempt {
+            soname: "libamdhip64.so.6".into(),
+            d0_missing: Ok(vec![]),
+            d1_missing: Ok(vec!["hipHostRegister".into(), "hipHostUnregister".into()]),
+        };
+        assert!(a.d0_ready());
+        assert!(!a.d1_ready());
+        let p = RocmProbe {
+            amd_gpus: vec![gpu(Some("amdgpu"), "0x030000")],
+            kfd: KfdState::Accessible,
+            compute: vec![a],
+            ..Default::default()
+        };
+        let (v, d) = p.classify();
+        assert_eq!(v, Verdict::Inconclusive); // D0 ready -> pending battery
+        assert!(d.contains("D0 runtime READY"));
+        assert!(d.contains("D1 not ready"));
+    }
+
+    #[test]
     fn full_chain_is_inconclusive_pending_execution() {
         let p = RocmProbe {
             amd_gpus: vec![gpu(Some("amdgpu"), "0x030000")],
             kfd: KfdState::Accessible,
-            compute: vec![attempt("libamdhip64.so.6", true)],
+            compute: vec![attempt("libamdhip64.so.6", true, true)],
             telemetry: vec![("librocm_smi64.so.1".into(), true)],
         };
         let (v, d) = p.classify();
@@ -440,7 +537,7 @@ mod tests {
         let p = RocmProbe {
             amd_gpus: vec![gpu(Some("amdgpu"), "0x030000")],
             kfd: KfdState::Accessible,
-            compute: vec![attempt("libamdhip64.so.6", false)],
+            compute: vec![attempt("libamdhip64.so.6", false, false)],
             telemetry: vec![("librocm_smi64.so.1".into(), true)],
         };
         assert_eq!(p.classify().0, Verdict::UnsupportedByApi);

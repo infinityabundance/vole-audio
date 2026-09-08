@@ -110,15 +110,20 @@ pub const BUILD_TARGET: Option<&str> = option_env!("VOLE_BUILD_TARGET");
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum SourceBinding {
-    /// Compiled-from == executed-in-worktree, both clean.
+    /// Compiled-from == executed-in-worktree, and both dirty states are
+    /// explicitly false.
     Bound,
     /// No git identity on either side (e.g. the crates.io tarball): the
     /// evidence is genuinely unbounded.
     #[default]
     Unavailable,
+    /// Only one side has a git identity, or both commits are present/equal
+    /// but a dirty state is unknown (could not be measured): the identity
+    /// picture is incomplete and cannot be bound.
+    Partial,
     /// Compiled-from commit != executed-in-worktree commit.
     Mismatch,
-    /// Compiled-from and/or work tree is dirty.
+    /// Compiled-from and/or work tree is explicitly dirty.
     Dirty,
 }
 
@@ -127,6 +132,7 @@ impl SourceBinding {
         match self {
             SourceBinding::Bound => "bound",
             SourceBinding::Unavailable => "unavailable",
+            SourceBinding::Partial => "partial",
             SourceBinding::Mismatch => "mismatch",
             SourceBinding::Dirty => "dirty",
         }
@@ -135,24 +141,32 @@ impl SourceBinding {
 
 impl Environment {
     /// Compute the source-binding state from the recorded identities.
+    /// Bound requires both identities present and equal with both dirty
+    /// states **explicitly false** (an unknown dirty state is never bound).
     pub fn source_binding(&self) -> SourceBinding {
         match (&self.build_git_commit, &self.git_commit) {
             (Some(b), Some(r)) if b == r => {
-                if self.build_dirty == Some(false) && self.git_dirty == Some(false) {
+                let build_clean = self.build_dirty == Some(false);
+                let run_clean = self.git_dirty == Some(false);
+                if build_clean && run_clean {
                     SourceBinding::Bound
-                } else {
+                } else if self.build_dirty == Some(true) || self.git_dirty == Some(true) {
                     SourceBinding::Dirty
+                } else {
+                    // Commits equal but a dirty state could not be measured.
+                    SourceBinding::Partial
                 }
             }
             (Some(_), Some(_)) => SourceBinding::Mismatch,
-            // One side has a git identity and the other does not: the
-            // binary was not built from this tree — cannot be bound.
-            _ => SourceBinding::Unavailable,
+            // Exactly one side has an identity: incomplete picture.
+            (Some(_), None) | (None, Some(_)) => SourceBinding::Partial,
+            (None, None) => SourceBinding::Unavailable,
         }
     }
 
     /// True only when the evidence is genuinely bound: compiled-from ==
-    /// executed-in-worktree, both clean. (Non-git builds are *not* "bound".)
+    /// executed-in-worktree, both explicitly clean. (Non-git builds are not
+    /// "bound".)
     pub fn source_bound(&self) -> bool {
         self.source_binding() == SourceBinding::Bound
     }
@@ -415,7 +429,7 @@ mod tests {
         };
         assert_eq!(stale.source_binding(), Mismatch);
         assert!(!stale.source_bound());
-        // Either side dirty.
+        // Either side explicitly dirty.
         let dirty_tree = Environment {
             git_commit: Some("abc123".into()),
             git_dirty: Some(true),
@@ -425,18 +439,28 @@ mod tests {
         };
         assert_eq!(dirty_tree.source_binding(), Dirty);
         assert!(!dirty_tree.source_bound());
-        // Non-git tarball build (both absent): evidence is unbounded, and
-        // "unbounded" must not masquerade as "bound".
+        // Equal commits but an unknown (unmeasured) build dirty state: never
+        // bound — Partial, not Dirty, not Bound.
+        let unknown_dirty = Environment {
+            git_commit: Some("abc123".into()),
+            git_dirty: Some(false),
+            build_git_commit: Some("abc123".into()),
+            build_dirty: None,
+            ..Environment::default()
+        };
+        assert_eq!(unknown_dirty.source_binding(), Partial);
+        assert!(!unknown_dirty.source_bound());
+        // Non-git tarball build (both absent): genuinely unbounded.
         let tarball = Environment::default();
         assert_eq!(tarball.source_binding(), Unavailable);
         assert!(!tarball.source_bound());
-        // One side only: cannot be bound.
+        // One side only: partial identity, never bound.
         let one_side = Environment {
             git_commit: Some("abc123".into()),
             build_git_commit: None,
             ..Environment::default()
         };
-        assert_eq!(one_side.source_binding(), Unavailable);
+        assert_eq!(one_side.source_binding(), Partial);
         assert!(!one_side.source_bound());
     }
 }

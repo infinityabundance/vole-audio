@@ -214,7 +214,19 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
     } else {
         artifact_path.with_extension("json")
     };
-    let determinism_path = PathBuf::from(DEFAULT_DETERMINISM);
+    // Determinism evidence follows the artifact: <artifact file>
+    // .determinism.json (env VOLE_ROCM_DETERMINISM overrides; the
+    // default-tree legacy name is the fallback). A custom artifact therefore
+    // carries its own repro-build evidence instead of silently depending on
+    // the default-tree file.
+    let determinism_path = std::env::var("VOLE_ROCM_DETERMINISM")
+        .map(PathBuf::from)
+        .ok()
+        .or_else(|| {
+            let canonical = dir.join(format!("{file}.determinism.json"));
+            canonical.exists().then_some(canonical)
+        })
+        .unwrap_or_else(|| PathBuf::from(DEFAULT_DETERMINISM));
     let env = Environment::capture();
 
     // 1. Compile surface (fail closed).
@@ -240,16 +252,21 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
         },
         "compute_runtime": probe.compute.iter().map(|a| serde_json::json!({
             "soname": a.soname,
-            "ready": a.ready(),
-            "detail": match &a.loaded {
-                Ok(missing) => if missing.is_empty() {
+            "d0_ready": a.d0_ready(),
+            "d1_ready": a.d1_ready(),
+            "detail": match (&a.d0_missing, &a.d1_missing) {
+                (Ok(m0), Ok(m1)) => if m0.is_empty() && m1.is_empty() {
                     None
+                } else if m0.is_empty() {
+                    Some(format!("D0 ready; D1 missing: {}", m1.join(",")))
                 } else {
-                    Some(format!("loaded, missing required symbols: {}", missing.join(",")))
+                    Some(format!("D0 missing: {}", m0.join(",")))
                 },
-                Err(e) => Some(e.clone()),
+                (Err(e), _) | (_, Err(e)) => Some(e.clone()),
             },
         })).collect::<Vec<_>>(),
+        "d0_readiness": probe.compute.iter().any(|a| a.d0_ready()),
+        "d1_readiness": probe.compute.iter().any(|a| a.d1_ready()),
         "telemetry_rocmsmi": probe.telemetry.iter().any(|(_, f)| *f),
         "classification": runtime_detail,
     });

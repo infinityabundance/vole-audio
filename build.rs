@@ -99,8 +99,11 @@ fn main() {
             println!("cargo:rustc-env={key}={v}");
         }
     }
-    println!(
-        "cargo:rustc-env=VOLE_BUILD_GIT_DIRTY={}",
-        dirty.unwrap_or(false)
-    );
+    // Emit the dirty stamp ONLY when it was actually measured. A failed
+    // `git status` must become "unknown" (env var absent -> None at compile
+    // time), never an implicit "false": source_binding allows Bound only
+    // when the build-time dirty state is explicitly false.
+    if let Some(d) = dirty {
+        println!("cargo:rustc-env=VOLE_BUILD_GIT_DIRTY={d}");
+    }
 }

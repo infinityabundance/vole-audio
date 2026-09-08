@@ -26,6 +26,12 @@ COMMANDS (current build):
                           entropy-d1 honors VOLE_ENTROPY_D1_EMIT_AUDIO=1)
     receipt show <file>   Verify and print an evidence receipt
     receipt perf <file>   Render a receipt's throughput_cells as Markdown
+    seal verify           Executable phase-seal gate: validates an explicit
+                          expected-verdict matrix over the newest receipts
+                          (source_binding == bound, single seal tree, frozen
+                          semantic/authored hashes, rocm compile surface)
+                          [--receipts DIR]
+                          [--expect court=SUPPORTED|NEGATIVE|ANY,...]
     version               Print version and build identity
     help                  Show this help
 
@@ -81,6 +87,7 @@ fn run(args: &[String]) -> Result<u8> {
         "probe" => cmd_probe(&args[2..]),
         "receipt" => cmd_receipt(&args[2..]),
         "court" => cmd_court(&args[2..]),
+        "seal" => cmd_seal(&args[2..]),
         "inspect" | "verify" | "encode" | "observe" | "play" | "bench" | "corpus" => {
             // Declared-but-not-yet-implemented surface: exit 3 (NOT_IMPLEMENTED);
             // the CLI never implies support that is absent.
@@ -122,9 +129,19 @@ fn cmd_probe(args: &[String]) -> Result<u8> {
                 "kfd": kfd_label,
                 "compute_runtime": p.compute.iter().map(|a| serde_json::json!({
                     "soname": a.soname,
-                    "loaded": a.loaded.is_ok(),
-                    "detail": a.loaded.as_ref().err(),
+                    "d0_ready": a.d0_ready(),
+                    "d1_ready": a.d1_ready(),
+                    "detail": match (&a.d0_missing, &a.d1_missing) {
+                        (Ok(m0), Ok(m1)) if m0.is_empty() && m1.is_empty() => None,
+                        (Ok(m0), Ok(m1)) if m0.is_empty() => {
+                            Some(format!("D0 ready; D1 missing: {}", m1.join(",")))
+                        }
+                        (Ok(m0), Ok(_)) => Some(format!("D0 missing: {}", m0.join(","))),
+                        (Err(e), _) | (_, Err(e)) => Some(e.clone()),
+                    },
                 })).collect::<Vec<_>>(),
+                "d0_readiness": p.compute.iter().any(|a| a.d0_ready()),
+                "d1_readiness": p.compute.iter().any(|a| a.d1_ready()),
                 "telemetry_rocmsmi": p.telemetry.iter().any(|(_, f)| *f),
             });
             println!(
@@ -151,9 +168,24 @@ fn cmd_probe(args: &[String]) -> Result<u8> {
             }
             println!("kfd:            {kfd_label}");
             for a in &p.compute {
-                match &a.loaded {
-                    Ok(_) => println!("compute:        {} loaded (symbols resolve)", a.soname),
-                    Err(e) => println!("compute:        {} not loadable ({e})", a.soname),
+                match (&a.d0_missing, &a.d1_missing) {
+                    (Ok(m0), Ok(m1)) if m0.is_empty() && m1.is_empty() => println!(
+                        "compute:        {} loaded (D0 + D1 surfaces resolve)",
+                        a.soname
+                    ),
+                    (Ok(m0), Ok(m1)) if m0.is_empty() => println!(
+                        "compute:        {} loaded (D0 ready; D1 missing: {})",
+                        a.soname,
+                        m1.join(",")
+                    ),
+                    (Ok(m0), Ok(_)) => println!(
+                        "compute:        {} loaded (D0 missing: {})",
+                        a.soname,
+                        m0.join(",")
+                    ),
+                    (Err(e), _) | (_, Err(e)) => {
+                        println!("compute:        {} not loadable ({e})", a.soname)
+                    }
                 }
             }
             for (n, found) in &p.telemetry {
@@ -253,6 +285,73 @@ fn cmd_probe(args: &[String]) -> Result<u8> {
 }
 
 /// Run an executable court: `vole-audio court <name> [--receipts DIR]`.
+/// `vole-audio seal verify`: executable phase-seal gate over the newest
+/// receipts (see `seal::verify_seal`). Default expectations: the six
+/// always-expected A–H courts and `h2` SUPPORTED, `rocm` NEGATIVE (honest
+/// non-SUPPORTED with a satisfied compile surface on this Phase-I host).
+fn cmd_seal(args: &[String]) -> Result<u8> {
+    let sub = args.first().map(String::as_str).unwrap_or("verify");
+    if sub != "verify" {
+        return Err(Error::malformed(format!("unknown seal subcommand '{sub}'")));
+    }
+    let mut receipts = std::path::PathBuf::from("receipts");
+    let mut expect = "semantic=SUPPORTED,authored=SUPPORTED,simd=SUPPORTED,\
+                       facts=SUPPORTED,cuda=SUPPORTED,d1=SUPPORTED,h2=SUPPORTED,\
+                       rocm=NEGATIVE"
+        .to_string();
+    let mut i = 1;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--receipts" => {
+                i += 1;
+                receipts = std::path::PathBuf::from(
+                    args.get(i)
+                        .ok_or_else(|| Error::malformed("--receipts requires a directory"))?,
+                );
+            }
+            "--expect" => {
+                i += 1;
+                expect = args
+                    .get(i)
+                    .ok_or_else(|| Error::malformed("--expect requires a matrix string"))?
+                    .clone();
+            }
+            other => return Err(Error::malformed(format!("unknown seal flag '{other}'"))),
+        }
+        i += 1;
+    }
+    let expectations = vole_audio::seal::parse_expectations(&expect)?;
+    let (ok, rows) = vole_audio::seal::verify_seal(&receipts, &expectations)?;
+    println!(
+        "vole-audio seal verify (receipts root: {})",
+        receipts.display()
+    );
+    println!("------------------------------------------------");
+    for row in &rows {
+        println!(
+            "  {:<12} expected={:<10} got={:<24} {}{}",
+            row.court,
+            row.expected,
+            row.got,
+            if row.pass { "PASS" } else { "FAIL" },
+            row.note
+                .as_ref()
+                .map(|n| format!("  [{n}]"))
+                .unwrap_or_default()
+        );
+    }
+    if ok {
+        println!(
+            "seal verified: {} receipts, expected matrix satisfied",
+            rows.len()
+        );
+        Ok(0)
+    } else {
+        println!("seal NOT verified: the matrix above must all PASS");
+        Ok(1)
+    }
+}
+
 fn cmd_court(args: &[String]) -> Result<u8> {
     let name = args.first().map(String::as_str);
     let Some(name) = name else {
