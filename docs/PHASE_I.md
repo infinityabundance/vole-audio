@@ -531,6 +531,45 @@ Seal run (release, `--all-features`, clean tree `28063ba`, version 0.6.1):
   nightly (321 total, 316 passed default-features; +3 over Seal 6); clippy
   `-D warnings` and `cargo fmt --check` clean.
 
+### Seal 8 — review-7 closure: fail-closed subject parser (2026-09-09)
+
+Delta since Seal 7:
+
+1. **Malformed/unmerged index records fail the subject, never silently
+   drop it.** `tracked_entries()` previously used `filter_map(parse_entry)`,
+   so a malformed index record or an in-progress merge (`stage != 0`) was
+   silently excluded from the subject while the docs claimed it was
+   rejected. `parse_entry` now returns `Result` with two distinct error
+   classes — structural malformation (`Kind::Malformed`) and an explicit
+   “unmerged git index entry (stage N) — an in-progress merge/rebase cannot
+   be sealed”; `parse_ls_files_stream()` fails on the first bad record and
+   `tracked_entries()` propagates. The subject covers the whole index or
+   does not exist: `Environment::capture` surfaces the failure as an absent
+   subject (a default seal cannot pass), with the dirty-tree binding check
+   as the independent second layer. `dedup_by` is gone — a duplicate
+   stage-0 path would be double-hashed (fail-safe), never dropped.
+2. **New test** `unmerged_index_fails_closed`: stream derivation fails on
+   unmerged and malformed records and parses clean streams fully; parse
+   tests assert the two error classes distinctly.
+
+Seal run (release, `--all-features`, clean tree `1144433`, version 0.6.2):
+
+- 18 receipts, committed separately at `dac48c8`; every receipt
+  `source_binding: bound` and carries `seal_subject_hash =
+  8a4043c33a81e174b2db3d64cbccc6d964a43521c2554bf9f2cdb610bd7f690a`;
+  `vole-audio seal verify` PASSes in **default mode** at the battery tree
+  and (after rebuilding from the release head, which only adds
+  receipts/docs) at the head itself.
+- All pre-existing courts SUPPORTED with frozen hashes unchanged (semantic
+  `1791816f4b93…`, authored `f7e103f3a97d…`).
+- `court rocm`: `UNSUPPORTED_BY_HARDWARE` with the compile surface satisfied
+  and bound (artifact `5092e129…` == sidecar == both determinism shas).
+- PTX artifact unchanged: sha256
+  `8b23325d03700847b056b29df4f4d4afd1a0c67386458512986c52f4fca7896b`.
+- Host tests: 332 total (327 passed, 5 ignored) all-features on the pinned
+  nightly (322 total, 317 passed default-features; +1 over Seal 7); clippy
+  `-D warnings` and `cargo fmt --check` clean.
+
 ## Execution record (implementation summary)
 
 - Entry freeze captured above; artifact baseline

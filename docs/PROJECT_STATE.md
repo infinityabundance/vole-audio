@@ -810,6 +810,11 @@ executed to the same evidence standard as every earlier phase.
   alters the subject even when bytes do not, symlinks contribute their
   link-target blob, and gitlinks contribute their pinned oid. All 18
   Seal-7 receipts share subject `4b809236…` (tree `28063ba`).
+- Review-7 closure (Seal 8, version 0.6.2): the subject parser fails
+  **closed** — malformed index records and in-progress merges (`stage !=
+  0`) are explicit errors, never silently dropped records; the subject
+  covers the whole index or does not exist. All 18 Seal-8 receipts share
+  subject `8a4043c3…` (tree `1144433`).
 
 ## Known blockers
 
