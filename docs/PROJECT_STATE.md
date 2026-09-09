@@ -793,6 +793,17 @@ executed to the same evidence standard as every earlier phase.
   (`vole_audio.amdgcn.determinism.json`). Artifact:
   `scripts/out/vole_audio.amdgcn.elf` sha256 `5092e129…` (gfx906;
   byte-deterministic).
+- Review-5 closure (Seal 6, ADR 0006, version 0.6.0): receipts now carry a
+  **seal subject** — SHA-256 over the tracked source excluding the
+  evidence/governance trees (`receipts/`, `target/`, `scripts/out/`,
+  `docs/`, `.git/`) — and the default seal invariant is `verifier seal
+  subject == receipt seal subject`, replacing the git-tree equality that
+  committing receipts could never satisfy. Committing receipts/ledgers no
+  longer invalidates a seal; the release head verifies the sealed subject
+  without `--historical`. `git_commit`/`git_tree_sha` remain as exact
+  battery-tree provenance; `vole-audio seal subject` prints the current
+  subject. All 18 Seal-6 receipts share subject `8890404e…` (tree
+  `57cc954`).
 
 ## Known blockers
 

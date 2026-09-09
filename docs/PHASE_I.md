@@ -444,6 +444,53 @@ Seal run (release, `--all-features`, clean tree `32a141e`):
   the same all-features count; clippy `-D warnings` and
   `cargo fmt --check` clean.
 
+### Seal 6 — review-5 closure: seal-subject identity (2026-09-09)
+
+Delta since Seal 5 (ADR 0006):
+
+1. **Seal-subject identity separates what was measured from where the
+   record was committed.** The git-tree invariant had a self-reference
+   defect: receipts attest the tree hash they name, but committing those
+   receipts — and the ledger — into that same tree changes it, so
+   `verifier.git_tree == receipt.git_tree` could never hold at a release
+   head once evidence was committed (it forced `--historical` after every
+   battery). Every receipt now carries `environment.seal_subject_hash`:
+   SHA-256 over every tracked source file except the evidence/governance
+   trees (`receipts/`, `target/`, `scripts/out/`, `docs/`, `.git/`). The
+   default seal invariant is now `verifier.seal_subject == receipt
+   seal_subject` (all bound, one subject + one battery tree across
+   receipts); `git_commit`/`git_tree_sha` remain as exact battery-tree
+   provenance. `--historical` relaxes only the verifier requirement and
+   accepts pre-amendment subjectless receipts (Seal 5 and earlier remain
+   verifiable that way).
+2. **Release version precedes the battery.** `Cargo.toml`/`Cargo.lock`
+   are part of the subject, so 0.6.0 was set in the implementation commit
+   `57cc954` before the seal run — the release head then verifies the
+   sealed subject without `--historical` (demonstrated below).
+3. **New surface**: `vole-audio seal subject` prints the current subject;
+   `vole-audio version` shows it.
+
+Seal run (release, `--all-features`, clean tree `57cc954`, version 0.6.0):
+
+- 18 receipts, committed separately at `742020e`; every receipt
+  `source_binding: bound` and carries `seal_subject_hash =
+  8890404e7fce60d2de081127e209aaa4c92c19a5639181353ae5cbf1b0ff85a2`;
+  `vole-audio seal verify` PASSes in **default mode** (no `--historical`)
+  both at the battery tree and — after rebuilding from the release head,
+  which only adds receipts/docs — at the head itself. That was impossible
+  under the git-tree invariant and is the property this seal fixes.
+- All pre-existing courts SUPPORTED with frozen hashes unchanged (semantic
+  `1791816f4b93…`, authored `f7e103f3a97d…`).
+- `court rocm`: `UNSUPPORTED_BY_HARDWARE` with the compile surface satisfied
+  and bound (artifact `5092e129…` == sidecar == both determinism shas).
+- PTX artifact unchanged: sha256
+  `8b23325d03700847b056b29df4f4d4afd1a0c67386458512986c52f4fca7896b`.
+- Host tests: 328 total (323 passed, 5 ignored) all-features on the pinned
+  nightly (318 total, 313 passed default-features; +7 tests over Seal 5:
+  the subject module pair, the environment capture test, and four
+  seal-gate subject tests); clippy `-D warnings` and `cargo fmt --check`
+  clean.
+
 ## Execution record (implementation summary)
 
 - Entry freeze captured above; artifact baseline
