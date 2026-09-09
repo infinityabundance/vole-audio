@@ -384,6 +384,52 @@ Seal run (release, `--all-features`, clean tree `bb04c00`):
   the same all-features count; clippy `-D warnings` and
   `cargo fmt --check` clean.
 
+### Seal 5 — review-4 closure (2026-09-08)
+
+Delta since Seal 4 (three review-4 items):
+
+1. **Executable-HSA ABI tables** (`32a141e`): `HSA_D0_REQUIRED` is derived
+   mechanically from ONE frozen, executable HSA launch path — agents
+   (`hsa_iterate_agents`/`hsa_agent_get_info`) → AMD memory pools
+   (`hsa_amd_agent_iterate_memory_pools`/`hsa_amd_memory_pool_get_info`/
+   `hsa_amd_memory_pool_allocate`/`hsa_amd_memory_pool_free`/
+   `hsa_amd_agents_allow_access`) → queue → executable alt-loading
+   (`create_alt` → `code_object_reader_create_from_memory` →
+   `load_agent_code_object` → `freeze` → `get_symbol_by_name` →
+   `symbol_get_info`) → launch signals; `HSA_D1_ADDITIONAL` is the
+   documented ROCr host-pinning pair `hsa_amd_memory_lock`/
+   `hsa_amd_memory_unlock` (the obsolete `hsa_host_malloc`/`hsa_host_free`
+   and the predicted `hsa_amd_agent_memory_pool_get_info` are gone). No
+   symbol is required outside the single path Phase J will implement.
+2. **Explicit seal verdict sets**: `NEGATIVE` is replaced by named
+   allowed-verdict sets validated against the verdict vocabulary — Phase-I
+   rocm = `UNSUPPORTED_BY_HARDWARE | UNSUPPORTED_BY_API | INCONCLUSIVE`;
+   corruption/execution-failure classes (`FAILED_CORRECTNESS`,
+   `FAILED_DEADLINE`, `FELL_BACK_TO_D0`, `NOT_IMPLEMENTED`) can never
+   satisfy a seal unless a phase names one.
+3. **Verifier-bound seal**: the gate now requires (default mode)
+   verifier build tree == verifier worktree == receipt seal tree, all
+   bound — a materially different binary cannot verify an old seal as if
+   it produced it; `seal verify --historical` relaxes only the
+   verifier-equality requirement (validated live: default FAILs and
+   historical PASSes against the Seal-4 receipts from a newer binary).
+
+Seal run (release, `--all-features`, clean tree `32a141e`):
+
+- 18 receipts, committed separately at `d3bddf1`; every receipt
+  `source_binding: bound`; `vole-audio seal verify` PASSes with the
+  verifier == seal tree == `32a141e` and the explicit rocm allowed set.
+- All pre-existing courts SUPPORTED with frozen hashes unchanged (semantic
+  `1791816f4b93…`, authored `f7e103f3a97d…`).
+- `court rocm`: `UNSUPPORTED_BY_HARDWARE` with the compile surface satisfied
+  and bound (artifact `5092e129…` == sidecar == both determinism shas).
+- PTX artifact unchanged: sha256
+  `8b23325d03700847b056b29df4f4d4afd1a0c67386458512986c52f4fca7896b`.
+- Host tests: 321 total (316 passed, 5 ignored) all-features on the pinned
+  nightly (311 total, 306 passed default-features); MSRV 1.89.0 green with
+  the same all-features count; clippy `-D warnings` and
+  `cargo fmt --check` clean.
+
 ## Execution record (implementation summary)
 
 - Entry freeze captured above; artifact baseline
