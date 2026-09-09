@@ -28,12 +28,17 @@ COMMANDS (current build):
     receipt perf <file>   Render a receipt's throughput_cells as Markdown
     seal verify           Executable phase-seal gate: validates an explicit
                           expected-verdict matrix over the newest receipts
-                          (source_binding == bound, single seal tree, frozen
-                          semantic/authored hashes, rocm compile surface;
-                          verifier == seal tree unless --historical)
+                          (source_binding == bound, single seal subject +
+                          battery tree, frozen semantic/authored hashes, rocm
+                          compile surface; verifier subject == receipt
+                          subject unless --historical)
                           [--receipts DIR]
                           [--expect court=SUPPORTED|ANY|LABEL|LABEL|...]
                           [--historical]
+    seal subject          Print the current seal-subject hash: SHA-256 of the
+                          tracked source excluding the evidence/governance
+                          trees (receipts/ target/ scripts/out/ docs/ .git/);
+                          the identity a seal compares
     version               Print version and build identity
     help                  Show this help
 
@@ -84,6 +89,9 @@ fn run(args: &[String]) -> Result<u8> {
                 );
             }
             println!("source_binding: {}", e.source_binding().label());
+            if let Some(s) = &e.seal_subject_hash {
+                println!("seal subject: {s}");
+            }
             Ok(0)
         }
         "probe" => cmd_probe(&args[2..]),
@@ -286,26 +294,46 @@ fn cmd_probe(args: &[String]) -> Result<u8> {
     Ok(0)
 }
 
-/// Run an executable court: `vole-audio court <name> [--receipts DIR]`.
 /// `vole-audio seal verify`: executable phase-seal gate over the newest
 /// receipts (see `seal::verify_seal`). Default expectations: the six
 /// always-expected A–H courts and `h2` SUPPORTED, and `rocm` restricted to
 /// the explicit allowed set `UNSUPPORTED_BY_HARDWARE | UNSUPPORTED_BY_API |
 /// INCONCLUSIVE` (never the corruption/execution-failure classes). The
-/// verifier itself must be bound to the seal tree; `--historical` relaxes
-/// only the verifier-equality requirement.
+/// default invariant is `verifier seal subject == receipt seal subject` (all
+/// bound); `--historical` relaxes the verifier requirement and accepts
+/// pre-amendment receipts without a subject. `vole-audio seal subject`
+/// prints the current subject hash for inspection.
 fn cmd_seal(args: &[String]) -> Result<u8> {
     let sub = args.first().map(String::as_str).unwrap_or("verify");
-    if sub != "verify" {
-        return Err(Error::malformed(format!("unknown seal subcommand '{sub}'")));
+    match sub {
+        "verify" => cmd_seal_verify(&args[1..]),
+        "subject" => {
+            let e = vole_audio::evidence::environment::Environment::capture();
+            match &e.seal_subject_hash {
+                Some(s) => {
+                    println!("{s}");
+                    Ok(0)
+                }
+                None => {
+                    eprintln!("no seal subject: not inside a git work tree");
+                    Ok(1)
+                }
+            }
+        }
+        other => Err(Error::malformed(format!(
+            "unknown seal subcommand '{other}'"
+        ))),
     }
+}
+
+fn cmd_seal_verify(args: &[String]) -> Result<u8> {
     let mut receipts = std::path::PathBuf::from("receipts");
     let mut historical = false;
     let mut expect = "semantic=SUPPORTED,authored=SUPPORTED,simd=SUPPORTED,\
                        facts=SUPPORTED,cuda=SUPPORTED,d1=SUPPORTED,h2=SUPPORTED,\
                        rocm=UNSUPPORTED_BY_HARDWARE|UNSUPPORTED_BY_API|INCONCLUSIVE"
         .to_string();
-    let mut i = 1;
+    let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
             "--receipts" => {
@@ -336,14 +364,18 @@ fn cmd_seal(args: &[String]) -> Result<u8> {
         receipts.display()
     );
     println!(
-        "  verifier: {} (binding: {})",
+        "  verifier: {} (binding: {}, seal subject: {})",
         verifier
             .git_identity()
             .unwrap_or_else(|| "no git identity".into()),
-        verifier.source_binding().label()
+        verifier.source_binding().label(),
+        verifier
+            .seal_subject_hash
+            .as_deref()
+            .unwrap_or("unavailable")
     );
     if historical {
-        println!("  mode: --historical (verifier-tree equality relaxed)");
+        println!("  mode: --historical (verifier requirement relaxed)");
     }
     println!("------------------------------------------------");
     for row in &rows {

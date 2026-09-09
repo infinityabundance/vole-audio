@@ -11,6 +11,7 @@ pub mod energy;
 pub mod environment;
 pub mod hardware;
 pub mod receipt;
+pub mod subject;
 pub mod timing;
 pub mod trace;
 

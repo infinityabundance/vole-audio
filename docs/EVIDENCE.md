@@ -62,6 +62,14 @@ never, by itself, mark the very tree it attests as dirty. Uncommitted source
 changes still do. New optional environment fields are appended and omitted
 when absent, so archived receipts continue to re-verify byte-identically.
 
+Each receipt also records the **seal subject** (`environment.seal_subject_hash`,
+see `evidence::subject`): a SHA-256 over every tracked source file except the
+evidence/governance trees (`receipts/`, `target/`, `scripts/out/`, `docs/`,
+`.git/`). This is the identity a seal compares — committing receipts/docs
+never invalidates a seal, and only a code change requires a new one. The git
+commit/tree stay in the receipt as the exact historical provenance of the
+battery tree (`vole-audio seal subject` prints the current subject).
+
 ## Measurement boundary (PCM/sample-domain exposure)
 
 Counted as sample-domain exposure (independently addressable storage):

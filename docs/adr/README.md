@@ -9,3 +9,4 @@ Phase H.2 introduced the first ADRs; later phases append theirs.
 | [0003](0003-dsfb-zero-authority.md) | DSFB has zero authority in VOLE-Audio |
 | [0004](0004-block-addressable-entropy.md) | Block-addressable entropy and the random-access requirement |
 | [0005](0005-literal-entropy-fallback.md) | Literal entropy fallback is mandatory and complete-cost based |
+| [0006](0006-seal-subject-identity.md) | Seal subject identity is the filtered source tree, not the git tree |

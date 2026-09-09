@@ -111,9 +111,20 @@ assertion.
     `UNSUPPORTED_BY_HARDWARE | UNSUPPORTED_BY_API | INCONCLUSIVE`;
     `FAILED_CORRECTNESS`/`FAILED_DEADLINE`/`FELL_BACK_TO_D0`/
     `NOT_IMPLEMENTED` are excluded unless a phase names them) — with
-    `source_binding == bound`, a single seal tree, frozen reference hashes,
-    the rocm compile-surface rule, and the verifier itself bound to the
-    seal tree (default mode; `--historical` relaxes only that).
+    `source_binding == bound`, one seal subject + one battery tree, frozen
+    reference hashes, the rocm compile-surface rule, and the verifier
+    itself bound with a seal subject equal to the receipts' (default mode;
+    `--historical` relaxes the verifier requirement and accepts
+    pre-amendment receipts that carry no subject).
+27. **Committing the receipts invalidates the seal they attest (the
+    git-tree self-reference).** No: a seal compares a **seal subject** —
+    SHA-256 over every tracked source file except the evidence/governance
+    trees (`receipts/`, `target/`, `scripts/out/`, `docs/`, `.git/`) — so
+    committing receipts and ledgers (which cannot affect execution) never
+    changes the subject; only code does. Version bumps live in the subject
+    (`Cargo.toml`/`Cargo.lock` are included), so they are made *before* the
+    battery. `git_commit`/`git_tree_sha` remain in every receipt as exact
+    historical provenance of the battery tree.
 
 Anything in this list that later gains evidence moves into a claims document
 with its receipt. Until then: **not claimed.**

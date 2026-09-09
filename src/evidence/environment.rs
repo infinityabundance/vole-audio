@@ -91,6 +91,14 @@ pub struct Environment {
     /// dirty). A seal requires `bound`.
     #[serde(default)]
     pub source_binding: SourceBinding,
+    /// SHA-256 of the filtered **seal subject** (see `crate::evidence::subject`):
+    /// every tracked source file except the evidence/governance trees
+    /// (`receipts/`, `target/`, `scripts/out/`, `docs/`, `.git/`). This is the
+    /// identity a seal compares: it survives committing receipts/docs (which
+    /// cannot affect execution) and changes only when code changes. `None`
+    /// outside a git work tree (unbounded evidence).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub seal_subject_hash: Option<String>,
 }
 
 /// Compile-time stamped constants (set by build.rs).
@@ -333,6 +341,16 @@ impl Environment {
             build_profile: BUILD_PROFILE.map(str::to_string),
             build_target: BUILD_TARGET.map(str::to_string),
             source_binding: SourceBinding::Unavailable,
+            // Filtered source-tree identity (best effort): absent outside a
+            // git work tree or when the subject cannot be computed. A seal
+            // requires it present on both the receipts and the verifier.
+            seal_subject_hash: crate::evidence::subject::repo_root()
+                .as_deref()
+                .and_then(|root| {
+                    crate::evidence::subject::seal_subject_hash(root)
+                        .ok()
+                        .flatten()
+                }),
         };
         env.source_binding = env.source_binding();
         env
@@ -404,6 +422,24 @@ mod tests {
             ..Environment::default()
         };
         assert_eq!(clean.git_identity(), Some("abc123".into()));
+    }
+
+    #[test]
+    fn seal_subject_hash_is_present_in_a_git_worktree() {
+        let env = Environment::capture();
+        if env.git_commit.is_some() {
+            // In a git work tree the subject exists and is a SHA-256 hex
+            // digest; outside one (crates.io tarball) it is absent — the
+            // evidence is unbounded, never fabricated.
+            let s = env
+                .seal_subject_hash
+                .as_deref()
+                .expect("subject in a git work tree");
+            assert_eq!(s.len(), 64);
+            assert!(s.bytes().all(|b| b.is_ascii_hexdigit()));
+        } else {
+            assert!(env.seal_subject_hash.is_none());
+        }
     }
 
     #[test]

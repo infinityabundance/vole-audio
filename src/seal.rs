@@ -10,15 +10,27 @@
 //!
 //! * `source_binding == bound` (compiled-from == executed-in-worktree, both
 //!   explicitly clean);
-//! * every receipt from the same seal tree (one git commit / tree sha);
+//! * every receipt from the same seal — one **seal subject** (a filtered
+//!   source-tree hash that excludes the evidence/governance trees
+//!   `receipts/`, `target/`, `scripts/out/`, `docs/`, `.git/`, so committing
+//!   receipts and ledgers can never invalidate a seal) and one battery tree
+//!   (git commit / tree sha, kept as exact historical provenance);
 //! * the court's verdict matches its expectation — `SUPPORTED`, `ANY`, or an
 //!   **explicit allowed-verdict set** (e.g. for the Phase-I host
 //!   `rocm=UNSUPPORTED_BY_HARDWARE|UNSUPPORTED_BY_API|INCONCLUSIVE`). A
 //!   categorical "anything but SUPPORTED" is not a seal: a court that
 //!   executes and produces corrupt samples must never satisfy one;
 //! * the **verifying executable is part of the seal**: in the default mode
-//!   its build tree == its worktree == the receipt seal tree, all bound
-//!   (`--historical` relaxes only the verifier-equality requirement).
+//!   its seal subject == the receipts' seal subject, all bound
+//!   (`--historical` relaxes only the verifier requirement, and accepts
+//!   pre-amendment receipts that carry no seal subject).
+//!
+//! Why a subject and not the git tree: receipts record the tree hash they
+//! attest, but committing those receipts into that same tree changes it — a
+//! strict `verifier.git_tree == receipt.git_tree` invariant can never hold
+//! once evidence is committed. The subject separates **what was measured**
+//! (everything capable of affecting execution) from **where the measurement
+//! record was subsequently committed** (receipts/ and docs/).
 //!
 //! Phase rules beyond the matrix:
 //!
@@ -168,10 +180,13 @@ fn newest_receipt(root: &Path, court: &str) -> Result<Option<(std::path::PathBuf
 
 /// Verify a seal over the newest receipts in `root` against `expectations`.
 /// `verifier` is the running executable's environment; the default phase-seal
-/// invariant is `verifier build tree == verifier worktree == receipt seal
-/// tree` (all bound). `historical` relaxes only the verifier-equality
-/// requirement (for re-verifying an older seal with a newer binary). Returns
-/// the pass/fail rows; `ok` is true only when every row passed.
+/// invariant is `verifier seal subject == receipt seal subject` (all bound) —
+/// a materially different *source* cannot verify a seal as if it produced it,
+/// while committing the receipts themselves (an excluded tree) never breaks
+/// the seal. `historical` relaxes the verifier requirement (re-verifying an
+/// older seal with a newer binary) and accepts pre-amendment receipts that
+/// carry no seal subject. Returns the pass/fail rows; `ok` is true only when
+/// every row passed.
 pub fn verify_seal(
     root: &Path,
     expectations: &[(String, Expect)],
@@ -183,9 +198,11 @@ pub fn verify_seal(
 
     // Cross-cutting facts: the verifier itself must be bound to its worktree
     // (compiled-from == executed, both clean) for any seal; in the default
-    // (non-historical) mode the verifier tree must ALSO equal the receipt
-    // seal tree — a materially different binary cannot verify a seal as if
-    // it produced it.
+    // (non-historical) mode the verifier's seal SUBJECT must ALSO equal the
+    // receipt seal subject — a materially different source cannot verify a
+    // seal as if it produced it. (Git-tree equality is deliberately NOT the
+    // invariant: committing the receipts into the attested tree changes that
+    // tree, so it could never hold once evidence is committed.)
     let mut verifier_note = String::new();
     if !verifier.source_bound() {
         verifier_note = format!("verifier not bound ({})", verifier.source_binding().label());
@@ -197,8 +214,14 @@ pub fn verify_seal(
         }
     }
 
-    // Single seal tree + per-receipt binding are cross-cutting: validate on
-    // the first receipt found and check every other receipt agrees.
+    // Single-seal anchors, validated on the first receipt found and checked
+    // on every other receipt:
+    //  * seal_subject_hash — the identity a seal compares (excludes the
+    //    evidence/governance trees, so committing receipts/docs never breaks
+    //    a seal; changes only when code changes);
+    //  * (git_commit, git_tree_sha) — exact historical provenance of the
+    //    single clean-tree battery that produced the receipts.
+    let mut seal_subject: Option<String> = None;
     let mut seal_tree: Option<(String, String)> = None; // (git_commit, git_tree_sha)
 
     for (court, expect) in expectations {
@@ -217,6 +240,7 @@ pub fn verify_seal(
         let env = r.get("environment").cloned().unwrap_or_default();
         let get = |k: &str| env.get(k).and_then(|v| v.as_str()).map(str::to_string);
         let binding = get("source_binding");
+        let subject = get("seal_subject_hash");
         let git_commit = get("git_commit");
         let git_tree = get("git_tree_sha");
         let build_commit = get("build_git_commit");
@@ -229,7 +253,7 @@ pub fn verify_seal(
         let mut notes: Vec<String> = Vec::new();
         let mut pass = true;
 
-        // Cross-cutting binding/tree checks.
+        // Cross-cutting binding checks.
         if binding.as_deref() != Some("bound") {
             pass = false;
             notes.push(format!("source_binding={}", binding.unwrap_or_default()));
@@ -238,6 +262,45 @@ pub fn verify_seal(
             pass = false;
             notes.push("compiled-from != executed-in-worktree".into());
         }
+
+        // Seal-subject identity: one subject across every receipt of the
+        // seal. Default mode also requires the verifier's subject to equal
+        // it. Pre-amendment receipts (no subject) are historical-only.
+        if let Some(s) = &subject {
+            match &seal_subject {
+                None => seal_subject = Some(s.clone()),
+                Some(s0) if s0 != s => {
+                    pass = false;
+                    notes.push("receipts from different seal subjects".into());
+                }
+                _ => {}
+            }
+        } else if !historical {
+            pass = false;
+            notes.push(
+                "receipt lacks seal_subject_hash (pre-amendment evidence); verify with \
+                 --historical"
+                    .into(),
+            );
+        }
+        if !historical {
+            match (&verifier.seal_subject_hash, &subject) {
+                (Some(v), Some(s)) if v == s => {}
+                (Some(_), Some(_)) => {
+                    pass = false;
+                    notes.push("verifier seal subject != receipt seal subject".into());
+                }
+                (None, Some(_)) => {
+                    pass = false;
+                    notes
+                        .push("verifier seal subject unavailable (not built in a git tree)".into());
+                }
+                _ => {} // subjectless receipt already failed above.
+            }
+        }
+
+        // Historical anchor: every receipt of a seal comes from one battery
+        // tree (kept as exact provenance; NOT the default-mode invariant).
         if let (Some(c), Some(t)) = (&git_commit, &git_tree) {
             match &seal_tree {
                 None => seal_tree = Some((c.clone(), t.clone())),
@@ -247,18 +310,6 @@ pub fn verify_seal(
                         notes.push("receipts from different seal trees".into());
                     }
                 }
-            }
-            // Default phase-seal invariant: verifier == receipt seal tree.
-            if !historical
-                && (verifier.git_commit.as_deref() != Some(c.as_str())
-                    || verifier.git_tree_sha.as_deref() != Some(t.as_str()))
-            {
-                pass = false;
-                notes.push(
-                    "verifier tree != receipt seal tree (default mode; use --historical \
-                     to verify an older seal with a newer binary)"
-                        .into(),
-                );
             }
         } else {
             pass = false;
@@ -394,5 +445,140 @@ mod tests {
             FROZEN_AUTHORED,
             crate::courts::authored::AUTHORED_COURT_REFERENCE_SHA256
         );
+    }
+
+    // ---- seal-subject gate tests ----------------------------------------
+    //
+    // These exercise the *verifier logic* with synthetic receipts (they do
+    // not run courts). The receipts are built through ReceiptBuilder so they
+    // carry valid self-hashes, exactly as real evidence does.
+
+    use crate::evidence::environment::{Environment, SourceBinding};
+    use crate::evidence::receipt::{Provenance, ReceiptBuilder};
+    use crate::status::Verdict;
+    use std::path::{Path, PathBuf};
+
+    fn temp_root(tag: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "vole-seal-test-{tag}-{}-{}",
+            std::process::id(),
+            crate::evidence::timing::monotonic_raw_ns()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    /// A bound environment (compiled-from == executed, both clean) with an
+    /// optional seal subject. Commit/tree name the battery tree; the subject
+    /// is the filtered source identity.
+    fn bound_env(subject: Option<&str>, commit: &str, tree: &str) -> Environment {
+        Environment {
+            git_commit: Some(commit.to_string()),
+            git_dirty: Some(false),
+            git_tree_sha: Some(tree.to_string()),
+            build_git_commit: Some(commit.to_string()),
+            build_dirty: Some(false),
+            source_binding: SourceBinding::Bound,
+            seal_subject_hash: subject.map(str::to_string),
+            ..Environment::default()
+        }
+    }
+
+    fn write_supported_receipt(root: &Path, court: &str, env: Environment) {
+        let mut b = ReceiptBuilder::new(court);
+        b.result(Verdict::Supported).environment(env);
+        // Courts with frozen-hash phase rules need their provenance set.
+        match court {
+            "semantic" => {
+                b.provenance(Provenance {
+                    reference_hash: Some(FROZEN_SEMANTIC.to_string()),
+                    ..Default::default()
+                });
+            }
+            "authored" => {
+                b.provenance(Provenance {
+                    reference_hash: Some(FROZEN_AUTHORED.to_string()),
+                    ..Default::default()
+                });
+            }
+            _ => {}
+        }
+        b.finish_write(root).expect("write test receipt");
+    }
+
+    fn matrix() -> Vec<(String, Expect)> {
+        vec![
+            ("semantic".to_string(), Expect::Supported),
+            ("authored".to_string(), Expect::Supported),
+        ]
+    }
+
+    #[test]
+    fn same_subject_across_commits_verifies_default_mode() {
+        // The self-reference fix: receipts attest commit C / tree T, then
+        // committing them moves the worktree to a later commit D with a
+        // different tree — but the seal SUBJECT (filtered source identity)
+        // is unchanged. A binary built at D must verify the seal in default
+        // mode; only a changed subject requires --historical.
+        let root = temp_root("subject-same");
+        write_supported_receipt(&root, "semantic", bound_env(Some("S"), "C", "T"));
+        write_supported_receipt(&root, "authored", bound_env(Some("S"), "C", "T"));
+        let verifier = bound_env(Some("S"), "D", "U"); // later commit, same source
+        let (ok, rows) = verify_seal(&root, &matrix(), &verifier, false).unwrap();
+        assert!(ok, "same subject must verify: {rows:?}");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn changed_subject_fails_default_mode() {
+        // A materially different source (different subject) cannot verify the
+        // seal in default mode — even at the same commit/tree.
+        let root = temp_root("subject-diff");
+        write_supported_receipt(&root, "semantic", bound_env(Some("S"), "C", "T"));
+        write_supported_receipt(&root, "authored", bound_env(Some("S"), "C", "T"));
+        let verifier = bound_env(Some("S2"), "D", "U");
+        let (ok, rows) = verify_seal(&root, &matrix(), &verifier, false).unwrap();
+        assert!(!ok, "different subject must fail: {rows:?}");
+        assert!(rows.iter().all(|r| !r.pass));
+        assert!(rows[0].note.as_deref().unwrap().contains("seal subject"));
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn receipts_with_different_subjects_are_not_one_seal() {
+        let root = temp_root("subject-mixed");
+        write_supported_receipt(&root, "semantic", bound_env(Some("S"), "C", "T"));
+        write_supported_receipt(&root, "authored", bound_env(Some("S2"), "C", "T"));
+        let verifier = bound_env(Some("S"), "C", "T");
+        let (ok, rows) = verify_seal(&root, &matrix(), &verifier, false).unwrap();
+        assert!(!ok);
+        assert!(
+            rows.iter().any(|r| r
+                .note
+                .as_deref()
+                .is_some_and(|n| n.contains("different seal subjects"))),
+            "rows: {rows:?}"
+        );
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn subjectless_receipts_are_historical_only() {
+        // Pre-amendment receipts carry no seal subject: a default seal must
+        // refuse them (nothing to compare), while --historical still verifies
+        // them by their exact battery-tree provenance.
+        let root = temp_root("subject-legacy");
+        write_supported_receipt(&root, "semantic", bound_env(None, "C", "T"));
+        write_supported_receipt(&root, "authored", bound_env(None, "C", "T"));
+        let verifier = bound_env(Some("S"), "D", "U");
+        let (ok_default, rows) = verify_seal(&root, &matrix(), &verifier, false).unwrap();
+        assert!(
+            !ok_default,
+            "subjectless receipts must not default-verify: {rows:?}"
+        );
+        assert!(rows[0].note.as_deref().unwrap().contains("--historical"));
+        let (ok_hist, _) = verify_seal(&root, &matrix(), &verifier, true).unwrap();
+        assert!(ok_hist, "--historical must accept pre-amendment receipts");
+        let _ = std::fs::remove_dir_all(&root);
     }
 }

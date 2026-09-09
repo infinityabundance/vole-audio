@@ -146,6 +146,20 @@ rustc 1.99.0-nightly, LLVM 22.1.8):
   bound to the verifying executable: default mode requires verifier build
   tree == verifier worktree == receipt seal tree, all bound;
   `--historical` relaxes only the verifier-equality requirement.
+- **I.10 Seal-subject identity amendment (review 5)** — the git-tree
+  invariant had a self-reference defect: receipts attest the tree hash they
+  name, but committing the receipts into that tree changes it, so
+  `verifier.git_tree == receipt.git_tree` could never hold at the release
+  head once evidence was committed. The fix separates **what was measured**
+  from **where the record was committed**: every receipt now carries a
+  `seal_subject_hash` — SHA-256 over the tracked source excluding the
+  evidence/governance trees (`receipts/`, `target/`, `scripts/out/`,
+  `docs/`, `.git/`) — and the default seal invariant is `verifier
+  seal_subject == receipt seal_subject` (all bound). Committing receipts
+  and ledgers can no longer invalidate a seal; only a code change can.
+  `git_commit`/`git_tree_sha` remain as exact battery-tree provenance, and
+  `--historical` accepts pre-amendment subjectless receipts. ADR 0006;
+  `vole-audio seal subject` prints the current subject.
 
 ## Claim boundary (what Phase I does NOT claim)
 
