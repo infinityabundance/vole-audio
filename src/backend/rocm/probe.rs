@@ -67,26 +67,50 @@ pub const HIP_D1_ADDITIONAL: &[&str] = &[
     "hipHostUnregister",
 ];
 
-/// Frozen direct-HSA **D0** ABI surface (used only if Phase J goes
-/// HSA-native rather than HIP). Symbol names follow the current ROCR ABI
-/// (AMD's tracing examples: hsa_executable_create_alt ->
-/// hsa_code_object_reader_create_from_memory ->
-/// hsa_executable_load_agent_code_object -> hsa_executable_freeze ->
-/// hsa_executable_get_symbol_by_name -> hsa_executable_symbol_get_info).
+/// Frozen direct-HSA **D0** ABI surface — derived **mechanically from one
+/// frozen, executable HSA launch path** (the only path Phase J will
+/// implement if it goes HSA-native; no symbols are predicted outside it):
+///
+/// ```text
+/// 1. hsa_init
+/// 2. hsa_iterate_agents                     (pick a compute agent)
+/// 3. hsa_agent_get_info                     (agent device type)
+/// 4. hsa_amd_agent_iterate_memory_pools     (select a global pool)
+/// 5. hsa_amd_memory_pool_get_info           (pool flags/size/granularity)
+/// 6. hsa_queue_create                       (launch queue)
+/// 7. hsa_executable_create_alt
+///    hsa_code_object_reader_create_from_memory
+///    hsa_executable_load_agent_code_object
+///    hsa_executable_freeze
+///    hsa_executable_get_symbol_by_name
+///    hsa_executable_symbol_get_info         (kernel handle + segment info)
+/// 8. hsa_amd_memory_pool_allocate           (device buffers)
+///    hsa_amd_agents_allow_access            (grant the agent access)
+/// 9. hsa_memory_copy                        (host<->device staging)
+///10. launch: hsa_signal_create,
+///    hsa_queue_store_write_index_relaxed, hsa_signal_store_release,
+///    hsa_signal_store_relaxed, hsa_signal_wait_acquire
+///11. hsa_amd_memory_pool_free
+///    hsa_code_object_reader_destroy
+///    hsa_shut_down
+/// ```
 pub const HSA_D0_REQUIRED: &[&str] = &[
     "hsa_init",
     "hsa_shut_down",
     "hsa_iterate_agents",
     "hsa_agent_get_info",
+    "hsa_amd_agent_iterate_memory_pools",
+    "hsa_amd_memory_pool_get_info",
+    "hsa_amd_memory_pool_allocate",
+    "hsa_amd_memory_pool_free",
+    "hsa_amd_agents_allow_access",
     "hsa_queue_create",
+    "hsa_memory_copy",
     "hsa_signal_create",
     "hsa_signal_store_relaxed",
     "hsa_signal_store_release",
     "hsa_signal_wait_acquire",
     "hsa_queue_store_write_index_relaxed",
-    "hsa_memory_allocate",
-    "hsa_memory_free",
-    "hsa_memory_copy",
     "hsa_executable_create_alt",
     "hsa_code_object_reader_create_from_memory",
     "hsa_code_object_reader_destroy",
@@ -96,13 +120,12 @@ pub const HSA_D0_REQUIRED: &[&str] = &[
     "hsa_executable_symbol_get_info",
 ];
 
-/// Frozen direct-HSA **D1 additional** ABI surface (host-memory mapping for
-/// the endpoint region).
-pub const HSA_D1_ADDITIONAL: &[&str] = &[
-    "hsa_host_malloc",
-    "hsa_host_free",
-    "hsa_amd_agent_memory_pool_get_info",
-];
+/// Frozen direct-HSA **D1 additional** ABI surface — derived from the same
+/// single path: pinning an *existing* host allocation (the ALSA mmap region
+/// analog) uses the documented ROCr `hsa_amd_memory_lock` /
+/// `hsa_amd_memory_unlock` pair (no `hsa_host_malloc`/`hsa_host_free` exist
+/// in current ROCr). D1 readiness = D0 readiness AND these resolve.
+pub const HSA_D1_ADDITIONAL: &[&str] = &["hsa_amd_memory_lock", "hsa_amd_memory_unlock"];
 
 /// Compute-runtime sonames probed in order: (name, D0 table, D1 table).
 /// Versioned and unversioned sonames are probed, and /opt/rocm* installs

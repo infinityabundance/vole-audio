@@ -11,8 +11,14 @@
 //! * `source_binding == bound` (compiled-from == executed-in-worktree, both
 //!   explicitly clean);
 //! * every receipt from the same seal tree (one git commit / tree sha);
-//! * the court's verdict matches its expectation (`SUPPORTED`, `NEGATIVE` —
-//!   any honest non-SUPPORTED label — or `ANY`).
+//! * the court's verdict matches its expectation — `SUPPORTED`, `ANY`, or an
+//!   **explicit allowed-verdict set** (e.g. for the Phase-I host
+//!   `rocm=UNSUPPORTED_BY_HARDWARE|UNSUPPORTED_BY_API|INCONCLUSIVE`). A
+//!   categorical "anything but SUPPORTED" is not a seal: a court that
+//!   executes and produces corrupt samples must never satisfy one;
+//! * the **verifying executable is part of the seal**: in the default mode
+//!   its build tree == its worktree == the receipt seal tree, all bound
+//!   (`--historical` relaxes only the verifier-equality requirement).
 //!
 //! Phase rules beyond the matrix:
 //!
@@ -35,16 +41,91 @@ pub const FROZEN_SEMANTIC: &str =
 pub const FROZEN_AUTHORED: &str =
     "f7e103f3a97d5fafd6988e3bb6551b3c3af62a2e65c6a82898d6c2d4aff9d6db";
 
-/// Verdict expectation for one court row.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Verdict expectation for one court row. A seal must state what it will
+/// accept; categorical "anything but SUPPORTED" is not a seal (a court that
+/// executes and produces corrupt samples must never satisfy a seal).
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expect {
     Supported,
-    /// Any honest non-SUPPORTED label (typed causes recorded in the receipt).
-    Negative,
     /// Any verdict.
     Any,
+    /// Exactly these verdict labels (e.g. rocm =
+    /// UNSUPPORTED_BY_HARDWARE | UNSUPPORTED_BY_API | INCONCLUSIVE for the
+    /// Phase-I host) — never FAILED_CORRECTNESS / FAILED_DEADLINE /
+    /// FELL_BACK_TO_D0 / NOT_IMPLEMENTED unless a phase explicitly allows
+    /// one of them.
+    Allowed(Vec<String>),
 }
 
+/// The verdict vocabulary a seal expectation may name (must match
+/// `status::Verdict::label` exactly — typos fail parsing).
+pub const VERDICT_VOCABULARY: &[&str] = &[
+    "SUPPORTED",
+    "UNSUPPORTED_BY_API",
+    "UNSUPPORTED_BY_HARDWARE",
+    "UNSUPPORTED_BY_TOPOLOGY",
+    "FAILED_CORRECTNESS",
+    "FAILED_DEADLINE",
+    "FELL_BACK_TO_D0",
+    "INCONCLUSIVE",
+    "NOT_APPLICABLE",
+    "NOT_IMPLEMENTED",
+];
+
+impl Expect {
+    /// Human-readable expectation, e.g. "SUPPORTED" or
+    /// "UNSUPPORTED_BY_HARDWARE|UNSUPPORTED_BY_API|INCONCLUSIVE".
+    pub fn display(&self) -> String {
+        match self {
+            Expect::Supported => "SUPPORTED".to_string(),
+            Expect::Any => "ANY".to_string(),
+            Expect::Allowed(v) => v.join("|"),
+        }
+    }
+
+    fn accepts(&self, got: &str) -> bool {
+        match self {
+            Expect::Supported => got == "SUPPORTED",
+            Expect::Any => true,
+            Expect::Allowed(v) => v.iter().any(|a| a == got),
+        }
+    }
+}
+
+/// Parse a `court=EXPECT,...` matrix string. Expectations: `SUPPORTED`,
+/// `ANY`, or an explicit pipe-joined allowed-verdict list whose members must
+/// be in [`VERDICT_VOCABULARY`] (e.g.
+/// `rocm=UNSUPPORTED_BY_HARDWARE|UNSUPPORTED_BY_API|INCONCLUSIVE`).
+pub fn parse_expectations(s: &str) -> Result<Vec<(String, Expect)>> {
+    let mut out = Vec::new();
+    for tok in s.split(',').filter(|t| !t.is_empty()) {
+        let (court, exp) = tok.split_once('=').ok_or_else(|| {
+            Error::malformed(format!("seal expectation '{tok}': expected court=EXPECT"))
+        })?;
+        let upper = exp.to_ascii_uppercase();
+        let e = match upper.as_str() {
+            "SUPPORTED" => Expect::Supported,
+            "ANY" => Expect::Any,
+            _ => {
+                let labels = upper.split('|').collect::<Vec<_>>();
+                for l in &labels {
+                    if !VERDICT_VOCABULARY.contains(l) {
+                        return Err(Error::malformed(format!(
+                            "seal expectation '{court}={exp}': '{l}' is not a verdict label \
+                             (allowed: {} | SUPPORTED | ANY)",
+                            VERDICT_VOCABULARY.join(" | ")
+                        )));
+                    }
+                }
+                Expect::Allowed(labels.iter().map(|l| (*l).to_string()).collect())
+            }
+        };
+        out.push((court.trim().to_string(), e));
+    }
+    Ok(out)
+}
+
+/// One validated seal row.
 #[derive(Debug, Clone)]
 pub struct Row {
     pub court: String,
@@ -52,29 +133,6 @@ pub struct Row {
     pub got: String,
     pub pass: bool,
     pub note: Option<String>,
-}
-
-/// Parse a `court=EXPECT,...` matrix string. Recognized expectations:
-/// `SUPPORTED`, `NEGATIVE`, `ANY`.
-pub fn parse_expectations(s: &str) -> Result<Vec<(String, Expect)>> {
-    let mut out = Vec::new();
-    for tok in s.split(',').filter(|t| !t.is_empty()) {
-        let (court, exp) = tok.split_once('=').ok_or_else(|| {
-            Error::malformed(format!("seal expectation '{tok}': expected court=EXPECT"))
-        })?;
-        let e = match exp.to_ascii_uppercase().as_str() {
-            "SUPPORTED" => Expect::Supported,
-            "NEGATIVE" => Expect::Negative,
-            "ANY" => Expect::Any,
-            other => {
-                return Err(Error::malformed(format!(
-                    "seal expectation '{court}={other}': expected SUPPORTED | NEGATIVE | ANY"
-                )));
-            }
-        };
-        out.push((court.trim().to_string(), e));
-    }
-    Ok(out)
 }
 
 fn newest_receipt(root: &Path, court: &str) -> Result<Option<(std::path::PathBuf, Value)>> {
@@ -109,26 +167,46 @@ fn newest_receipt(root: &Path, court: &str) -> Result<Option<(std::path::PathBuf
 }
 
 /// Verify a seal over the newest receipts in `root` against `expectations`.
-/// Returns the pass/fail rows; `ok` is true only when every row passed.
-pub fn verify_seal(root: &Path, expectations: &[(String, Expect)]) -> Result<(bool, Vec<Row>)> {
+/// `verifier` is the running executable's environment; the default phase-seal
+/// invariant is `verifier build tree == verifier worktree == receipt seal
+/// tree` (all bound). `historical` relaxes only the verifier-equality
+/// requirement (for re-verifying an older seal with a newer binary). Returns
+/// the pass/fail rows; `ok` is true only when every row passed.
+pub fn verify_seal(
+    root: &Path,
+    expectations: &[(String, Expect)],
+    verifier: &crate::evidence::environment::Environment,
+    historical: bool,
+) -> Result<(bool, Vec<Row>)> {
     let mut rows: Vec<Row> = Vec::new();
     let mut ok = true;
+
+    // Cross-cutting facts: the verifier itself must be bound to its worktree
+    // (compiled-from == executed, both clean) for any seal; in the default
+    // (non-historical) mode the verifier tree must ALSO equal the receipt
+    // seal tree — a materially different binary cannot verify a seal as if
+    // it produced it.
+    let mut verifier_note = String::new();
+    if !verifier.source_bound() {
+        verifier_note = format!("verifier not bound ({})", verifier.source_binding().label());
+        // Historical mode intentionally relaxes the verifier requirement
+        // (verifying an older seal with a newer or dirty binary); only the
+        // default phase-seal mode fails on it.
+        if !historical {
+            ok = false;
+        }
+    }
 
     // Single seal tree + per-receipt binding are cross-cutting: validate on
     // the first receipt found and check every other receipt agrees.
     let mut seal_tree: Option<(String, String)> = None; // (git_commit, git_tree_sha)
 
     for (court, expect) in expectations {
-        let label = |e: &Expect| match e {
-            Expect::Supported => "SUPPORTED",
-            Expect::Negative => "NEGATIVE",
-            Expect::Any => "ANY",
-        };
         let Some((path, r)) = newest_receipt(root, court)? else {
             ok = false;
             rows.push(Row {
                 court: court.clone(),
-                expected: label(expect).to_string(),
+                expected: expect.display(),
                 got: "NO_RECEIPT".into(),
                 pass: false,
                 note: Some(format!("no receipt under {}", root.join(court).display())),
@@ -170,20 +248,32 @@ pub fn verify_seal(root: &Path, expectations: &[(String, Expect)]) -> Result<(bo
                     }
                 }
             }
+            // Default phase-seal invariant: verifier == receipt seal tree.
+            if !historical
+                && (verifier.git_commit.as_deref() != Some(c.as_str())
+                    || verifier.git_tree_sha.as_deref() != Some(t.as_str()))
+            {
+                pass = false;
+                notes.push(
+                    "verifier tree != receipt seal tree (default mode; use --historical \
+                     to verify an older seal with a newer binary)"
+                        .into(),
+                );
+            }
         } else {
             pass = false;
             notes.push("missing git identity".into());
         }
-
-        // Verdict expectation.
-        let verdict_ok = match expect {
-            Expect::Supported => result == "SUPPORTED",
-            Expect::Negative => result != "SUPPORTED",
-            Expect::Any => true,
-        };
-        if !verdict_ok {
+        if !verifier_note.is_empty() && !historical {
             pass = false;
-            notes.push(format!("verdict {result} != {}", label(expect)));
+            notes.push(verifier_note.clone());
+        }
+
+        // Verdict expectation (explicit allowed set; never a categorical
+        // "anything but SUPPORTED").
+        if !expect.accepts(&result) {
+            pass = false;
+            notes.push(format!("verdict {result} not in {{{}}}", expect.display()));
         }
 
         // Phase rules.
@@ -225,7 +315,7 @@ pub fn verify_seal(root: &Path, expectations: &[(String, Expect)]) -> Result<(bo
         ok &= pass;
         rows.push(Row {
             court: court.clone(),
-            expected: label(expect).to_string(),
+            expected: expect.display(),
             got: result,
             pass,
             note: if notes.is_empty() {
@@ -244,13 +334,52 @@ mod tests {
 
     #[test]
     fn expectation_parsing() {
-        let e = parse_expectations("semantic=SUPPORTED,rocm=NEGATIVE,h2=ANY").unwrap();
+        let e = parse_expectations(
+            "semantic=SUPPORTED,rocm=UNSUPPORTED_BY_HARDWARE|UNSUPPORTED_BY_API|INCONCLUSIVE,\
+             h2=ANY",
+        )
+        .unwrap();
         assert_eq!(e.len(), 3);
         assert_eq!(e[0], ("semantic".to_string(), Expect::Supported));
-        assert_eq!(e[1], ("rocm".to_string(), Expect::Negative));
+        assert_eq!(
+            e[1],
+            (
+                "rocm".to_string(),
+                Expect::Allowed(vec![
+                    "UNSUPPORTED_BY_HARDWARE".into(),
+                    "UNSUPPORTED_BY_API".into(),
+                    "INCONCLUSIVE".into()
+                ])
+            )
+        );
         assert_eq!(e[2], ("h2".to_string(), Expect::Any));
-        assert!(parse_expectations("cuda=MAYBE").is_err());
+        assert!(parse_expectations("cuda=MAYBE").is_err()); // not a verdict
+        assert!(parse_expectations("cuda=FAILED_CORRECTNESS").is_ok()); // explicit allowed
         assert!(parse_expectations("naked").is_err());
+    }
+
+    #[test]
+    fn allowed_sets_never_accept_corruption_verdicts_by_default() {
+        // The Phase-I default rocm set must never contain the corruption/
+        // execution-failure classes: a court that ran and produced corrupt
+        // samples must not satisfy the seal.
+        let e = parse_expectations("rocm=UNSUPPORTED_BY_HARDWARE|UNSUPPORTED_BY_API|INCONCLUSIVE")
+            .unwrap()[0]
+            .1
+            .clone();
+        assert!(e.accepts("UNSUPPORTED_BY_HARDWARE"));
+        assert!(e.accepts("INCONCLUSIVE"));
+        assert!(!e.accepts("FAILED_CORRECTNESS"));
+        assert!(!e.accepts("FAILED_DEADLINE"));
+        assert!(!e.accepts("FELL_BACK_TO_D0"));
+        assert!(!e.accepts("NOT_IMPLEMENTED"));
+        assert!(!e.accepts("SUPPORTED"));
+    }
+
+    #[test]
+    fn allowed_sets_members_must_be_real_verdicts() {
+        assert!(parse_expectations("rocm=UNSUPPORTED_BY_HARDWARE|BOGUS").is_err());
+        assert!(parse_expectations("rocm=INCONCLUSIVE").is_ok());
     }
 
     #[test]

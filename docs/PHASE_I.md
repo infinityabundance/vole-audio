@@ -129,6 +129,23 @@ rustc 1.99.0-nightly, LLVM 22.1.8):
   (f) `/opt/rocm*` is scanned by soname prefix
   (`libamdhip64.so*`/`libhsa-runtime64.so*`) so future ROCm versioned
   SONAMEs are discovered rather than frozen version numbers.
+- **I.9 Review-4 closure: executable-HSA tables, explicit verdict sets,
+  verifier-bound seal** — (a) the direct-HSA D0 table is derived
+  mechanically from ONE frozen, executable HSA launch path (agents → AMD
+  memory pools (`hsa_amd_agent_iterate_memory_pools` /
+  `hsa_amd_memory_pool_*` / `hsa_amd_agents_allow_access`) → queue →
+  executable alt-loading → launch signals — no predicted symbols); the D1
+  additions are the documented ROCr host-pinning pair
+  `hsa_amd_memory_lock`/`hsa_amd_memory_unlock` (the obsolete
+  `hsa_host_malloc`/`hsa_host_free` requirement is gone); (b) the seal
+  expectation vocabulary replaces categorical `NEGATIVE` with explicit
+  allowed-verdict sets (Phase-I rocm =
+  `UNSUPPORTED_BY_HARDWARE | UNSUPPORTED_BY_API | INCONCLUSIVE` — never
+  `FAILED_CORRECTNESS`/`FAILED_DEADLINE`/`FELL_BACK_TO_D0`/
+  `NOT_IMPLEMENTED` unless a phase names one); (c) the executable seal is
+  bound to the verifying executable: default mode requires verifier build
+  tree == verifier worktree == receipt seal tree, all bound;
+  `--historical` relaxes only the verifier-equality requirement.
 
 ## Claim boundary (what Phase I does NOT claim)
 

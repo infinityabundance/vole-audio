@@ -106,8 +106,14 @@ assertion.
 26. **A court battery run is a phase seal.** No: `court-all.sh` collects
     evidence (courts exit 0 after writing any verdict). A seal is
     `vole-audio seal verify`: an executable gate over an explicit
-    expected-verdict matrix with `source_binding == bound`, a single seal
-    tree, frozen reference hashes, and the rocm compile-surface rule.
+    expected-verdict matrix — verdicts are named, never categorical
+    "anything but SUPPORTED" (Phase-I rocm =
+    `UNSUPPORTED_BY_HARDWARE | UNSUPPORTED_BY_API | INCONCLUSIVE`;
+    `FAILED_CORRECTNESS`/`FAILED_DEADLINE`/`FELL_BACK_TO_D0`/
+    `NOT_IMPLEMENTED` are excluded unless a phase names them) — with
+    `source_binding == bound`, a single seal tree, frozen reference hashes,
+    the rocm compile-surface rule, and the verifier itself bound to the
+    seal tree (default mode; `--historical` relaxes only that).
 
 Anything in this list that later gains evidence moves into a claims document
 with its receipt. Until then: **not claimed.**

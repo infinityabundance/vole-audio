@@ -29,9 +29,11 @@ COMMANDS (current build):
     seal verify           Executable phase-seal gate: validates an explicit
                           expected-verdict matrix over the newest receipts
                           (source_binding == bound, single seal tree, frozen
-                          semantic/authored hashes, rocm compile surface)
+                          semantic/authored hashes, rocm compile surface;
+                          verifier == seal tree unless --historical)
                           [--receipts DIR]
-                          [--expect court=SUPPORTED|NEGATIVE|ANY,...]
+                          [--expect court=SUPPORTED|ANY|LABEL|LABEL|...]
+                          [--historical]
     version               Print version and build identity
     help                  Show this help
 
@@ -287,17 +289,21 @@ fn cmd_probe(args: &[String]) -> Result<u8> {
 /// Run an executable court: `vole-audio court <name> [--receipts DIR]`.
 /// `vole-audio seal verify`: executable phase-seal gate over the newest
 /// receipts (see `seal::verify_seal`). Default expectations: the six
-/// always-expected A–H courts and `h2` SUPPORTED, `rocm` NEGATIVE (honest
-/// non-SUPPORTED with a satisfied compile surface on this Phase-I host).
+/// always-expected A–H courts and `h2` SUPPORTED, and `rocm` restricted to
+/// the explicit allowed set `UNSUPPORTED_BY_HARDWARE | UNSUPPORTED_BY_API |
+/// INCONCLUSIVE` (never the corruption/execution-failure classes). The
+/// verifier itself must be bound to the seal tree; `--historical` relaxes
+/// only the verifier-equality requirement.
 fn cmd_seal(args: &[String]) -> Result<u8> {
     let sub = args.first().map(String::as_str).unwrap_or("verify");
     if sub != "verify" {
         return Err(Error::malformed(format!("unknown seal subcommand '{sub}'")));
     }
     let mut receipts = std::path::PathBuf::from("receipts");
+    let mut historical = false;
     let mut expect = "semantic=SUPPORTED,authored=SUPPORTED,simd=SUPPORTED,\
                        facts=SUPPORTED,cuda=SUPPORTED,d1=SUPPORTED,h2=SUPPORTED,\
-                       rocm=NEGATIVE"
+                       rocm=UNSUPPORTED_BY_HARDWARE|UNSUPPORTED_BY_API|INCONCLUSIVE"
         .to_string();
     let mut i = 1;
     while i < args.len() {
@@ -316,20 +322,33 @@ fn cmd_seal(args: &[String]) -> Result<u8> {
                     .ok_or_else(|| Error::malformed("--expect requires a matrix string"))?
                     .clone();
             }
+            "--historical" => historical = true,
             other => return Err(Error::malformed(format!("unknown seal flag '{other}'"))),
         }
         i += 1;
     }
     let expectations = vole_audio::seal::parse_expectations(&expect)?;
-    let (ok, rows) = vole_audio::seal::verify_seal(&receipts, &expectations)?;
+    let verifier = vole_audio::evidence::environment::Environment::capture();
+    let (ok, rows) =
+        vole_audio::seal::verify_seal(&receipts, &expectations, &verifier, historical)?;
     println!(
         "vole-audio seal verify (receipts root: {})",
         receipts.display()
     );
+    println!(
+        "  verifier: {} (binding: {})",
+        verifier
+            .git_identity()
+            .unwrap_or_else(|| "no git identity".into()),
+        verifier.source_binding().label()
+    );
+    if historical {
+        println!("  mode: --historical (verifier-tree equality relaxed)");
+    }
     println!("------------------------------------------------");
     for row in &rows {
         println!(
-            "  {:<12} expected={:<10} got={:<24} {}{}",
+            "  {:<12} expected={:<34} got={:<24} {}{}",
             row.court,
             row.expected,
             row.got,
