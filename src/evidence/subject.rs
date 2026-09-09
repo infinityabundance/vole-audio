@@ -98,32 +98,71 @@ impl IndexEntry {
     }
 }
 
-/// Parse one `git ls-files -s -z` record: `<mode> <oid> <stage>\\t<path>`.
-/// Returns `None` for malformed records (a NUL-framing artifact or an
-/// unmerged stage entry, which cannot be sealed anyway).
-fn parse_entry(record: &[u8]) -> Option<IndexEntry> {
-    let tab = record.iter().position(|&b| b == b'\t')?;
+/// Parse one `git ls-files -s -z` record: `<mode> <oid> <stage>\t<path>`.
+///
+/// Fail-closed semantics: a structurally malformed record is an error, and
+/// so is a non-zero stage (an unmerged index — merge/rebase/cherry-pick in
+/// progress). Neither class is ever silently dropped from the subject: the
+/// subject must either cover the whole index or not exist.
+fn parse_entry(record: &[u8]) -> Result<IndexEntry> {
+    let tab = record.iter().position(|&b| b == b'\t').ok_or_else(|| {
+        Error::malformed("seal subject: malformed git index record (no path tab)")
+    })?;
     let head = &record[..tab];
     let path_bytes = &record[tab + 1..];
     if path_bytes.is_empty() {
-        return None;
+        return Err(Error::malformed(
+            "seal subject: malformed git index record (empty path)",
+        ));
     }
     let mut fields = head.split(|&b| b == b' ');
-    let mode = String::from_utf8_lossy(fields.next()?).into_owned();
-    let oid = String::from_utf8_lossy(fields.next()?).into_owned();
-    let stage = String::from_utf8_lossy(fields.next()?).into_owned();
-    if stage != "0" || fields.next().is_some() {
-        return None; // unmerged or malformed
+    let mode = String::from_utf8_lossy(fields.next().ok_or_else(|| {
+        Error::malformed("seal subject: malformed git index record (missing mode)")
+    })?)
+    .into_owned();
+    let oid = String::from_utf8_lossy(fields.next().ok_or_else(|| {
+        Error::malformed("seal subject: malformed git index record (missing oid)")
+    })?)
+    .into_owned();
+    let stage = String::from_utf8_lossy(fields.next().ok_or_else(|| {
+        Error::malformed("seal subject: malformed git index record (missing stage)")
+    })?)
+    .into_owned();
+    if stage != "0" {
+        return Err(Error::malformed(format!(
+            "seal subject: unmerged git index entry (stage {stage}) — an in-progress \
+             merge/rebase cannot be sealed"
+        )));
+    }
+    if fields.next().is_some() {
+        return Err(Error::malformed(
+            "seal subject: malformed git index record (trailing fields)",
+        ));
     }
     if mode.len() != 6 || !mode.bytes().all(|b| b.is_ascii_digit()) || oid.is_empty() {
-        return None;
+        return Err(Error::malformed(
+            "seal subject: malformed git index record (bad mode/oid)",
+        ));
     }
     let path = String::from_utf8_lossy(path_bytes).replace('\\', "/");
-    Some(IndexEntry { mode, oid, path })
+    Ok(IndexEntry { mode, oid, path })
+}
+
+/// Parse the full NUL-terminated `git ls-files -s -z` stream. Fails (never
+/// silently skips) on the first malformed or unmerged record, so a subject
+/// can never be computed over a partial index.
+fn parse_ls_files_stream(stdout: &[u8]) -> Result<Vec<IndexEntry>> {
+    let mut entries = Vec::new();
+    for record in stdout.split(|&b| b == 0).filter(|s| !s.is_empty()) {
+        entries.push(parse_entry(record)?);
+    }
+    Ok(entries)
 }
 
 /// The tracked, non-excluded index entries (root-relative posix paths) of a
 /// git work tree, from `git ls-files -s`. `None` outside a git work tree.
+/// Fails (never silently drops) on a malformed or unmerged index record: the
+/// subject must cover the whole index or not exist.
 pub fn tracked_entries(root: &Path) -> Result<Option<Vec<IndexEntry>>> {
     let out = Command::new("git")
         .args(["-C", root.to_str().unwrap_or("."), "ls-files", "-s", "-z"])
@@ -133,15 +172,11 @@ pub fn tracked_entries(root: &Path) -> Result<Option<Vec<IndexEntry>>> {
         // Not a git work tree (e.g. the crates.io tarball): no subject.
         return Ok(None);
     }
-    let mut entries: Vec<IndexEntry> = out
-        .stdout
-        .split(|&b| b == 0)
-        .filter(|s| !s.is_empty())
-        .filter_map(parse_entry)
+    let mut entries: Vec<IndexEntry> = parse_ls_files_stream(&out.stdout)?
+        .into_iter()
         .filter(|e| !is_excluded(&e.path))
         .collect();
     entries.sort_by(|a, b| a.path.cmp(&b.path));
-    entries.dedup_by(|a, b| a.path == b.path);
     Ok(Some(entries))
 }
 
@@ -250,10 +285,49 @@ mod tests {
         let rec = b"160000 0123456789abcdef0123456789abcdef01234567 0\tsub";
         let e = parse_entry(rec).expect("gitlink entry");
         assert!(e.is_gitlink());
-        // Unmerged (stage != 0) and malformed records are rejected.
-        assert!(parse_entry(b"100644 abc 1\tconflict").is_none());
-        assert!(parse_entry(b"bogus\tpath").is_none());
-        assert!(parse_entry(b"").is_none());
+        // Unmerged (stage != 0) and malformed records are distinct errors —
+        // never silent skips.
+        let e = parse_entry(b"100644 abc 1\tconflict").unwrap_err();
+        assert!(e.to_string().contains("unmerged"), "{e}");
+        for bad in [
+            &b"bogus\tpath"[..],
+            b"100644 oid\tpath",         // missing stage
+            b"100644 oid 0 extra\tpath", // trailing fields
+            b"100644 0123456789abcdef0123456789abcdef01234567 0\t", // empty path
+            b"",
+        ] {
+            assert!(parse_entry(bad).is_err(), "{bad:?} must fail");
+        }
+    }
+
+    #[test]
+    fn unmerged_index_fails_closed() {
+        // The security property: a subject cannot be produced from an
+        // incomplete (unmerged/malformed) index — derivation must fail, not
+        // silently drop the bad record and seal over whatever remains.
+        let good = b"100644 0123456789abcdef0123456789abcdef01234567 0\tfile.rs";
+        let unmerged = b"100644 0123456789abcdef0123456789abcdef01234567 2\tconflict.rs";
+        let mut stream = good.to_vec();
+        stream.push(0);
+        stream.extend_from_slice(unmerged);
+        stream.push(0);
+        let err = parse_ls_files_stream(&stream).unwrap_err();
+        assert!(err.to_string().contains("unmerged"), "{err}");
+        // Malformed records fail the whole stream the same way.
+        let mut stream = good.to_vec();
+        stream.push(0);
+        stream.extend_from_slice(b"not-an-index-record");
+        stream.push(0);
+        assert!(parse_ls_files_stream(&stream).is_err());
+        // A clean stream parses fully (every record present, in order).
+        let mut stream = good.to_vec();
+        stream.push(0);
+        stream.extend_from_slice(b"100755 abcdef0123456789abcdef0123456789abcdef01 0\tbin/run");
+        stream.push(0);
+        let entries = parse_ls_files_stream(&stream).unwrap();
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].path, "file.rs");
+        assert_eq!(entries[1].path, "bin/run");
     }
 
     #[test]
