@@ -491,6 +491,46 @@ Seal run (release, `--all-features`, clean tree `57cc954`, version 0.6.0):
   seal-gate subject tests); clippy `-D warnings` and `cargo fmt --check`
   clean.
 
+### Seal 7 — review-6 micro-hardening: mode-inclusive seal subject (2026-09-09)
+
+Delta since Seal 6 (ADR 0006 amendment):
+
+1. **The subject now includes the Git mode.** Seal 6 hashed
+   `path || NUL || content` per tracked file, so a `100644` → `100755`
+   change on an executable script — or the introduction of symlinks or
+   submodules — would not alter the subject despite changing what git
+   would commit. `src/evidence/subject.rs` now derives entries from the
+   Git **index** (`git ls-files -s -z`) and each non-excluded entry
+   contributes `mode || NUL || path || NUL || content` in sorted path
+   order. Content is the worktree bytes for regular files, the
+   link-target bytes for symlinks (`120000` — git stores the target as
+   the blob content), and the pinned object id for gitlinks (`160000`,
+   which have no worktree content). Unmerged (`stage != 0`) entries are
+   rejected. The subject therefore identifies what git would commit, not
+   merely what the files currently contain.
+2. **New tests** (5 subject tests now): ls-files record parsing
+   (regular/symlink/gitlink/unmerged), mode sensitivity on identical
+   bytes, and symlink content identity (link text, never the pointed-at
+   file).
+
+Seal run (release, `--all-features`, clean tree `28063ba`, version 0.6.1):
+
+- 18 receipts, committed separately at `e179a47`; every receipt
+  `source_binding: bound` and carries `seal_subject_hash =
+  4b8092367c187f1fc1487418291411ed6e7c82677ad3b1fbed87a4dbb81b5514`;
+  `vole-audio seal verify` PASSes in **default mode** at the battery tree
+  and (after rebuilding from the release head, which only adds
+  receipts/docs) at the head itself.
+- All pre-existing courts SUPPORTED with frozen hashes unchanged (semantic
+  `1791816f4b93…`, authored `f7e103f3a97d…`).
+- `court rocm`: `UNSUPPORTED_BY_HARDWARE` with the compile surface satisfied
+  and bound (artifact `5092e129…` == sidecar == both determinism shas).
+- PTX artifact unchanged: sha256
+  `8b23325d03700847b056b29df4f4d4afd1a0c67386458512986c52f4fca7896b`.
+- Host tests: 331 total (326 passed, 5 ignored) all-features on the pinned
+  nightly (321 total, 316 passed default-features; +3 over Seal 6); clippy
+  `-D warnings` and `cargo fmt --check` clean.
+
 ## Execution record (implementation summary)
 
 - Entry freeze captured above; artifact baseline

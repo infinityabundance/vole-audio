@@ -804,6 +804,12 @@ executed to the same evidence standard as every earlier phase.
   battery-tree provenance; `vole-audio seal subject` prints the current
   subject. All 18 Seal-6 receipts share subject `8890404e…` (tree
   `57cc954`).
+- Review-6 micro-hardening (Seal 7, version 0.6.1): the subject is derived
+  from Git **index** entries and each includes the Git **mode**
+  (`mode || NUL || path || NUL || content`) — a `100644`→`100755` change
+  alters the subject even when bytes do not, symlinks contribute their
+  link-target blob, and gitlinks contribute their pinned oid. All 18
+  Seal-7 receipts share subject `4b809236…` (tree `28063ba`).
 
 ## Known blockers
 
