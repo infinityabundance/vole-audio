@@ -98,9 +98,39 @@ same typed-cause discipline the CUDA courts use.
 
 ## Seal history
 
+### Seal 1 — Phase J implementation + clean-tree battery (2026-09-09)
+
+Seal run (release, `--all-features`, clean tree `3807428`, version 0.7.0):
+
+- 20 receipts, committed separately at `0e56bd3`; every receipt
+  `source_binding: bound` and carries `seal_subject_hash =
+  ba5b5a1c7cc1a4ce9a0e6eac2178c08191b3c15cd2cf748102b69645baf55094`;
+  `vole-audio seal verify` PASSes on the 10-row matrix (the eight prior
+  rows plus `rocm-d0` and `rocm-d1`) in **default mode** at the battery
+  tree and (after rebuilding from the release head, which only adds
+  receipts/docs) at the head itself.
+- All pre-existing courts SUPPORTED with frozen hashes unchanged (semantic
+  `1791816f4b93…`, authored `f7e103f3a97d…`).
+- `court rocm` / `rocm-d0` / `rocm-d1`: `UNSUPPORTED_BY_HARDWARE` with the
+  compile surface satisfied and bound (artifact `5092e129…` == sidecar ==
+  both determinism shas) and the typed runtime chain recording no AMD
+  compute candidate on this host — the Phase-J differential battery and
+  the D1 endpoint experiment do not execute here, and no receipt claims
+  they did.
+- PTX artifact unchanged: sha256
+  `8b23325d03700847b056b29df4f4d4afd1a0c67386458512986c52f4fca7896b`.
+- Host tests: 340 total (335 passed, 5 ignored) all-features on the pinned
+  nightly (330 total, 325 passed default-features; +8 over Seal 8: the
+  HIP ffi/runtime/kernel unit battery — marshalling layout, frozen-surface
+  coverage, launch-geometry contract, entropy descriptor layout,
+  registration classifier); clippy `-D warnings` and
+  `cargo fmt --check` clean.
+
 (Seal runs are appended here as they are produced; Seal 1 records the
 clean-tree battery on this host, where the AMD surface is compile evidence
-and the runtime chain is typed to the missing device.)
+and the runtime chain is typed to the missing device. The positive paths
+of `rocm-d0`/`rocm-d1` execute when a D0/D1-ready ROCm stack + AMD device
+are present.)
 
 ## Execution record (implementation summary)
 
