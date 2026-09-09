@@ -18,10 +18,10 @@ USAGE:
 COMMANDS (current build):
     probe                 Capture environment + hardware evidence summary
     court <name>          Run an executable court (semantic, authored, simd, facts,
-                          cuda, d1, rocm, entropy-rans, entropy-literal,
-                          entropy-residual, entropy-pages, entropy-partial,
-                          entropy-simd, entropy-cuda, entropy-d1, entropyfs,
-                          dsfb-entropy, h2)
+                          cuda, d1, rocm, rocm-d0, rocm-d1, entropy-rans,
+                          entropy-literal, entropy-residual, entropy-pages,
+                          entropy-partial, entropy-simd, entropy-cuda, entropy-d1,
+                          entropyfs, dsfb-entropy, h2)
                           [--receipts DIR]; court d1 accepts --emit-audio (court
                           entropy-d1 honors VOLE_ENTROPY_D1_EMIT_AUDIO=1)
     receipt show <file>   Verify and print an evidence receipt
@@ -331,7 +331,9 @@ fn cmd_seal_verify(args: &[String]) -> Result<u8> {
     let mut historical = false;
     let mut expect = "semantic=SUPPORTED,authored=SUPPORTED,simd=SUPPORTED,\
                        facts=SUPPORTED,cuda=SUPPORTED,d1=SUPPORTED,h2=SUPPORTED,\
-                       rocm=UNSUPPORTED_BY_HARDWARE|UNSUPPORTED_BY_API|INCONCLUSIVE"
+                       rocm=UNSUPPORTED_BY_HARDWARE|UNSUPPORTED_BY_API|INCONCLUSIVE,\
+                       rocm-d0=UNSUPPORTED_BY_HARDWARE|UNSUPPORTED_BY_API|INCONCLUSIVE,\
+                       rocm-d1=UNSUPPORTED_BY_HARDWARE|UNSUPPORTED_BY_API|INCONCLUSIVE"
         .to_string();
     let mut i = 0;
     while i < args.len() {

@@ -125,6 +125,15 @@ assertion.
     (`Cargo.toml`/`Cargo.lock` are included), so they are made *before* the
     battery. `git_commit`/`git_tree_sha` remain in every receipt as exact
     historical provenance of the battery tree.
+28. **Phase J executes ROCm kernels on this host.** No: `court rocm-d0`
+    (differential scalar == ROCm) and `court rocm-d1` (D1 endpoint
+    experiment) gate on the typed runtime chain — an AMD compute candidate,
+    KFD access, and (for D1) the HIP host-registration surface. Without a
+    D0/D1-ready device they record `UNSUPPORTED_BY_HARDWARE` /
+    `UNSUPPORTED_BY_API` with the compile surface bound and the full chain
+    evidenced; no kernel execution is pretended. A D0-ready stack whose HIP
+    runtime lacks host registration is "ROCm D0 READY; D1
+    UNSUPPORTED_BY_API", never "runtime unavailable".
 
 Anything in this list that later gains evidence moves into a claims document
 with its receipt. Until then: **not claimed.**

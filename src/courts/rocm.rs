@@ -194,84 +194,14 @@ fn compile_surface(
 }
 
 pub fn run(receipts_root: &Path) -> Result<Verdict> {
-    let artifact_path = std::env::var("VOLE_ROCM_ARTIFACT")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| PathBuf::from(DEFAULT_ARTIFACT));
-    // Sidecar: canonical <full artifact filename>.json
-    // (vole_audio.amdgcn.elf.json); legacy <stem>.json accepted as fallback
-    // (mirrors evidence::artifact::sidecar_path).
-    let dir = artifact_path
-        .parent()
-        .unwrap_or_else(|| std::path::Path::new("."))
-        .to_path_buf();
-    let file = artifact_path
-        .file_name()
-        .map(|f| f.to_string_lossy().into_owned())
-        .unwrap_or_default();
-    let canonical_sidecar = dir.join(format!("{file}.json"));
-    let sidecar_path = if canonical_sidecar.exists() {
-        canonical_sidecar
-    } else {
-        artifact_path.with_extension("json")
-    };
-    // Determinism evidence follows the artifact: <artifact file>
-    // .determinism.json (env VOLE_ROCM_DETERMINISM overrides; the
-    // default-tree legacy name is the fallback). A custom artifact therefore
-    // carries its own repro-build evidence instead of silently depending on
-    // the default-tree file.
-    let determinism_path = std::env::var("VOLE_ROCM_DETERMINISM")
-        .map(PathBuf::from)
-        .ok()
-        .or_else(|| {
-            let canonical = dir.join(format!("{file}.determinism.json"));
-            canonical.exists().then_some(canonical)
-        })
-        .unwrap_or_else(|| PathBuf::from(DEFAULT_DETERMINISM));
-    let env = Environment::capture();
-
-    // 1. Compile surface (fail closed).
-    let (compile, compile_satisfied) =
-        compile_surface(&artifact_path, &sidecar_path, &determinism_path, &env);
-    let artifact_sha = compile
-        .get("sha256")
-        .and_then(|v| v.as_str())
-        .map(str::to_string);
-
-    // 2. Runtime surface.
+    // Compile surface + runtime surface are shared with the Phase-J courts
+    // (rocm-d0/rocm-d1); one implementation, three consumers.
+    let (compile, compile_satisfied, artifact_sha) = artifact_chain()?;
     let probe = RocmProbe::capture()?;
+    let runtime = runtime_surface(&probe);
     let (runtime_verdict, runtime_detail) = probe.classify();
-    let runtime = serde_json::json!({
-        "amd_gpus": probe.amd_gpus.iter().map(|g| serde_json::json!({
-            "bdf": g.bdf, "vendor": g.vendor, "device": g.device, "driver": g.driver,
-            "class": g.class,
-        })).collect::<Vec<_>>(),
-        "kfd": match probe.kfd {
-            KfdState::Absent => "absent",
-            KfdState::PresentNotAccessible => "present_not_accessible",
-            KfdState::Accessible => "accessible",
-        },
-        "compute_runtime": probe.compute.iter().map(|a| serde_json::json!({
-            "soname": a.soname,
-            "d0_ready": a.d0_ready(),
-            "d1_ready": a.d1_ready(),
-            "detail": match (&a.d0_missing, &a.d1_missing) {
-                (Ok(m0), Ok(m1)) => if m0.is_empty() && m1.is_empty() {
-                    None
-                } else if m0.is_empty() {
-                    Some(format!("D0 ready; D1 missing: {}", m1.join(",")))
-                } else {
-                    Some(format!("D0 missing: {}", m0.join(",")))
-                },
-                (Err(e), _) | (_, Err(e)) => Some(e.clone()),
-            },
-        })).collect::<Vec<_>>(),
-        "d0_readiness": probe.compute.iter().any(|a| a.d0_ready()),
-        "d1_readiness": probe.compute.iter().any(|a| a.d1_ready()),
-        "telemetry_rocmsmi": probe.telemetry.iter().any(|(_, f)| *f),
-        "classification": runtime_detail,
-    });
 
-    // 3. Verdict: compile surface first (Phase I evidence is incomplete
+    // Verdict: compile surface first (Phase I evidence is incomplete
     // without its clean amdgcn build), then the runtime chain.
     let (verdict, detail) = if !compile_satisfied {
         (
@@ -290,7 +220,7 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
         (runtime_verdict, runtime_detail)
     };
 
-    // 4. Receipt.
+    // Receipt.
     let mut b = ReceiptBuilder::new("rocm");
     b.result(verdict)
         .result_detail(format!("rocm: {detail}"))
@@ -331,6 +261,88 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
     println!("  {detail}");
     println!("  receipt: {}", path.display());
     Ok(verdict)
+}
+
+/// Resolve the artifact chain (path + sidecar + determinism evidence) the
+/// way `court rocm` and the Phase-J courts all consume it: env overrides
+/// honored, compile surface computed against the captured environment.
+/// Returns (compile_surface value, satisfied, artifact sha256).
+pub(crate) fn artifact_chain() -> Result<(serde_json::Value, bool, Option<String>)> {
+    let artifact_path = std::env::var("VOLE_ROCM_ARTIFACT")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| PathBuf::from(DEFAULT_ARTIFACT));
+    // Sidecar: canonical <full artifact filename>.json
+    // (vole_audio.amdgcn.elf.json); legacy <stem>.json accepted as fallback
+    // (mirrors evidence::artifact::sidecar_path).
+    let dir = artifact_path
+        .parent()
+        .unwrap_or_else(|| std::path::Path::new("."))
+        .to_path_buf();
+    let file = artifact_path
+        .file_name()
+        .map(|f| f.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let canonical_sidecar = dir.join(format!("{file}.json"));
+    let sidecar_path = if canonical_sidecar.exists() {
+        canonical_sidecar
+    } else {
+        artifact_path.with_extension("json")
+    };
+    // Determinism evidence follows the artifact: <artifact file>
+    // .determinism.json (env VOLE_ROCM_DETERMINISM overrides; the
+    // default-tree legacy name is the fallback).
+    let determinism_path = std::env::var("VOLE_ROCM_DETERMINISM")
+        .map(PathBuf::from)
+        .ok()
+        .or_else(|| {
+            let canonical = dir.join(format!("{file}.determinism.json"));
+            canonical.exists().then_some(canonical)
+        })
+        .unwrap_or_else(|| PathBuf::from(DEFAULT_DETERMINISM));
+    let env = Environment::capture();
+    let (compile, satisfied) =
+        compile_surface(&artifact_path, &sidecar_path, &determinism_path, &env);
+    let artifact_sha = compile
+        .get("sha256")
+        .and_then(|v| v.as_str())
+        .map(str::to_string);
+    Ok((compile, satisfied, artifact_sha))
+}
+
+/// Runtime-surface JSON shared by `court rocm` and the Phase-J courts: the
+/// sysfs/KFD/loader chain exactly as probed.
+pub(crate) fn runtime_surface(probe: &RocmProbe) -> serde_json::Value {
+    let (_, runtime_detail) = probe.classify();
+    serde_json::json!({
+        "amd_gpus": probe.amd_gpus.iter().map(|g| serde_json::json!({
+            "bdf": g.bdf, "vendor": g.vendor, "device": g.device, "driver": g.driver,
+            "class": g.class,
+        })).collect::<Vec<_>>(),
+        "kfd": match probe.kfd {
+            KfdState::Absent => "absent",
+            KfdState::PresentNotAccessible => "present_not_accessible",
+            KfdState::Accessible => "accessible",
+        },
+        "compute_runtime": probe.compute.iter().map(|a| serde_json::json!({
+            "soname": a.soname,
+            "d0_ready": a.d0_ready(),
+            "d1_ready": a.d1_ready(),
+            "detail": match (&a.d0_missing, &a.d1_missing) {
+                (Ok(m0), Ok(m1)) => if m0.is_empty() && m1.is_empty() {
+                    None
+                } else if m0.is_empty() {
+                    Some(format!("D0 ready; D1 missing: {}", m1.join(",")))
+                } else {
+                    Some(format!("D0 missing: {}", m0.join(",")))
+                },
+                (Err(e), _) | (_, Err(e)) => Some(e.clone()),
+            },
+        })).collect::<Vec<_>>(),
+        "d0_readiness": probe.compute.iter().any(|a| a.d0_ready()),
+        "d1_readiness": probe.compute.iter().any(|a| a.d1_ready()),
+        "telemetry_rocmsmi": probe.telemetry.iter().any(|(_, f)| *f),
+        "classification": runtime_detail,
+    })
 }
 
 #[cfg(test)]

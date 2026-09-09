@@ -45,6 +45,10 @@ pub mod h2;
 #[cfg(feature = "std")]
 pub mod rocm;
 #[cfg(feature = "std")]
+pub mod rocm_d0;
+#[cfg(feature = "std")]
+pub mod rocm_d1;
+#[cfg(feature = "std")]
 pub mod semantic;
 #[cfg(feature = "std")]
 pub mod simd;
@@ -139,8 +143,21 @@ all sub-courts are SUPPORTED (--all-features on supported hardware)",
     (
         "rocm",
         "Phase I ROCm evidence: AMD/ROCm presence probe + amdgcn code-object artifact state; \
-no kernel is executed (hardware-unavailable evidence; the differential device battery is \
-Phase J on ROCm hardware)",
+        no kernel is executed (hardware-unavailable evidence; the differential device battery is \
+        Phase J on ROCm hardware)",
+    ),
+    (
+        "rocm-d0",
+        "Phase J differential battery: scalar == ROCm on frozen fixture windows, entropy \
+        decode jobs, and the mono->stereo upmix transform (D0; executes only on a D0-ready \
+        ROCm runtime + AMD device)",
+    ),
+    (
+        "rocm-d1",
+        "Phase J D1 endpoint experiment: register the actual ALSA mmap endpoint region with \
+        hipHostRegister(hipHostRegisterMapped), render final codes directly into it (incl. \
+        the device mono->stereo expansion), and measure the bytes D1 removes vs the D0 \
+        baseline (default silence-safe)",
     ),
 ];
 
@@ -165,6 +182,8 @@ pub fn run(name: &str, receipts_root: &Path) -> crate::error::Result<Verdict> {
         "dsfb-entropy" => dsfb_entropy::run(receipts_root),
         "h2" => h2::run(receipts_root),
         "rocm" => rocm::run(receipts_root),
+        "rocm-d0" => rocm_d0::run(receipts_root),
+        "rocm-d1" => rocm_d1::run(receipts_root),
         other => Err(crate::error::Error::malformed(format!(
             "unknown court '{other}' (available: {})",
             COURT_NAMES

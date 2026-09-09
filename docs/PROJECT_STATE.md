@@ -816,6 +816,36 @@ executed to the same evidence standard as every earlier phase.
   covers the whole index or does not exist. All 18 Seal-8 receipts share
   subject `8a4043c3…` (tree `1144433`).
 
+### Phase J — ROCm D1 (complete)
+
+Charter + seal ledger: `docs/PHASE_J.md`. Scope is the contract's own
+statement — **ROCm D1: differential scalar == ROCm battery + the D1
+endpoint experiment** — on top of the frozen Phase-I ABI contract. This
+host has no AMD GPU / ROCm userspace, so the runtime is code-complete and
+the courts record typed causes (`UNSUPPORTED_BY_HARDWARE` with the full
+chain) — no kernel execution is pretended.
+
+- `backend/rocm/ffi.rs`: dlopen'd HIP bindings over exactly the frozen
+  `HIP_D0_REQUIRED` / `HIP_D1_ADDITIONAL` tables (+ optional evidence
+  extras). No symbol outside the tables is required.
+- `backend/rocm/runtime.rs`: RAII `Rocm` session, `Module` (AMDGPU code
+  object from bytes), `Function` (launch with the `device::geom`
+  contract), `DeviceBuffer`, and D1 `HostRegistration`
+  (`hipHostRegister(hipHostRegisterMapped)` / `hipHostGetDevicePointer` /
+  unregister) with typed attempts and rc classification.
+- `backend/rocm/kernel.rs`: `RocmWorld` (render / render_direct / render_to
+  / upmix) and `EntropyWorldRocm` (decode / decode_into) mirroring the
+  CUDA host side; AMD launch geometry is passed as kernel parameters and
+  equals the actual launch geometry.
+- `court rocm-d0`: differential scalar == ROCm (frozen fixture windows +
+  entropy literal/residual decode jobs + mono->stereo upmix), byte-compared
+  against the scalar oracle; typed negatives without a D0-ready device.
+- `court rocm-d1`: D1 endpoint experiment (D0 baseline + stereo-direct +
+  mono-upmix sessions on the registered ALSA mmap ring, frozen zero-xrun
+  policy, per-session traffic/exposure cells incl. the 2048-byte bounded
+  mono intermediate); D1 readiness split is preserved — a D0-ready stack
+  without host registration is `UNSUPPORTED_BY_API`, never "unavailable".
+
 ## Known blockers
 
 - None for Phases F/G/H/H.2. ROCm hardware absent (evidence row only). The D1
@@ -828,13 +858,14 @@ Phase H.2 is complete (entropy-native core: all ten H.2 courts SUPPORTED on
 this machine, aggregate `court h2` SUPPORTED; fused entropy->CUDA->D1 endpoint
 path sealed). Phase I (ROCm) is complete: clean amdgcn code-object build +
 `backend/rocm` probe + `court rocm`/`probe rocm` hardware-unavailable evidence
-(no AMD GPU / KFD / ROCm userspace on this host). Next:
+(no AMD GPU / KFD / ROCm userspace on this host). Phase J (ROCm D1) is
+complete as code + courts: `court rocm-d0` (differential scalar == ROCm) and
+`court rocm-d1` (D1 endpoint experiment) exist and record typed causes on this
+host; their positive paths execute when a D0/D1-ready ROCm stack + AMD device
+are present. Next:
 
-1. Phase J — ROCm D1 (differential scalar == ROCm battery + the endpoint
-   experiment on ROCm hardware; validates the Phase I code object's
-   loadability).
-2. Phase K — inverse compiler (H.2 is its storage-cost oracle); Phase L — GPU
+1. Phase K — inverse compiler (H.2 is its storage-cost oracle); Phase L — GPU
    inverse search;
-3. Phase M — production depth/courts/corpus; Phase N — transport/archive
+2. Phase M — production depth/courts/corpus; Phase N — transport/archive
    (embeds H.2 canonical records); Phase O — learned deterministic prediction
    addendum (judged by the H.2 complete-cost API).
