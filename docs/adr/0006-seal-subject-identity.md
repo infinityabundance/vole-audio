@@ -25,8 +25,17 @@ Each receipt's `environment` carries a new optional field,
 `seal_subject_hash`:
 
 ```text
-SHA-256 over, in sorted root-relative path order, every tracked
-non-excluded file, of: path bytes || 0x00 || file content bytes
+SHA-256 over, in sorted path order, every tracked non-excluded index entry
+(git ls-files -s), of:
+
+    git mode || 0x00 || path || 0x00 || content
+
+mode      the 6-digit octal Git mode (100644 / 100755 / 120000 / 160000 …)
+path      root-relative posix path
+content   worktree bytes for regular files; the link-target bytes for
+          symlinks (120000 — Git stores the target as the blob content);
+          the pinned object id for gitlinks/submodules (160000, which have
+          no worktree content)
 ```
 
 where the excluded trees are the ones that only record or govern evidence
@@ -64,6 +73,10 @@ head then verifies the sealed subject without `--historical`.
   invalidate a seal; only a change to a file that can affect execution does.
 - A seal now means "this exact source content produced these receipts",
   which is the property that actually matters for reproducibility.
+- Review-6 micro-hardening: the subject is derived from Git **index**
+  entries and includes the Git **mode**, so a mode-only change (`100644` →
+  `100755`) alters the subject even when bytes do not, and symlinks/gitlinks
+  have well-defined identity (link-target blob / pinned oid).
 - Pre-amendment archived seals (Seal 5 and earlier, subjectless) remain
   verifiable with `--historical`; default mode refuses them with an explicit
   message rather than silently falling back to tree equality.
