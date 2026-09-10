@@ -148,22 +148,26 @@ Seal run (release, `--all-features`, clean tree, version 0.11.0):
 
 ## Where this goes next
 
-1. **Seals 2–12 — the corpus is frozen, verified and review-closed; the flagship
-   B0/B1 conventional baseline is measured; the full-object container mechanism
-   and its parser are frozen; the B1-vs-VOLE result exists with clean population
-   arithmetic; the entropy complete-cost oracle equals the physical artifact;
-   the runtime substrate is measured under a frozen protocol with a stratified
-   crossover surface; the negative, random-access, depth and interference courts
-   exist with a Phase-M aggregate; and the Seal-11 evidence defects are closed.**
+1. **Seals 2–13 — Phase M evidence is closed.** The corpus is frozen, verified
+   and review-closed; the flagship B0/B1 conventional baseline is measured; the
+   full-object container mechanism and its parser are frozen; the B1-vs-VOLE
+   result exists with clean population arithmetic; the entropy complete-cost
+   oracle equals the physical artifact; the runtime substrate is measured under a
+   frozen protocol with a stratified crossover surface; the negative,
+   random-access, depth and interference courts exist with a Phase-M aggregate;
+   the Seal-11 evidence defects are closed; and the hostile-control definition is
+   shared with the corpus membership tests.**
 2. **What remains in Phase M** is not another court: the license-clean
    real-recording stratum (currently vacant), energy on a host that exposes a
    readable cumulative counter, an unbounded soak rather than the bounded one,
-   and the conditions this host cannot control. Then Phase N — transport/archive;
-   Phase O — learned deterministic prediction addendum.
-3. **Release status.** 0.19.0 and 0.20.0 are published; 0.21.0 was deliberately
-   left unpublished (it carries the Seal-11 evidence defects). 0.22.0 is
-   committed and pushed; publish it once the crates.io 24-hour version quota
-   permits, then begin Phase N.
+   and the conditions this host cannot control. These are future evidence
+   extensions, not blockers. Next: Phase N — transport/archive; then Phase O —
+   learned deterministic prediction addendum.
+3. **Release status.** 0.19.0 and 0.20.0 are published. 0.21.0 and 0.22.0 are
+   deliberately left unpublished (each carried evidence defects at its head).
+   **0.22.1 is the final Phase-M release**, committed, tagged and pushed;
+   publish it from that tag once the crates.io 24-hour version quota permits,
+   in a separate worktree so Phase-N files never enter the Phase-M package.
 
 ### Seal 2 — flagship corpus freeze (2026-09-10)
 
@@ -925,3 +929,59 @@ Seal run: seal subject `2a9ce87e…`; the **23-row** `seal verify` matrix passes
 tests **439 passed / 12 ignored** all-features and **429 passed / 12 ignored**
 default-features. Random-access, negative and interference are resealed; every
 other court's receipt is field-for-field identical to Seal 11.
+
+*Superseded by Seal 13 for `court negative`: the “incompressible” population
+above still selected objects by entropy class alone, so it counted the
+full-width anticorrelated-stereo and reduced-amplitude objects as hostile
+controls even though their structure is compressible. The corrected figures are
+in Seal 13 below.*
+
+### Seal 13 — hostile-control definition (2026-09-10)
+
+The corpus already defined the hostile stratum correctly in its membership
+tests: full-width occupancy, random or scrambled character, **and genuinely
+independent channels**. `court negative` did not use that definition — it
+filtered on the entropy class alone — so its 20-object “incompressible”
+population contained four objects the corpus itself excludes:
+
+```text
+uniform-full-48000hz-2ch-full_i32-anticorrelated_stereo   B1/B0 0.516
+uniform-48000hz-1ch-s16_like-mono                         B1/B0 0.516
+uniform-48000hz-1ch-s24_like-mono                         B1/B0 0.766
+uniform-48000hz-1ch-low_byte-mono                         B1/B0 0.298
+```
+
+Their high unused bits or cross-channel relation (`R = -L`) is real
+compressible structure, so the old headline mixed compressible material into a
+negative control.
+
+The classification is now one shared function,
+`corpus::generate::is_hostile_incompressible`, called by both the membership
+tests and the court, so they cannot drift. The four excluded objects are kept
+and reported separately as **structured-random controls** — they demonstrate
+that *temporal randomness is not incompressibility* — and never enter the
+hostile aggregate. The corrected result:
+
+```text
+all (16 objects)        B0 9,812,400 B   VOLE 9,840,560 B   VOLE/B0 1.00287
+B1-domain (15 objects)  B0 9,236,400 B   B1 9,241,113 B     VOLE 9,264,146 B
+                        B1/B0 1.00051   VOLE/B1 1.00249
+```
+
+Neither representation manufactures compression from genuinely full-width
+independent noise: both land at raw plus their own framing overhead. Resealed:
+`8e6e1a34…`.
+
+**Energy failure semantics.** `probe_energy_counter` used `?` inside its scan,
+so the first unreadable candidate abandoned the whole probe instead of
+trying later ones; and `joules_between` returned `0.0` for a wrapped counter
+with no declared range, indistinguishable from a genuine zero-energy interval.
+It now skips unreadable candidates and returns `Option<f64>` (`None` =
+undeterminable). Neither changes this host's result — no readable counter
+exists — so `court interference`'s frozen result is unchanged (`f23c70c1…`).
+
+Seal run: seal subject `920c23ee…`; the **23-row** `seal verify` matrix passes;
+tests **439 passed / 12 ignored** all-features and **429 passed / 12 ignored**
+default-features. Every court except `negative` is field-for-field identical to
+Seal 12. This is the final Phase-M evidence closure; `0.22.1` is tagged and
+crates.io publication of it remains pending the version quota.

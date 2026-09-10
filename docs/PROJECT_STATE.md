@@ -1368,6 +1368,34 @@ Narrow evidence corrections; no data path changed.
   ignored all-features, 429 passed / 12 ignored default-features. 0.21.0 is left
   unpublished (it carries the Seal-11 defects); 0.22.0 awaits the crates.io
   quota.
+- *Superseded by Seal 13:* the `court negative` population above still selected
+  hostile controls by entropy class alone, so four compressible objects
+  (anticorrelated stereo, s16_like, s24_like, low_byte) were counted as
+  incompressible.
+
+### Phase M Seal 13 — hostile-control definition (v0.22.1)
+
+Final Phase-M evidence closure.
+
+- **Hostile controls are now classified by the corpus's own definition**, shared
+  as `corpus::generate::is_hostile_incompressible` (full-width entropy AND full
+  amplitude AND mono/independent-stereo/multichannel) between the membership
+  tests and `court negative`. Sixteen true controls (fifteen B1-comparable):
+  all B0 9,812,400 B / VOLE 9,840,560 B (VOLE/B0 1.00287); B1-domain B0
+  9,236,400 B / B1 9,241,113 B / VOLE 9,264,146 B (B1/B0 1.00051, VOLE/B1
+  1.00249). Neither codec manufactures compression from full-width independent
+  noise. Resealed `8e6e1a34…`.
+- The four excluded objects are retained as **structured-random controls**
+  (B1/B0 0.298–0.766): they show that temporal randomness alone is not
+  incompressibility. They never enter the hostile aggregate.
+- **Energy failure semantics:** an unreadable powercap candidate is skipped
+  rather than aborting the probe, and an undeterminable wrapped interval returns
+  `None` instead of `0.0`. This host's result is unchanged, so `court
+  interference` stays `f23c70c1…`.
+- Seal subject `920c23ee…`; **23-row** `seal verify` matrix; 439 passed / 12
+  ignored all-features, 429 passed / 12 ignored default-features. Every court
+  except `negative` is field-for-field identical to Seal 12. **0.22.1 is the
+  final Phase-M release**, tagged; publication pending the crates.io quota.
 
 ## Next work (exact order — the implementation contract is executed in sequence)
 
@@ -1389,14 +1417,17 @@ re-verified by the exact evaluator (`court inverse-search`), and the placement
 policy keeps the measured-faster host surface (`SearchBudget::placement`,
 `Auto`).
 
-1. Phase M — **the court set is complete and its evidence is review-closed**.
-   The runtime substrate is measured under a frozen protocol (Seal 10); the
-   negative, random-access, depth, interference and aggregate courts exist
-   (Seal 11); and the Seal-11 evidence-contract defects are fixed (Seal 12).
-   What remains in Phase M is not another court: the license-clean real-recording
-   stratum (currently vacant), energy on a host that exposes a readable cumulative
-   counter, an unbounded soak in place of the bounded one, and the load
-   conditions this host cannot control. Release: 0.19.0/0.20.0 published, 0.21.0
-   deliberately unpublished, 0.22.0 committed and awaiting the crates.io quota.
-   Then Phase N — transport/archive; Phase O — learned deterministic prediction
-   addendum.
+1. Phase M — **evidence closed at Seal 13 / v0.22.1**. The runtime substrate is
+   measured under a frozen protocol (Seal 10); the negative, random-access,
+   depth, interference and aggregate courts exist (Seal 11); the Seal-11
+   evidence-contract defects are fixed (Seal 12); and the hostile-control
+   definition is shared with the corpus (Seal 13). What remains in Phase M is
+   not another court: the license-clean real-recording stratum (vacant), energy
+   on a host with a readable cumulative counter, an unbounded soak, and the load
+   conditions this host cannot control — future evidence extensions, not
+   blockers. Release: 0.19.0/0.20.0 published, 0.21.0/0.22.0 deliberately
+   unpublished, **0.22.1 tagged and awaiting the quota**.
+2. **Phase N — transport/archive** (finalized canonical archive, event/
+   checkpoint transport, integrity, recovery, reproducible manifests; embeds
+   H.2 canonical records), then **Phase O — learned deterministic prediction**
+   (judged by the H.2 complete-cost API).
