@@ -14,6 +14,8 @@
 #[cfg(feature = "std")]
 pub mod all;
 #[cfg(feature = "std")]
+pub mod archive;
+#[cfg(feature = "std")]
 pub mod authored;
 #[cfg(feature = "std")]
 pub mod conventional;
@@ -67,6 +69,8 @@ pub(crate) mod measure;
 #[cfg(feature = "std")]
 pub mod negative;
 #[cfg(feature = "std")]
+pub mod phase_n;
+#[cfg(feature = "std")]
 pub mod random_access;
 #[cfg(feature = "std")]
 pub mod rocm;
@@ -80,6 +84,8 @@ pub mod runtime;
 pub mod semantic;
 #[cfg(feature = "std")]
 pub mod simd;
+#[cfg(feature = "std")]
+pub mod transport;
 
 use crate::status::Verdict;
 use std::path::Path;
@@ -187,6 +193,24 @@ runtime, random-access, negative, depth, interference) in sequence and is SUPPOR
 all of them are",
     ),
     (
+        "archive",
+        "Phase N canonical `.volea` archive container: the frozen corpus packaged as \
+integrity-bound full-object payloads under a reproducible manifest, with canonical \
+decode/re-encode, deterministic encoding and a resealed hostile battery",
+    ),
+    (
+        "transport",
+        "Phase N deterministic transport: ordered bounded framing for \
+object/state/event/checkpoint/dependency/clock/integrity frames, stream attestation, \
+receiver classification of duplicates/stale epochs/gaps/late events/resync, and \
+deterministic xrun recovery outcomes (contract §36/§37)",
+    ),
+    (
+        "phase-n",
+        "Phase-N aggregate: runs every Phase-N court (archive, transport) in sequence and is \
+SUPPORTED only when all of them are",
+    ),
+    (
         "cuda",
         "Phase G CUDA D0: scalar == CUDA parity on frozen fixtures + facts on the device\
 surface + strategy comparison + fixture-level throughput",
@@ -291,6 +315,9 @@ pub fn run(name: &str, receipts_root: &Path) -> crate::error::Result<Verdict> {
         "depth" => depth::run(receipts_root),
         "interference" => interference::run(receipts_root),
         "all" => all::run(receipts_root),
+        "archive" => archive::run(receipts_root),
+        "transport" => transport::run(receipts_root),
+        "phase-n" => phase_n::run(receipts_root),
         "flattening" => flattening::run(receipts_root),
         "cuda" => cuda::run(receipts_root),
         "d1" => d1::run(receipts_root),

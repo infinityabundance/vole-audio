@@ -26,15 +26,20 @@
 //!     SHA256    32        digest of the payload
 //! ```
 //!
-//! Canonical layout rules the decoder enforces: section 0 is the MANIFEST, the
-//! remaining sections are OBJECTs in manifest-entry order, payload offsets are
-//! contiguous and start immediately after the table, there are no trailing
-//! bytes, and no unknown section kind is accepted in v1.
+//! Canonical layout rules the decoder enforces: section 0 is the MANIFEST, then
+//! OBJECTs in manifest-entry order, then the optional EVENT, CHECKPOINT and
+//! DEPENDENCY sections in manifest-count order (so a name/session bundle is one
+//! canonical, integrity-bound artifact), payload offsets are contiguous and
+//! start immediately after the table, there are no trailing bytes, and no unknown
+//! section kind is accepted in v1.
 //!
 //! ```text
 //! Manifest :=
-//!     ENTRY_COUNT  u32        1..=MAX_OBJECTS
+//!     ENTRY_COUNT  u32        1..=MAX_SECTIONS
 //!     ENTRY_COUNT × Entry     ordered by name, strictly ascending
+//!     EVENT_COUNT      u32    0..=MAX_SECTIONS
+//!     CHECKPOINT_COUNT u32    0..=MAX_SECTIONS
+//!     DEPENDENCY_COUNT u32    0..=MAX_SECTIONS
 //!
 //! Entry :=
 //!     NAME_LEN         u8      1..=MAX_NAME
@@ -46,9 +51,18 @@
 //!     CONTENT_ID       32      SHA-256 of the canonical object bytes
 //! ```
 //!
-//! The OBJECT payload **is** the canonical U1 object byte form, so an archive
-//! entry's `CONTENT_ID` is exactly [`crate::object::canonical_content_id`] and
-//! the decoder verifies it against the payload rather than trusting the table.
+//! The OBJECT payload is a **canonical object payload** — the canonical U1 object
+//! byte form, or a full-object container — and is opaque to the archive beyond
+//! its identity: an entry's `CONTENT_ID` must equal the SHA-256 of the payload it
+//! indexes, and the decoder verifies that rather than trusting the table.
+//!
+//! The EVENT, CHECKPOINT and DEPENDENCY sections carry **canonical session
+//! payloads** (the same canonical byte forms the transport framing uses): an
+//! EVENT payload must decode as a canonical [`crate::transport::event::Event`], a
+//! CHECKPOINT payload as a canonical
+//! [`crate::transport::checkpoint::Checkpoint`], and a DEPENDENCY payload is
+//! exactly a 32-byte content id. They are integrity-bound like objects and their
+//! counts are frozen in the MANIFEST, so a session cannot be silently trimmed.
 
 use crate::error::{Error, Result};
 use crate::hash::sha256::{Sha256, hex};
@@ -153,12 +167,50 @@ impl ArchiveEntry {
     }
 }
 
+/// The optional session sections carried beside the objects: canonical event and
+/// checkpoint payloads plus externally-required dependency content ids.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ArchiveSession {
+    /// Canonical event payloads (see [`crate::transport::event::encode_event`]).
+    pub events: Vec<Vec<u8>>,
+    /// Canonical checkpoint payloads (see
+    /// [`crate::transport::checkpoint::encode_checkpoint`]).
+    pub checkpoints: Vec<Vec<u8>>,
+    /// Content ids this archive requires but does not itself contain.
+    pub dependencies: Vec<ContentId>,
+}
+
+impl ArchiveSession {
+    /// Validate every payload in isolation (bounded, canonical, non-empty host
+    /// graph only when the caller supplied one).
+    fn validate(&self) -> Result<()> {
+        let total = self.events.len() + self.checkpoints.len() + self.dependencies.len();
+        if total > MAX_SECTIONS as usize {
+            return Err(Error::limit(
+                "archive session section count exceeds the bound",
+            ));
+        }
+        for e in &self.events {
+            crate::transport::event::decode_event(e).map_err(|_| {
+                Error::malformed("archive event section is not a canonical event payload")
+            })?;
+        }
+        for c in &self.checkpoints {
+            crate::transport::checkpoint::decode_checkpoint(c).map_err(|_| {
+                Error::malformed("archive checkpoint section is not a canonical checkpoint payload")
+            })?;
+        }
+        Ok(())
+    }
+}
+
 /// The archive catalogue (the MANIFEST section).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ArchiveManifest {
     pub profile: String,
     pub universe: String,
     pub entries: Vec<ArchiveEntry>,
+    pub session: ArchiveSession,
 }
 
 impl ArchiveManifest {
@@ -195,6 +247,7 @@ impl ArchiveManifest {
             return Err(Error::malformed("archive universe tag length out of range"));
         }
         self.validate_entries()?;
+        self.session.validate()?;
         let mut out = Vec::new();
         out.extend_from_slice(&(self.entries.len() as u32).to_le_bytes());
         for e in &self.entries {
@@ -206,10 +259,15 @@ impl ArchiveManifest {
             out.extend_from_slice(&e.frames.to_le_bytes());
             out.extend_from_slice(&e.content_id.to_bytes());
         }
+        out.extend_from_slice(&(self.session.events.len() as u32).to_le_bytes());
+        out.extend_from_slice(&(self.session.checkpoints.len() as u32).to_le_bytes());
+        out.extend_from_slice(&(self.session.dependencies.len() as u32).to_le_bytes());
         Ok(out)
     }
 
-    fn parse(bytes: &[u8]) -> Result<ArchiveManifest> {
+    /// Parse the manifest payload, returning the object entries and the declared
+    /// session counts (the session *payloads* are separate sections).
+    fn parse(bytes: &[u8]) -> Result<(Vec<ArchiveEntry>, SessionCounts)> {
         let mut r = Reader::new(bytes);
         let count = r.u32()? as usize;
         if count == 0 {
@@ -244,6 +302,17 @@ impl ArchiveManifest {
                 content_id,
             });
         }
+        let events = r.u32()? as usize;
+        let checkpoints = r.u32()? as usize;
+        let dependencies = r.u32()? as usize;
+        if events > MAX_SECTIONS as usize
+            || checkpoints > MAX_SECTIONS as usize
+            || dependencies > MAX_SECTIONS as usize
+        {
+            return Err(Error::limit(
+                "archive manifest session count exceeds the bound",
+            ));
+        }
         if r.remaining() != 0 {
             return Err(Error::malformed("trailing bytes in the archive manifest"));
         }
@@ -251,9 +320,34 @@ impl ArchiveManifest {
             profile: String::new(),
             universe: String::new(),
             entries,
+            session: ArchiveSession::default(),
         };
         manifest.validate_entries()?;
-        Ok(manifest)
+        Ok((
+            manifest.entries,
+            SessionCounts {
+                events,
+                checkpoints,
+                dependencies,
+            },
+        ))
+    }
+}
+
+/// Declared session section counts, parsed before the session payloads are read.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+struct SessionCounts {
+    events: usize,
+    checkpoints: usize,
+    dependencies: usize,
+}
+
+impl SessionCounts {
+    fn total(&self) -> Result<usize> {
+        self.events
+            .checked_add(self.checkpoints)
+            .and_then(|n| n.checked_add(self.dependencies))
+            .ok_or_else(|| Error::limit("archive session count overflows"))
     }
 }
 
@@ -279,6 +373,26 @@ impl DecodedArchive {
 
     pub fn manifest(&self) -> &ArchiveManifest {
         &self.manifest
+    }
+
+    /// The session sections carried beside the objects (canonical payloads).
+    pub fn session(&self) -> &ArchiveSession {
+        &self.manifest.session
+    }
+
+    /// Canonical event payloads, in frozen section order.
+    pub fn events(&self) -> &[Vec<u8>] {
+        &self.manifest.session.events
+    }
+
+    /// Canonical checkpoint payloads, in frozen section order.
+    pub fn checkpoints(&self) -> &[Vec<u8>] {
+        &self.manifest.session.checkpoints
+    }
+
+    /// Dependency content ids, in frozen section order.
+    pub fn dependencies(&self) -> &[ContentId] {
+        &self.manifest.session.dependencies
     }
 
     pub fn archive_digest(&self) -> [u8; 32] {
@@ -337,9 +451,37 @@ pub fn encode_archive(manifest: &ArchiveManifest, objects: &[Vec<u8>]) -> Result
         }
     }
 
+    // Section layout: MANIFEST, then OBJECTs, then the session sections in a
+    // fixed kind order. Each section carries its explicit kind in the table.
+    let dep_bytes: Vec<[u8; 32]> = manifest
+        .session
+        .dependencies
+        .iter()
+        .map(|c| c.to_bytes())
+        .collect();
+    let mut kinds: Vec<SectionKind> = Vec::new();
+    kinds.push(SectionKind::Manifest);
+    kinds.extend(std::iter::repeat_n(SectionKind::Object, objects.len()));
+    kinds.extend(std::iter::repeat_n(
+        SectionKind::Event,
+        manifest.session.events.len(),
+    ));
+    kinds.extend(std::iter::repeat_n(
+        SectionKind::Checkpoint,
+        manifest.session.checkpoints.len(),
+    ));
+    kinds.extend(std::iter::repeat_n(
+        SectionKind::Dependency,
+        manifest.session.dependencies.len(),
+    ));
+
     let payloads: Vec<&[u8]> = std::iter::once(manifest_payload.as_slice())
         .chain(objects.iter().map(Vec::as_slice))
+        .chain(manifest.session.events.iter().map(Vec::as_slice))
+        .chain(manifest.session.checkpoints.iter().map(Vec::as_slice))
+        .chain(dep_bytes.iter().map(|b| b.as_slice()))
         .collect();
+    debug_assert_eq!(payloads.len(), kinds.len());
     let section_count = u32::try_from(payloads.len())
         .map_err(|_| Error::limit("archive section count overflows"))?;
     if section_count > MAX_SECTIONS {
@@ -359,13 +501,8 @@ pub fn encode_archive(manifest: &ArchiveManifest, objects: &[Vec<u8>]) -> Result
     out.extend_from_slice(&section_count.to_le_bytes());
 
     let mut offset = header_len + table_len;
-    for (i, payload) in payloads.iter().enumerate() {
-        let kind = if i == 0 {
-            SectionKind::Manifest
-        } else {
-            SectionKind::Object
-        };
-        out.push(kind as u8);
+    for (kind, payload) in kinds.iter().zip(&payloads) {
+        out.push(*kind as u8);
         out.push(0);
         out.extend_from_slice(&(offset as u64).to_le_bytes());
         out.extend_from_slice(&(payload.len() as u64).to_le_bytes());
@@ -415,12 +552,14 @@ pub fn decode_archive(bytes: &[u8]) -> Result<DecodedArchive> {
     let universe = read_tag(bytes, p, universe_len)?;
     p += universe_len;
 
-    let section_count = u32::from_le_bytes(
-        bytes[p..p + 4]
-            .try_into()
-            .map_err(|_| Error::malformed("archive section count is truncated"))?,
-    ) as usize;
-    p += 4;
+    let count_end = p
+        .checked_add(4)
+        .ok_or_else(|| Error::limit("archive section count offset overflows"))?;
+    if count_end > bytes.len() {
+        return Err(Error::malformed("archive section count is truncated"));
+    }
+    let section_count = u32::from_le_bytes(bytes[p..count_end].try_into().unwrap()) as usize;
+    p = count_end;
     if section_count == 0 || section_count > MAX_SECTIONS as usize {
         return Err(Error::limit("archive section count out of range"));
     }
@@ -468,17 +607,8 @@ pub fn decode_archive(bytes: &[u8]) -> Result<DecodedArchive> {
                 format!("archive {} payload digest mismatch", kind.name()),
             ));
         }
-        // Section kinds: manifest first, objects thereafter, in v1.
-        let expected_kind = if i == 0 {
-            SectionKind::Manifest
-        } else {
-            SectionKind::Object
-        };
-        if kind != expected_kind {
-            return Err(Error::malformed(
-                "archive sections must be the manifest followed by objects",
-            ));
-        }
+        // Section kinds are validated as a canonical group sequence once the
+        // manifest has been parsed (the counts live in the manifest payload).
         kinds.push(kind);
         ranges.push(offset..end);
         expected_offset = end;
@@ -497,14 +627,40 @@ pub fn decode_archive(bytes: &[u8]) -> Result<DecodedArchive> {
     }
 
     let manifest_payload = &bytes[ranges[0].clone()];
-    let parsed = ArchiveManifest::parse(manifest_payload)?;
-    if parsed.entries.len() + 1 != section_count {
+    let (entries, counts) = ArchiveManifest::parse(manifest_payload)?;
+    let object_count = entries.len();
+    let expected_sections = object_count
+        .checked_add(counts.total()?)
+        .and_then(|n| n.checked_add(1))
+        .ok_or_else(|| Error::limit("archive section count overflows"))?;
+    if expected_sections != section_count {
         return Err(Error::malformed(
-            "archive section count does not match the manifest entry count",
+            "archive section count does not match the manifest",
         ));
     }
+    // Canonical kind order: MANIFEST, objects, events, checkpoints, dependencies.
+    let expected_kind = |i: usize| -> SectionKind {
+        if i == 0 {
+            SectionKind::Manifest
+        } else if i <= object_count {
+            SectionKind::Object
+        } else if i <= object_count + counts.events {
+            SectionKind::Event
+        } else if i <= object_count + counts.events + counts.checkpoints {
+            SectionKind::Checkpoint
+        } else {
+            SectionKind::Dependency
+        }
+    };
+    for (i, kind) in kinds.iter().enumerate() {
+        if *kind != expected_kind(i) {
+            return Err(Error::malformed(
+                "archive sections are not in canonical kind order",
+            ));
+        }
+    }
     // The manifest's identity column must agree with the stored payloads.
-    for (i, entry) in parsed.entries.iter().enumerate() {
+    for (i, entry) in entries.iter().enumerate() {
         let payload = &bytes[ranges[i + 1].clone()];
         if ContentId::from_bytes(Sha256::digest(payload)) != entry.content_id {
             return Err(Error::new(
@@ -516,10 +672,37 @@ pub fn decode_archive(bytes: &[u8]) -> Result<DecodedArchive> {
             ));
         }
     }
+    // Recover the session payloads and re-validate them semantically.
+    let mut session = ArchiveSession::default();
+    let events_at = 1 + object_count;
+    for i in 0..counts.events {
+        session
+            .events
+            .push(bytes[ranges[events_at + i].clone()].to_vec());
+    }
+    let checkpoints_at = events_at + counts.events;
+    for i in 0..counts.checkpoints {
+        session
+            .checkpoints
+            .push(bytes[ranges[checkpoints_at + i].clone()].to_vec());
+    }
+    let dependencies_at = checkpoints_at + counts.checkpoints;
+    for i in 0..counts.dependencies {
+        let range = ranges[dependencies_at + i].clone();
+        let bytes = bytes
+            .get(range.clone())
+            .ok_or_else(|| Error::malformed("archive dependency section is out of bounds"))?;
+        let id: [u8; 32] = bytes
+            .try_into()
+            .map_err(|_| Error::malformed("archive dependency section must be exactly 32 bytes"))?;
+        session.dependencies.push(ContentId::from_bytes(id));
+    }
+    session.validate()?;
     let manifest = ArchiveManifest {
         profile,
         universe,
-        entries: parsed.entries,
+        entries,
+        session,
     };
     Ok(DecodedArchive {
         profile: manifest.profile.clone(),
@@ -633,6 +816,7 @@ mod tests {
             profile: "u1/v1".into(),
             universe: "vole.audio.u1".into(),
             entries: vec![a, b],
+            session: ArchiveSession::default(),
         };
         let objects = vec![ab, bb];
         let bytes = encode_archive(&manifest, &objects).expect("encode");
@@ -690,6 +874,7 @@ mod tests {
             profile: "u1/v1".into(),
             universe: "vole.audio.u1".into(),
             entries: vec![a],
+            session: ArchiveSession::default(),
         };
         let err = encode_archive(&manifest, &[ab]).unwrap_err();
         assert_eq!(err.kind(), crate::error::Kind::Integrity);
@@ -703,6 +888,7 @@ mod tests {
             profile: "u1/v1".into(),
             universe: "vole.audio.u1".into(),
             entries: vec![a.clone(), b.clone()],
+            session: ArchiveSession::default(),
         };
         assert!(encode_archive(&unsorted, &[ab.clone(), bb.clone()]).is_err());
 
@@ -712,6 +898,7 @@ mod tests {
             profile: "u1/v1".into(),
             universe: "vole.audio.u1".into(),
             entries: vec![bad_name],
+            session: ArchiveSession::default(),
         };
         assert!(encode_archive(&manifest, &[ab]).is_err());
 
@@ -719,6 +906,7 @@ mod tests {
             profile: "u1/v1".into(),
             universe: "vole.audio.u1".into(),
             entries: Vec::new(),
+            session: ArchiveSession::default(),
         };
         assert!(encode_archive(&empty, &[]).is_err());
     }
@@ -810,6 +998,50 @@ mod tests {
     }
 
     #[test]
+    fn session_sections_round_trip_and_are_validated() {
+        use crate::transport::{Checkpoint, encode_checkpoint, encode_event};
+        use crate::universe::event::{Event, EventClass};
+        use crate::universe::time::MediaFrame;
+
+        let (a, ab) = constant("alpha", 1, 1024);
+        let event = encode_event(&Event::new(MediaFrame::new(48), EventClass::Param, 1, 7));
+        let checkpoint = encode_checkpoint(&Checkpoint::new(0, 96, vec![1, 2, 3])).unwrap();
+        let manifest = ArchiveManifest {
+            profile: "u1/v1".into(),
+            universe: "vole.audio.u1".into(),
+            entries: vec![a],
+            session: ArchiveSession {
+                events: vec![event],
+                checkpoints: vec![checkpoint],
+                dependencies: vec![ContentId::from_bytes([3u8; 32])],
+            },
+        };
+        let bytes = encode_archive(&manifest, std::slice::from_ref(&ab)).unwrap();
+        let decoded = decode_archive(&bytes).unwrap();
+        assert_eq!(decoded.session(), &manifest.session);
+        assert_eq!(decoded.events().len(), 1);
+        assert_eq!(decoded.checkpoints().len(), 1);
+        assert_eq!(decoded.dependencies().len(), 1);
+        assert_eq!(
+            encode_archive(decoded.manifest(), std::slice::from_ref(&ab)).unwrap(),
+            bytes
+        );
+
+        // A non-canonical session payload is refused at encode.
+        let mut bad = manifest.clone();
+        bad.session.events = vec![vec![0u8; 18]];
+        assert!(encode_archive(&bad, &[ab]).is_err());
+
+        // Retagging the EVENT section as an OBJECT breaks the canonical kind
+        // order even though every digest is resealed.
+        let ts = table_start(&bytes);
+        let mut s = bytes.clone();
+        s[ts + SECTION_RECORD_BYTES * 2] = SectionKind::Object as u8;
+        reseal(&mut s);
+        assert!(decode_archive(&s).is_err());
+    }
+
+    #[test]
     fn trailing_bytes_are_rejected_even_when_resealed() {
         let (_, _, base) = valid_archive();
         let mut t = base.clone();
@@ -830,5 +1062,27 @@ mod tests {
         b[manifest_off..manifest_off + 4].copy_from_slice(&MAX_SECTIONS.to_le_bytes());
         reseal(&mut b);
         assert!(decode_archive(&b).is_err());
+    }
+
+    #[test]
+    fn short_archives_with_maximal_tags_do_not_panic() {
+        // The minimum-length precheck admits a 52-byte input whose profile and
+        // universe tags consume almost the whole buffer; the section-count read
+        // must be bounds-checked rather than slicing past the end.
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(&MAGIC);
+        bytes.push(VERSION);
+        bytes.push(MAX_TAG as u8);
+        bytes.extend_from_slice(&[b'p'; MAX_TAG]);
+        bytes.push(4);
+        bytes.extend_from_slice(b"u1/v");
+        assert_eq!(bytes.len(), 51);
+        bytes.push(0); // reach the minimum admitted length without a table
+        assert_eq!(bytes.len(), MAGIC.len() + 1 + 1 + 1 + 1 + 4 + DIGEST_BYTES);
+        assert!(decode_archive(&bytes).is_err());
+        // And every shorter truncation is likewise a typed error, never a panic.
+        for cut in 0..bytes.len() {
+            assert!(decode_archive(&bytes[..cut]).is_err());
+        }
     }
 }

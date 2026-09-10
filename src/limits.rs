@@ -148,6 +148,22 @@ pub const MAX_ENTROPY_SHARED_MODELS: u32 = 1 << 16;
 /// Maximum model bytes across an object's shared model pool.
 pub const MAX_ENTROPY_MODEL_POOL_BYTES: u32 = 1 << 22;
 
+// ---------------------------------------------------------------------------
+// Transport (Phase N, contract §36/§37)
+// ---------------------------------------------------------------------------
+
+/// Maximum payload bytes in one transport frame.
+pub const MAX_FRAME_PAYLOAD_BYTES: u32 = 1 << 26;
+
+/// Maximum frames in one transport stream (decode-side bound).
+pub const MAX_FRAMES_PER_STREAM: u32 = 1 << 20;
+
+/// Maximum events the receiver buffers before it refuses more (bounded use).
+pub const MAX_PENDING_EVENTS: u32 = MAX_SCHEDULED_EVENTS;
+
+/// Maximum checkpoint state bytes in one checkpoint frame.
+pub const MAX_CHECKPOINT_STATE_BYTES: u32 = 1 << 26;
+
 /// Maximum page-index bytes in one object index.
 pub const MAX_ENTROPY_INDEX_BYTES: u32 = 1 << 28;
 

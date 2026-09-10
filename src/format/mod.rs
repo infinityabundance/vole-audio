@@ -3,6 +3,7 @@
 //! tested; the media format is explicit binary, never serde/bincode.
 
 pub mod archive;
+pub mod manifest;
 pub mod wav;
 
 pub use wav::{DecodedWav, PcmFormat};

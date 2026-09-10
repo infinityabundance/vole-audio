@@ -20,7 +20,7 @@ COMMANDS (current build):
     court <name>          Run an executable court (semantic, authored, simd, facts,
                           inverse, inverse-search, conventional, corpus, fullobj,
                           flagship, runtime, random-access, negative, depth,
-                          interference, all, flattening,
+                          interference, all, archive, transport, phase-n, flattening,
                           cuda, d1, rocm,
                           rocm-d0, rocm-d1, entropy-rans, entropy-literal,
                           entropy-residual, entropy-pages, entropy-partial,
@@ -348,6 +348,7 @@ fn cmd_seal_verify(args: &[String]) -> Result<u8> {
                        fullobj=SUPPORTED,flagship=SUPPORTED,runtime=SUPPORTED,\
                        random-access=SUPPORTED,negative=SUPPORTED,depth=SUPPORTED,\
                        interference=SUPPORTED,all=SUPPORTED,\
+                       archive=SUPPORTED,transport=SUPPORTED,phase-n=SUPPORTED,\
                        cuda=SUPPORTED,d1=SUPPORTED,h2=SUPPORTED,\
                        rocm=UNSUPPORTED_BY_HARDWARE|UNSUPPORTED_BY_API|INCONCLUSIVE,\
                        rocm-d0=UNSUPPORTED_BY_HARDWARE|UNSUPPORTED_BY_API|INCONCLUSIVE,\

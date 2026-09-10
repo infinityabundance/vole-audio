@@ -97,9 +97,9 @@ src/
                       + search (L); rocm/ probe + artifact (I), runtime (J),
                       search (L); entropy_flat (H.2) host flat-job builder
   audio/              ALSA endpoint, directness, topology   (Phase H+)
-  format/             canonical archive + WAV ingest        (Phase E)
+  format/             canonical `.volea` archive + WAV ingest   (Phase E/N)
   inverse/            bounded inverse-proceduralization + search placement (K/L)
-  transport/          deterministic framing                 (Phase N+)
+  transport/          deterministic framing + receiver + clock  (Phase N)
   evidence/           receipts/counters/timing/environment  (Phase A)
   courts/             executable courts                     (Phase C+)
   main.rs             the vole-audio CLI                    (grows by phase)
@@ -312,9 +312,11 @@ see the
 measurement-boundary notes (repository-only). Courts arrive with their phases;
 the court list is fixed in the implementation contract (semantic, authored,
 simd, facts, inverse, flattening, cuda, rocm, d1, d2, depth, conventional,
-random-access, negative, interference, all). `inverse`, `flattening` and
-`inverse-search` are Phases K/L; `d2`, `depth`, `conventional`,
-`random-access`, `negative`, `interference` and `all` arrive with Phases M.
+random-access, negative, interference, all, archive, transport). `inverse`,
+`flattening` and `inverse-search` are Phases K/L; `d2`, `depth`, `conventional`,
+`random-access`, `negative`, `interference` and `all` arrive with Phase M; the
+canonical `.volea` archive and deterministic transport (`archive`, `transport`,
+`phase-n`) arrive with Phase N.
 
 ## Non-claims
 
