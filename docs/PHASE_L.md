@@ -224,6 +224,49 @@ Seal run (release, `--all-features`, clean tree `3cb4a6d`, version 0.10.0):
   `vole-audio seal verify` PASSes the 13-row matrix in **default mode** at the
   battery tree and at the release head.
 
+### Seal 3 — review-2 closure: CUDA current-context affinity (2026-09-10)
+
+Review-2 found the remaining half of CUDA resource identity: the Seal-2 Arc
+graph guarantees *lifetime*, but CUDA operations target the calling thread's
+*current* context, so a live resource could still be used against the wrong
+context (or from a thread that never entered one). All context-dependent
+operations now enter their owner (`CudaContext::enter` → `cuCtxSetCurrent`,
+previous value restored on drop), and stream-taking APIs take `&Stream` with an
+`Arc::ptr_eq` context check. `cuCtxPushCurrent` was rejected on evidence: a
+`cuCtxCreate`d context is already on the calling thread's stack and pushing it
+again returns rc 201 (reproduced on driver 610.57.04 by a minimal C driver-API
+program and then in Rust).
+
+Seal run (release, `--all-features`, clean tree `26a610e`, version 0.10.1):
+
+- `court inverse-search` SUPPORTED, 3 execution surfaces + 1 compile-only
+  hardware-pending ROCm surface, frozen result `d966d98e…` unchanged;
+  measured scalar 27.21 ms, parallel 6.31 ms (**0.232×**), CUDA 7.51 ms
+  (**0.276×**) — the CUDA ratio remains clock-state-dependent and is still not
+  claimed as stable.
+- `court inverse` still reports **6 non-literal explanations** with the frozen
+  static result `217b09a7…`; the affinity change did not move semantics,
+  economics or the accepted set.
+- Device artifacts are byte-identical to Seals 1/2 (the change is host-side):
+  PTX `d13d22c3…`, AMDGPU `5c30a4bc…`, rebuilt from the clean `26a610e` tree
+  (`source_tree_sha = 59acd844…`, `source_dirty = false`, deterministic across
+  isolated builds).
+- Every CUDA-dependent court still SUPPORTED with unchanged hashes: `cuda`,
+  `d1`, `inverse-search`, `entropy-cuda`, `entropy-d1`.
+- Gated host regressions now include three affinity tests, all passing on the
+  RTX 4080: two-context isolation with restore, foreign-thread use, and
+  cross-context rejection.
+- All pre-existing courts SUPPORTED with frozen hashes unchanged (semantic
+  `1791816f4b93…`, authored `f7e103f3a97d…`, inverse `217b09a7…`).
+- Host tests: **391 passed, 10 ignored** all-features (381 passed, 10 ignored
+  default-features; +3 ignored over Seal 2: the affinity regressions); clippy
+  `-D warnings` and `cargo fmt --check` clean.
+- 23 receipts, every one `source_binding: bound` and carrying
+  `seal_subject_hash =
+  acbcc2b2162b309e174592ecdad147a7509029821e8720508872d5963585d837`;
+  `vole-audio seal verify` PASSes the 13-row matrix in **default mode** at the
+  battery tree and at the release head.
+
 ## Execution record (implementation summary)
 
 - The device surface grows by exactly one entry and no per-backend semantics:
