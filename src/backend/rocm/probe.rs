@@ -42,12 +42,16 @@ use crate::status::Verdict;
 
 /// Frozen Phase-J HIP **D0** ABI surface (the module/launch path mirroring
 /// the CUDA driver API this repository already runs — scalar == ROCm
-/// differential battery). Every symbol must resolve for D0 readiness.
+/// differential battery). Every symbol must resolve for D0 readiness,
+/// including `hipModuleUnload`: the runtime unloads modules during ordinary
+/// teardown, so a surface that omits it could "resolve completely" and then
+/// panic/UB on drop.
 pub const HIP_D0_REQUIRED: &[&str] = &[
     "hipInit",
     "hipGetDeviceCount",
     "hipSetDevice",
     "hipModuleLoadData",
+    "hipModuleUnload",
     "hipModuleGetFunction",
     "hipModuleLaunchKernel",
     "hipMalloc",
@@ -128,16 +132,29 @@ pub const HSA_D0_REQUIRED: &[&str] = &[
 pub const HSA_D1_ADDITIONAL: &[&str] = &["hsa_amd_memory_lock", "hsa_amd_memory_unlock"];
 
 /// Compute-runtime sonames probed in order: (name, D0 table, D1 table).
-/// Versioned and unversioned sonames are probed, and /opt/rocm* installs
-/// are additionally scanned for `libamdhip64.so*` / `libhsa-runtime64.so*`
-/// by prefix, so a future ROCm layout with a newer versioned SONAME is
+/// Versioned and unversioned sonames are probed (ROCm 7 exposes
+/// `libamdhip64.so.7`, sometimes without an unversioned symlink), and every
+/// explicit ROCm library directory (ROCM_LIB_PATH entries + /opt/rocm*
+/// lib/lib64) is scanned for `libamdhip64.so*` / `libhsa-runtime64.so*` by
+/// prefix, so a future ROCm layout with a newer versioned SONAME is
 /// discovered rather than mislabeled absent.
 pub const COMPUTE_SONAMES: &[(&str, &[&str], &[&str])] = &[
+    ("libamdhip64.so.7", HIP_D0_REQUIRED, HIP_D1_ADDITIONAL),
     ("libamdhip64.so.6", HIP_D0_REQUIRED, HIP_D1_ADDITIONAL),
     ("libamdhip64.so.5", HIP_D0_REQUIRED, HIP_D1_ADDITIONAL),
     ("libamdhip64.so", HIP_D0_REQUIRED, HIP_D1_ADDITIONAL),
     ("libhsa-runtime64.so.1", HSA_D0_REQUIRED, HSA_D1_ADDITIONAL),
     ("libhsa-runtime64.so", HSA_D0_REQUIRED, HSA_D1_ADDITIONAL),
+];
+
+/// HIP sonames in preference order — the single source of truth for both
+/// the probe rows and the runtime opener (`backend::rocm::runtime::
+/// open_hip_lib`), so the two cannot drift.
+pub const HIP_SONAMES: &[&str] = &[
+    "libamdhip64.so.7",
+    "libamdhip64.so.6",
+    "libamdhip64.so.5",
+    "libamdhip64.so",
 ];
 
 /// Auxiliary telemetry soname (energy/clock source only; not evidence of a

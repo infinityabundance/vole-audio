@@ -301,9 +301,9 @@ fn upmix_parity(artifact: &[u8]) -> Result<Vec<ParityRow>> {
         .map(|f| sat_i32(((f as i64) - 256) * 4_000 * 2))
         .collect();
     let expect: Vec<i32> = mono.iter().flat_map(|&s| [s, s]).collect();
-    let src = DeviceBuffer::alloc(&session.fns, (frames as usize) * 4)?;
+    let src = DeviceBuffer::alloc(&session.api, (frames as usize) * 4)?;
     src.upload(bytemuck(&mono))?;
-    let dst = DeviceBuffer::alloc(&session.fns, (frames as usize * channels as usize) * 4)?;
+    let dst = DeviceBuffer::alloc(&session.api, (frames as usize * channels as usize) * 4)?;
     upmix_mono_dup(
         &session,
         &module,
@@ -337,6 +337,87 @@ fn bytemuck<T: Sized>(v: &[T]) -> &[u8] {
     unsafe { std::slice::from_raw_parts(v.as_ptr() as *const u8, std::mem::size_of_val(v)) }
 }
 
+pub(crate) fn phase_j_d0_gate(probe: &RocmProbe) -> (Verdict, String) {
+    use crate::backend::rocm::probe::KfdState as K;
+    if probe.amd_gpus.is_empty() {
+        return (
+            Verdict::UnsupportedByHardware,
+            "no AMD compute candidate in the sysfs PCI walk — the scalar == ROCm battery \
+             cannot execute on this host"
+                .into(),
+        );
+    }
+    if !probe
+        .amd_gpus
+        .iter()
+        .any(|g| g.driver.as_deref() == Some("amdgpu"))
+    {
+        return (
+            Verdict::UnsupportedByHardware,
+            "AMD candidate not bound to amdgpu — the KFD compute interface is unavailable".into(),
+        );
+    }
+    match probe.kfd {
+        K::Absent => {
+            return (
+                Verdict::UnsupportedByHardware,
+                "AMD candidate bound to amdgpu but no KFD device interface".into(),
+            );
+        }
+        K::PresentNotAccessible => {
+            return (
+                Verdict::Inconclusive,
+                "KFD present but /dev/kfd not openable read-write (permissions/cgroup)".into(),
+            );
+        }
+        K::Accessible => {}
+    }
+    // The Phase-J executor is HIP-only: readiness must be proven by a HIP
+    // D0-ready row. An HSA-ready/HIP-unavailable system is UNSUPPORTED_BY_API
+    // (review finding: classify() over both families must not authorize the
+    // HIP executor).
+    let hip_d0 = probe
+        .compute
+        .iter()
+        .find(|a| a.soname.contains("libamdhip64") && a.d0_ready());
+    match hip_d0 {
+        Some(_) => (Verdict::Supported, String::new()),
+        None => {
+            let hsa_ready = probe
+                .compute
+                .iter()
+                .any(|a| a.soname.contains("libhsa-runtime64") && a.d0_ready());
+            let why = probe
+                .compute
+                .iter()
+                .filter(|a| a.soname.contains("libamdhip64"))
+                .map(|a| match &a.d0_missing {
+                    Ok(m) if m.is_empty() => {
+                        format!("{}: loaded, D0 complete (D1 {})", a.soname, a.d1_ready())
+                    }
+                    Ok(m) => format!("{}: D0 missing {}", a.soname, m.join(",")),
+                    Err(e) => format!("{}: {e}", a.soname),
+                })
+                .collect::<Vec<_>>()
+                .join("; ");
+            if hsa_ready {
+                (
+                    Verdict::UnsupportedByApi,
+                    format!(
+                        "HIP runtime unavailable (only HSA rows are D0-ready; the Phase-J \
+                         executor is HIP-only): {why}"
+                    ),
+                )
+            } else {
+                (
+                    Verdict::UnsupportedByApi,
+                    format!("no HIP runtime resolves its full D0 ABI surface: {why}"),
+                )
+            }
+        }
+    }
+}
+
 pub fn run(receipts_root: &Path) -> Result<Verdict> {
     let t0 = Instant::now();
     let mut counters = Counters::new();
@@ -350,10 +431,11 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
     let probe = RocmProbe::capture()?;
     let runtime = crate::courts::rocm::runtime_surface(&probe);
     extras.insert("runtime_surface".into(), runtime);
-    let (runtime_verdict, runtime_detail) = probe.classify();
     // Gate receipt: full surfaces + typed detail for every non-executing
     // outcome (compile unsatisfied / artifact unreadable / no D0-ready
-    // device).
+    // device). `gate_extras` is a snapshot so the closure never borrows
+    // `extras` (the battery keeps extending it).
+    let gate_extras = extras.clone();
     let emit_gate =
         |verdict: Verdict, detail: &str, artifact_sha: Option<String>| -> Result<Verdict> {
             let mut b = ReceiptBuilder::new("rocm-d0");
@@ -370,12 +452,13 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
                     gpu_artifact_hash: artifact_sha,
                     ..Default::default()
                 })
-                .extra("compile_surface", extras["compile_surface"].clone())
-                .extra("runtime_surface", extras["runtime_surface"].clone())
                 .timing(RunTiming {
                     total_ns: Some(t0.elapsed().as_nanos() as i64),
                     ..Default::default()
                 });
+            for (k, v) in &gate_extras {
+                b.extra(k, v.clone());
+            }
             b.limitation(
                 "The scalar == ROCm differential battery requires a D0-ready ROCm runtime AND an \
              AMD compute device; neither is pretended. This receipt records the typed runtime \
@@ -390,11 +473,8 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
     if !compile_satisfied {
         return emit_gate(
             Verdict::Inconclusive,
-            &format!(
-                "compile surface unsatisfied (run scripts/build-rocm-device.sh on this tree); \
-                 the differential battery never executes against an unbound artifact — runtime \
-                 classification recorded separately: {runtime_detail}"
-            ),
+            "compile surface unsatisfied (run scripts/build-rocm-device.sh on this tree); \
+             the differential battery never executes against an unbound artifact",
             artifact_sha,
         );
     }
@@ -408,92 +488,129 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
             );
         }
     };
-    if runtime_verdict != Verdict::Inconclusive {
-        // No D0-ready runtime+device: the battery cannot execute.
-        return emit_gate(runtime_verdict, &runtime_detail, artifact_sha);
+    // HIP-specific D0 gate (the executor is HIP-only; an HSA-ready row does
+    // not authorize it).
+    let (gate_verdict, gate_detail) = phase_j_d0_gate(&probe);
+    if gate_verdict != Verdict::Supported {
+        return emit_gate(gate_verdict, &gate_detail, artifact_sha);
     }
 
-    // 2. Differential battery (scalar == ROCm).
-    let mut failed_rows: Vec<String> = Vec::new();
-    let record = |rows: Vec<ParityRow>,
-                  extras: &mut BTreeMap<String, serde_json::Value>,
-                  failed: &mut Vec<String>| {
-        for (label, ok, detail) in rows {
-            extras.insert(format!("row/{label}"), json!(ok));
-            if !ok {
-                failed.push(format!("{label}: {}", detail.unwrap_or_default()));
+    // 2. Differential battery (scalar == ROCm). The whole battery is one
+    // fallible unit: any operational failure (e.g. HIP open/launch) becomes
+    // a typed INCONCLUSIVE gate receipt, never a propagated error that
+    // skips evidence (review finding: `?` must not escape the court).
+    let battery_run = (|| -> Result<()> {
+        let mut failed_rows: Vec<String> = Vec::new();
+        let record = |rows: Vec<ParityRow>,
+                      extras: &mut BTreeMap<String, serde_json::Value>,
+                      failed: &mut Vec<String>| {
+            for (label, ok, detail) in rows {
+                extras.insert(format!("row/{label}"), json!(ok));
+                if !ok {
+                    failed.push(format!("{label}: {}", detail.unwrap_or_default()));
+                }
             }
+        };
+        // 2a. Frozen procedural fixtures.
+        {
+            let (store, events) = crate::courts::semantic::semantic_court_fixture();
+            let world = World::new(RATE_HZ, crate::courts::semantic::CHANNELS, events)?;
+            let windows = [(0i64, 2400usize), (700, 900), (1600, 800)];
+            let flat = fixture_flat("semantic", &store, &world, &windows, &mut hashes)?;
+            let rows = device_parity(
+                "semantic",
+                &artifact.0,
+                &store,
+                &world,
+                &flat,
+                &windows,
+                &mut hashes,
+                &mut counters,
+            )?;
+            record(rows, &mut extras, &mut failed_rows);
         }
-    };
-    // 2a. Frozen procedural fixtures.
-    {
-        let (store, events) = crate::courts::semantic::semantic_court_fixture();
-        let world = World::new(RATE_HZ, crate::courts::semantic::CHANNELS, events)?;
-        let windows = [(0i64, 2400usize), (700, 900), (1600, 800)];
-        let flat = fixture_flat("semantic", &store, &world, &windows, &mut hashes)?;
-        let rows = device_parity(
-            "semantic",
-            &artifact.0,
-            &store,
-            &world,
-            &flat,
-            &windows,
-            &mut hashes,
-            &mut counters,
-        )?;
-        record(rows, &mut extras, &mut failed_rows);
-    }
-    {
-        let (store, events) = crate::courts::authored::authored_court_fixture();
-        let world = World::new(RATE_HZ, 1, events)?;
-        let windows = [(0i64, 4000usize), (400, 3600), (1600, 2400)];
-        let flat = fixture_flat("authored", &store, &world, &windows, &mut hashes)?;
-        let rows = device_parity(
-            "authored",
-            &artifact.0,
-            &store,
-            &world,
-            &flat,
-            &windows,
-            &mut hashes,
-            &mut counters,
-        )?;
-        record(rows, &mut extras, &mut failed_rows);
-    }
-    {
-        let (store, events) = crate::courts::simd::mixed_world();
-        let world = World::new(RATE_HZ, 2, events)?;
-        let windows = [(0i64, 8192usize), (1234, 700), (7000, 1192)];
-        let flat = fixture_flat("mixed", &store, &world, &windows, &mut hashes)?;
-        let rows = device_parity(
-            "mixed",
-            &artifact.0,
-            &store,
-            &world,
-            &flat,
-            &windows,
-            &mut hashes,
-            &mut counters,
-        )?;
-        record(rows, &mut extras, &mut failed_rows);
-    }
-    // 2b. Entropy decode parity.
-    {
-        let rows = entropy_parity(&artifact.0, &mut hashes)?;
-        record(rows, &mut extras, &mut failed_rows);
-    }
-    // 2c. Upmix transform parity.
-    {
-        let rows = upmix_parity(&artifact.0)?;
-        record(rows, &mut extras, &mut failed_rows);
+        {
+            let (store, events) = crate::courts::authored::authored_court_fixture();
+            let world = World::new(RATE_HZ, 1, events)?;
+            let windows = [(0i64, 4000usize), (400, 3600), (1600, 2400)];
+            let flat = fixture_flat("authored", &store, &world, &windows, &mut hashes)?;
+            let rows = device_parity(
+                "authored",
+                &artifact.0,
+                &store,
+                &world,
+                &flat,
+                &windows,
+                &mut hashes,
+                &mut counters,
+            )?;
+            record(rows, &mut extras, &mut failed_rows);
+        }
+        {
+            let (store, events) = crate::courts::simd::mixed_world();
+            let world = World::new(RATE_HZ, 2, events)?;
+            let windows = [(0i64, 8192usize), (1234, 700), (7000, 1192)];
+            let flat = fixture_flat("mixed", &store, &world, &windows, &mut hashes)?;
+            let rows = device_parity(
+                "mixed",
+                &artifact.0,
+                &store,
+                &world,
+                &flat,
+                &windows,
+                &mut hashes,
+                &mut counters,
+            )?;
+            record(rows, &mut extras, &mut failed_rows);
+        }
+        // 2b. Entropy decode parity.
+        {
+            let rows = entropy_parity(&artifact.0, &mut hashes)?;
+            record(rows, &mut extras, &mut failed_rows);
+        }
+        // 2c. Upmix transform parity.
+        {
+            let rows = upmix_parity(&artifact.0)?;
+            record(rows, &mut extras, &mut failed_rows);
+        }
+        if failed_rows.is_empty() {
+            extras.insert("battery_passed".into(), json!(true));
+        } else {
+            extras.insert("battery_passed".into(), json!(false));
+            extras.insert(
+                "failed_rows".into(),
+                json!(failed_rows.iter().collect::<Vec<_>>()),
+            );
+        }
+        Ok(())
+    })();
+    if let Err(e) = battery_run {
+        return emit_gate(
+            Verdict::Inconclusive,
+            &format!("differential battery could not execute: {e}"),
+            artifact_sha,
+        );
     }
 
-    let passed = failed_rows.is_empty();
+    let passed = extras
+        .get("battery_passed")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
     let verdict = if passed {
         Verdict::Supported
     } else {
         Verdict::FailedCorrectness
     };
+    let failed_rows: Vec<String> = extras
+        .get("failed_rows")
+        .and_then(|v| v.as_array())
+        .map(|a| {
+            a.iter()
+                .filter_map(|s| s.as_str())
+                .map(str::to_string)
+                .collect()
+        })
+        .unwrap_or_default();
     let detail = if passed {
         format!(
             "scalar == ROCm byte-exact on the frozen fixture windows ({} hashes), the entropy \
@@ -556,4 +673,74 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
     }
     println!("  receipt: {}", path.display());
     Ok(verdict)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::backend::rocm::probe::{AmdGpu, KfdState, RuntimeAttempt};
+
+    fn gpu() -> AmdGpu {
+        AmdGpu {
+            bdf: "0000:01:00.0".into(),
+            vendor: Some("1002".into()),
+            device: Some("73bf".into()),
+            driver: Some("amdgpu".into()),
+            class: Some("0x030000".into()),
+        }
+    }
+
+    fn attempt(soname: &str, d0_ok: bool) -> RuntimeAttempt {
+        RuntimeAttempt {
+            soname: soname.to_string(),
+            d0_missing: if d0_ok {
+                Ok(vec![])
+            } else {
+                Ok(vec!["hipInit".into()])
+            },
+            d1_missing: Ok(vec![]),
+        }
+    }
+
+    fn probe_with(amd: Vec<AmdGpu>, compute: Vec<RuntimeAttempt>) -> RocmProbe {
+        RocmProbe {
+            amd_gpus: amd,
+            kfd: KfdState::Accessible,
+            compute,
+            telemetry: vec![],
+        }
+    }
+
+    #[test]
+    fn hsa_readiness_does_not_authorize_the_hip_executor() {
+        // The generic probe classify() treats any D0-ready row (HIP or HSA)
+        // as pending-execution; the Phase-J gate must NOT let an HSA-ready /
+        // HIP-unavailable system authorize the HIP-only executor.
+        let probe = probe_with(vec![gpu()], vec![attempt("libhsa-runtime64.so.1", true)]);
+        let (classify_verdict, _) = probe.classify();
+        assert_eq!(classify_verdict, Verdict::Inconclusive);
+        let (v, d) = phase_j_d0_gate(&probe);
+        assert_eq!(v, Verdict::UnsupportedByApi);
+        assert!(d.contains("HIP runtime unavailable"), "{d}");
+    }
+
+    #[test]
+    fn hip_d0_readiness_authorizes_the_battery() {
+        let probe = probe_with(
+            vec![gpu()],
+            vec![
+                attempt("libhsa-runtime64.so.1", true),
+                attempt("libamdhip64.so.6", true),
+            ],
+        );
+        let (v, _) = phase_j_d0_gate(&probe);
+        assert_eq!(v, Verdict::Supported);
+    }
+
+    #[test]
+    fn missing_device_is_hardware_unsupported() {
+        let probe = probe_with(vec![], vec![]);
+        let (v, _) = phase_j_d0_gate(&probe);
+        assert_eq!(v, Verdict::UnsupportedByHardware);
+    }
 }

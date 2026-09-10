@@ -1,16 +1,29 @@
 //! Native-Rust HIP runtime session (Phase J) — RAII over the resolved
 //! `ffi::Fns`, mirroring `backend::cuda::driver` for the AMD surface.
 //!
+//! Ownership (structural, not comments): one `HipApi` owns the dlopen'd
+//! `Lib` + the resolved `Fns`, shared through `Arc`. Every resource that
+//! can outlive the opening session — `Module`, `Function`, `DeviceBuffer`,
+//! `HostRegistration` — retains an `Arc` clone, so Rust itself proves the
+//! library cannot be unloaded while any resolved function pointer is still
+//! reachable, and a module cannot be unloaded while one of its `Function`s
+//! is alive (`Function` retains the module owner):
+//!
+//! ```text
+//! DeviceBuffer ─────┐
+//! HostRegistration ─┤
+//! Module ───────────┤──> HipApi ──> Lib
+//! Function ─> Module┘
+//! ```
+//!
 //! * `Rocm` — one HIP session: init, device selection, synchronized launch
 //!   context (legacy default stream; every Phase-J launch is fully
-//!   synchronized before the host reads anything, which is the exactness
-//!   discipline the differential battery needs);
+//!   synchronized before the host reads anything);
 //! * `Module`/`Function` — an AMDGPU code object loaded from bytes
 //!   (`hipModuleLoadData`) and its kernel entries;
 //! * `DeviceBuffer` — device memory with host<->device copies;
 //! * `HostRegistration` — D1: pin an existing host range (the ALSA mmap
-//!   endpoint region) with `hipHostRegister(hipHostRegisterMapped)` so the
-//!   device can write it directly.
+//!   endpoint region) with `hipHostRegister(hipHostRegisterMapped)`.
 //!
 //! Nothing here executes without a device; every path returns typed errors
 //! that the courts record exactly.
@@ -20,13 +33,29 @@ use crate::backend::rocm::loader::Lib;
 use crate::device::geom::Grid;
 use crate::error::{Error, Kind, Result};
 use std::os::raw::{c_char, c_void};
+use std::sync::Arc;
 
-/// HIP session (RAII). The library handle outlives every resolved pointer
-/// and is closed on drop.
-pub struct Rocm {
+/// The dlopen'd HIP library + its resolved function table, owned together.
+/// All runtime resources hold an `Arc` to this, so the library outlives
+/// every pointer resolved from it (structural lifetime).
+pub struct HipApi {
+    /// The dlopen handle (dlclose on drop).
+    pub lib: Lib,
+    /// Resolved function pointers (valid while `lib` is alive).
     pub fns: Fns,
-    /// The dlopen'd HIP library (kept alive for `fns`).
-    _lib: Lib,
+}
+
+impl std::fmt::Debug for HipApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("HipApi")
+            .field("lib", &self.lib.name)
+            .finish()
+    }
+}
+
+/// HIP session (RAII over one `Arc<HipApi>`).
+pub struct Rocm {
+    pub api: Arc<HipApi>,
     /// Ordinal the session is bound to.
     pub ordinal: i32,
     /// Number of visible HIP devices at open time.
@@ -68,13 +97,14 @@ impl Rocm {
                 ),
             ));
         }
+        let api = Arc::new(HipApi { lib, fns });
         // SAFETY: hipInit(0) is the documented initialization call.
-        let f = fns.hipInit.expect("bound");
-        ffi::check(&fns, "hipInit", unsafe { f(0) })?;
+        let f = api.fns.hipInit.expect("bound");
+        ffi::check(&api.fns, "hipInit", unsafe { f(0) })?;
         let mut count: i32 = 0;
         // SAFETY: out-param writes one int.
-        ffi::check(&fns, "hipGetDeviceCount", unsafe {
-            (fns.hipGetDeviceCount.expect("bound"))(&mut count)
+        ffi::check(&api.fns, "hipGetDeviceCount", unsafe {
+            (api.fns.hipGetDeviceCount.expect("bound"))(&mut count)
         })?;
         if count <= 0 {
             return Err(Error::new(
@@ -89,12 +119,11 @@ impl Rocm {
             ));
         }
         // SAFETY: hipSetDevice selects the current device for this thread.
-        ffi::check(&fns, "hipSetDevice", unsafe {
-            (fns.hipSetDevice.expect("bound"))(ordinal)
+        ffi::check(&api.fns, "hipSetDevice", unsafe {
+            (api.fns.hipSetDevice.expect("bound"))(ordinal)
         })?;
         let mut rocm = Rocm {
-            fns,
-            _lib: lib,
+            api,
             ordinal,
             device_count: count,
             device_name: None,
@@ -108,7 +137,7 @@ impl Rocm {
     }
 
     fn device_name_evidence(&self) -> Option<String> {
-        let f = self.fns.hipDeviceGetName?;
+        let f = self.api.fns.hipDeviceGetName?;
         let mut buf = vec![0u8; 256];
         // SAFETY: hipDeviceGetName writes at most `len` bytes into buf.
         let rc = unsafe {
@@ -127,9 +156,9 @@ impl Rocm {
 
     fn version_evidence(&self, driver: bool) -> Option<i32> {
         let f = if driver {
-            self.fns.hipDriverGetVersion?
+            self.api.fns.hipDriverGetVersion?
         } else {
-            self.fns.hipRuntimeGetVersion?
+            self.api.fns.hipRuntimeGetVersion?
         };
         let mut v: i32 = 0;
         // SAFETY: out-param writes one int.
@@ -143,106 +172,103 @@ impl Rocm {
     pub fn synchronize(&self) -> Result<()> {
         // SAFETY: hipDeviceSynchronize blocks until all preceding work on
         // this device completes.
-        ffi::check(&self.fns, "hipDeviceSynchronize", unsafe {
-            (self.fns.hipDeviceSynchronize.expect("bound"))()
+        ffi::check(&self.api.fns, "hipDeviceSynchronize", unsafe {
+            (self.api.fns.hipDeviceSynchronize.expect("bound"))()
         })
     }
 
     /// Load an AMDGPU code object from its exact bytes.
     pub fn load_module(&self, image: &[u8]) -> Result<Module> {
-        Module::load(&self.fns, image)
+        Module::load(&self.api, image)
     }
 }
 
 /// Open the HIP library through the same candidate chain the probe uses
-/// (ld cache sonames, ROCM_LIB_PATH dirs, /opt/rocm* prefix scan).
+/// (single-sourced: `probe::HIP_SONAMES` + explicit ROCm lib dir scans).
 pub fn open_hip_lib() -> Result<Lib> {
-    let mut candidates: Vec<String> = Vec::new();
-    for soname in crate::backend::rocm::probe::COMPUTE_SONAMES {
-        if soname.0.starts_with("libamdhip64") {
-            candidates.push(soname.0.to_string());
-        }
-    }
-    if let Ok(p) = std::env::var("ROCM_LIB_PATH") {
-        for dir in p.split(':').filter(|d| !d.is_empty()) {
-            candidates.push(format!("{dir}/libamdhip64.so"));
-        }
-    }
-    if let Ok(entries) = std::fs::read_dir("/opt") {
-        let mut rocm_dirs = entries
-            .filter_map(|e| e.ok())
-            .filter(|e| e.file_name().to_string_lossy().starts_with("rocm"))
-            .map(|e| e.path())
-            .collect::<Vec<_>>();
-        rocm_dirs.sort();
-        for dir in rocm_dirs {
-            for sub in ["lib", "lib64"] {
-                let libdir = dir.join(sub);
-                if let Ok(files) = std::fs::read_dir(&libdir) {
-                    let mut found = files
-                        .filter_map(|e| e.ok())
-                        .filter(|e| {
-                            e.file_name()
-                                .to_string_lossy()
-                                .starts_with("libamdhip64.so")
-                        })
-                        .map(|e| e.path())
-                        .collect::<Vec<_>>();
-                    found.sort();
-                    for p in found {
-                        candidates.push(p.to_string_lossy().into_owned());
-                    }
-                }
-            }
-        }
-    }
+    let sonames = crate::backend::rocm::probe::HIP_SONAMES;
+    let candidates = crate::backend::rocm::loader::lib_candidates(sonames);
     let names = candidates.iter().map(String::as_str).collect::<Vec<_>>();
     Lib::open_candidates(names).map_err(|e| Error::new(Kind::Unavailable, e))
 }
 
-/// A loaded AMDGPU code object (RAII; unloaded on drop).
-pub struct Module {
-    pub fns: Fns,
+/// The module handle + its owning API. `hipModuleUnload` runs when the last
+/// `Arc<ModuleInner>` drops — i.e. only after every `Function` resolved from
+/// the module is gone (structural lifetime).
+pub struct ModuleInner {
+    pub api: Arc<HipApi>,
     pub handle: ffi::hipModule_t,
 }
 
+// SAFETY: mirrors `loader::Lib`: the HIP module handle is an opaque runtime
+// handle; the runtime is used from one thread (the courts) and every use
+// happens while the owning API is alive. The impl exists so the module can
+// be shared with its `Function`s through `Arc` (structural lifetime).
+unsafe impl Send for ModuleInner {}
+unsafe impl Sync for ModuleInner {}
+
+impl Drop for ModuleInner {
+    fn drop(&mut self) {
+        if !self.handle.is_null() {
+            // SAFETY: the handle was returned by hipModuleLoadData and is
+            // still owned (this is the last Arc); no Function outlives it by
+            // construction.
+            unsafe {
+                (self.api.fns.hipModuleUnload.expect("bound"))(self.handle);
+            }
+        }
+    }
+}
+
+/// A loaded AMDGPU code object.
+pub struct Module {
+    pub inner: Arc<ModuleInner>,
+}
+
 impl Module {
-    pub fn load(fns: &Fns, image: &[u8]) -> Result<Module> {
+    /// Load an AMDGPU code object from its exact bytes.
+    pub fn load(api: &Arc<HipApi>, image: &[u8]) -> Result<Module> {
         if image.is_empty() {
             return Err(Error::new(Kind::Malformed, "empty code object image"));
         }
         let mut handle: ffi::hipModule_t = std::ptr::null_mut();
         // SAFETY: hipModuleLoadData parses the image bytes; handle is an
         // out-param. The image lives for the call.
-        ffi::check(fns, "hipModuleLoadData", unsafe {
-            (fns.hipModuleLoadData.expect("bound"))(&mut handle, image.as_ptr() as *const c_void)
+        ffi::check(&api.fns, "hipModuleLoadData", unsafe {
+            (api.fns.hipModuleLoadData.expect("bound"))(
+                &mut handle,
+                image.as_ptr() as *const c_void,
+            )
         })?;
-        Ok(Module { fns: *fns, handle })
+        Ok(Module {
+            inner: Arc::new(ModuleInner {
+                api: api.clone(),
+                handle,
+            }),
+        })
     }
 
-    /// Resolve a kernel entry by its exact exported name.
+    /// Resolve a kernel entry by its exact exported name. The returned
+    /// `Function` retains this module, so the module stays loaded (and the
+    /// API stays open) for as long as the function exists.
     pub fn function(&self, entry: &str) -> Result<Function> {
-        // SAFETY: `get` passes the module handle to the HIP runtime; the
-        // handle is owned by self and alive for the call.
-        unsafe { Function::get(&self.fns, self.handle, entry) }
+        Function::get(self.inner.clone(), entry)
+    }
+
+    /// The owning API (shared).
+    pub fn api(&self) -> &Arc<HipApi> {
+        &self.inner.api
+    }
+
+    /// The module handle.
+    pub fn handle(&self) -> ffi::hipModule_t {
+        self.inner.handle
     }
 }
 
-impl Drop for Module {
-    fn drop(&mut self) {
-        if !self.handle.is_null() {
-            // SAFETY: the handle was returned by hipModuleLoadData and is
-            // still owned by self; function handles die with the module.
-            unsafe {
-                (self.fns.hipModuleUnload.expect("bound"))(self.handle);
-            }
-        }
-    }
-}
-
-/// One resolved kernel entry.
+/// One resolved kernel entry; retains its module owner.
 pub struct Function {
-    pub fns: Fns,
+    module: Arc<ModuleInner>,
     pub handle: ffi::hipFunction_t,
     /// Entry name (evidence + marshalling identity).
     pub entry: String,
@@ -250,19 +276,23 @@ pub struct Function {
 
 impl Function {
     /// # SAFETY
-    /// `module` must be a live module handle (owned by a `Module` that
-    /// outlives the returned `Function`); `entry` is a NUL-terminated C
-    /// string for the call duration.
-    pub unsafe fn get(fns: &Fns, module: ffi::hipModule_t, entry: &str) -> Result<Function> {
+    /// `module` must outlive the returned `Function` (it does: the function
+    /// retains the `Arc`). The module must be a live, loaded module.
+    pub fn get(module: Arc<ModuleInner>, entry: &str) -> Result<Function> {
         let cname = std::ffi::CString::new(entry)
             .map_err(|_| Error::new(Kind::Malformed, "kernel entry name contains NUL"))?;
         let mut handle: ffi::hipFunction_t = std::ptr::null_mut();
-        // SAFETY: out-param; cname is NUL-terminated and lives for the call.
-        ffi::check(fns, "hipModuleGetFunction", unsafe {
-            (fns.hipModuleGetFunction.expect("bound"))(&mut handle, module, cname.as_ptr())
+        // SAFETY: out-param; cname is NUL-terminated and lives for the call;
+        // the module handle is owned by `module` and alive.
+        ffi::check(&module.api.fns, "hipModuleGetFunction", unsafe {
+            (module.api.fns.hipModuleGetFunction.expect("bound"))(
+                &mut handle,
+                module.handle,
+                cname.as_ptr(),
+            )
         })?;
         Ok(Function {
-            fns: *fns,
+            module,
             handle,
             entry: entry.to_string(),
         })
@@ -292,7 +322,7 @@ impl Function {
         // value slots (each slot aligned and sized per its Arg kind), which
         // live for the call. sharedMemBytes 0, stream = legacy default.
         let rc = unsafe {
-            (self.fns.hipModuleLaunchKernel.expect("bound"))(
+            (self.module.api.fns.hipModuleLaunchKernel.expect("bound"))(
                 self.handle,
                 grid.blocks_x,
                 1,
@@ -306,7 +336,12 @@ impl Function {
                 std::ptr::null_mut(),
             )
         };
-        ffi::check(&self.fns, "hipModuleLaunchKernel", rc)
+        ffi::check(&self.module.api.fns, "hipModuleLaunchKernel", rc)
+    }
+
+    /// The owning API (shared).
+    pub fn api(&self) -> &Arc<HipApi> {
+        &self.module.api
     }
 }
 
@@ -339,26 +374,27 @@ pub fn marshal(args: &[Arg]) -> Vec<u64> {
     slots
 }
 
-/// Device memory (RAII; freed on drop).
+/// Device memory (RAII; freed on drop). Retains the owning `Arc<HipApi>`,
+/// so `hipFree` can never run through an unloaded library.
 pub struct DeviceBuffer {
-    pub fns: Fns,
+    pub api: Arc<HipApi>,
     /// Device pointer (0 = invalid).
     pub ptr: u64,
     pub bytes: usize,
 }
 
 impl DeviceBuffer {
-    pub fn alloc(fns: &Fns, bytes: usize) -> Result<DeviceBuffer> {
+    pub fn alloc(api: &Arc<HipApi>, bytes: usize) -> Result<DeviceBuffer> {
         if bytes == 0 {
             return Err(Error::new(Kind::Malformed, "zero-byte device allocation"));
         }
         let mut ptr: *mut c_void = std::ptr::null_mut();
         // SAFETY: out-param; hipMalloc returns a device pointer.
-        ffi::check(fns, "hipMalloc", unsafe {
-            (fns.hipMalloc.expect("bound"))(&mut ptr, bytes)
+        ffi::check(&api.fns, "hipMalloc", unsafe {
+            (api.fns.hipMalloc.expect("bound"))(&mut ptr, bytes)
         })?;
         Ok(DeviceBuffer {
-            fns: *fns,
+            api: api.clone(),
             ptr: ptr as u64,
             bytes,
         })
@@ -374,8 +410,8 @@ impl DeviceBuffer {
         }
         // SAFETY: dst is `self.bytes` of device memory; src is `bytes.len()`
         // live host bytes; kind H2D.
-        ffi::check(&self.fns, "hipMemcpy(H2D)", unsafe {
-            (self.fns.hipMemcpy.expect("bound"))(
+        ffi::check(&self.api.fns, "hipMemcpy(H2D)", unsafe {
+            (self.api.fns.hipMemcpy.expect("bound"))(
                 self.ptr as *mut c_void,
                 bytes.as_ptr() as *const c_void,
                 bytes.len(),
@@ -394,8 +430,8 @@ impl DeviceBuffer {
         }
         // SAFETY: src is `self.bytes` of device memory; dst is `out.len()`
         // live host bytes; kind D2H.
-        ffi::check(&self.fns, "hipMemcpy(D2H)", unsafe {
-            (self.fns.hipMemcpy.expect("bound"))(
+        ffi::check(&self.api.fns, "hipMemcpy(D2H)", unsafe {
+            (self.api.fns.hipMemcpy.expect("bound"))(
                 out.as_mut_ptr() as *mut c_void,
                 self.ptr as *const c_void,
                 out.len(),
@@ -414,9 +450,10 @@ impl Drop for DeviceBuffer {
     fn drop(&mut self) {
         if self.ptr != 0 {
             // SAFETY: the pointer was returned by hipMalloc and is still
-            // owned by self.
+            // owned by self; the API (library) is alive because self retains
+            // it.
             unsafe {
-                (self.fns.hipFree.expect("bound"))(self.ptr as *mut c_void);
+                (self.api.fns.hipFree.expect("bound"))(self.ptr as *mut c_void);
             }
         }
     }
@@ -432,10 +469,10 @@ impl Drop for DeviceBuffer {
 /// NOT set: the registration is process-local by design.
 pub const D1_REGISTER_FLAGS: u32 = ffi::HIP_HOST_REGISTER_MAPPED;
 
-/// A registered host-memory range (RAII): unregistered on drop. Drop order is
-/// the caller's concern (must precede HIP teardown).
+/// A registered host-memory range (RAII): unregistered on drop. Retains the
+/// owning `Arc<HipApi>`.
 pub struct HostRegistration {
-    pub fns: Fns,
+    pub api: Arc<HipApi>,
     /// Exact host pointer passed to hipHostRegister.
     pub host_ptr: u64,
     /// Exact byte length passed to hipHostRegister.
@@ -466,7 +503,8 @@ pub enum RegistrationAttempt {
 /// `base..base+len` must be a live, mapped, writable host range for the whole
 /// call and for the lifetime of the returned `HostRegistration`; the caller
 /// (the D1 court) holds the ALSA mapping open for that window.
-pub unsafe fn attempt_register(fns: &Fns, base: u64, len: usize) -> RegistrationAttempt {
+pub unsafe fn attempt_register(api: &Arc<HipApi>, base: u64, len: usize) -> RegistrationAttempt {
+    let fns = &api.fns;
     if !fns.d1_ready() {
         let missing = fns.d1_missing();
         return RegistrationAttempt::MissingSymbol(missing.join(", "));
@@ -497,7 +535,7 @@ pub unsafe fn attempt_register(fns: &Fns, base: u64, len: usize) -> Registration
         };
     }
     RegistrationAttempt::Registered(HostRegistration {
-        fns: *fns,
+        api: api.clone(),
         host_ptr: base,
         bytes: len,
         flags: D1_REGISTER_FLAGS,
@@ -545,9 +583,10 @@ impl Drop for HostRegistration {
     fn drop(&mut self) {
         if self.host_ptr != 0 {
             // SAFETY: unregister exactly what was registered; the caller
-            // guarantees the mapping outlives this drop.
+            // guarantees the mapping outlives this drop; the API (library)
+            // is alive because self retains it.
             unsafe {
-                (self.fns.hipHostUnregister.expect("bound"))(self.host_ptr as *mut c_void);
+                (self.api.fns.hipHostUnregister.expect("bound"))(self.host_ptr as *mut c_void);
             }
         }
     }
@@ -566,28 +605,68 @@ mod tests {
             Arg::U32(0xffff_ffff),
         ]);
         assert_eq!(slots, vec![0x1234, 64, 512, 0xffff_ffff]);
-        // Pointer cells must be non-null for the driver (marshalling
-        // contract: every arg has a slot).
         assert_eq!(slots.len(), 4);
     }
 
     #[test]
     fn invalid_geometry_is_rejected_before_launch() {
-        // No device needed: the launch contract is enforced host-side first.
         let g = Grid::new(0, 0);
         assert!(!g.valid());
     }
 
     #[test]
     fn classifier_distinguishes_api_from_hardware() {
-        // d1_ready=false => API-level, whatever the rc.
         let (v, _) = HostRegistration::classify(1, false);
         assert_eq!(v, crate::status::Verdict::UnsupportedByApi);
-        // d1_ready with a supported-class rc.
         let (v, _) = HostRegistration::classify(ffi::HIP_ERROR_NOT_SUPPORTED, true);
         assert_eq!(v, crate::status::Verdict::UnsupportedByApi);
-        // Unknown rc => inconclusive with exact rc recorded.
         let (v, _) = HostRegistration::classify(777, true);
         assert_eq!(v, crate::status::Verdict::Inconclusive);
+    }
+
+    #[test]
+    fn resources_hold_the_api_arc() {
+        // Hostile-lifetime guard without a device: `Rocm`/resources are
+        // built around one `Arc<HipApi>`; the `Arc` is the structural
+        // guarantee that dropping the session cannot unload the library
+        // while a resource exists. We exercise the graph with a libc-backed
+        // placeholder (no HIP calls happen: nothing is allocated/launched).
+        let lib = Lib::open("libc.so.6").expect("libc dlopens");
+        let api = Arc::new(HipApi {
+            lib,
+            fns: Fns {
+                hipInit: None,
+                hipGetDeviceCount: None,
+                hipSetDevice: None,
+                hipDeviceSynchronize: None,
+                hipStreamSynchronize: None,
+                hipModuleLoadData: None,
+                hipModuleUnload: None,
+                hipModuleGetFunction: None,
+                hipModuleLaunchKernel: None,
+                hipMalloc: None,
+                hipFree: None,
+                hipMemcpy: None,
+                hipHostRegister: None,
+                hipHostUnregister: None,
+                hipHostGetDevicePointer: None,
+                hipGetErrorString: None,
+                hipRuntimeGetVersion: None,
+                hipDriverGetVersion: None,
+                hipDeviceGetName: None,
+            },
+        });
+        assert_eq!(Arc::strong_count(&api), 1);
+        // A device buffer (conceptually) retains the api.
+        let buf = DeviceBuffer {
+            api: api.clone(),
+            ptr: 0, // never freed (drop guards on ptr != 0)
+            bytes: 4096,
+        };
+        assert_eq!(Arc::strong_count(&api), 2);
+        drop(api);
+        // The buffer still holds the library alive.
+        assert_eq!(Arc::strong_count(&buf.api), 1);
+        drop(buf);
     }
 }

@@ -109,14 +109,15 @@ hip_fns! {
 }
 
 /// How the runtime library handle is kept alive: `Fns` does not own a
-/// handle, so the session (`runtime::Rocm`) owns the `Lib` and the `Fns`
-/// copy dies with it. This mirrors the CUDA `Driver`/`Fns` split.
+/// handle — every runtime resource (`runtime::Rocm`/`Module`/`Function`/
+/// `DeviceBuffer`/`HostRegistration`) retains the owning `HipApi`
+/// (`Arc<Lib + Fns>`), so the library cannot be unloaded while a resolved
+/// pointer is still reachable (structural lifetime, not a comment).
 ///
-/// The HIP sonames this backend opens, in preference order (matches the
-/// probe's `COMPUTE_SONAMES` HIP rows)., in preference order (matches the
-/// probe's `COMPUTE_SONAMES` HIP rows).
-pub const HIP_SONAMES: &[&str] = &["libamdhip64.so.6", "libamdhip64.so.5", "libamdhip64.so"];
-
+/// HIP soname preference order lives in `backend::rocm::probe::HIP_SONAMES`
+/// (the single source of truth shared with the probe and the opener); there
+/// is deliberately no second copy here.
+///
 /// Resolve the frozen D0 + D1-additional symbol tables from an open library.
 ///
 /// # SAFETY
@@ -183,6 +184,7 @@ impl Fns {
             "hipGetDeviceCount" => self.hipGetDeviceCount.is_some(),
             "hipSetDevice" => self.hipSetDevice.is_some(),
             "hipModuleLoadData" => self.hipModuleLoadData.is_some(),
+            "hipModuleUnload" => self.hipModuleUnload.is_some(),
             "hipModuleGetFunction" => self.hipModuleGetFunction.is_some(),
             "hipModuleLaunchKernel" => self.hipModuleLaunchKernel.is_some(),
             "hipMalloc" => self.hipMalloc.is_some(),
@@ -303,6 +305,39 @@ mod tests {
     fn missing_library_is_a_typed_error() {
         let r = Lib::open("libvole_audio_no_such_hip.so.99");
         assert!(r.is_err());
+    }
+
+    #[test]
+    fn module_unload_is_part_of_the_frozen_d0_surface() {
+        // The runtime unloads modules during ordinary teardown; a surface
+        // that omitted hipModuleUnload could "resolve completely" and then
+        // panic/UB on drop (review finding).
+        assert!(
+            crate::backend::rocm::probe::HIP_D0_REQUIRED.contains(&"hipModuleUnload"),
+            "hipModuleUnload must be a required D0 symbol"
+        );
+        let empty = Fns {
+            hipInit: None,
+            hipGetDeviceCount: None,
+            hipSetDevice: None,
+            hipDeviceSynchronize: None,
+            hipStreamSynchronize: None,
+            hipModuleLoadData: None,
+            hipModuleUnload: None,
+            hipModuleGetFunction: None,
+            hipModuleLaunchKernel: None,
+            hipMalloc: None,
+            hipFree: None,
+            hipMemcpy: None,
+            hipHostRegister: None,
+            hipHostUnregister: None,
+            hipHostGetDevicePointer: None,
+            hipGetErrorString: None,
+            hipRuntimeGetVersion: None,
+            hipDriverGetVersion: None,
+            hipDeviceGetName: None,
+        };
+        assert!(empty.d0_missing().contains(&"hipModuleUnload"));
     }
 
     #[test]

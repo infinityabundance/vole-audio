@@ -96,6 +96,54 @@ same typed-cause discipline the CUDA courts use.
 - **J.6 Docs** — this charter; `PROJECT_STATE` Phase J section + next-work
   renumbering; `NON_CLAIMS`; `ARCHITECTURE` runtime note.
 
+## Review amendment 1 (runtime safety, before Seal 2)
+
+The first external review of the Phase-J runtime found real host-runtime
+correctness defects (not provenance polish); all are fixed here:
+
+1. **Structural ownership (`Arc<HipApi>`).** `Fns` is `Copy`, so resources
+   could previously outlive the `Lib` that owns the resolved pointers
+   (e.g. `drop(rocm); drop(buf)` would call a copied `hipFree` through an
+   unloaded library), and a `Function` could outlive its `Module`. One
+   `HipApi` now owns `Lib + Fns` behind an `Arc`; `Module`/`Function`/
+   `DeviceBuffer`/`HostRegistration` each retain it (`Function` additionally
+   retains the module owner), so the library and module lifetimes are
+   enforced by the type system — no field reordering can invalidate them.
+   `EntropyWorldRocm`'s destruction order therefore stops mattering.
+2. **Exact shared launch Grid.** `render_args()` previously derived the
+   `blocks_x`/`threads_x` kernel parameters from `max_frames` while the
+   launch used the window grid (512 stereo frames: launch 4 blocks vs
+   parameter 2). One `window_grid(frames, channels)` now feeds BOTH the
+   launch and the parameter marshalling; a unit test pins
+   `window_grid(512,2) == Grid::new(4,256)` and the equality for every
+   court window size.
+3. **HIP-specific D0 gate.** `RocmProbe::classify()` accepts any D0-ready
+   row (HIP *or* HSA); `court rocm-d0` must not be authorized by an
+   HSA-ready/HIP-unavailable system. `phase_j_d0_gate()` gates on a
+   `libamdhip64` D0-ready row only and reports `UNSUPPORTED_BY_API` with
+   the reason otherwise (unit-tested with an HSA-only probe). The battery
+   is also wrapped so an operational failure becomes a typed INCONCLUSIVE
+   gate receipt instead of a propagated error that skips evidence.
+4. **`hipModuleUnload` joins the frozen D0 surface.** The runtime unloads
+   modules in ordinary teardown; the symbol is now in `HIP_D0_REQUIRED` and
+   in the `d0_missing` mapping, so “no required symbol outside the frozen
+   table” is literally true.
+5. **ROCm 7 discovery, single-sourced.** `libamdhip64.so.7` is probed, the
+   candidate builder scans every explicit ROCm library dir (`ROCM_LIB_PATH`
+   entries + `/opt/rocm*/lib{,64}`) by family prefix, and
+   `probe::HIP_SONAMES` is the single source shared by the probe and the
+   opener (`ffi`'s duplicate list is gone). A hostile test proves a
+   `.so.7`-only install in `ROCM_LIB_PATH` is discovered, including via the
+   unversioned-soname row.
+6. **D1 verdict semantics aligned with CUDA.** Once an endpoint produced a
+   D1 session, only that endpoint's cells are verdict-bearing
+   (`aggregate_verdict`); other candidates' open/registration failures stay
+   in the receipt as trial evidence. Unit tests: candidate A unsupported +
+   candidate B exact D1 success = top-level SUPPORTED with A preserved;
+   a completed-but-failed D1 session is the verdict.
+
+Seal 2 re-runs the clean-tree battery with these fixes.
+
 ## Seal history
 
 ### Seal 1 — Phase J implementation + clean-tree battery (2026-09-09)

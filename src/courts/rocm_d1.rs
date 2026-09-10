@@ -486,6 +486,39 @@ fn verdict_for(out: &SessionOut, completed: bool, what: &str) -> (Verdict, Strin
     }
 }
 
+fn verdict_rank(v: Verdict) -> u8 {
+    use Verdict as V;
+    match v {
+        V::FailedCorrectness => 5,
+        V::FailedDeadline => 4,
+        V::Inconclusive => 3,
+        V::UnsupportedByApi => 2,
+        V::UnsupportedByHardware => 2,
+        _ => 1,
+    }
+}
+
+/// Aggregate session cells into the court verdict. CUDA-D1-aligned: once an
+/// endpoint produced a completed D1 session (`completed` = its pcm name),
+/// ONLY that endpoint's cells are verdict-bearing; every other candidate's
+/// open/registration failures remain trial evidence (they are preserved in
+/// the receipt but never sink the global result). With no completed D1
+/// session, every cell counts.
+fn aggregate_verdict(cells: &[Cell], completed: Option<&str>) -> Verdict {
+    let scope: Vec<&Cell> = match completed {
+        Some(name) => cells
+            .iter()
+            .filter(|c| c.label.starts_with(&format!("{name}/")))
+            .collect(),
+        None => cells.iter().collect(),
+    };
+    scope
+        .iter()
+        .map(|c| c.verdict)
+        .max_by_key(|v| verdict_rank(*v))
+        .unwrap_or(Verdict::Inconclusive)
+}
+
 // ---------------------------------------------------------------------------
 // Court
 // ---------------------------------------------------------------------------
@@ -679,6 +712,12 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
     let mono_endpoint_hash = hex(&observation_sha256(&mono_stereo));
 
     let mut cells: Vec<Cell> = Vec::new();
+    // Endpoint whose D1 sessions are verdict-bearing (set once a D1
+    // session ran there). Other candidates' open/registration failures stay
+    // in `cells` as trial evidence but never sink the global result — the
+    // D1 question is "is there a real endpoint on which this path works?"
+    // (review finding: alignment with CUDA D1).
+    let mut verdict_endpoint: Option<String> = None;
     let mut endpoint_cell = |label: &str,
                              verdict: Verdict,
                              detail: String,
@@ -848,7 +887,7 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
             let base64 = base as u64;
             // SAFETY: the ALSA mapping is live for the whole trial (pcm
             // holds it); the registration dies before pcm in this scope.
-            let attempt = unsafe { attempt_register(&world.session().fns, base64, len) };
+            let attempt = unsafe { attempt_register(&world.session().api, base64, len) };
             match attempt {
                 RegistrationAttempt::Registered(reg) => Ok(Direct {
                     registration: reg,
@@ -917,6 +956,9 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
             ),
             Some(endpoint_hash.clone()),
         );
+        // A D1 session ran on this endpoint: from here on, its cells are
+        // verdict-bearing; other candidates' rows stay as trial evidence.
+        verdict_endpoint = Some(pcm_name.clone());
         drop(direct);
         println!(
             "court rocm-d1: D1 session on {pcm_name} (registered 0x{base:x}+{len}; \
@@ -945,7 +987,7 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
         let mono_dev = mono_direct.registration.device_ptr.unwrap_or(0);
         // Bound mono arena (one 512-frame chunk); declared peak exposure.
         let arena = match DeviceBuffer::alloc(
-            &mono_direct.world.session().fns,
+            &mono_direct.world.session().api,
             MONO_ARENA_BYTES as usize,
         ) {
             Ok(a) => a,
@@ -1012,23 +1054,10 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
         break; // first successfully opened endpoint runs the experiment
     }
 
-    // Aggregate: worst cell wins; SUPPORTED only when every cell is.
-    let rank = |v: Verdict| -> u8 {
-        use Verdict as V;
-        match v {
-            V::FailedCorrectness => 5,
-            V::FailedDeadline => 4,
-            V::Inconclusive => 3,
-            V::UnsupportedByApi => 2,
-            V::UnsupportedByHardware => 2,
-            _ => 1,
-        }
-    };
-    let worst = cells
-        .iter()
-        .map(|c| c.verdict)
-        .max_by_key(|v| rank(*v))
-        .unwrap_or(Verdict::Inconclusive);
+    // Aggregate: once an endpoint produced a D1 session, only that
+    // endpoint's cells are verdict-bearing; otherwise every cell counts
+    // (CUDA-D1-aligned semantics — review finding).
+    let worst = aggregate_verdict(&cells, verdict_endpoint.as_deref());
     let detail = if worst == Verdict::Supported {
         format!(
             "ROCm D1: registered the actual ALSA endpoint region with \
@@ -1116,4 +1145,68 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
     println!("court rocm-d1: {worst}");
     println!("  receipt: {}", path.display());
     Ok(worst)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn cell(label: &str, v: Verdict) -> Cell {
+        Cell {
+            label: label.to_string(),
+            verdict: v,
+            detail: String::new(),
+            frames_committed: 0,
+            chunks: 0,
+            xruns: 0,
+            wall_mean_ms: None,
+            wall_median_ms: None,
+            wall_max_ms: None,
+            mat_gpu_to_host: 0,
+            mat_host_copy: 0,
+            mat_host_resident: 0,
+            device_sample_block: 0,
+            endpoint_obs: 0,
+            verification_read: 0,
+            gpu_global_sample_intermediate_peak: 0,
+            launches: 0,
+            drain_state: None,
+            exact_equality: v == Verdict::Supported,
+            endpoint_hash: None,
+        }
+    }
+
+    #[test]
+    fn candidate_a_failure_does_not_sink_endpoint_b_success() {
+        // CUDA-D1-aligned semantics: endpoint A fails registration (trial
+        // evidence only); endpoint B completes an exact D1 session. The
+        // top-level verdict must be B's SUPPORTED, with A preserved as a
+        // row — not the worst cell across candidates.
+        let cells = vec![
+            cell("hw:0,0/open", Verdict::UnsupportedByHardware),
+            cell("hw:0,1/registration", Verdict::UnsupportedByApi),
+            cell("hw:2,0/d0-baseline", Verdict::Supported),
+            cell("hw:2,0/d1-stereo-direct", Verdict::Supported),
+            cell("hw:2,0/d1-mono-upmix", Verdict::Supported),
+        ];
+        assert_eq!(
+            aggregate_verdict(&cells, Some("hw:2,0")),
+            Verdict::Supported
+        );
+        // Without a completed D1 session every row counts (strict).
+        assert_eq!(aggregate_verdict(&cells, None), Verdict::UnsupportedByApi);
+    }
+
+    #[test]
+    fn completed_but_failed_d1_session_is_the_verdict() {
+        let cells = vec![
+            cell("hw:0,0/registration", Verdict::UnsupportedByApi),
+            cell("hw:2,0/d0-baseline", Verdict::Supported),
+            cell("hw:2,0/d1-stereo-direct", Verdict::FailedDeadline),
+        ];
+        assert_eq!(
+            aggregate_verdict(&cells, Some("hw:2,0")),
+            Verdict::FailedDeadline
+        );
+    }
 }

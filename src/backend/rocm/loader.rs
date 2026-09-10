@@ -90,29 +90,36 @@ impl Drop for Lib {
     }
 }
 
-/// Load a runtime soname (via ld cache + custom-install candidate paths +
-/// a /opt/rocm* prefix scan for future versioned SONAMEs) and resolve a D0
-/// table and a D1-additional table.
-pub fn probe_soname_surfaces<'a>(
-    soname: &str,
-    d0: &[&'a str],
-    d1: &[&'a str],
-) -> Result<(String, Vec<&'a str>, Vec<&'a str>), String> {
-    let mut candidates = vec![soname.to_string()];
-    // ROCM_LIB_PATH override (colon-separated absolute dirs).
+/// Enumerate library files under `libdir` whose name starts with `prefix`
+/// (e.g. every `libamdhip64.so*` version in a ROCm lib dir).
+pub fn scan_dir(prefix: &str, libdir: &std::path::Path) -> Vec<String> {
+    let mut found: Vec<String> = std::fs::read_dir(libdir)
+        .map(|rd| {
+            rd.filter_map(|e| e.ok())
+                .filter(|e| e.path().is_file())
+                .filter(|e| e.file_name().to_string_lossy().starts_with(prefix))
+                .map(|e| e.path().to_string_lossy().into_owned())
+                .collect()
+        })
+        .unwrap_or_default();
+    found.sort();
+    found
+}
+
+/// Every explicit ROCm library directory: `ROCM_LIB_PATH` entries (each
+/// searched for the full prefix family) plus `/opt/rocm*/lib` and
+/// `/opt/rocm*/lib64`.
+pub fn rocm_lib_dirs() -> Vec<std::path::PathBuf> {
+    let mut dirs: Vec<std::path::PathBuf> = Vec::new();
     if let Ok(p) = std::env::var("ROCM_LIB_PATH") {
         for dir in p.split(':').filter(|d| !d.is_empty()) {
-            candidates.push(format!("{dir}/{soname}"));
+            dirs.push(std::path::PathBuf::from(dir));
         }
     }
-    // /opt/rocm* installs the ld cache may not know. Scan each lib dir for
-    // the soname's prefix (`libamdhip64.so*` / `libhsa-runtime64.so*`) so a
-    // future ROCm with a newer versioned SONAME is discovered instead of
-    // frozen version numbers forever.
-    let prefix = soname.rsplit_once('.').map(|(p, _)| p).unwrap_or(soname);
     if let Ok(entries) = std::fs::read_dir("/opt") {
         let mut rocm_dirs = entries
             .filter_map(|e| e.ok())
+            .filter(|e| e.path().is_dir())
             .filter(|e| e.file_name().to_string_lossy().starts_with("rocm"))
             .map(|e| e.path())
             .collect::<Vec<_>>();
@@ -120,20 +127,60 @@ pub fn probe_soname_surfaces<'a>(
         for dir in rocm_dirs {
             for sub in ["lib", "lib64"] {
                 let libdir = dir.join(sub);
-                if let Ok(files) = std::fs::read_dir(&libdir) {
-                    let mut found = files
-                        .filter_map(|e| e.ok())
-                        .filter(|e| e.file_name().to_string_lossy().starts_with(prefix))
-                        .map(|e| e.path())
-                        .collect::<Vec<_>>();
-                    found.sort();
-                    for p in found {
-                        candidates.push(p.to_string_lossy().into_owned());
-                    }
+                if libdir.is_dir() {
+                    dirs.push(libdir);
                 }
             }
         }
     }
+    dirs
+}
+
+/// Candidate library paths for a family of sonames: the sonames themselves
+/// (ld.so cache), then every matching-version file in every explicit ROCm
+/// library directory (scanning by the family prefix discovers future
+/// versioned SONAMEs).
+pub fn lib_candidates(sonames: &[&str]) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for s in sonames {
+        out.push((*s).to_string());
+    }
+    let mut seen: Vec<String> = Vec::new();
+    for s in sonames {
+        let prefix = if let Some((head, tail)) = s.rsplit_once(".so") {
+            if !tail.is_empty() && tail.chars().all(|c| c == '.' || c.is_ascii_digit()) {
+                let mut p = head.to_string();
+                p.push_str(".so");
+                p
+            } else {
+                (*s).to_string()
+            }
+        } else {
+            (*s).to_string()
+        };
+        if seen.contains(&prefix) {
+            continue;
+        }
+        seen.push(prefix.clone());
+        for dir in rocm_lib_dirs() {
+            for p in scan_dir(&prefix, &dir) {
+                if !out.contains(&p) {
+                    out.push(p);
+                }
+            }
+        }
+    }
+    out
+}
+
+/// Load a runtime soname (via ld cache + explicit ROCm library dirs) and
+/// resolve a D0 table and a D1-additional table.
+pub fn probe_soname_surfaces<'a>(
+    soname: &str,
+    d0: &[&'a str],
+    d1: &[&'a str],
+) -> Result<(String, Vec<&'a str>, Vec<&'a str>), String> {
+    let candidates = lib_candidates(&[soname]);
     let names = candidates.iter().map(String::as_str).collect::<Vec<_>>();
     let lib = Lib::open_candidates(names)?;
     // SAFETY: the symbol pointers are used only to prove resolvability
@@ -172,5 +219,46 @@ mod tests {
         assert!(sym.is_some());
         let missing = unsafe { lib.symbol::<unsafe extern "C" fn()>("vole_no_such_symbol") };
         assert!(missing.is_none());
+    }
+}
+
+#[cfg(test)]
+mod extra_tests {
+    use super::*;
+
+    #[test]
+    fn versioned_soname_family_is_discovered_in_explicit_rocm_dirs() {
+        // ROCm 7 can ship libamdhip64.so.7 without an unversioned symlink;
+        // the candidate builder must find it inside every explicit ROCm
+        // library directory (here: ROCM_LIB_PATH), not just /opt.
+        let dir = std::env::temp_dir().join(format!(
+            "vole-rocm-cand-{}-{}",
+            std::process::id(),
+            crate::evidence::timing::monotonic_raw_ns()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let so7 = dir.join("libamdhip64.so.7");
+        std::fs::write(&so7, b"").unwrap();
+        // SAFETY: test-only; single-threaded section (the value is restored
+        // immediately after the assertions).
+        unsafe {
+            std::env::set_var("ROCM_LIB_PATH", &dir);
+        }
+        let cands = lib_candidates(&[
+            "libamdhip64.so.7",
+            "libamdhip64.so.6",
+            "libamdhip64.so.5",
+            "libamdhip64.so",
+        ]);
+        // The unversioned-soname row alone also discovers the family (scan
+        // by prefix), so a .so.7-only install is not mislabeled absent.
+        let cands2 = lib_candidates(&["libamdhip64.so"]);
+        unsafe {
+            std::env::remove_var("ROCM_LIB_PATH");
+        }
+        let path = so7.to_string_lossy().into_owned();
+        assert!(cands.contains(&path), "candidates: {cands:?}");
+        assert!(cands2.contains(&path), "candidates: {cands2:?}");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
