@@ -44,10 +44,14 @@ COMMANDS (current build):
     version               Print version and build identity
     corpus list           List the frozen flagship corpus objects and classes
     corpus verify         Regenerate every object and prove the frozen manifest
-                          (missing/extra/mutated/mis-sized/wrong-rate/wrong-hash
-                          all fail; exits nonzero on failure) [--receipts DIR]
-    corpus freeze         Rewrite the manifest from the frozen membership
-                          (the freeze act; run once, deliberately) [--out PATH]
+                          (missing/extra/duplicate/reordered/mutated/mis-sized/
+                          wrong-rate/wrong-hash/root all fail; exits nonzero on
+                          failure) [--receipts DIR]
+    corpus freeze         Write the manifest from the frozen membership (the
+                          freeze act; run once, deliberately). Refuses to
+                          overwrite an existing FROZEN manifest unless the new
+                          corpus identity is declared with an explicit reason:
+                          [--out PATH] [--amend-frozen REASON]
     help                  Show this help
 
 Planned commands arrive with their phases (inspect/verify/encode/observe/play,
@@ -484,7 +488,7 @@ fn cmd_corpus(args: &[String]) -> Result<u8> {
                     o.sample_rate_hz,
                     o.channels,
                     o.frames,
-                    o.representation_class,
+                    o.source_structure_class,
                     o.amplitude_class,
                     o.channel_structure,
                     o.temporal_class,
@@ -526,6 +530,7 @@ fn cmd_corpus(args: &[String]) -> Result<u8> {
         }
         Some("freeze") => {
             let mut out = std::path::PathBuf::from("corpus/manifest.json");
+            let mut amend: Option<String> = None;
             let mut i = 1;
             while i < args.len() {
                 match args[i].as_str() {
@@ -536,12 +541,59 @@ fn cmd_corpus(args: &[String]) -> Result<u8> {
                                 .ok_or_else(|| Error::malformed("--out requires a path"))?,
                         );
                     }
+                    "--amend-frozen" => {
+                        i += 1;
+                        let reason = args
+                            .get(i)
+                            .ok_or_else(|| Error::malformed("--amend-frozen requires a reason"))?;
+                        if reason.trim().is_empty() {
+                            return Err(Error::malformed(
+                                "--amend-frozen reason must not be empty",
+                            ));
+                        }
+                        amend = Some(reason.clone());
+                    }
                     other => {
                         return Err(Error::malformed(format!("unknown corpus flag '{other}'")));
                     }
                 }
                 i += 1;
             }
+
+            // Freezing is a one-time act. Silently overwriting a frozen manifest
+            // would let a population be retuned after results exist, so it is
+            // refused unless the operator deliberately defines a new corpus
+            // identity with an explicit reason.
+            if out.exists() {
+                let existing = std::fs::read_to_string(&out).map_err(|e| {
+                    Error::internal(format!(
+                        "cannot read existing manifest {}: {e}",
+                        out.display()
+                    ))
+                })?;
+                let state = serde_json::from_str::<vole_audio::corpus::Manifest>(&existing)
+                    .ok()
+                    .map(|m| m.state);
+                match state.as_deref() {
+                    Some(vole_audio::corpus::STATE_FROZEN) if amend.is_none() => {
+                        return Err(Error::malformed(format!(
+                            "refusing to overwrite the frozen manifest at {} (state FROZEN): \
+                             amend it deliberately with --amend-frozen <reason>, which defines \
+                             a new corpus identity",
+                            out.display()
+                        )));
+                    }
+                    None if amend.is_none() => {
+                        return Err(Error::malformed(format!(
+                            "existing manifest {} does not parse; remove it deliberately or \
+                             pass --amend-frozen <reason>",
+                            out.display()
+                        )));
+                    }
+                    _ => {}
+                }
+            }
+
             let specs = vole_audio::corpus::specs::specs();
             let m = vole_audio::corpus::frozen_manifest(&specs)?;
             let json = serde_json::to_string_pretty(&m)?;
@@ -551,6 +603,9 @@ fn cmd_corpus(args: &[String]) -> Result<u8> {
                 m.objects.len(),
                 out.display()
             );
+            if let Some(reason) = &amend {
+                println!("  amendment: {reason}");
+            }
             println!(
                 "  populations: whole {} / b1-comparable {} / excluded {}",
                 m.populations.whole_corpus_objects,

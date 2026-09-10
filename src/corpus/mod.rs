@@ -10,20 +10,28 @@
 //!
 //! ```text
 //! object identity bytes =
-//!     id ∥ representation ∥ amplitude ∥ channel structure ∥ temporal ∥ entropy
-//!   ∥ rate ∥ channels ∥ frames ∥ semantics ∥ repeat period
-//!   ∥ generator kind ∥ generator parameters ∥ source ∥ canonical i32 hash
+//!     id ∥ class ∥ source structure ∥ amplitude ∥ channel structure ∥ temporal
+//!   ∥ entropy ∥ rate ∥ channels ∥ frames ∥ semantics ∥ repeat period
+//!   ∥ generator kind ∥ generator parameters ∥ source ∥ conversion
+//!   ∥ b1 comparable ∥ canonical i32 hash
 //! ```
 //!
-//! and `manifest_sha256` covers the whole object set plus the population counts.
-//! A flagship result can therefore state exactly which frozen population, under
-//! which generator parameters, produced it.
+//! `duration_ms` is *derived* and recomputed+verified rather than hashed, and
+//! `expected_inclusion_surfaces` is *derived policy* recomputed during
+//! verification, not independent authority. `manifest_sha256` covers the whole
+//! object set plus the population counts. A flagship result can therefore state
+//! exactly which frozen population, under which generator parameters, produced
+//! it.
 //!
-//! `verify` fails on **any** of: a manifest that does not parse or has the wrong
-//! schema; a corpus hash that does not match its objects; an object missing from
-//! the manifest that the frozen membership defines (or the reverse); a
-//! mis-sized, wrong-rate or wrong-channel object; a generator whose regenerated
-//! samples do not match the frozen canonical hash.
+//! `verify` fails on **any** of: a manifest that does not parse, has the wrong
+//! schema, universe, profile or state; a corpus hash that does not match its
+//! objects; a duplicate object id; a missing or extra object versus the frozen
+//! membership; a manifest order that differs from the frozen membership
+//! (benchmark order is experimental state); a mis-sized, wrong-rate,
+//! wrong-channel or wrong-`b1_comparable` object; a generator whose regenerated
+//! samples do not match the frozen canonical hash; any identity field that
+//! differs from the canonical regenerated object; and population-count drift
+//! from the **derived** format-domain counts.
 
 use crate::error::{Error, Result};
 use crate::hash::sha256::{Sha256, hex};
@@ -32,12 +40,19 @@ use serde::{Deserialize, Serialize};
 pub mod generate;
 pub mod specs;
 
-use self::generate::{
-    Amplitude, ChannelStructure, Entropy, Representation, Signal, Spec, Temporal,
-};
+use self::generate::{Signal, Spec};
 
 /// Frozen manifest schema id.
 pub const SCHEMA: &str = "vole.audio.corpus.v1";
+
+/// Frozen manifest universe id.
+pub const UNIVERSE: &str = "vole.audio.u1";
+
+/// Frozen manifest profile id.
+pub const PROFILE: &str = "u1/v1";
+
+/// The only admissible state of a frozen corpus.
+pub const STATE_FROZEN: &str = "FROZEN";
 
 /// The frozen manifest, embedded from the repository (shipped in the crate).
 pub const MANIFEST_JSON: &str = include_str!("../../corpus/manifest.json");
@@ -51,7 +66,11 @@ pub const SYNTHETIC_CONVERSION: &str =
 pub struct ManifestObject {
     pub id: String,
     pub class: String,
-    pub representation_class: String,
+    /// The frozen **source (generative) structure class** of the object. This is
+    /// what the material was designed as, not the representation the inverse
+    /// compiler later selects; measured results record `selected_representation`
+    /// separately.
+    pub source_structure_class: String,
     pub amplitude_class: String,
     pub channel_structure: String,
     pub temporal_class: String,
@@ -112,7 +131,8 @@ fn identity_bytes(o: &ManifestObject) -> Vec<u8> {
     }
     let mut v = Vec::new();
     push_str(&mut v, &o.id);
-    push_str(&mut v, &o.representation_class);
+    push_str(&mut v, &o.class);
+    push_str(&mut v, &o.source_structure_class);
     push_str(&mut v, &o.amplitude_class);
     push_str(&mut v, &o.channel_structure);
     push_str(&mut v, &o.temporal_class);
@@ -123,13 +143,16 @@ fn identity_bytes(o: &ManifestObject) -> Vec<u8> {
     push_str(&mut v, &o.semantics);
     v.extend_from_slice(&o.repeat_period_frames.unwrap_or(u32::MAX).to_le_bytes());
     push_str(&mut v, &o.source);
+    // The conversion path is provenance-critical for future real recordings:
+    // changing how a canonical i32 was derived must change the identity.
+    push_str(&mut v, &o.conversion);
     v.extend_from_slice(
         serde_json::to_string(&o.generator)
             .unwrap_or_default()
             .as_bytes(),
     );
     v.push(0);
-    v.extend_from_slice(&(o.b1_comparable as u8).to_le_bytes());
+    v.push(o.b1_comparable as u8);
     push_str(&mut v, &o.canonical_i32_sha256);
     v
 }
@@ -165,14 +188,15 @@ pub fn manifest_sha256(m: &Manifest) -> [u8; 32] {
 }
 
 /// Build the manifest object for one spec (used by `corpus freeze`).
+///
+/// This is also the **canonical** object the verifier compares the manifest
+/// against, field for field: given a frozen `Spec` and its regenerated samples,
+/// `object_for` is the single source of truth for every derived field (`class`,
+/// the inclusion surfaces, `b1_comparable`, `duration_ms`, the content hash).
 pub fn object_for(spec: &Spec, canonical: &[i32]) -> ManifestObject {
-    let repr = spec.representation;
-    let amp = spec.amplitude;
-    let ch = spec.channel_structure;
-    let temporal = spec.temporal;
-    let entropy = spec.entropy;
+    let b1 = spec.b1_comparable();
     let mut surfaces = vec!["B0".to_string()];
-    if spec.b1_comparable() {
+    if b1 {
         surfaces.push("B1".to_string());
     } else {
         surfaces.push("B1_NOT_APPLICABLE_BY_FORMAT_DOMAIN".to_string());
@@ -181,11 +205,11 @@ pub fn object_for(spec: &Spec, canonical: &[i32]) -> ManifestObject {
     ManifestObject {
         id: spec.id.clone(),
         class: "generated".to_string(),
-        representation_class: repr.as_str().to_string(),
-        amplitude_class: amp.as_str().to_string(),
-        channel_structure: ch.as_str().to_string(),
-        temporal_class: temporal.as_str().to_string(),
-        entropy_class: entropy.as_str().to_string(),
+        source_structure_class: spec.source_structure.as_str().to_string(),
+        amplitude_class: spec.amplitude.as_str().to_string(),
+        channel_structure: spec.channel_structure.as_str().to_string(),
+        temporal_class: spec.temporal.as_str().to_string(),
+        entropy_class: spec.entropy.as_str().to_string(),
         sample_rate_hz: spec.sample_rate_hz,
         channels: spec.channels,
         frames: spec.frames as u64,
@@ -196,9 +220,22 @@ pub fn object_for(spec: &Spec, canonical: &[i32]) -> ManifestObject {
         source: spec.source.clone(),
         conversion: SYNTHETIC_CONVERSION.to_string(),
         expected_inclusion_surfaces: surfaces,
-        b1_comparable: spec.b1_comparable(),
+        b1_comparable: b1,
         canonical_i32_sha256: hex(&self::generate::canonical_sha256(canonical)),
     }
+}
+
+/// Derive the B1 population counts from the **format domain** (channel count),
+/// never from the manifest's audit field. This is what courts must use for the
+/// B1-vs-VOLE denominator.
+pub fn derived_b1_counts(objects: &[ManifestObject]) -> (usize, usize) {
+    let mut comparable = 0usize;
+    for o in objects {
+        if self::generate::b1_comparable(o.channels) {
+            comparable += 1;
+        }
+    }
+    (comparable, objects.len() - comparable)
 }
 
 /// Build the full manifest from the frozen membership (the freeze act).
@@ -212,9 +249,9 @@ pub fn frozen_manifest(specs: &[Spec]) -> Result<Manifest> {
     let corpus = corpus_sha256(&objects);
     Ok(Manifest {
         schema: SCHEMA.to_string(),
-        universe: "vole.audio.u1".to_string(),
-        profile: "u1/v1".to_string(),
-        state: "FROZEN".to_string(),
+        universe: UNIVERSE.to_string(),
+        profile: PROFILE.to_string(),
+        state: STATE_FROZEN.to_string(),
         note: "Frozen before any flagship result exists. Membership and class \
                assignments are not changed because a result is unfavourable \
                (contract §48). Objects are generated, never stored: the manifest \
@@ -253,6 +290,12 @@ pub enum FindingKind {
     CorpusHashMismatch,
     SchemaMismatch,
     PopulationMismatch,
+    /// The manifest's universe, profile or state is not the frozen one.
+    RootMismatch,
+    /// An object id appears more than once.
+    DuplicateId,
+    /// The manifest's object order differs from the frozen membership order.
+    OrderMismatch,
 }
 
 impl FindingKind {
@@ -269,6 +312,9 @@ impl FindingKind {
             FindingKind::CorpusHashMismatch => "corpus_hash_mismatch",
             FindingKind::SchemaMismatch => "schema_mismatch",
             FindingKind::PopulationMismatch => "population_mismatch",
+            FindingKind::RootMismatch => "root_mismatch",
+            FindingKind::DuplicateId => "duplicate_id",
+            FindingKind::OrderMismatch => "order_mismatch",
         }
     }
 }
@@ -292,12 +338,24 @@ impl VerifyReport {
 /// Verify the embedded manifest against the frozen membership and the
 /// regenerated objects.
 ///
-/// Fails on a schema mismatch, a corpus hash that does not cover its objects,
-/// membership drift in either direction, a class/size/rate/channel mutation, a
-/// generator whose output no longer matches the frozen hash, and a population
-/// count that disagrees with the objects.
+/// Fails on a schema, universe, profile or state mismatch; a corpus hash that
+/// does not cover its objects; a duplicate object id; membership drift in either
+/// direction; a manifest order that differs from the frozen membership; a
+/// size/rate/channel mutation; any identity field (including `class` and
+/// `conversion`) that differs from the canonical regenerated object; a generator
+/// whose output no longer matches the frozen hash; and a population count that
+/// disagrees with the **derived** format-domain counts.
 pub fn verify() -> Result<VerifyReport> {
     verify_manifest(&manifest()?)
+}
+
+/// One finding, constructed uniformly.
+fn finding(id: &str, kind: FindingKind, detail: impl Into<String>) -> Finding {
+    Finding {
+        id: id.to_string(),
+        kind,
+        detail: detail.into(),
+    }
 }
 
 /// Verify a specific manifest (the embedded one in production; a mutated one in
@@ -305,191 +363,193 @@ pub fn verify() -> Result<VerifyReport> {
 pub fn verify_manifest(m: &Manifest) -> Result<VerifyReport> {
     let mut findings: Vec<Finding> = Vec::new();
 
+    // Root identity and frozen state: a changed universe, profile or state is a
+    // different corpus identity, not a compatible one.
     if m.schema != SCHEMA {
-        findings.push(Finding {
-            id: "<manifest>".into(),
-            kind: FindingKind::SchemaMismatch,
-            detail: format!("schema {} != {SCHEMA}", m.schema),
-        });
+        findings.push(finding(
+            "<manifest>",
+            FindingKind::SchemaMismatch,
+            format!("schema {} != {SCHEMA}", m.schema),
+        ));
+    }
+    for (what, got, want) in [
+        ("universe", m.universe.as_str(), UNIVERSE),
+        ("profile", m.profile.as_str(), PROFILE),
+        ("state", m.state.as_str(), STATE_FROZEN),
+    ] {
+        if got != want {
+            findings.push(finding(
+                "<manifest>",
+                FindingKind::RootMismatch,
+                format!("{what} {got} != {want}"),
+            ));
+        }
     }
 
     // Corpus hash must cover exactly these objects.
     let computed_corpus = hex(&corpus_sha256(&m.objects));
     if computed_corpus != m.corpus_sha256 {
-        findings.push(Finding {
-            id: "<manifest>".into(),
-            kind: FindingKind::CorpusHashMismatch,
-            detail: format!(
+        findings.push(finding(
+            "<manifest>",
+            FindingKind::CorpusHashMismatch,
+            format!(
                 "computed {computed_corpus}, manifest declares {}",
                 m.corpus_sha256
             ),
-        });
+        ));
     }
 
-    // Membership drift: compare the frozen membership (code) with the manifest.
+    // Duplicate ids: a set-based membership comparison would silently collapse
+    // them, so an appended copy of an existing object must fail here rather than
+    // pass as the same id set.
+    let mut seen_ids: std::collections::BTreeSet<&str> = std::collections::BTreeSet::new();
+    for o in &m.objects {
+        if !seen_ids.insert(o.id.as_str()) {
+            findings.push(finding(
+                &o.id,
+                FindingKind::DuplicateId,
+                "the manifest lists this object id more than once",
+            ));
+        }
+    }
+
+    // Membership drift in either direction, plus exact frozen order: benchmark
+    // order is experimental state (cache, thermal and GPU-clock history), so the
+    // frozen *sequence*, not merely the set, must be preserved.
     let frozen = specs::specs();
-    let frozen_by_id: std::collections::BTreeMap<&str, &Spec> =
-        frozen.iter().map(|s| (s.id.as_str(), s)).collect();
+    let frozen_ids: Vec<&str> = frozen.iter().map(|s| s.id.as_str()).collect();
+    let manifest_ids: Vec<&str> = m.objects.iter().map(|o| o.id.as_str()).collect();
+    let frozen_set: std::collections::BTreeSet<&str> = frozen_ids.iter().copied().collect();
+    let manifest_set: std::collections::BTreeSet<&str> = manifest_ids.iter().copied().collect();
     let manifest_by_id: std::collections::BTreeMap<&str, &ManifestObject> =
         m.objects.iter().map(|o| (o.id.as_str(), o)).collect();
-    for id in frozen_by_id.keys() {
-        if !manifest_by_id.contains_key(id) {
-            findings.push(Finding {
-                id: (*id).to_string(),
-                kind: FindingKind::MissingFromManifest,
-                detail: "the frozen membership defines this object but the manifest does not"
-                    .into(),
-            });
+    for id in &frozen_set {
+        if !manifest_set.contains(id) {
+            findings.push(finding(
+                id,
+                FindingKind::MissingFromManifest,
+                "the frozen membership defines this object but the manifest does not",
+            ));
         }
     }
-    for id in manifest_by_id.keys() {
-        if !frozen_by_id.contains_key(id) {
-            findings.push(Finding {
-                id: (*id).to_string(),
-                kind: FindingKind::ExtraInManifest,
-                detail: "the manifest contains an object the frozen membership does not define"
-                    .into(),
-            });
+    for id in &manifest_set {
+        if !frozen_set.contains(id) {
+            findings.push(finding(
+                id,
+                FindingKind::ExtraInManifest,
+                "the manifest contains an object the frozen membership does not define",
+            ));
         }
+    }
+    if manifest_ids != frozen_ids {
+        findings.push(finding(
+            "<manifest>",
+            FindingKind::OrderMismatch,
+            format!(
+                "manifest id order ({} entries) != frozen membership order ({} entries)",
+                manifest_ids.len(),
+                frozen_ids.len()
+            ),
+        ));
     }
 
-    // Per-object verification.
-    let mut verified = 0usize;
+    // Structural domain checks apply to every listed object, even one that is
+    // not part of the frozen membership.
     for o in &m.objects {
-        // Identity fields must agree with the frozen membership when present.
-        if let Some(s) = frozen_by_id.get(o.id.as_str()) {
-            let expected_repr = s.representation.as_str();
-            let expected_amp = s.amplitude.as_str();
-            let expected_ch = s.channel_structure.as_str();
-            let expected_t = s.temporal.as_str();
-            let expected_e = s.entropy.as_str();
-            if o.representation_class != expected_repr
-                || o.amplitude_class != expected_amp
-                || o.channel_structure != expected_ch
-                || o.temporal_class != expected_t
-                || o.entropy_class != expected_e
-                || o.sample_rate_hz != s.sample_rate_hz
-                || o.channels != s.channels
-                || o.frames != s.frames as u64
-                || o.generator != s.signal
-            {
-                findings.push(Finding {
-                    id: o.id.clone(),
-                    kind: FindingKind::IdentityChanged,
-                    detail: "manifest identity differs from the frozen membership".into(),
-                });
-                continue;
-            }
-        }
-
-        // Structural checks that do not need regeneration.
         if o.sample_rate_hz == 0 {
-            findings.push(Finding {
-                id: o.id.clone(),
-                kind: FindingKind::WrongRate,
-                detail: "zero sample rate".into(),
-            });
-            continue;
+            findings.push(finding(&o.id, FindingKind::WrongRate, "zero sample rate"));
         }
-        if o.channels == 0 {
-            findings.push(Finding {
-                id: o.id.clone(),
-                kind: FindingKind::WrongChannels,
-                detail: "zero channels".into(),
-            });
-            continue;
+        if o.channels == 0 || o.channels > crate::limits::MAX_CHANNELS as u8 {
+            findings.push(finding(
+                &o.id,
+                FindingKind::WrongChannels,
+                format!("channels {} out of domain", o.channels),
+            ));
         }
         if o.frames == 0 || o.frames > crate::limits::MAX_OBJECT_FRAMES {
-            findings.push(Finding {
-                id: o.id.clone(),
-                kind: FindingKind::MisSized,
-                detail: format!("frames {} out of domain", o.frames),
-            });
-            continue;
+            findings.push(finding(
+                &o.id,
+                FindingKind::MisSized,
+                format!("frames {} out of domain", o.frames),
+            ));
         }
+    }
 
-        // Regenerate and check the content hash and structure.
-        let (
-            Some(representation),
-            Some(amplitude),
-            Some(channel_structure),
-            Some(temporal),
-            Some(entropy),
-        ) = (
-            parse_repr(&o.representation_class),
-            parse_amp(&o.amplitude_class),
-            parse_channels(&o.channel_structure),
-            parse_temporal(&o.temporal_class),
-            parse_entropy(&o.entropy_class),
-        )
-        else {
-            findings.push(Finding {
-                id: o.id.clone(),
-                kind: FindingKind::IdentityChanged,
-                detail: "the manifest carries an unknown class label".into(),
-            });
-            continue;
+    // Canonical per-object verification: regenerate each frozen object and
+    // compare the manifest entry against the canonical object field for field.
+    // This covers every derived field (class, conversion, duration, inclusion
+    // surfaces, b1 flag, content hash) without a hand-maintained subset, and it
+    // is fail-closed: an unknown or mutated label is a mismatch, never a silent
+    // default.
+    let mut verified = 0usize;
+    for s in &frozen {
+        let Some(o) = manifest_by_id.get(s.id.as_str()) else {
+            continue; // already reported as MissingFromManifest
         };
-        let spec = Spec {
-            id: o.id.clone(),
-            representation,
-            amplitude,
-            channel_structure,
-            temporal,
-            entropy,
-            sample_rate_hz: o.sample_rate_hz,
-            channels: o.channels,
-            frames: o.frames as usize,
-            semantics: parse_semantics(&o.semantics, o.repeat_period_frames),
-            signal: o.generator,
-            source: o.source.clone(),
-        };
-        match self::generate::generate(&spec) {
+        match self::generate::generate(s) {
             Ok(samples) => {
-                if samples.len() != o.frames as usize * usize::from(o.channels) {
-                    findings.push(Finding {
-                        id: o.id.clone(),
-                        kind: FindingKind::MisSized,
-                        detail: format!(
-                            "regenerated {} samples, manifest declares {}",
-                            samples.len(),
-                            o.frames as usize * usize::from(o.channels)
+                let expected = object_for(s, &samples);
+                if o.canonical_i32_sha256 != expected.canonical_i32_sha256 {
+                    findings.push(finding(
+                        &s.id,
+                        FindingKind::HashMismatch,
+                        format!(
+                            "regenerated {}, frozen {}",
+                            expected.canonical_i32_sha256, o.canonical_i32_sha256
                         ),
-                    });
+                    ));
                     continue;
                 }
-                let got = hex(&self::generate::canonical_sha256(&samples));
-                if got != o.canonical_i32_sha256 {
-                    findings.push(Finding {
-                        id: o.id.clone(),
-                        kind: FindingKind::HashMismatch,
-                        detail: format!("regenerated {got}, frozen {}", o.canonical_i32_sha256),
-                    });
+                if **o != expected {
+                    findings.push(finding(
+                        &s.id,
+                        FindingKind::IdentityChanged,
+                        format!(
+                            "manifest identity differs from the canonical object; \
+                             differing fields: {}",
+                            diff_fields(o, &expected)
+                        ),
+                    ));
                     continue;
                 }
                 verified += 1;
             }
-            Err(e) => findings.push(Finding {
-                id: o.id.clone(),
-                kind: FindingKind::GeneratorError,
-                detail: format!("{e}"),
-            }),
+            Err(e) => findings.push(finding(&s.id, FindingKind::GeneratorError, format!("{e}"))),
         }
     }
 
-    // Population accounting must agree with the objects.
-    let b1_ok = m.objects.iter().filter(|o| o.b1_comparable).count();
+    // B1 eligibility is a format-domain fact, derived from the channel count:
+    // the denominator can never be changed by editing a manifest flag. The
+    // manifest's field remains audited metadata that must agree with the
+    // derivation.
+    let mut b1_ok = 0usize;
+    for o in &m.objects {
+        let derived = self::generate::b1_comparable(o.channels);
+        if o.b1_comparable != derived {
+            findings.push(finding(
+                &o.id,
+                FindingKind::PopulationMismatch,
+                format!(
+                    "b1_comparable {} != format-domain value {derived} for {} channels",
+                    o.b1_comparable, o.channels
+                ),
+            ));
+        }
+        if derived {
+            b1_ok += 1;
+        }
+    }
     let b1_no = m.objects.len() - b1_ok;
     if m.populations.whole_corpus_objects != m.objects.len()
         || m.populations.b1_comparable_objects != b1_ok
         || m.populations.b1_excluded_objects != b1_no
         || m.populations.high_channel_stress_objects != b1_no
     {
-        findings.push(Finding {
-            id: "<manifest>".into(),
-            kind: FindingKind::PopulationMismatch,
-            detail: format!(
-                "declared whole/b1_ok/b1_excluded/high_channel = {}/{}/{}/{}, objects say {}/{}/{}/{}",
+        findings.push(finding(
+            "<manifest>",
+            FindingKind::PopulationMismatch,
+            format!(
+                "declared whole/b1_ok/b1_excluded/high_channel = {}/{}/{}/{}, derived {}/{}/{}/{}",
                 m.populations.whole_corpus_objects,
                 m.populations.b1_comparable_objects,
                 m.populations.b1_excluded_objects,
@@ -499,7 +559,7 @@ pub fn verify_manifest(m: &Manifest) -> Result<VerifyReport> {
                 b1_no,
                 b1_no
             ),
-        });
+        ));
     }
 
     Ok(VerifyReport {
@@ -511,72 +571,39 @@ pub fn verify_manifest(m: &Manifest) -> Result<VerifyReport> {
     })
 }
 
-// Class parsing (the manifest is data; an unknown label is a verification
-// finding, never a silent default).
-fn parse_repr(s: &str) -> Option<Representation> {
-    Some(match s {
-        "literal" => Representation::Literal,
-        "exact_repetition" => Representation::ExactRepetition,
-        "oscillator" => Representation::Oscillator,
-        "wavetable" => Representation::Wavetable,
-        "residual" => Representation::Residual,
-        "compound" => Representation::Compound,
-        "noise" => Representation::Noise,
-        _ => return None,
-    })
-}
-
-fn parse_amp(s: &str) -> Option<Amplitude> {
-    Some(match s {
-        "low_byte" => Amplitude::LowByte,
-        "s16_like" => Amplitude::S16,
-        "s24_like" => Amplitude::S24,
-        "full_i32" => Amplitude::Full,
-        _ => return None,
-    })
-}
-
-fn parse_channels(s: &str) -> Option<ChannelStructure> {
-    Some(match s {
-        "mono" => ChannelStructure::Mono,
-        "identical_stereo" => ChannelStructure::IdenticalStereo,
-        "correlated_stereo" => ChannelStructure::CorrelatedStereo,
-        "anticorrelated_stereo" => ChannelStructure::AnticorrelatedStereo,
-        "independent_stereo" => ChannelStructure::IndependentStereo,
-        "multichannel" => ChannelStructure::Multichannel,
-        _ => return None,
-    })
-}
-
-fn parse_temporal(s: &str) -> Option<Temporal> {
-    Some(match s {
-        "stationary" => Temporal::Stationary,
-        "transient" => Temporal::Transient,
-        "loop" => Temporal::Loop,
-        "one_shot" => Temporal::OneShot,
-        "slowly_varying" => Temporal::SlowlyVarying,
-        "strongly_modulated" => Temporal::StronglyModulated,
-        _ => return None,
-    })
-}
-
-fn parse_entropy(s: &str) -> Option<Entropy> {
-    Some(match s {
-        "highly_predictable" => Entropy::HighlyPredictable,
-        "locally_predictable" => Entropy::LocallyPredictable,
-        "globally_periodic" => Entropy::GloballyPeriodic,
-        "sparse_residual" => Entropy::SparseResidual,
-        "spectrally_structured" => Entropy::SpectrallyStructured,
-        "full_width_random" => Entropy::FullWidthRandom,
-        "scrambled" => Entropy::Scrambled,
-        _ => return None,
-    })
-}
-
-fn parse_semantics(kind: &str, period: Option<u32>) -> self::generate::Semantics {
-    match (kind, period) {
-        ("loop", Some(p)) => self::generate::Semantics::Loop { period_frames: p },
-        _ => self::generate::Semantics::OneShot,
+/// The names of the identity fields that differ, for a truthful finding detail.
+/// `canonical_i32_sha256` is reported separately as [`FindingKind::HashMismatch`].
+fn diff_fields(got: &ManifestObject, expected: &ManifestObject) -> String {
+    let mut names: Vec<&str> = Vec::new();
+    macro_rules! check {
+        ($f:ident) => {
+            if got.$f != expected.$f {
+                names.push(stringify!($f));
+            }
+        };
+    }
+    check!(id);
+    check!(class);
+    check!(source_structure_class);
+    check!(amplitude_class);
+    check!(channel_structure);
+    check!(temporal_class);
+    check!(entropy_class);
+    check!(sample_rate_hz);
+    check!(channels);
+    check!(frames);
+    check!(duration_ms);
+    check!(semantics);
+    check!(repeat_period_frames);
+    check!(generator);
+    check!(source);
+    check!(conversion);
+    check!(expected_inclusion_surfaces);
+    check!(b1_comparable);
+    if names.is_empty() {
+        "none".to_string()
+    } else {
+        names.join(", ")
     }
 }
 
@@ -615,6 +642,14 @@ mod tests {
         let mut m4 = m.clone();
         m4.populations.b1_comparable_objects += 1;
         assert_ne!(manifest_sha256(&m), manifest_sha256(&m4));
+
+        // `class` and `conversion` are provenance-critical and must be covered.
+        let mut m5 = m.clone();
+        m5.objects[0].class = "imported".into();
+        assert_ne!(corpus_sha256(&m.objects), corpus_sha256(&m5.objects));
+        let mut m6 = m.clone();
+        m6.objects[0].conversion = "shifted 8 bits".into();
+        assert_ne!(corpus_sha256(&m.objects), corpus_sha256(&m6.objects));
     }
 
     #[test]
@@ -731,5 +766,51 @@ mod tests {
                 || k.contains(&FindingKind::CorpusHashMismatch),
             "a mutated generator must fail: {k:?}"
         );
+
+        // Manifest root/state must be the frozen one.
+        for mutate in [
+            (|m: &mut Manifest| m.universe = "vole.audio.u2".into()) as fn(&mut Manifest),
+            |m: &mut Manifest| m.profile = "u1/v2".into(),
+            |m: &mut Manifest| m.state = "DRAFT".into(),
+        ] {
+            let mut m = small.clone();
+            mutate(&mut m);
+            assert!(kinds(&m).contains(&FindingKind::RootMismatch));
+        }
+
+        // Duplicate ids: a set comparison would collapse them, so an appended
+        // copy of an existing object must fail explicitly.
+        let mut m = small.clone();
+        let dup = m.objects[0].clone();
+        m.objects.push(dup);
+        m.corpus_sha256 = hex(&corpus_sha256(&m.objects));
+        assert!(kinds(&m).contains(&FindingKind::DuplicateId));
+
+        // Frozen order: benchmark order is experimental state, so a reordering
+        // must fail even when the corpus hash is recomputed to match.
+        let mut m = small.clone();
+        m.objects.swap(0, 1);
+        m.corpus_sha256 = hex(&corpus_sha256(&m.objects));
+        assert!(kinds(&m).contains(&FindingKind::OrderMismatch));
+
+        // B1 eligibility is derived from the format domain, so editing the
+        // manifest audit flag is a failure even when the hash is recomputed.
+        let mut m = small.clone();
+        m.objects[0].b1_comparable = !m.objects[0].b1_comparable;
+        m.corpus_sha256 = hex(&corpus_sha256(&m.objects));
+        assert!(kinds(&m).contains(&FindingKind::PopulationMismatch));
+
+        // `duration_ms` is derived: it is recomputed and verified, not trusted.
+        let mut m = small.clone();
+        m.objects[0].duration_ms += 1;
+        m.corpus_sha256 = hex(&corpus_sha256(&m.objects));
+        assert!(kinds(&m).contains(&FindingKind::IdentityChanged));
+
+        // `class` and `conversion` are part of the identity the canonical
+        // comparison checks (a mutated value must be an identity failure).
+        let mut m = small.clone();
+        m.objects[0].conversion = "shifted 8 bits".into();
+        m.corpus_sha256 = hex(&corpus_sha256(&m.objects));
+        assert!(kinds(&m).contains(&FindingKind::IdentityChanged));
     }
 }

@@ -13,7 +13,7 @@
 //! The stratification axes are deliberately **orthogonal**, because a single
 //! "structured vs random" label cannot interpret a result: a signal can be
 //! random in time yet strongly redundant across channels (the H.2
-//! `random-control` lesson). Each object names representation, amplitude
+//! `random-control` lesson). Each object names source structure, amplitude
 //! occupancy, channel structure, temporal structure and entropy character.
 //!
 //! Negative controls are hostile by construction: full i32 occupancy,
@@ -31,6 +31,13 @@ pub const RATES: [u32; 4] = [44_100, 48_000, 96_000, 192_000];
 /// format domain and must never enter a B1-vs-VOLE aggregate.
 pub const B1_MAX_CHANNELS: u8 = 8;
 
+/// B1 (FLAC) eligibility is a **format-domain fact**, derived from the channel
+/// count — never read from mutable manifest policy. Courts must use this, not
+/// the manifest's audit field.
+pub const fn b1_comparable(channels: u8) -> bool {
+    channels >= 1 && channels <= B1_MAX_CHANNELS
+}
+
 // ---------------------------------------------------------------------------
 // Axes
 // ---------------------------------------------------------------------------
@@ -47,7 +54,15 @@ macro_rules! axis {
     };
 }
 
-axis!(Representation {
+// The **source (generative) structure class** of an object.
+//
+// This names the material the object was *designed as*, frozen before any
+// result exists. It is deliberately **not** `object::descriptor::Representation`:
+// no flagship comparison has run at freeze time, so this must never be read as
+// the representation the inverse compiler later *selects*. A source class of
+// `oscillator` may well be compiled to `exact_repeat`; that is a result, not a
+// contradiction. Measured results record `selected_representation` separately.
+axis!(SourceStructure {
     Literal => "literal",
     ExactRepetition => "exact_repetition",
     Oscillator => "oscillator",
@@ -203,7 +218,7 @@ pub enum Signal {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Spec {
     pub id: String,
-    pub representation: Representation,
+    pub source_structure: SourceStructure,
     pub amplitude: Amplitude,
     pub channel_structure: ChannelStructure,
     pub temporal: Temporal,
@@ -223,9 +238,10 @@ impl Spec {
         self.frames as u64 * 1000 / self.sample_rate_hz as u64
     }
 
-    /// Whether B1 (FLAC) can encode this object by format domain.
+    /// Whether B1 (FLAC) can encode this object by format domain. Derived from
+    /// the channel count via [`b1_comparable`], never from stored policy.
     pub const fn b1_comparable(&self) -> bool {
-        self.channels >= 1 && self.channels <= B1_MAX_CHANNELS
+        b1_comparable(self.channels)
     }
 
     /// The generator identity string for the manifest.

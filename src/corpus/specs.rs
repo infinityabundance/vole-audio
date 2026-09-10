@@ -8,7 +8,7 @@
 //!
 //! Rules this list obeys:
 //!
-//! * **orthogonal stratification** — representation, amplitude occupancy,
+//! * **orthogonal stratification** — source structure, amplitude occupancy,
 //!   channel structure, temporal structure and entropy character are named
 //!   independently, so a result can be interpreted (the H.2 `random-control`
 //!   lesson: random in time, redundant across channels);
@@ -22,8 +22,8 @@
 //! * **frozen rates** — 44.1 / 48 / 96 / 192 kHz only.
 
 use super::generate::{
-    Amplitude, B1_MAX_CHANNELS, ChannelStructure, Entropy, RATES, Representation, Semantics,
-    Signal, Spec, Temporal, WaveShape,
+    Amplitude, ChannelStructure, Entropy, RATES, Semantics, Signal, SourceStructure, Spec,
+    Temporal, WaveShape, b1_comparable,
 };
 
 struct B {
@@ -35,7 +35,7 @@ impl B {
     fn add(
         &mut self,
         stem: &str,
-        representation: Representation,
+        source_structure: SourceStructure,
         amplitude: Amplitude,
         channel_structure: ChannelStructure,
         temporal: Temporal,
@@ -62,7 +62,7 @@ impl B {
         );
         self.out.push(Spec {
             id,
-            representation,
+            source_structure,
             amplitude,
             channel_structure,
             temporal,
@@ -106,8 +106,8 @@ pub fn specs() -> Vec<Spec> {
     use Amplitude::*;
     use ChannelStructure::*;
     use Entropy::*;
-    use Representation::*;
     use Semantics::{Loop, OneShot};
+    use SourceStructure::*;
     use Temporal::*;
 
     let mut b = B { out: Vec::new() };
@@ -754,8 +754,8 @@ fn additional(b: &mut B) {
     use Amplitude::*;
     use ChannelStructure::*;
     use Entropy::*;
-    use Representation::*;
     use Semantics::{Loop, OneShot};
+    use SourceStructure::*;
     use Temporal::*;
 
     // Structural objects at 44.1 kHz and further tonal frequencies.
@@ -1469,7 +1469,9 @@ pub fn populations(specs: &[Spec]) -> Populations {
         high_channel_stress_objects: 0,
     };
     for s in specs {
-        if s.channels <= B1_MAX_CHANNELS {
+        // B1 eligibility is derived from the format domain (channel count),
+        // never read from a stored flag.
+        if b1_comparable(s.channels) {
             p.b1_comparable_objects += 1;
         } else {
             p.b1_excluded_objects += 1;
@@ -1482,6 +1484,32 @@ pub fn populations(specs: &[Spec]) -> Populations {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The hostile incompressible stratum: full-width occupancy, random or
+    /// scrambled character, and **genuinely independent channels**.
+    ///
+    /// An object that is temporally random but cross-channel structured (for
+    /// example anticorrelated stereo, where `R = -L`) is a valuable control but
+    /// is not *incompressible*, so it is deliberately excluded here.
+    fn hostile_controls(s: &[Spec]) -> Vec<&Spec> {
+        s.iter()
+            .filter(|x| {
+                matches!(x.entropy, Entropy::FullWidthRandom | Entropy::Scrambled)
+                    && x.amplitude == Amplitude::Full
+                    && matches!(
+                        x.channel_structure,
+                        ChannelStructure::Mono
+                            | ChannelStructure::IndependentStereo
+                            | ChannelStructure::Multichannel
+                    )
+            })
+            .collect()
+    }
+
+    /// One channel's samples, deinterleaved from the canonical layout.
+    fn channel(samples: &[i32], channels: usize, c: usize) -> Vec<i32> {
+        samples.iter().skip(c).step_by(channels).copied().collect()
+    }
 
     #[test]
     fn membership_is_frozen_and_stratified() {
@@ -1507,15 +1535,15 @@ mod tests {
             );
         }
         for rep in [
-            Representation::Literal,
-            Representation::Oscillator,
-            Representation::Wavetable,
-            Representation::ExactRepetition,
-            Representation::Residual,
-            Representation::Compound,
-            Representation::Noise,
+            SourceStructure::Literal,
+            SourceStructure::Oscillator,
+            SourceStructure::Wavetable,
+            SourceStructure::ExactRepetition,
+            SourceStructure::Residual,
+            SourceStructure::Compound,
+            SourceStructure::Noise,
         ] {
-            assert!(s.iter().any(|x| x.representation == rep), "no {rep:?}");
+            assert!(s.iter().any(|x| x.source_structure == rep), "no {rep:?}");
         }
         for amp in [
             Amplitude::LowByte,
@@ -1569,29 +1597,25 @@ mod tests {
     #[test]
     fn negative_controls_are_hostile_by_construction() {
         let s = specs();
-        // The hostile stratum is defined as full-width occupancy with a random
-        // or scrambled character; lower-amplitude uniform variants exist as
-        // *separate* (limited-occupancy) strata and are not hostile controls.
-        let controls: Vec<&Spec> = s
-            .iter()
-            .filter(|x| {
-                matches!(x.entropy, Entropy::FullWidthRandom | Entropy::Scrambled)
-                    && x.amplitude == Amplitude::Full
-            })
-            .collect();
+        let controls = hostile_controls(&s);
         assert!(
             controls.len() >= 8,
-            "too few full-width negative controls: {}",
+            "too few full-width independent-channel negative controls: {}",
             controls.len()
         );
+        // Every hostile control must have genuinely independent channels: no
+        // duplicated, correlated or mirrored channel is an incompressible one.
         for c in &controls {
-            // Independent channels where stereo/multichannel, never duplicated.
-            match c.channel_structure {
-                ChannelStructure::IdenticalStereo | ChannelStructure::CorrelatedStereo => {
-                    panic!("{}: negative controls must not reuse channels", c.id)
-                }
-                _ => {}
-            }
+            assert!(
+                matches!(
+                    c.channel_structure,
+                    ChannelStructure::Mono
+                        | ChannelStructure::IndependentStereo
+                        | ChannelStructure::Multichannel
+                ),
+                "{}: a hostile control must have independent channels",
+                c.id
+            );
         }
         // Both uniform and scrambled hostile controls are present.
         assert!(
@@ -1600,42 +1624,94 @@ mod tests {
                 .any(|c| c.entropy == Entropy::FullWidthRandom)
         );
         assert!(controls.iter().any(|c| c.entropy == Entropy::Scrambled));
+
+        // The temporally-random, cross-channel-*structured* object is kept in
+        // the frozen population (it is a valuable control) but must not be
+        // counted as incompressible: `R = -L` is maximally predictable across
+        // channels, which is exactly the H.2 `random-control` lesson.
+        let anticorrelated = s
+            .iter()
+            .find(|x| {
+                x.entropy == Entropy::FullWidthRandom
+                    && x.amplitude == Amplitude::Full
+                    && x.channel_structure == ChannelStructure::AnticorrelatedStereo
+            })
+            .expect("the anticorrelated full-width random control is frozen");
+        assert!(
+            !controls.iter().any(|c| c.id == anticorrelated.id),
+            "{} is cross-channel structured and must not be a hostile control",
+            anticorrelated.id
+        );
     }
 
     #[test]
     fn generation_is_deterministic_and_unbiased() {
         let s = specs();
-        let noise = s
-            .iter()
-            .find(|x| x.id == "uniform-full-48000hz-1ch-full_i32-mono")
-            .expect("full-width mono control");
-        let a = super::super::generate::generate(noise).unwrap();
-        let b = super::super::generate::generate(noise).unwrap();
-        assert_eq!(a, b, "generation must be deterministic");
-        assert_eq!(a.len(), noise.frames);
-        // Full-width and unbiased: both signs present, mean near zero, extremes
-        // reach the wide range (no limited dynamic range). The mean bound is
-        // generous (about 8 standard errors for this length) so it catches a
-        // real offset, not ordinary sampling noise.
-        let sum: i128 = a.iter().map(|&v| v as i128).sum();
-        let mean = sum / a.len() as i128;
-        assert!(
-            mean.abs() < (1i128 << 25),
-            "DC bias in a noise control: {mean}"
-        );
-        assert!(a.iter().any(|&v| v < 0) && a.iter().any(|&v| v > 0));
-        let peak = a.iter().map(|&v| i64::from(v).abs()).max().unwrap();
-        assert!(
-            peak > (1i64 << 30),
-            "noise control does not reach full width"
-        );
-        // No accidental short period: no p <= 1024 repeats the signal.
-        for p in 1..=1024usize {
-            if p >= a.len() {
-                break;
+        let controls = hostile_controls(&s);
+        assert!(!controls.is_empty());
+        for c in &controls {
+            let a = super::super::generate::generate(c).unwrap();
+            let b = super::super::generate::generate(c).unwrap();
+            assert_eq!(a, b, "{}: generation must be deterministic", c.id);
+            let nch = usize::from(c.channels);
+            assert_eq!(a.len(), c.frames * nch);
+
+            let mut hashes: Vec<[u8; 32]> = Vec::with_capacity(nch);
+            for ch in 0..nch {
+                let v = channel(&a, nch, ch);
+                // Full-width and unbiased, independently per channel. The sum
+                // bound is ~8 standard errors for a uniform full-width stream,
+                // so it catches a real offset rather than sampling noise.
+                let sum: i128 = v.iter().map(|&x| x as i128).sum();
+                let bound = 8 * (1i128 << 31) * (v.len() as u128).isqrt() as i128;
+                assert!(
+                    sum.abs() < bound,
+                    "{} ch{ch}: DC bias (sum {sum}, bound {bound})",
+                    c.id
+                );
+                assert!(
+                    v.iter().any(|&x| x < 0) && v.iter().any(|&x| x > 0),
+                    "{} ch{ch}: single sign",
+                    c.id
+                );
+                let peak = v.iter().map(|&x| i64::from(x).abs()).max().unwrap();
+                assert!(
+                    peak > (1i64 << 30),
+                    "{} ch{ch}: does not reach full width",
+                    c.id
+                );
+                // No accidental short period (the `all` short-circuits on the
+                // first mismatch, so this is cheap for real noise).
+                for p in 1..=1024usize {
+                    if p >= v.len() {
+                        break;
+                    }
+                    assert!(
+                        !(p..v.len()).all(|i| v[i] == v[i - p]),
+                        "{} ch{ch}: periodic with period {p}",
+                        c.id
+                    );
+                }
+                hashes.push(super::super::generate::canonical_sha256(&v));
             }
-            let periodic = (p..a.len()).all(|i| a[i] == a[i - p]);
-            assert!(!periodic, "noise control is periodic with period {p}");
+
+            // Channels must be genuinely independent: no duplicate channel, and
+            // no L == R or L == -R relationship.
+            let mut sorted = hashes.clone();
+            sorted.sort_unstable();
+            let before = sorted.len();
+            sorted.dedup();
+            assert_eq!(before, sorted.len(), "{}: duplicate channel hash", c.id);
+            if nch >= 2 {
+                let l = channel(&a, nch, 0);
+                let r = channel(&a, nch, 1);
+                assert_ne!(l, r, "{}: L == R", c.id);
+                assert!(
+                    !l.iter().zip(&r).all(|(&x, &y)| y == x.saturating_neg()),
+                    "{}: L == -R",
+                    c.id
+                );
+            }
         }
     }
 }

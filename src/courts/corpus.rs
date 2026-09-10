@@ -55,11 +55,11 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
     };
 
     // Class histograms are evidence about the population, not results about it.
-    let by_representation = histogram(
+    let by_source_structure = histogram(
         manifest
             .objects
             .iter()
-            .map(|o| o.representation_class.clone()),
+            .map(|o| o.source_structure_class.clone()),
     );
     let by_amplitude = histogram(manifest.objects.iter().map(|o| o.amplitude_class.clone()));
     let by_channels = histogram(manifest.objects.iter().map(|o| o.channel_structure.clone()));
@@ -71,6 +71,10 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
             .iter()
             .map(|o| o.sample_rate_hz.to_string()),
     );
+
+    // The B1 denominator is derived from the format domain (channel count),
+    // never read from the manifest's audit field.
+    let (b1_comparable, b1_excluded) = crate::corpus::derived_b1_counts(&manifest.objects);
 
     let params = CourtParams {
         universe: Some(manifest.universe.clone()),
@@ -85,12 +89,13 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
         .result(verdict)
         .result_detail(format!(
             "flagship corpus {} verified: {} objects regenerated and hash-matched, \
-             {}/{} B1-comparable ({} excluded by format domain); manifest sha256 {}",
+             {}/{} B1-comparable ({} excluded by format domain, derived from the \
+             channel count); manifest sha256 {}",
             if report.ok() { "PASS" } else { "FAIL" },
             report.verified,
-            manifest.populations.b1_comparable_objects,
+            b1_comparable,
             manifest.populations.whole_corpus_objects,
-            manifest.populations.b1_excluded_objects,
+            b1_excluded,
             report.manifest_sha256,
         ))
         .params(params)
@@ -116,15 +121,17 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
             "populations",
             serde_json::json!({
                 "whole_corpus_objects": manifest.populations.whole_corpus_objects,
-                "b1_comparable_objects": manifest.populations.b1_comparable_objects,
-                "b1_excluded_objects": manifest.populations.b1_excluded_objects,
+                "b1_comparable_objects": b1_comparable,
+                "b1_excluded_objects": b1_excluded,
                 "high_channel_stress_objects": manifest.populations.high_channel_stress_objects,
                 "b1_domain_rule": "1..=8 channels are B1-comparable; >8 are \
                                    NOT_APPLICABLE_BY_FORMAT_DOMAIN and never enter a \
                                    B1-vs-VOLE aggregate",
+                "derivation": "b1-comparable counts are derived from each object's channel \
+                               count, not read from the manifest's audit field",
             }),
         )
-        .extra("by_representation_class", by_representation)
+        .extra("by_source_structure_class", by_source_structure)
         .extra("by_amplitude_class", by_amplitude)
         .extra("by_channel_structure", by_channels)
         .extra("by_temporal_class", by_temporal)
@@ -166,10 +173,7 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
     println!("court corpus: {verdict}");
     println!(
         "  objects: {}  verified: {}  B1-comparable: {}  excluded (format domain): {}",
-        report.objects,
-        report.verified,
-        manifest.populations.b1_comparable_objects,
-        manifest.populations.b1_excluded_objects
+        report.objects, report.verified, b1_comparable, b1_excluded
     );
     println!("  manifest sha256: {}", report.manifest_sha256);
     println!("  corpus sha256:   {}", report.corpus_sha256);

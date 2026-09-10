@@ -10,8 +10,14 @@ This directory holds the canonical flagship corpus manifest (Phase M).
   instead of their samples.
 
 Current state: **FROZEN** — 115 objects, ~3.6 minutes of material at
-44.1/48/96/192 kHz, stratified across representation, amplitude occupancy,
+44.1/48/96/192 kHz, stratified across source structure, amplitude occupancy,
 channel structure, temporal structure and entropy character.
+
+`source_structure_class` names the material an object was **designed as**
+(frozen before any result exists). It is not the representation the inverse
+compiler later selects; measured results record `selected_representation`
+separately, and a source class of `oscillator` may legitimately compile to
+`exact_repeat`.
 
 ## What is frozen
 
@@ -22,16 +28,26 @@ seal subject). The manifest is written **once** from that membership:
 vole-audio corpus freeze --out corpus/manifest.json
 ```
 
-and is never tuned afterwards. Everything that can change a result is part of
-the object identity:
+and is never tuned afterwards. A re-run refuses to overwrite an existing
+`FROZEN` manifest unless a new corpus identity is declared deliberately:
 
-```text
-id ∥ representation ∥ amplitude ∥ channel structure ∥ temporal ∥ entropy
-   ∥ sample_rate ∥ channels ∥ frames ∥ semantics ∥ repeat period
-   ∥ generator kind ∥ generator parameters ∥ source ∥ canonical i32 hash
+```sh
+vole-audio corpus freeze --out corpus/manifest.json \
+    --amend-frozen "reason recorded in the seal ledger"
 ```
 
-and `corpus_sha256` covers every object's identity bytes in order.
+Everything that can change a result is part of the object identity:
+
+```text
+id ∥ class ∥ source structure ∥ amplitude ∥ channel structure ∥ temporal
+   ∥ entropy ∥ sample_rate ∥ channels ∥ frames ∥ semantics ∥ repeat period
+   ∥ generator kind ∥ generator parameters ∥ source ∥ conversion
+   ∥ b1 comparable ∥ canonical i32 hash
+```
+
+and `corpus_sha256` covers every object's identity bytes **in order**.
+`duration_ms` is derived and recomputed+verified rather than hashed, and
+`expected_inclusion_surfaces` is derived policy.
 
 ## Verification
 
@@ -41,11 +57,14 @@ vole-audio corpus verify    # regenerate everything and prove the manifest
 ```
 
 `corpus verify` exits nonzero on **any** of: a manifest that does not parse or
-carries the wrong schema; a `corpus_sha256` that does not cover its objects; an
-object the frozen membership defines but the manifest lacks (or the reverse); a
-mutated class assignment, rate, channel count or frame count; a generator whose
-regenerated samples no longer match the frozen canonical hash; population
-counts that disagree with the objects.
+carries the wrong schema, universe, profile or state; a `corpus_sha256` that
+does not cover its objects; a duplicate object id; an object the frozen
+membership defines but the manifest lacks (or the reverse); a manifest order
+that differs from the frozen membership (benchmark order is experimental state);
+a mutated class/rate/size/channel; any identity field (including `class` and
+`conversion`) that differs from the canonical regenerated object; a generator
+whose regenerated samples no longer match the frozen canonical hash; population
+counts that disagree with the **derived** format-domain counts.
 
 ## Populations and the B1 format domain
 
@@ -58,7 +77,10 @@ flagship/high-channel stress  >8 channels: B1 = NOT_APPLICABLE_BY_FORMAT_DOMAIN
 ```
 
 Objects in the second population can still be measured by every other surface,
-but their bytes must never enter a B1-vs-VOLE aggregate.
+but their bytes must never enter a B1-vs-VOLE aggregate. Eligibility is derived
+from each object's channel count by the verifier and the courts — never read
+from the manifest's `b1_comparable` audit field, which must merely agree with
+the derivation.
 
 ## The real-recording stratum
 
