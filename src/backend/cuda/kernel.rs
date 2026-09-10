@@ -458,8 +458,18 @@ pub fn grid_for(frames: usize, channels: u8) -> (u32, u32, u32) {
 #[cfg(test)]
 mod smoke_tests {
     //! Gated smoke tests (require a CUDA GPU + the built PTX artifact). Run
-    //! with: VOLE_CUDA_PTX=scripts/out/vole_audio.ptx cargo test --release \
-    //!     --lib backend::cuda::kernel::smoke_tests -- --ignored
+    //! with:
+    //!
+    //! ```text
+    //! CUDA_MODULE_LOADING=EAGER CUDA_CACHE_DISABLE=1 \
+    //!   cargo test --release --all-features --lib \
+    //!   backend::cuda::kernel::smoke_tests -- --ignored
+    //! ```
+    //!
+    //! The environment is set by the runner, never by the library or by these
+    //! tests: `set_var` in a multithreaded process (which the test harness is)
+    //! races concurrent environment reads. EAGER + cache-disable give
+    //! deterministic JIT with no stale on-disk cache entry (rc 218 hazard).
 
     fn ptx() -> Vec<u8> {
         let p =
@@ -470,9 +480,6 @@ mod smoke_tests {
     #[test]
     #[ignore = "requires CUDA GPU + built PTX artifact"]
     fn module_loads_and_renders() {
-        // Set eager module loading where supported so JIT errors surface at
-        // load (LAZY defers them to first use on some drivers).
-        unsafe { std::env::set_var("CUDA_MODULE_LOADING", "EAGER") };
         let ptx = ptx();
         let cuda = super::super::driver::Cuda::open(0).expect("cuda open");
         let module = cuda.load_module(&ptx).expect("module load");
@@ -510,7 +517,6 @@ mod smoke_tests {
     #[test]
     #[ignore = "requires CUDA GPU + built PTX artifact"]
     fn function_outlives_the_module_handle() {
-        unsafe { std::env::set_var("CUDA_MODULE_LOADING", "EAGER") };
         let ptx = ptx();
         let cuda = super::super::driver::Cuda::open(0).expect("cuda open");
         let module = cuda.load_module(&ptx).expect("module load");
@@ -580,6 +586,34 @@ mod smoke_tests {
         handle.join().expect("foreign thread panicked");
     }
 
+    /// Context-lifecycle regression (Phase L review-3): `Cuda::open` must not
+    /// leave its context attached to the calling thread, and the final `Arc`
+    /// may be dropped on a foreign thread without poisoning the creator.
+    /// `cuCtxDestroy` does not detach a context that is current elsewhere, so a
+    /// non-floating context dropped on another thread would leave a destroyed
+    /// context current on this one.
+    #[test]
+    #[ignore = "requires CUDA GPU"]
+    fn context_is_floating_after_open_and_safe_to_drop_elsewhere() {
+        let cuda = super::super::driver::Cuda::open(0).expect("open");
+        assert!(
+            !cuda.ctx().is_current(),
+            "open must return a floating context, not an attached one"
+        );
+        let buf = cuda.alloc(64).expect("alloc");
+        buf.upload(&[5u8; 64]).expect("upload");
+        drop(cuda);
+        // `buf` is now the last owner: its drop destroys the context on
+        // another thread.
+        std::thread::spawn(move || drop(buf))
+            .join()
+            .expect("foreign drop thread panicked");
+        // The creator thread is unaffected: a fresh session still works.
+        let again = super::super::driver::Cuda::open(0).expect("reopen after foreign drop");
+        let b2 = again.alloc(32).expect("alloc after foreign drop");
+        b2.upload(&[1u8; 32]).expect("upload after foreign drop");
+    }
+
     /// Affinity regression (Phase L review): pairing resources from different
     /// contexts is rejected by the safe API rather than silently executed
     /// against whichever context happens to be current.
@@ -605,12 +639,66 @@ mod smoke_tests {
         assert!(err.to_string().contains("different CUDA contexts"), "{err}");
     }
 
+    /// Release-on-drop regression (Phase L review-3): the D1 host registration
+    /// must be *unregistered against its own context* when it drops. If the
+    /// guard that makes the owner context current is released too early, the
+    /// unregister silently fails and the range stays registered, so the next
+    /// registration of the same mapping fails with rc 712.
+    #[test]
+    #[ignore = "requires CUDA GPU + host-register support"]
+    fn host_registration_is_released_on_drop() {
+        use super::super::direct::{RegistrationAttempt, attempt_register};
+        let cuda = super::super::driver::Cuda::open(0).expect("open");
+        if cuda.device.host_register_supported == 0 {
+            return; // registration is unsupported on this device; nothing to assert
+        }
+        let len = 8192usize;
+        // SAFETY: anonymous private read/write mapping, page aligned, unmapped
+        // at the end of the test.
+        let base = unsafe {
+            libc::mmap(
+                std::ptr::null_mut(),
+                len,
+                libc::PROT_READ | libc::PROT_WRITE,
+                libc::MAP_PRIVATE | libc::MAP_ANONYMOUS,
+                -1,
+                0,
+            )
+        };
+        assert_ne!(base, libc::MAP_FAILED, "mmap failed");
+        let addr = base as usize;
+        // First registration, released by `drop`.
+        match unsafe { attempt_register(&cuda.ctx, addr, len) } {
+            RegistrationAttempt::Registered(r) => {
+                assert!(r.device_ptr.is_some(), "no device pointer");
+                drop(r);
+            }
+            // Not a registration-capable mapping/API: nothing to assert.
+            _ => {
+                // SAFETY: unmapping the mapping created above.
+                unsafe { libc::munmap(base, len) };
+                return;
+            }
+        }
+        // The same range must register again: the first registration was
+        // released, against the correct context.
+        match unsafe { attempt_register(&cuda.ctx, addr, len) } {
+            RegistrationAttempt::Registered(r) => drop(r),
+            RegistrationAttempt::Failed { rc, message } => panic!(
+                "re-registering the same range failed (rc {rc}: {message}) — the \
+                 previous registration was not released"
+            ),
+            RegistrationAttempt::MissingSymbol(m) => panic!("missing driver symbols: {m}"),
+        }
+        // SAFETY: unmapping the mapping created above.
+        unsafe { libc::munmap(base, len) };
+    }
+
     #[test]
     #[ignore = "requires CUDA GPU + built PTX artifact"]
     fn probe_then_load_reproduces_court_sequence() {
         // court cuda runs CudaProbe::capture (open+drop) before the first
         // KernelWorld::open; reproduce exactly that sequence to chase rc 218.
-        unsafe { std::env::set_var("CUDA_MODULE_LOADING", "EAGER") };
         let ptx = ptx();
         let probe = super::super::probe::CudaProbe::capture(0).expect("probe");
         println!("probe: {:?}", probe.as_ref().map(|p| p.device.name.clone()));

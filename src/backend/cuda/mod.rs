@@ -22,3 +22,20 @@ pub use direct::{HostRegistration, PointerEvidence, RegisterRange};
 pub use driver::{Cuda, DeviceBuffer, DeviceInfo, Event, Function, GraphExec, Module, Stream};
 pub use kernel::KernelWorld;
 pub use search::SearchWorld;
+
+/// CUDA configuration observed from the process environment, for receipts.
+///
+/// The library never mutates the process environment (`Cuda::open` is a safe
+/// public API and cannot assume a single-threaded process); a runner that wants
+/// deterministic JIT and no on-disk JIT cache exports `CUDA_MODULE_LOADING=EAGER`
+/// and `CUDA_CACHE_DISABLE=1` before `exec`. This records what was in effect, so
+/// configuration is evidence rather than hidden mutation.
+pub fn environment_evidence() -> serde_json::Value {
+    let (module_loading, cache_disable) = driver::module_loading_policy();
+    serde_json::json!({
+        "module_loading": module_loading,
+        "cache_disable": cache_disable,
+        "observation": "read from the process environment (CUDA_MODULE_LOADING / \
+                        CUDA_CACHE_DISABLE); the library never calls set_var",
+    })
+}

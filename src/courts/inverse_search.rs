@@ -450,6 +450,10 @@ pub fn run(receipts_root: &Path) -> crate::error::Result<Verdict> {
         )
         .extra("aggregate", aggregate)
         .extra("cuda", cuda_row)
+        .extra(
+            "cuda_environment",
+            crate::backend::cuda::environment_evidence(),
+        )
         .extra("rocm", rocm_row)
         .extra("rocm_cells", serde_json::Value::Array(rocm_cells))
         .extra("cells", serde_json::Value::Array(cells))

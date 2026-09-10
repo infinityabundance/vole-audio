@@ -982,6 +982,14 @@ possible surfaces and proves that placement is a **performance** question only:
   `cuCtxCreate` is already on the calling thread's stack and pushing it again
   returns rc 201 (reproduced on driver 610.57.04). Gated regressions: two-context
   isolation with restore, foreign-thread use, cross-context rejection.
+- Seal 4 (review-3 driver hygiene, v0.10.2): `Cuda::open` no longer touches the
+  process environment (a safe public API cannot assume a single-threaded
+  process); the runner sets `CUDA_MODULE_LOADING`/`CUDA_CACHE_DISABLE` and each
+  CUDA receipt records the observed `cuda_environment`. The new context is
+  popped immediately, so it is *floating* on return (non-invasive creation; the
+  final `Arc` can be dropped on any thread). `CurrentContextGuard` is `!Send`
+  by construction plus a compile-time assertion. Gated regression:
+  `context_is_floating_after_open_and_safe_to_drop_elsewhere`.
 
 ## Next work (exact order — the implementation contract is executed in sequence)
 

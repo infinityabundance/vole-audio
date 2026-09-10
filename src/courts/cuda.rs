@@ -372,6 +372,11 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
         }
     };
     extras.insert("probe".to_string(), serde_json::to_value(&probe)?);
+    // The CUDA configuration actually in effect (recorded, never mutated).
+    extras.insert(
+        "cuda_environment".to_string(),
+        crate::backend::cuda::environment_evidence(),
+    );
     let strategies: Vec<Strategy> = {
         let mut v = vec![Strategy::Standard];
         if probe.device.stream_priorities_supported {

@@ -26,6 +26,15 @@ set -eu
 
 cd "$(dirname "$0")/.."
 
+# Deterministic CUDA JIT: EAGER module loading (JIT errors surface at load rather
+# than at first use) with no on-disk JIT cache (a stale entry can present as a
+# silent rc 218). The library deliberately does NOT mutate the process
+# environment — `Cuda::open` is a safe public API and cannot assume a
+# single-threaded process — so the runner sets it here, and CUDA receipts record
+# the values that were actually in effect (extra `cuda_environment`).
+export CUDA_MODULE_LOADING=${CUDA_MODULE_LOADING:-EAGER}
+export CUDA_CACHE_DISABLE=${CUDA_CACHE_DISABLE:-1}
+
 echo "building release binary (all-features)..."
 cargo build --release --all-features
 

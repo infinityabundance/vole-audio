@@ -194,6 +194,11 @@ type FnCtxGetCurrent = unsafe extern "C" fn(*mut CUcontext) -> CUresult;
 /// `cuCtxSetCurrent` switches without touching the stack, so saving the
 /// previous value and setting it back restores the exact prior state.
 type FnCtxSetCurrent = unsafe extern "C" fn(CUcontext) -> CUresult;
+/// cuCtxPopCurrent(CUcontext*) — pop the calling thread's context stack,
+/// restoring the previous current context. Used once, right after creation, to
+/// leave a newly created context *floating* rather than attached to its
+/// creator thread.
+type FnCtxPopCurrent = unsafe extern "C" fn(*mut CUcontext) -> CUresult;
 type FnModuleLoadData = unsafe extern "C" fn(*mut CUmodule, *const c_void) -> CUresult;
 type FnModuleLoadDataEx = unsafe extern "C" fn(
     *mut CUmodule,
@@ -275,6 +280,7 @@ fns! {
     cuCtxGetStreamPriorityRange: FnCtxGetStreamPriorityRange,
     cuCtxGetCurrent: FnCtxGetCurrent,
     cuCtxSetCurrent: FnCtxSetCurrent,
+    cuCtxPopCurrent: FnCtxPopCurrent,
     cuModuleLoadData: FnModuleLoadData,
     cuModuleLoadDataEx: FnModuleLoadDataEx,
     cuModuleUnload: FnModuleUnload,
@@ -359,7 +365,7 @@ impl Fns {
             cuInit, cuDriverGetVersion, cuDeviceGetCount, cuDeviceGet,
             cuDeviceGetName, cuDeviceComputeCapability, cuDeviceGetAttribute,
             cuCtxCreate, cuCtxDestroy, cuCtxSynchronize, cuCtxGetStreamPriorityRange,
-            cuCtxGetCurrent, cuCtxSetCurrent,
+            cuCtxGetCurrent, cuCtxSetCurrent, cuCtxPopCurrent,
             cuModuleLoadDataEx, cuModuleUnload, cuModuleGetFunction, cuMemAlloc, cuMemFree,
             cuMemcpyHtoD, cuMemcpyDtoH, cuLaunchKernel, cuStreamCreate,
             cuStreamCreateWithPriority, cuStreamDestroy, cuStreamSynchronize,

@@ -291,6 +291,10 @@ pub fn run(receipts_root: &Path) -> crate::error::Result<Verdict> {
         })
         .extra("cells", serde_json::Value::Array(cells))
         .extra(
+            "cuda_environment",
+            crate::backend::cuda::environment_evidence(),
+        )
+        .extra(
             "artifact",
             crate::evidence::artifact::artifact_evidence(
                 &std::env::var("VOLE_CUDA_PTX")

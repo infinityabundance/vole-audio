@@ -101,6 +101,39 @@ Entering costs one `cuCtxGetCurrent` in the single-context single-thread case
 (the whole forward/entropy/D0/D1 path), which is why the ordinary courts are
 unaffected — their counts and frozen hashes are unchanged.
 
+### Non-invasive context lifecycle (Seal 4)
+
+Three driver-hygiene properties complete the model, none of which changes audio
+semantics:
+
+* **`Cuda::open` never mutates the process environment.** It is a safe public
+  function and cannot assume a single-threaded process, where `set_var` races
+  concurrent environment reads. Deterministic JIT (`CUDA_MODULE_LOADING=EAGER`)
+  and no on-disk JIT cache (`CUDA_CACHE_DISABLE=1`) are set by the *runner*
+  (`scripts/court-all.sh`, or the documented command for the gated tests), and
+  every CUDA receipt records the values actually in effect as the
+  `cuda_environment` extra.
+* **The created context is popped immediately, so it is *floating* on return.**
+  `cuCtxCreate` pushes the new context onto the calling thread's stack;
+  `open` performs its setup queries and then `cuCtxPopCurrent`s it, restoring
+  the caller's stack exactly. Two consequences matter: `open` does not
+  permanently alter its caller's current context, and the final `Arc` may be
+  dropped on any thread without leaving a context that is current *on the
+  creator* in a destroyed state (`cuCtxDestroy` does not detach a context that
+  is current elsewhere).
+* **`CurrentContextGuard` is neither `Send` nor `Sync`.** It represents
+  thread-local driver state, so moving it to another thread would restore the
+  saved context on the wrong thread. A `PhantomData<Rc<()>>` marker plus a
+  compile-time assertion makes that a type property: if a future refactor made
+  the guard `Send`, the assertion fails to compile rather than the bug shipping.
+
+```text
+context lifecycle
+    create  →  setup queries  →  POP (floating)
+    operation: attach (cuCtxSetCurrent) → work → restore caller
+    last Arc dropped on any thread → cuCtxDestroy while floating
+```
+
 ## The two invariants the court asserts
 
 1. **Placement has no semantics.** Every surface must produce identical

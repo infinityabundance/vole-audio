@@ -263,7 +263,7 @@ pub unsafe fn attempt_register(
         Err(e) => {
             return RegistrationAttempt::Failed {
                 rc: CUDA_ERROR_INVALID_CONTEXT,
-                message: format!("cuCtxPushCurrent: {e}"),
+                message: format!("CUDA context enter: {e}"),
             };
         }
     };
@@ -381,7 +381,12 @@ impl Drop for HostRegistration {
             // SAFETY: unregister exactly what was registered; the caller
             // guarantees the mapping outlives this drop. Enter the owning
             // context so the unregister targets it.
-            let _ = self.ctx.enter();
+            // Bind the guard to a named local so it lives until the end of this
+            // drop body: `let _ = ...` would release it at the end of the
+            // statement, and the unregister would run without the context
+            // current (rc 201/leaked registration, observed as rc 712 on the
+            // next registration of the same mapping).
+            let _guard = self.ctx.enter();
             unsafe { (self.ctx.fns.cuMemHostUnregister.expect("bound"))(self.host_ptr) };
         }
     }

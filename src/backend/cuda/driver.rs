@@ -28,8 +28,10 @@
 
 use crate::error::{Error, Result};
 use std::ffi::{CString, c_void};
+use std::marker::PhantomData;
 use std::ops::Deref;
 use std::path::Path;
+use std::rc::Rc;
 use std::sync::Arc;
 
 use super::ffi::{
@@ -182,22 +184,30 @@ impl Drop for CudaContext {
 /// CUDA's driver API operates on the calling thread's *current* context, so a
 /// resource that is alive but not current cannot be used (the driver returns
 /// `CUDA_ERROR_INVALID_CONTEXT`). Entering is cheap when the owning context is
-/// already current — the single-context, single-thread case — and otherwise
-/// switches to it with `cuCtxSetCurrent`, restoring the exact previous value on
-/// drop. `cuCtxPushCurrent` is deliberately not used: a context created by
-/// `cuCtxCreate` is already on the calling thread's context stack, and pushing
-/// it again fails with rc 201 (verified on driver 610.57.04).
-pub struct CurrentContextGuard<'a> {
+/// already current, and otherwise switches to it with `cuCtxSetCurrent`,
+/// restoring the exact previous value on drop. `cuCtxPushCurrent` is
+/// deliberately not used: a context created by `cuCtxCreate` is already on the
+/// calling thread's context stack, and pushing it again fails with rc 201
+/// (verified on driver 610.57.04).
+///
+/// The guard is **neither `Send` nor `Sync`**: it represents thread-local
+/// driver state, so moving it to another thread would restore the saved context
+/// on the wrong thread and leave the entering thread switched. The
+/// `PhantomData<Rc<()>>` marker makes that a compile-time property rather than
+/// a comment.
+pub(crate) struct CurrentContextGuard<'a> {
     ctx: &'a CudaContext,
     /// `None` when nothing had to change; otherwise the context to restore
     /// (`0` meaning "no current context").
     previous: Option<CUcontext>,
+    /// `Rc<()>` is neither `Send` nor `Sync`, and is zero-sized.
+    _thread_bound: PhantomData<Rc<()>>,
 }
 
 impl CudaContext {
     /// Make this context current on the calling thread until the guard drops,
     /// which restores whatever was current before.
-    pub fn enter(&self) -> Result<CurrentContextGuard<'_>> {
+    pub(crate) fn enter(&self) -> Result<CurrentContextGuard<'_>> {
         let mut current: CUcontext = 0;
         // SAFETY: out-param.
         let rc = unsafe { (self.fns.cuCtxGetCurrent.expect("bound"))(&mut current) };
@@ -206,6 +216,7 @@ impl CudaContext {
             return Ok(CurrentContextGuard {
                 ctx: self,
                 previous: None,
+                _thread_bound: PhantomData,
             });
         }
         // SAFETY: make this context current on the calling thread.
@@ -214,10 +225,15 @@ impl CudaContext {
         Ok(CurrentContextGuard {
             ctx: self,
             previous: Some(current),
+            _thread_bound: PhantomData,
         })
     }
 
     /// True when this context is the calling thread's current context.
+    ///
+    /// Public because it is the query the affinity guard performs: callers may
+    /// ask whether a resource's owner is current on this thread without
+    /// entering it.
     pub fn is_current(&self) -> bool {
         let mut current: CUcontext = 0;
         // SAFETY: out-param; a failure leaves `current` at zero.
@@ -230,10 +246,43 @@ impl Drop for CurrentContextGuard<'_> {
     fn drop(&mut self) {
         if let Some(previous) = self.previous {
             // SAFETY: best effort; restores the exact context that was current
-            // before this guard entered (0 = no current context).
+            // before this guard entered (0 = no current context). Runs on the
+            // thread that entered, which is the thread the state belongs to.
             unsafe { (self.ctx.fns.cuCtxSetCurrent.expect("bound"))(previous) };
         }
     }
+}
+
+// Compile-time assertion: the affinity guard must not be Send (identity of the
+// current context is per-thread). If a future refactor made it Send, this
+// instantiation becomes ambiguous and fails to compile.
+const _: fn() = || {
+    trait AmbiguousIfSend<A> {
+        fn some_item() {}
+    }
+    impl<T: ?Sized> AmbiguousIfSend<()> for T {}
+    impl<T: ?Sized + Send> AmbiguousIfSend<u8> for T {}
+    let _ = <CurrentContextGuard<'static> as AmbiguousIfSend<_>>::some_item;
+};
+
+/// The CUDA module-loading / JIT-cache configuration **observed** from the
+/// process environment, for receipts.
+///
+/// `Cuda::open` never mutates the process environment: it is a safe public
+/// function and cannot assume a single-threaded process, where `set_var` would
+/// race concurrent environment reads. Runners that want deterministic JIT
+/// (`EAGER`) and no on-disk JIT cache (`CUDA_CACHE_DISABLE=1`) export those
+/// before `exec`; this records what was actually in effect, so configuration is
+/// evidence rather than hidden mutation. Values are `EAGER`/`LAZY`/`unset` and
+/// `1`/`0`/`unset`.
+pub fn module_loading_policy() -> (String, String) {
+    fn read(key: &str) -> String {
+        std::env::var(key)
+            .ok()
+            .filter(|v| !v.trim().is_empty())
+            .unwrap_or_else(|| "unset".to_string())
+    }
+    (read("CUDA_MODULE_LOADING"), read("CUDA_CACHE_DISABLE"))
 }
 
 /// Reject a cross-context pairing through the safe API (e.g. a kernel from
@@ -278,23 +327,17 @@ impl std::fmt::Debug for Cuda {
 }
 
 impl Cuda {
-    /// Open the driver, pick `ordinal` (default 0), create a context.
+    /// Open the driver, pick `ordinal` (default 0), create a context, then pop
+    /// that context off the calling thread's context stack so it is *floating*
+    /// on return.
+    ///
+    /// The library deliberately does **not** mutate the process environment
+    /// (see [`module_loading_policy`]): `Cuda::open` is a safe public function
+    /// and cannot assume a single-threaded process, where `set_var` would race
+    /// arbitrary concurrent environment reads. A runner that wants deterministic
+    /// JIT (EAGER) and no on-disk JIT cache exports `CUDA_MODULE_LOADING` /
+    /// `CUDA_CACHE_DISABLE` before `exec`; receipts record what was in effect.
     pub fn open(ordinal: i32) -> Result<Cuda> {
-        // Eager module loading + no on-disk JIT cache: with the default LAZY
-        // mode the driver defers PTX JIT past module load (deferred failures
-        // surface confusingly), and the on-disk JIT cache can serve a stale
-        // entry as a silent rc 218 (observed on driver 610.57.04). We JIT
-        // deterministically at load — the "warm JIT at setup, never on a
-        // real-time path" rule — with no hidden on-disk state. Process-wide
-        // settings, applied only when unset; documented in PROJECT_STATE.
-        if std::env::var_os("CUDA_MODULE_LOADING").is_none() {
-            // SAFETY: single-threaded setup before any other driver use.
-            unsafe { std::env::set_var("CUDA_MODULE_LOADING", "EAGER") };
-        }
-        if std::env::var_os("CUDA_CACHE_DISABLE").is_none() {
-            // SAFETY: single-threaded setup before any other driver use.
-            unsafe { std::env::set_var("CUDA_CACHE_DISABLE", "1") };
-        }
         let driver = Driver::open()?;
         let fns = driver.fns;
         // SAFETY: driver API init.
@@ -330,19 +373,42 @@ impl Cuda {
         // `NULL` ctxCreateParams creates a regular context (cuda.h 6481).
         // Legacy `cuCtxCreate_v2` (three-arg) on this driver yields a context
         // that rejects later allocation with rc 201 (verified, driver
-        // 610.57.04). The created context becomes current for this thread.
+        // 610.57.04). `cuCtxCreate` pushes the new context onto this thread's
+        // context stack.
         let mut context: usize = 0;
         // SAFETY: out-param; NULL params (regular context); default flags.
         let rc = unsafe {
             (fns.cuCtxCreate.expect("bound"))(&mut context, std::ptr::null_mut(), 0, ordinal)
         };
         check(&fns, "cuCtxCreate", rc)?;
-        // Stream priority range: context query, the only documented source.
+        // Stream priority range: context query, the only documented source,
+        // performed while the new context is still current.
         let (mut least, mut greatest) = (0, 0);
         // SAFETY: out-params.
         let rc =
             unsafe { (fns.cuCtxGetStreamPriorityRange.expect("bound"))(&mut least, &mut greatest) };
         check(&fns, "cuCtxGetStreamPriorityRange", rc)?;
+        // Pop the new context immediately: on return it is *floating*, and the
+        // calling thread's context stack is exactly as it was before. Two
+        // consequences matter for embedding this library:
+        //   * `open` does not permanently alter its caller's current context;
+        //   * the final `Arc` may be dropped on any thread without leaving a
+        //     destroyed context current on the creating thread (`cuCtxDestroy`
+        //     does not detach a context that is current elsewhere).
+        // Every operation re-attaches via `CudaContext::enter` anyway.
+        let mut popped: usize = 0;
+        // SAFETY: out-param; pops the context created just above.
+        let rc = unsafe { (fns.cuCtxPopCurrent.expect("bound"))(&mut popped) };
+        check(&fns, "cuCtxPopCurrent", rc)?;
+        if popped != context {
+            return Err(Error::new(
+                crate::error::Kind::External,
+                format!(
+                    "cuCtxPopCurrent returned {popped:#x}, expected the created context \
+                     {context:#x}"
+                ),
+            ));
+        }
         Ok(Cuda {
             ctx: Arc::new(CudaContext {
                 fns,
@@ -433,7 +499,9 @@ impl Drop for ModuleInner {
             // SAFETY: module unload (best effort); the context is alive
             // because this struct retains it, and no `Function` outlives it
             // by construction. Enter the context so unload targets it.
-            let _ = self.ctx.enter();
+            // Bind the guard to a named local: `let _ = ...` would drop it at
+            // the end of this statement and unload with the wrong context.
+            let _guard = self.ctx.enter();
             unsafe { (self.ctx.fns.cuModuleUnload.expect("bound"))(self.handle) };
         }
     }
@@ -666,7 +734,7 @@ impl Drop for Stream {
         if self.handle != 0 {
             // SAFETY: stream destroy (best effort); the context is alive
             // because this struct retains it. Enter it so destroy targets it.
-            let _ = self.ctx.enter();
+            let _guard = self.ctx.enter();
             unsafe { (self.ctx.fns.cuStreamDestroy.expect("bound"))(self.handle) };
         }
     }
@@ -735,7 +803,7 @@ impl Drop for Event {
         if self.handle != 0 {
             // SAFETY: event destroy (best effort); the context is alive
             // because this struct retains it.
-            let _ = self.ctx.enter();
+            let _guard = self.ctx.enter();
             unsafe { (self.ctx.fns.cuEventDestroy.expect("bound"))(self.handle) };
         }
     }
@@ -867,7 +935,7 @@ impl Drop for DeviceBuffer {
         if self.ptr != 0 {
             // SAFETY: device free (best effort); the context is alive because
             // this struct retains it. Enter it so the free targets it.
-            let _ = self.ctx.enter();
+            let _guard = self.ctx.enter();
             unsafe { (self.ctx.fns.cuMemFree.expect("bound"))(self.ptr) };
         }
     }
@@ -936,7 +1004,7 @@ impl Drop for GraphExec {
         if self.handle != 0 {
             // SAFETY: graph exec destroy (best effort); the context is alive
             // because this struct retains it.
-            let _ = self.ctx.enter();
+            let _guard = self.ctx.enter();
             unsafe { (self.ctx.fns.cuGraphExecDestroy.expect("bound"))(self.handle) };
         }
     }
