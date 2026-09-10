@@ -45,6 +45,8 @@ pub mod entropyfs;
 #[cfg(feature = "std")]
 pub mod facts;
 #[cfg(feature = "std")]
+pub mod flagship;
+#[cfg(feature = "std")]
 pub mod flattening;
 #[cfg(feature = "std")]
 pub mod fullobj;
@@ -123,6 +125,12 @@ with the frozen membership; missing/extra/mutated/mis-sized/wrong-rate/wrong-has
         "Phase M full-object archival container mechanism: frozen 65,536-frame segmentation, \
 exact U1 segments, real serialized bytes, semantics-preserving reconstruction, boundary \
 observation and hostile-container rejection over non-flagship fixtures",
+    ),
+    (
+        "flagship",
+        "Phase M flagship result: B1 FLAC versus current bounded VOLE inverse selection over \
+the frozen 115-object corpus (110 B1-comparable), with per-object container bytes, \
+selected representations and comparison buckets",
     ),
     (
         "cuda",
@@ -222,6 +230,7 @@ pub fn run(name: &str, receipts_root: &Path) -> crate::error::Result<Verdict> {
         "conventional" => conventional::run(receipts_root),
         "corpus" => corpus::run(receipts_root),
         "fullobj" => fullobj::run(receipts_root),
+        "flagship" => flagship::run(receipts_root),
         "flattening" => flattening::run(receipts_root),
         "cuda" => cuda::run(receipts_root),
         "d1" => d1::run(receipts_root),
