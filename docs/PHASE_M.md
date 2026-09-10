@@ -102,19 +102,20 @@ the context and leaves the caller's context stack exactly as it was.
 
 ## What is *not* in this increment
 
-Stated plainly so the gap is visible:
+Stated plainly so the gap is visible (updated at Seal 2 — the corpus freeze is
+now done; the rest is not):
 
-* the **flagship corpus is not frozen yet**. This increment measures the frozen
-  **H.2 entropy corpus** (14 generated fixtures). Its negative controls are built
-  for 8-bit symbolization and are not all incompressible at 32 bits/sample (for
-  example `random-control` is 2-channel with identical channels, so mid-side
-  decorrelation halves it); the flagship corpus must be stratified by
-  representation *and* amplitude class;
+* the flagship **B1/VOLE comparison has not been run**. Seal 2 freezes and
+  verifies the corpus; the comparison is a later increment, so no flagship
+  performance claim exists yet;
 * B2–B4 (sampler / disk-streaming / compressed-file playback) are
   `NOT_IMPLEMENTED`;
 * `court depth`, `court random-access`, `court negative`, `court interference`,
   `court all` are not implemented;
-* energy and the adversarial real-time load matrix (§49) are not measured.
+* energy and the adversarial real-time load matrix (§49) are not measured;
+* the **license-clean real-recording stratum is declared and vacant** (see
+  `corpus/README.md`); no production claim rests on real recordings yet, and
+  `court corpus` records that rather than staying silent.
 
 ## Seal history
 
@@ -141,10 +142,43 @@ Seal run (release, `--all-features`, clean tree, version 0.11.0):
 
 ## Where this goes next
 
-1. **Freeze the flagship corpus** (~100 objects, several minutes, 44.1/48/96/192
-   kHz, one-shots/loops/reverse/rate/ADSR/pan/automation/bounded filters,
-   stratified by representation and amplitude), with a manifest and
-   `corpus verify`.
-2. B2–B4 and the `depth` / `random-access` / `negative` courts.
-3. The crossover surface: `court all` stratified by representation.
-4. Adversarial real-time load (§49) and energy where measurable.
+1. **Seal 2 (this seal) — the flagship corpus is frozen and verified.**
+2. Switch the conventional/baseline courts onto the flagship corpus (population
+   rule in force) and implement B2–B4, then the `depth` / `random-access` /
+   `negative` courts and the crossover surface.
+3. Adversarial real-time load (§49) and energy where measurable.
+
+### Seal 2 — flagship corpus freeze (2026-09-10)
+
+Seal run (release, `--all-features`, clean tree, version 0.12.0):
+
+- **115 objects, ~3.6 minutes of material** (217.8 s) at 44.1 kHz ×9, 48 kHz
+  ×85, 96 kHz ×13, 192 kHz ×8; generated, never stored.
+- Populations: **110 B1-comparable**, **5 excluded by format domain**
+  (`>8` channels = `NOT_APPLICABLE_BY_FORMAT_DOMAIN`, recorded so the exclusion
+  can never become a hidden denominator change).
+- Stratification, per axis (counts are the frozen population, not results):
+  representation — literal 7, oscillator 29, wavetable 12, exact_repetition 7,
+  residual 12, compound 19, noise 29; amplitude — low_byte 5, s16 52, s24 30,
+  full 28; channel structure — mono 79, identical 6, correlated 4,
+  anti-correlated 4, independent 7, multichannel 15; temporal — stationary 90,
+  transient 6, loop 7, one-shot 2, slowly varying 5, strongly modulated 5;
+  entropy — highly predictable 28, locally predictable 22, globally periodic 19,
+  sparse residual 17, spectrally structured 9, full-width random 14, scrambled 6.
+- Hostile controls are hostile by construction and by test: full-width uniform
+  and bit-scrambled noise with independent per-channel seeds, independent stereo
+  rather than duplicated channels, no shared low-byte structure, no short
+  accidental period (checked to p ≤ 1024), no DC bias and no reduced dynamic
+  range (all asserted by unit tests).
+- `court corpus` **SUPPORTED**: 115 objects regenerated and hash-matched;
+  corpus sha256 `c0fc62ff…`, manifest sha256 `a575bf12…`.
+- The gate is itself tested by a **mutation battery**: schema, corpus-hash,
+  missing-object, extra-object, class, rate, size, content-hash, generator,
+  zero-rate, zero-channel, zero-frame and population-count mutations all fail
+  with the expected finding kind.
+- Duplicate-id defect found and fixed during the freeze (objects differing only
+  in channel structure, or in a swept parameter, had collided); ids now carry
+  the channel structure, and the membership test asserts uniqueness.
+- B1's integrity invariant is now enforced inside `b1_flac` itself (a
+  STREAMINFO MD5 failure is an error at every compression level, for every
+  caller), not only at the court's primary call site.

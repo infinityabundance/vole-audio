@@ -157,6 +157,14 @@ pub fn b1_flac(
 
     let source_sha256 = crate::universe::observation::observation_sha256(samples);
     let decoded_sha256 = crate::universe::observation::observation_sha256(&decoded.interleaved);
+    // The integrity check is part of what a B1 encoding *is*, so it is enforced
+    // here rather than left to callers: no B1 result can exist without a verified
+    // STREAMINFO audio MD5, at any compression level.
+    if !decoded.md5_ok {
+        return Err(Error::internal(
+            "B1/FLAC STREAMINFO audio MD5 did not verify",
+        ));
+    }
     let exact_roundtrip = decoded.interleaved == samples;
     if !exact_roundtrip {
         let first = samples

@@ -16,6 +16,8 @@ pub mod authored;
 #[cfg(feature = "std")]
 pub mod conventional;
 #[cfg(feature = "std")]
+pub mod corpus;
+#[cfg(feature = "std")]
 pub mod cuda;
 #[cfg(feature = "std")]
 pub mod d1;
@@ -107,6 +109,12 @@ must produce exactly the sequential candidate set re-verified by the exact evalu
         "Phase M conventional baselines (contract §47): B0 raw PCM vs B1 in-process pure-Rust \
 FLAC at 32 bits/sample (level 5 primary, 0/8 controls) over the exact canonical i32 domain, \
 with the full B0-B9 ladder visible and every FLAC row required to round-trip exactly",
+    ),
+    (
+        "corpus",
+        "Phase M flagship-corpus gate: the frozen manifest's identity (schema, corpus hash, \
+class assignments, rates, sizes, canonical i32 hashes) must regenerate exactly and agree \
+with the frozen membership; missing/extra/mutated/mis-sized/wrong-rate/wrong-hash all fail",
     ),
     (
         "cuda",
@@ -204,6 +212,7 @@ pub fn run(name: &str, receipts_root: &Path) -> crate::error::Result<Verdict> {
         "inverse" => inverse::run(receipts_root),
         "inverse-search" => inverse_search::run(receipts_root),
         "conventional" => conventional::run(receipts_root),
+        "corpus" => corpus::run(receipts_root),
         "flattening" => flattening::run(receipts_root),
         "cuda" => cuda::run(receipts_root),
         "d1" => d1::run(receipts_root),

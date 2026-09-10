@@ -1,6 +1,6 @@
 [package]
 name = "vole-audio"
-version = "0.11.0"
+version = "0.12.0"
 edition = "2024"
 # Verified MSRV: the full host test suite (all-features; 280+ tests incl.
 # the AVX-512 kernels, which need `stdarch_x86_avx512` stabilized in 1.89)
@@ -18,13 +18,16 @@ license = "MIT OR Apache-2.0"
 
 # Published-package hygiene: keep the crates.io tarball lean and buildable on
 # stable Rust. In particular `rust-toolchain.toml` (a repo-local nightly pin
-# used for GPU device cross-compilation) must never ship, and the frozen
-# lookup tables under assets/u1/ (pulled in via include_bytes!) must ship.
+# used for GPU device cross-compilation) must never ship, and the frozen lookup
+# tables under assets/u1/ (pulled in via include_bytes!) must ship. The flagship
+# corpus manifest (corpus/manifest.json, pulled in via include_str!) must ship
+# too, so `vole-audio corpus verify` works from the published crate — only the
+# bulk generated-object directory is excluded.
 exclude = [
     "rust-toolchain.toml",
     "scripts/",
     "receipts/",
-    "corpus/",
+    "corpus/generated/",
     "docs/",
     ".gitignore",
 ]

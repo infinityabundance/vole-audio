@@ -1019,10 +1019,40 @@ conventional baseline ladder's foundation:
   step (or panic) between `cuCtxCreate` and the RAII owner destroys the context
   and leaves the caller's context stack unchanged.
 
-Not yet in Phase M: the flagship corpus freeze (this increment measures the H.2
-entropy corpus, whose negative controls are not all incompressible at 32
-bits/sample), B2–B4, `court depth|random-access|negative|interference|all`, the
-crossover surface, energy, and the adversarial real-time load matrix.
+Not yet in Phase M: the flagship B1/VOLE comparison (Seal 2 froze and verified
+the corpus but ran no flagship measurement), B2–B4,
+`court depth|random-access|negative|interference|all`, the crossover surface,
+energy, and the adversarial real-time load matrix.
+
+### Phase M Seal 2 — flagship corpus freeze (v0.12.0)
+
+The corpus is now frozen and verifiable:
+
+- `src/corpus/specs.rs` is the frozen membership (115 objects, ~3.6 minutes,
+  44.1/48/96/192 kHz) with orthogonal stratification across representation,
+  amplitude occupancy, channel structure, temporal structure and entropy
+  character, plus hostile full-width/scrambled controls with independent
+  per-channel seeds.
+- `src/corpus/generate.rs` regenerates every object deterministically
+  (integer-only); `corpus/manifest.json` is the frozen identity-bearing manifest
+  (identity bytes cover classes, rate, channels, frames, semantics, generator
+  parameters, source and canonical i32 hash; `corpus_sha256` covers all of it).
+- `court corpus` / `vole-audio corpus verify` is the gate: it fails on a bad
+  schema, a corpus hash that does not cover its objects, membership drift in
+  either direction, a mutated class/rate/size, a generator whose output no
+  longer matches the frozen hash, and population-count drift. A mutation battery
+  tests each class.
+- Populations are explicit: 110 B1-comparable, 5 excluded by FLAC's format
+  domain (`>8` channels, never entering a B1-vs-VOLE aggregate).
+- The license-clean real-recording stratum is declared and **vacant**, with a
+  documented admission path; `court corpus` records it as
+  `real_audio_stratum: VACANT_DECLARED`.
+- `b1_flac` now enforces the STREAMINFO MD5 invariant internally, at every
+  compression level, so no caller can accept a B1 encoding without it.
+
+Measured: corpus sha256 `c0fc62ff…`, manifest sha256 `a575bf12…`, 115/115
+objects regenerated and hash-matched. The flagship comparison itself is the next
+increment.
 
 ## Next work (exact order — the implementation contract is executed in sequence)
 
@@ -1044,7 +1074,8 @@ re-verified by the exact evaluator (`court inverse-search`), and the placement
 policy keeps the measured-faster host surface (`SearchBudget::placement`,
 `Auto`).
 
-1. Phase M — remaining increments (flagship corpus freeze; B2–B4; depth /
+1. Phase M — remaining increments (flagship B1/VOLE comparison on the frozen
+   corpus; B2–B4; depth /
    random-access / negative / interference courts; crossover surface; energy);
    Phase N — transport/archive
    (embeds H.2 canonical records); Phase O — learned deterministic prediction

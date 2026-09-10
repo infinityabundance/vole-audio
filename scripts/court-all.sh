@@ -57,7 +57,7 @@ run_court() {
 }
 
 rc=0
-for court in semantic authored simd facts inverse inverse-search conventional flattening cuda d1 rocm \
+for court in semantic authored simd facts inverse inverse-search conventional corpus flattening cuda d1 rocm \
     entropy-rans entropy-literal \
     entropy-residual entropy-pages entropy-partial entropy-simd; do
     if ! run_court "$court"; then

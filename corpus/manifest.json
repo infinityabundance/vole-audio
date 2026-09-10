@@ -2,9 +2,3443 @@
   "schema": "vole.audio.corpus.v1",
   "universe": "vole.audio.u1",
   "profile": "u1/v1",
-  "nominal_sample_rate_hz": 48000,
-  "state": "EMPTY_DRAFT",
-  "note": "The frozen ~100-object flagship corpus is defined in Phase M. Until then no content claims are made from this directory.",
-  "objects": [],
-  "sha256": null
+  "state": "FROZEN",
+  "note": "Frozen before any flagship result exists. Membership and class assignments are not changed because a result is unfavourable (contract §48). Objects are generated, never stored: the manifest carries the generator plus the canonical content hash.",
+  "populations": {
+    "whole_corpus_objects": 115,
+    "b1_comparable_objects": 110,
+    "b1_excluded_objects": 5,
+    "high_channel_stress_objects": 5
+  },
+  "objects": [
+    {
+      "id": "silence-48000hz-1ch-full_i32-mono",
+      "class": "generated",
+      "representation_class": "literal",
+      "amplitude_class": "full_i32",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "highly_predictable",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 96000,
+      "duration_ms": 2000,
+      "semantics": "one_shot",
+      "generator": "Silence",
+      "source": "generated: corpus::generate (silence), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "fec9afb531a8e036eba1d81651896e1b2c1f78b0234dbadc8e7549563f09407b"
+    },
+    {
+      "id": "dc-48000hz-1ch-low_byte-mono",
+      "class": "generated",
+      "representation_class": "literal",
+      "amplitude_class": "low_byte",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "highly_predictable",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 96000,
+      "duration_ms": 2000,
+      "semantics": "one_shot",
+      "generator": {
+        "Dc": {
+          "amp_milli": 900
+        }
+      },
+      "source": "generated: corpus::generate (dc), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "a1d098042d64e92ffc8f8ce9c4f04fe4d00640548a1c1556d7bec1ffd6650fc8"
+    },
+    {
+      "id": "dc-48000hz-1ch-s16_like-mono",
+      "class": "generated",
+      "representation_class": "literal",
+      "amplitude_class": "s16_like",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "highly_predictable",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 96000,
+      "duration_ms": 2000,
+      "semantics": "one_shot",
+      "generator": {
+        "Dc": {
+          "amp_milli": 900
+        }
+      },
+      "source": "generated: corpus::generate (dc), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "eec13ebf6a51ec8b8ea2df3c80f6dd9e4b776776c1ffcdb1eaa17d733e8318b7"
+    },
+    {
+      "id": "dc-48000hz-1ch-s24_like-mono",
+      "class": "generated",
+      "representation_class": "literal",
+      "amplitude_class": "s24_like",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "highly_predictable",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 96000,
+      "duration_ms": 2000,
+      "semantics": "one_shot",
+      "generator": {
+        "Dc": {
+          "amp_milli": 900
+        }
+      },
+      "source": "generated: corpus::generate (dc), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "e5c1c229b8e46031e17e470d14c62fef2e05b6b5dc58c4299a63c33e59649c30"
+    },
+    {
+      "id": "dc-48000hz-1ch-full_i32-mono",
+      "class": "generated",
+      "representation_class": "literal",
+      "amplitude_class": "full_i32",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "highly_predictable",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 96000,
+      "duration_ms": 2000,
+      "semantics": "one_shot",
+      "generator": {
+        "Dc": {
+          "amp_milli": 900
+        }
+      },
+      "source": "generated: corpus::generate (dc), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "ef7cb2326c464f2591a5a5abdde97650fa80b5ac817bd5535d519779e5a60752"
+    },
+    {
+      "id": "osc-1k-48000hz-1ch-low_byte-mono",
+      "class": "generated",
+      "representation_class": "oscillator",
+      "amplitude_class": "low_byte",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "highly_predictable",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 96000,
+      "duration_ms": 2000,
+      "semantics": "one_shot",
+      "generator": {
+        "Oscillator": {
+          "hz": 1000
+        }
+      },
+      "source": "generated: corpus::generate (oscillator), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "1d26807fe7c62bf5618a8b5db65f7a5e6dc2c7ca89d0cc25d929baccc493d4ad"
+    },
+    {
+      "id": "osc-1k-48000hz-1ch-s16_like-mono",
+      "class": "generated",
+      "representation_class": "oscillator",
+      "amplitude_class": "s16_like",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "highly_predictable",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 96000,
+      "duration_ms": 2000,
+      "semantics": "one_shot",
+      "generator": {
+        "Oscillator": {
+          "hz": 1000
+        }
+      },
+      "source": "generated: corpus::generate (oscillator), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "ba824b51b0b4a99f1f325d5a534f5749afde6e01a87f7256b7121f1614b2fe54"
+    },
+    {
+      "id": "osc-1k-48000hz-1ch-s24_like-mono",
+      "class": "generated",
+      "representation_class": "oscillator",
+      "amplitude_class": "s24_like",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "highly_predictable",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 96000,
+      "duration_ms": 2000,
+      "semantics": "one_shot",
+      "generator": {
+        "Oscillator": {
+          "hz": 1000
+        }
+      },
+      "source": "generated: corpus::generate (oscillator), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "4f3d83b3f08e00016dae7e2b033e4332dce35664a9971afa947778494cd03470"
+    },
+    {
+      "id": "osc-1k-48000hz-1ch-full_i32-mono",
+      "class": "generated",
+      "representation_class": "oscillator",
+      "amplitude_class": "full_i32",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "highly_predictable",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 96000,
+      "duration_ms": 2000,
+      "semantics": "one_shot",
+      "generator": {
+        "Oscillator": {
+          "hz": 1000
+        }
+      },
+      "source": "generated: corpus::generate (oscillator), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "78d7203a696d1a5535f259df5f702093a7689683bf0872a23465fceafa96054d"
+    },
+    {
+      "id": "osc-1k-44100hz-1ch-s16_like-mono",
+      "class": "generated",
+      "representation_class": "oscillator",
+      "amplitude_class": "s16_like",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "highly_predictable",
+      "sample_rate_hz": 44100,
+      "channels": 1,
+      "frames": 88200,
+      "duration_ms": 2000,
+      "semantics": "one_shot",
+      "generator": {
+        "Oscillator": {
+          "hz": 1000
+        }
+      },
+      "source": "generated: corpus::generate (oscillator), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "8a97085eaa46372e6464b176ca9731df7a7daa4484f2d83809db578f0ffe911f"
+    },
+    {
+      "id": "osc-1k-96000hz-1ch-s16_like-mono",
+      "class": "generated",
+      "representation_class": "oscillator",
+      "amplitude_class": "s16_like",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "highly_predictable",
+      "sample_rate_hz": 96000,
+      "channels": 1,
+      "frames": 96000,
+      "duration_ms": 1000,
+      "semantics": "one_shot",
+      "generator": {
+        "Oscillator": {
+          "hz": 1000
+        }
+      },
+      "source": "generated: corpus::generate (oscillator), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "6aebb717b79239c4081d6417e909e8fa664269d52256e249914daf9966db8259"
+    },
+    {
+      "id": "osc-1k-192000hz-1ch-s16_like-mono",
+      "class": "generated",
+      "representation_class": "oscillator",
+      "amplitude_class": "s16_like",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "highly_predictable",
+      "sample_rate_hz": 192000,
+      "channels": 1,
+      "frames": 96000,
+      "duration_ms": 500,
+      "semantics": "one_shot",
+      "generator": {
+        "Oscillator": {
+          "hz": 1000
+        }
+      },
+      "source": "generated: corpus::generate (oscillator), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "2b256d0fb7abba38c831c321daa789ac74a51e1fc630cec175717c43a8113e24"
+    },
+    {
+      "id": "harmonic-220-48000hz-1ch-low_byte-mono",
+      "class": "generated",
+      "representation_class": "oscillator",
+      "amplitude_class": "low_byte",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "locally_predictable",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 96000,
+      "duration_ms": 2000,
+      "semantics": "one_shot",
+      "generator": {
+        "Harmonic": {
+          "hz": 220,
+          "partials": 8
+        }
+      },
+      "source": "generated: corpus::generate (harmonic), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "c70e5352275450fe42aeed29ffd5b4181081e02bf0a152a4fa1550cad51f9b2d"
+    },
+    {
+      "id": "harmonic-220-48000hz-1ch-s16_like-mono",
+      "class": "generated",
+      "representation_class": "oscillator",
+      "amplitude_class": "s16_like",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "locally_predictable",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 96000,
+      "duration_ms": 2000,
+      "semantics": "one_shot",
+      "generator": {
+        "Harmonic": {
+          "hz": 220,
+          "partials": 8
+        }
+      },
+      "source": "generated: corpus::generate (harmonic), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "246da85d547e49369bf4880d66a6af41fbc3cfecd0755daed9165cd27ede8443"
+    },
+    {
+      "id": "harmonic-220-48000hz-1ch-s24_like-mono",
+      "class": "generated",
+      "representation_class": "oscillator",
+      "amplitude_class": "s24_like",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "locally_predictable",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 96000,
+      "duration_ms": 2000,
+      "semantics": "one_shot",
+      "generator": {
+        "Harmonic": {
+          "hz": 220,
+          "partials": 8
+        }
+      },
+      "source": "generated: corpus::generate (harmonic), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "f9b51599416b95bb189c756297726d0e8d23d18f49bbf82994124f8ce0b94544"
+    },
+    {
+      "id": "harmonic-220-48000hz-1ch-full_i32-mono",
+      "class": "generated",
+      "representation_class": "oscillator",
+      "amplitude_class": "full_i32",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "locally_predictable",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 96000,
+      "duration_ms": 2000,
+      "semantics": "one_shot",
+      "generator": {
+        "Harmonic": {
+          "hz": 220,
+          "partials": 8
+        }
+      },
+      "source": "generated: corpus::generate (harmonic), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "f3a01ba58b45c91460db58a1b60a1b9cc02c989786e71a9205e178c8b7f47ef0"
+    },
+    {
+      "id": "wavetable-saw-1k-48000hz-1ch-low_byte-mono",
+      "class": "generated",
+      "representation_class": "wavetable",
+      "amplitude_class": "low_byte",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "globally_periodic",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 96000,
+      "duration_ms": 2000,
+      "semantics": "loop",
+      "repeat_period_frames": 48,
+      "generator": {
+        "Wavetable": {
+          "period": 48,
+          "shape": "saw"
+        }
+      },
+      "source": "generated: corpus::generate (wavetable), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "d0feaa52250d7d014a3cfd20c368689e9c1fee4366afefb83e721eab8983dec2"
+    },
+    {
+      "id": "wavetable-saw-1k-48000hz-1ch-s16_like-mono",
+      "class": "generated",
+      "representation_class": "wavetable",
+      "amplitude_class": "s16_like",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "globally_periodic",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 96000,
+      "duration_ms": 2000,
+      "semantics": "loop",
+      "repeat_period_frames": 48,
+      "generator": {
+        "Wavetable": {
+          "period": 48,
+          "shape": "saw"
+        }
+      },
+      "source": "generated: corpus::generate (wavetable), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "bf66a11de5d4dd06d3d04f712906492d54c786cfe2f0487f8591807847d51cec"
+    },
+    {
+      "id": "wavetable-saw-1k-48000hz-1ch-s24_like-mono",
+      "class": "generated",
+      "representation_class": "wavetable",
+      "amplitude_class": "s24_like",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "globally_periodic",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 96000,
+      "duration_ms": 2000,
+      "semantics": "loop",
+      "repeat_period_frames": 48,
+      "generator": {
+        "Wavetable": {
+          "period": 48,
+          "shape": "saw"
+        }
+      },
+      "source": "generated: corpus::generate (wavetable), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "01e79f010745872589b6ba903eb7b12e54f5a6d01235c92b5228108f5f1d7aeb"
+    },
+    {
+      "id": "wavetable-saw-1k-48000hz-1ch-full_i32-mono",
+      "class": "generated",
+      "representation_class": "wavetable",
+      "amplitude_class": "full_i32",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "globally_periodic",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 96000,
+      "duration_ms": 2000,
+      "semantics": "loop",
+      "repeat_period_frames": 48,
+      "generator": {
+        "Wavetable": {
+          "period": 48,
+          "shape": "saw"
+        }
+      },
+      "source": "generated: corpus::generate (wavetable), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "e9cc8f1c78dacb935010177453fb743596b056301d77cfe6783060930cf9cb97"
+    },
+    {
+      "id": "wavetable-square-48000hz-1ch-s16_like-mono",
+      "class": "generated",
+      "representation_class": "wavetable",
+      "amplitude_class": "s16_like",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "globally_periodic",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 96000,
+      "duration_ms": 2000,
+      "semantics": "loop",
+      "repeat_period_frames": 48,
+      "generator": {
+        "Wavetable": {
+          "period": 48,
+          "shape": "square"
+        }
+      },
+      "source": "generated: corpus::generate (wavetable), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "9fe86ab04e03011602286fb0549f10fbf19a06bb53ba2262131a7590500fb9d9"
+    },
+    {
+      "id": "wavetable-triangle-48000hz-1ch-s16_like-mono",
+      "class": "generated",
+      "representation_class": "wavetable",
+      "amplitude_class": "s16_like",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "globally_periodic",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 96000,
+      "duration_ms": 2000,
+      "semantics": "loop",
+      "repeat_period_frames": 48,
+      "generator": {
+        "Wavetable": {
+          "period": 48,
+          "shape": "triangle"
+        }
+      },
+      "source": "generated: corpus::generate (wavetable), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "06d20dd319e7f29a914ccd496e5d079f53439b07bcdbc4648758481d27caf7e5"
+    },
+    {
+      "id": "wavetable-sine-48000hz-1ch-s16_like-mono",
+      "class": "generated",
+      "representation_class": "wavetable",
+      "amplitude_class": "s16_like",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "globally_periodic",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 96000,
+      "duration_ms": 2000,
+      "semantics": "loop",
+      "repeat_period_frames": 48,
+      "generator": {
+        "Wavetable": {
+          "period": 48,
+          "shape": "sine"
+        }
+      },
+      "source": "generated: corpus::generate (wavetable), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "ba824b51b0b4a99f1f325d5a534f5749afde6e01a87f7256b7121f1614b2fe54"
+    },
+    {
+      "id": "repeat-1000-saw-48000hz-1ch-s24_like-mono",
+      "class": "generated",
+      "representation_class": "exact_repetition",
+      "amplitude_class": "s24_like",
+      "channel_structure": "mono",
+      "temporal_class": "loop",
+      "entropy_class": "globally_periodic",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 96000,
+      "duration_ms": 2000,
+      "semantics": "loop",
+      "repeat_period_frames": 1000,
+      "generator": {
+        "ExactRepeat": {
+          "period": 1000,
+          "shape": "saw"
+        }
+      },
+      "source": "generated: corpus::generate (exact_repeat), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "77234e4b18a4ad1d5e84c33f92efbf4528146472307938e3cd1424d0af6f7a65"
+    },
+    {
+      "id": "repeat-1000-square-48000hz-1ch-s24_like-mono",
+      "class": "generated",
+      "representation_class": "exact_repetition",
+      "amplitude_class": "s24_like",
+      "channel_structure": "mono",
+      "temporal_class": "loop",
+      "entropy_class": "globally_periodic",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 96000,
+      "duration_ms": 2000,
+      "semantics": "loop",
+      "repeat_period_frames": 1000,
+      "generator": {
+        "ExactRepeat": {
+          "period": 1000,
+          "shape": "square"
+        }
+      },
+      "source": "generated: corpus::generate (exact_repeat), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "561d8591b48045c727753cf51d690cc1faf3f4190c4a54819ad4bc3ba815fd61"
+    },
+    {
+      "id": "repeat-1000-sine-48000hz-1ch-s24_like-mono",
+      "class": "generated",
+      "representation_class": "exact_repetition",
+      "amplitude_class": "s24_like",
+      "channel_structure": "mono",
+      "temporal_class": "loop",
+      "entropy_class": "globally_periodic",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 96000,
+      "duration_ms": 2000,
+      "semantics": "loop",
+      "repeat_period_frames": 1000,
+      "generator": {
+        "ExactRepeat": {
+          "period": 1000,
+          "shape": "sine"
+        }
+      },
+      "source": "generated: corpus::generate (exact_repeat), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "c3bdc796cee50f7a7eb6b509343e1eb80140780add3d28567c5a9febca93c288"
+    },
+    {
+      "id": "repeat-1000-triangle-48000hz-1ch-s24_like-mono",
+      "class": "generated",
+      "representation_class": "exact_repetition",
+      "amplitude_class": "s24_like",
+      "channel_structure": "mono",
+      "temporal_class": "loop",
+      "entropy_class": "globally_periodic",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 96000,
+      "duration_ms": 2000,
+      "semantics": "loop",
+      "repeat_period_frames": 1000,
+      "generator": {
+        "ExactRepeat": {
+          "period": 1000,
+          "shape": "triangle"
+        }
+      },
+      "source": "generated: corpus::generate (exact_repeat), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "ecb22f87b5f7600b91baaaee47be08372c0760019488a16897e77e11838c85a9"
+    },
+    {
+      "id": "wavetable-saw-1k-96000hz-1ch-s24_like-mono",
+      "class": "generated",
+      "representation_class": "wavetable",
+      "amplitude_class": "s24_like",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "globally_periodic",
+      "sample_rate_hz": 96000,
+      "channels": 1,
+      "frames": 96000,
+      "duration_ms": 1000,
+      "semantics": "loop",
+      "repeat_period_frames": 96,
+      "generator": {
+        "Wavetable": {
+          "period": 96,
+          "shape": "saw"
+        }
+      },
+      "source": "generated: corpus::generate (wavetable), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "fe0a238de26e275eabb47312676b6e0c842ea61c24619566bef0f358658cc8b0"
+    },
+    {
+      "id": "wavetable-saw-1k-192000hz-1ch-s24_like-mono",
+      "class": "generated",
+      "representation_class": "wavetable",
+      "amplitude_class": "s24_like",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "globally_periodic",
+      "sample_rate_hz": 192000,
+      "channels": 1,
+      "frames": 96000,
+      "duration_ms": 500,
+      "semantics": "loop",
+      "repeat_period_frames": 192,
+      "generator": {
+        "Wavetable": {
+          "period": 192,
+          "shape": "saw"
+        }
+      },
+      "source": "generated: corpus::generate (wavetable), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "965d63bdc0dc1099bc881cf19a1cd23ed6b0c5fcda3bf19f82ecbec7f26313d8"
+    },
+    {
+      "id": "osc-1k-48000hz-2ch-s16_like-identical_stereo",
+      "class": "generated",
+      "representation_class": "oscillator",
+      "amplitude_class": "s16_like",
+      "channel_structure": "identical_stereo",
+      "temporal_class": "stationary",
+      "entropy_class": "highly_predictable",
+      "sample_rate_hz": 48000,
+      "channels": 2,
+      "frames": 96000,
+      "duration_ms": 2000,
+      "semantics": "one_shot",
+      "generator": {
+        "Oscillator": {
+          "hz": 1000
+        }
+      },
+      "source": "generated: corpus::generate (oscillator), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "b8a5e6dd61ed0f523cd0f7d8a14411d76e797ab57b42aacaa7eac59d1a0a81c6"
+    },
+    {
+      "id": "osc-1k-48000hz-2ch-s16_like-correlated_stereo",
+      "class": "generated",
+      "representation_class": "oscillator",
+      "amplitude_class": "s16_like",
+      "channel_structure": "correlated_stereo",
+      "temporal_class": "stationary",
+      "entropy_class": "highly_predictable",
+      "sample_rate_hz": 48000,
+      "channels": 2,
+      "frames": 96000,
+      "duration_ms": 2000,
+      "semantics": "one_shot",
+      "generator": {
+        "Oscillator": {
+          "hz": 1000
+        }
+      },
+      "source": "generated: corpus::generate (oscillator), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "691f7f004666ba3fcb194d4edc3e46903f2b135ea3d66fdeaadc9df6a8aaee2d"
+    },
+    {
+      "id": "osc-1k-48000hz-2ch-s16_like-anticorrelated_stereo",
+      "class": "generated",
+      "representation_class": "oscillator",
+      "amplitude_class": "s16_like",
+      "channel_structure": "anticorrelated_stereo",
+      "temporal_class": "stationary",
+      "entropy_class": "highly_predictable",
+      "sample_rate_hz": 48000,
+      "channels": 2,
+      "frames": 96000,
+      "duration_ms": 2000,
+      "semantics": "one_shot",
+      "generator": {
+        "Oscillator": {
+          "hz": 1000
+        }
+      },
+      "source": "generated: corpus::generate (oscillator), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "a64ee90f2c45ac0513b5b8958dd9b568dc597b662714daf3e6c6ed09fb77b0ce"
+    },
+    {
+      "id": "osc-detuned-48000hz-2ch-s16_like-independent_stereo",
+      "class": "generated",
+      "representation_class": "oscillator",
+      "amplitude_class": "s16_like",
+      "channel_structure": "independent_stereo",
+      "temporal_class": "stationary",
+      "entropy_class": "locally_predictable",
+      "sample_rate_hz": 48000,
+      "channels": 2,
+      "frames": 96000,
+      "duration_ms": 2000,
+      "semantics": "one_shot",
+      "generator": {
+        "Oscillator": {
+          "hz": 997
+        }
+      },
+      "source": "generated: corpus::generate (oscillator), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "328bb94e271760fab8095a32f6c8859458db4412d5267c6862a05498ee3be24f"
+    },
+    {
+      "id": "poly-6-48000hz-6ch-s16_like-multichannel",
+      "class": "generated",
+      "representation_class": "compound",
+      "amplitude_class": "s16_like",
+      "channel_structure": "multichannel",
+      "temporal_class": "stationary",
+      "entropy_class": "locally_predictable",
+      "sample_rate_hz": 48000,
+      "channels": 6,
+      "frames": 48000,
+      "duration_ms": 1000,
+      "semantics": "one_shot",
+      "generator": {
+        "Polyphony": {
+          "voices": 6,
+          "base_hz": 110
+        }
+      },
+      "source": "generated: corpus::generate (polyphony), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "2cc3b08e58c8103b0df7be56844846f51a34e7311beb7de5a10c6848fafae5e4"
+    },
+    {
+      "id": "poly-8-48000hz-8ch-s16_like-multichannel",
+      "class": "generated",
+      "representation_class": "compound",
+      "amplitude_class": "s16_like",
+      "channel_structure": "multichannel",
+      "temporal_class": "stationary",
+      "entropy_class": "locally_predictable",
+      "sample_rate_hz": 48000,
+      "channels": 8,
+      "frames": 48000,
+      "duration_ms": 1000,
+      "semantics": "one_shot",
+      "generator": {
+        "Polyphony": {
+          "voices": 8,
+          "base_hz": 110
+        }
+      },
+      "source": "generated: corpus::generate (polyphony), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "18e4edb779c38d9be08ea84ec18f69bef51ed8e42c83ebe66386d1b2b7201895"
+    },
+    {
+      "id": "voice-8-48000hz-8ch-s16_like-multichannel",
+      "class": "generated",
+      "representation_class": "residual",
+      "amplitude_class": "s16_like",
+      "channel_structure": "multichannel",
+      "temporal_class": "slowly_varying",
+      "entropy_class": "sparse_residual",
+      "sample_rate_hz": 48000,
+      "channels": 8,
+      "frames": 48000,
+      "duration_ms": 1000,
+      "semantics": "one_shot",
+      "generator": {
+        "Voice": {
+          "f0_hz": 120,
+          "formant_shift": 1,
+          "vibrato_hz": 5
+        }
+      },
+      "source": "generated: corpus::generate (voice), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "2f3f8e6d1818744628cdd8992461bee908a29253d52a05572ed74dd569fe4c64"
+    },
+    {
+      "id": "noise-s16-8-48000hz-8ch-s16_like-multichannel",
+      "class": "generated",
+      "representation_class": "noise",
+      "amplitude_class": "s16_like",
+      "channel_structure": "multichannel",
+      "temporal_class": "stationary",
+      "entropy_class": "spectrally_structured",
+      "sample_rate_hz": 48000,
+      "channels": 8,
+      "frames": 24000,
+      "duration_ms": 500,
+      "semantics": "one_shot",
+      "generator": {
+        "Uniform": {
+          "seed": 32776
+        }
+      },
+      "source": "generated: corpus::generate (uniform), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "922a2da86ddb6e1cdeb7eb25146ae7a6012ffa04de99a2c1e2b7edb581caf3d5"
+    },
+    {
+      "id": "poly-stress-48000hz-12ch-s16_like-multichannel",
+      "class": "generated",
+      "representation_class": "compound",
+      "amplitude_class": "s16_like",
+      "channel_structure": "multichannel",
+      "temporal_class": "stationary",
+      "entropy_class": "locally_predictable",
+      "sample_rate_hz": 48000,
+      "channels": 12,
+      "frames": 12000,
+      "duration_ms": 250,
+      "semantics": "one_shot",
+      "generator": {
+        "Polyphony": {
+          "voices": 12,
+          "base_hz": 110
+        }
+      },
+      "source": "generated: corpus::generate (polyphony), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1_NOT_APPLICABLE_BY_FORMAT_DOMAIN",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": false,
+      "canonical_i32_sha256": "71b248fefe1205113d78e05409924d574807333b9e3054c99ea1a29aa62686e3"
+    },
+    {
+      "id": "poly-stress-48000hz-32ch-s16_like-multichannel",
+      "class": "generated",
+      "representation_class": "compound",
+      "amplitude_class": "s16_like",
+      "channel_structure": "multichannel",
+      "temporal_class": "stationary",
+      "entropy_class": "locally_predictable",
+      "sample_rate_hz": 48000,
+      "channels": 32,
+      "frames": 12000,
+      "duration_ms": 250,
+      "semantics": "one_shot",
+      "generator": {
+        "Polyphony": {
+          "voices": 12,
+          "base_hz": 110
+        }
+      },
+      "source": "generated: corpus::generate (polyphony), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1_NOT_APPLICABLE_BY_FORMAT_DOMAIN",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": false,
+      "canonical_i32_sha256": "224b4916f429af2b8714f36fb15d1136c563e57b8a2476aa0b6958e57816ef9e"
+    },
+    {
+      "id": "noise-stress-48000hz-12ch-full_i32-multichannel",
+      "class": "generated",
+      "representation_class": "noise",
+      "amplitude_class": "full_i32",
+      "channel_structure": "multichannel",
+      "temporal_class": "stationary",
+      "entropy_class": "full_width_random",
+      "sample_rate_hz": 48000,
+      "channels": 12,
+      "frames": 12000,
+      "duration_ms": 250,
+      "semantics": "one_shot",
+      "generator": {
+        "Uniform": {
+          "seed": 33059
+        }
+      },
+      "source": "generated: corpus::generate (uniform), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1_NOT_APPLICABLE_BY_FORMAT_DOMAIN",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": false,
+      "canonical_i32_sha256": "1f65505ba55f16235e335ed1cf922db6ec38904b3d2385dfdbe6c11b27dc6445"
+    },
+    {
+      "id": "perc-8-48000hz-1ch-s16_like-mono",
+      "class": "generated",
+      "representation_class": "compound",
+      "amplitude_class": "s16_like",
+      "channel_structure": "mono",
+      "temporal_class": "one_shot",
+      "entropy_class": "sparse_residual",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 96000,
+      "duration_ms": 2000,
+      "semantics": "one_shot",
+      "generator": {
+        "Percussive": {
+          "hits": 8,
+          "decay_shift": 6
+        }
+      },
+      "source": "generated: corpus::generate (percussive), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "b50ce65a41e69a62648645a48e392a33b087c1f67a1a6e42cd86da70a58d3dd7"
+    },
+    {
+      "id": "perc-64-48000hz-1ch-s16_like-mono",
+      "class": "generated",
+      "representation_class": "compound",
+      "amplitude_class": "s16_like",
+      "channel_structure": "mono",
+      "temporal_class": "transient",
+      "entropy_class": "sparse_residual",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 96000,
+      "duration_ms": 2000,
+      "semantics": "one_shot",
+      "generator": {
+        "Percussive": {
+          "hits": 64,
+          "decay_shift": 4
+        }
+      },
+      "source": "generated: corpus::generate (percussive), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "0a9a3e4c4d48dcc7a1f8ce006696495e033def86bf44e83809ebe3f92d65f5a5"
+    },
+    {
+      "id": "impulses-256-48000hz-1ch-s24_like-mono",
+      "class": "generated",
+      "representation_class": "residual",
+      "amplitude_class": "s24_like",
+      "channel_structure": "mono",
+      "temporal_class": "transient",
+      "entropy_class": "sparse_residual",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 96000,
+      "duration_ms": 2000,
+      "semantics": "loop",
+      "repeat_period_frames": 256,
+      "generator": {
+        "Impulses": {
+          "spacing": 256,
+          "decay_shift": 5
+        }
+      },
+      "source": "generated: corpus::generate (impulses), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "38af0874d90db77a95ef8e3238870b1e366a4d1cfe0fa996dff6eb0b34f8260d"
+    },
+    {
+      "id": "am-440-48000hz-1ch-s16_like-mono",
+      "class": "generated",
+      "representation_class": "compound",
+      "amplitude_class": "s16_like",
+      "channel_structure": "mono",
+      "temporal_class": "strongly_modulated",
+      "entropy_class": "locally_predictable",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 96000,
+      "duration_ms": 2000,
+      "semantics": "one_shot",
+      "generator": {
+        "Am": {
+          "carrier_hz": 440,
+          "mod_hz": 3,
+          "depth_milli": 700
+        }
+      },
+      "source": "generated: corpus::generate (am), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "af05177e216ebbcdb897701ff849d99e97af2b33446cbc5fe37b96873ca2b53b"
+    },
+    {
+      "id": "fm-440-48000hz-1ch-s16_like-mono",
+      "class": "generated",
+      "representation_class": "compound",
+      "amplitude_class": "s16_like",
+      "channel_structure": "mono",
+      "temporal_class": "strongly_modulated",
+      "entropy_class": "locally_predictable",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 96000,
+      "duration_ms": 2000,
+      "semantics": "one_shot",
+      "generator": {
+        "Fm": {
+          "carrier_hz": 440,
+          "dev_hz": 5,
+          "index_milli": 1500
+        }
+      },
+      "source": "generated: corpus::generate (fm), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "d6e222dc653b3b54ca1880efc4e4f4a762a9c6f317a7571429b9a09a2d09d50c"
+    },
+    {
+      "id": "voice-slow-48000hz-1ch-s24_like-mono",
+      "class": "generated",
+      "representation_class": "residual",
+      "amplitude_class": "s24_like",
+      "channel_structure": "mono",
+      "temporal_class": "slowly_varying",
+      "entropy_class": "sparse_residual",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 96000,
+      "duration_ms": 2000,
+      "semantics": "one_shot",
+      "generator": {
+        "Voice": {
+          "f0_hz": 110,
+          "formant_shift": 0,
+          "vibrato_hz": 4
+        }
+      },
+      "source": "generated: corpus::generate (voice), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "72bdc0f5c87fa83873d46c3149e5c0558668784ebb8bcab5a87d2ea68d00a19f"
+    },
+    {
+      "id": "am-slow-48000hz-1ch-s24_like-mono",
+      "class": "generated",
+      "representation_class": "compound",
+      "amplitude_class": "s24_like",
+      "channel_structure": "mono",
+      "temporal_class": "slowly_varying",
+      "entropy_class": "locally_predictable",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 96000,
+      "duration_ms": 2000,
+      "semantics": "one_shot",
+      "generator": {
+        "Am": {
+          "carrier_hz": 330,
+          "mod_hz": 1,
+          "depth_milli": 400
+        }
+      },
+      "source": "generated: corpus::generate (am), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "919570e7e2bd160faf939e70571a7a77eee88ac084f08620723f3ffbf1d515f4"
+    },
+    {
+      "id": "onepole-c50-48000hz-1ch-s24_like-mono",
+      "class": "generated",
+      "representation_class": "noise",
+      "amplitude_class": "s24_like",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "spectrally_structured",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 96000,
+      "duration_ms": 2000,
+      "semantics": "one_shot",
+      "generator": {
+        "OnePole": {
+          "cutoff_milli": 50,
+          "seed": 306
+        }
+      },
+      "source": "generated: corpus::generate (one_pole), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "14b8e44bc9739929a4d21d5b318e69aa4b5bab8ae695c766a9a85fd4c439e7fe"
+    },
+    {
+      "id": "onepole-c200-48000hz-1ch-s24_like-mono",
+      "class": "generated",
+      "representation_class": "noise",
+      "amplitude_class": "s24_like",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "spectrally_structured",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 96000,
+      "duration_ms": 2000,
+      "semantics": "one_shot",
+      "generator": {
+        "OnePole": {
+          "cutoff_milli": 200,
+          "seed": 456
+        }
+      },
+      "source": "generated: corpus::generate (one_pole), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "e9efca0c1c20fcf5bff911487c2d684d0a94a62cdb34aba795fd3d68b871a7cb"
+    },
+    {
+      "id": "onepole-c800-48000hz-1ch-s24_like-mono",
+      "class": "generated",
+      "representation_class": "noise",
+      "amplitude_class": "s24_like",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "spectrally_structured",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 96000,
+      "duration_ms": 2000,
+      "semantics": "one_shot",
+      "generator": {
+        "OnePole": {
+          "cutoff_milli": 800,
+          "seed": 1056
+        }
+      },
+      "source": "generated: corpus::generate (one_pole), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "019e035faba1d00200aad6ba38a30805bb7923bbf2d20e2a164f0648ef80c918"
+    },
+    {
+      "id": "onepole-full-48000hz-2ch-full_i32-independent_stereo",
+      "class": "generated",
+      "representation_class": "noise",
+      "amplitude_class": "full_i32",
+      "channel_structure": "independent_stereo",
+      "temporal_class": "stationary",
+      "entropy_class": "spectrally_structured",
+      "sample_rate_hz": 48000,
+      "channels": 2,
+      "frames": 96000,
+      "duration_ms": 2000,
+      "semantics": "one_shot",
+      "generator": {
+        "OnePole": {
+          "cutoff_milli": 300,
+          "seed": 768
+        }
+      },
+      "source": "generated: corpus::generate (one_pole), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "26f624df1b5a23be21635cb94b4c1bfc49a76f9e626b7a357040970cac2ccfe4"
+    },
+    {
+      "id": "sparse-c64-48000hz-1ch-s24_like-mono",
+      "class": "generated",
+      "representation_class": "residual",
+      "amplitude_class": "s24_like",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "sparse_residual",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 96000,
+      "duration_ms": 2000,
+      "semantics": "one_shot",
+      "generator": {
+        "SparseResidual": {
+          "hz": 220,
+          "corrections": 64,
+          "seed": 2624
+        }
+      },
+      "source": "generated: corpus::generate (sparse_residual), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "928912f7f89bd1d1ab294ed56525ca1434919903b06c8f0ef4a445bd1db99eac"
+    },
+    {
+      "id": "sparse-c512-48000hz-1ch-s24_like-mono",
+      "class": "generated",
+      "representation_class": "residual",
+      "amplitude_class": "s24_like",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "sparse_residual",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 96000,
+      "duration_ms": 2000,
+      "semantics": "one_shot",
+      "generator": {
+        "SparseResidual": {
+          "hz": 220,
+          "corrections": 512,
+          "seed": 3072
+        }
+      },
+      "source": "generated: corpus::generate (sparse_residual), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "b8920d84aa9020ac353775e1c26ffbc00571096dbc02ac444ca910a404e0e3e3"
+    },
+    {
+      "id": "sparse-s16-48000hz-2ch-s16_like-correlated_stereo",
+      "class": "generated",
+      "representation_class": "residual",
+      "amplitude_class": "s16_like",
+      "channel_structure": "correlated_stereo",
+      "temporal_class": "stationary",
+      "entropy_class": "sparse_residual",
+      "sample_rate_hz": 48000,
+      "channels": 2,
+      "frames": 96000,
+      "duration_ms": 2000,
+      "semantics": "one_shot",
+      "generator": {
+        "SparseResidual": {
+          "hz": 220,
+          "corrections": 256,
+          "seed": 2816
+        }
+      },
+      "source": "generated: corpus::generate (sparse_residual), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "751ae82c44472b8ce72ae25b792288680407d381a1ad5bd39088be46cae39e7e"
+    },
+    {
+      "id": "uniform-full-44100hz-1ch-full_i32-mono",
+      "class": "generated",
+      "representation_class": "noise",
+      "amplitude_class": "full_i32",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "full_width_random",
+      "sample_rate_hz": 44100,
+      "channels": 1,
+      "frames": 88200,
+      "duration_ms": 2000,
+      "semantics": "one_shot",
+      "generator": {
+        "Uniform": {
+          "seed": 4027427908
+        }
+      },
+      "source": "generated: corpus::generate (uniform), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "987d037c00c2f5e090dd708bd62256694fdabf35d92b1f86b5114206e2f3fd13"
+    },
+    {
+      "id": "uniform-full-48000hz-1ch-full_i32-mono",
+      "class": "generated",
+      "representation_class": "noise",
+      "amplitude_class": "full_i32",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "full_width_random",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 96000,
+      "duration_ms": 2000,
+      "semantics": "one_shot",
+      "generator": {
+        "Uniform": {
+          "seed": 4027431808
+        }
+      },
+      "source": "generated: corpus::generate (uniform), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "386934635509f87566ae6e722dcbde3b3ed9be6c4d5cb980b5f61d58ce93ae6e"
+    },
+    {
+      "id": "uniform-full-96000hz-1ch-full_i32-mono",
+      "class": "generated",
+      "representation_class": "noise",
+      "amplitude_class": "full_i32",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "full_width_random",
+      "sample_rate_hz": 96000,
+      "channels": 1,
+      "frames": 96000,
+      "duration_ms": 1000,
+      "semantics": "one_shot",
+      "generator": {
+        "Uniform": {
+          "seed": 4027479808
+        }
+      },
+      "source": "generated: corpus::generate (uniform), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "73a7f1c7afd063ae2ffdf596146ff3a60e5a4eb7316445de4e78d036404cafaf"
+    },
+    {
+      "id": "uniform-full-192000hz-1ch-full_i32-mono",
+      "class": "generated",
+      "representation_class": "noise",
+      "amplitude_class": "full_i32",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "full_width_random",
+      "sample_rate_hz": 192000,
+      "channels": 1,
+      "frames": 96000,
+      "duration_ms": 500,
+      "semantics": "one_shot",
+      "generator": {
+        "Uniform": {
+          "seed": 4027575808
+        }
+      },
+      "source": "generated: corpus::generate (uniform), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "e5a8d7d990c2880e3d948b77dac65c3254047c91cb161b85971f275fa028c979"
+    },
+    {
+      "id": "uniform-full-48000hz-2ch-full_i32-independent_stereo",
+      "class": "generated",
+      "representation_class": "noise",
+      "amplitude_class": "full_i32",
+      "channel_structure": "independent_stereo",
+      "temporal_class": "stationary",
+      "entropy_class": "full_width_random",
+      "sample_rate_hz": 48000,
+      "channels": 2,
+      "frames": 96000,
+      "duration_ms": 2000,
+      "semantics": "one_shot",
+      "generator": {
+        "Uniform": {
+          "seed": 286335522
+        }
+      },
+      "source": "generated: corpus::generate (uniform), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "22c44b3dcbb46f2e10a086afd64a5e49077bf368ec248f518892179d51bfaf22"
+    },
+    {
+      "id": "uniform-full-96000hz-2ch-full_i32-independent_stereo",
+      "class": "generated",
+      "representation_class": "noise",
+      "amplitude_class": "full_i32",
+      "channel_structure": "independent_stereo",
+      "temporal_class": "stationary",
+      "entropy_class": "full_width_random",
+      "sample_rate_hz": 96000,
+      "channels": 2,
+      "frames": 96000,
+      "duration_ms": 1000,
+      "semantics": "one_shot",
+      "generator": {
+        "Uniform": {
+          "seed": 858997828
+        }
+      },
+      "source": "generated: corpus::generate (uniform), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "74fdac87e9738e9b19fd73af67d3ca918933c13e4923e30cbfc7dca750295d32"
+    },
+    {
+      "id": "uniform-full-48000hz-8ch-full_i32-multichannel",
+      "class": "generated",
+      "representation_class": "noise",
+      "amplitude_class": "full_i32",
+      "channel_structure": "multichannel",
+      "temporal_class": "stationary",
+      "entropy_class": "full_width_random",
+      "sample_rate_hz": 48000,
+      "channels": 8,
+      "frames": 24000,
+      "duration_ms": 500,
+      "semantics": "one_shot",
+      "generator": {
+        "Uniform": {
+          "seed": 1431660134
+        }
+      },
+      "source": "generated: corpus::generate (uniform), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "983ab6b250991f87f61b293fab676ec1dbb887805c48d81140dab0bcbefb53f1"
+    },
+    {
+      "id": "uniform-full-48000hz-2ch-full_i32-anticorrelated_stereo",
+      "class": "generated",
+      "representation_class": "noise",
+      "amplitude_class": "full_i32",
+      "channel_structure": "anticorrelated_stereo",
+      "temporal_class": "stationary",
+      "entropy_class": "full_width_random",
+      "sample_rate_hz": 48000,
+      "channels": 2,
+      "frames": 48000,
+      "duration_ms": 1000,
+      "semantics": "one_shot",
+      "generator": {
+        "Uniform": {
+          "seed": 2004322440
+        }
+      },
+      "source": "generated: corpus::generate (uniform), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "d030c8f9dc87515793a0b34b562a3e91a4604f39c2c40ddc18fae490d7684fc6"
+    },
+    {
+      "id": "uniform-48000hz-1ch-s16_like-mono",
+      "class": "generated",
+      "representation_class": "noise",
+      "amplitude_class": "s16_like",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "full_width_random",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 96000,
+      "duration_ms": 2000,
+      "semantics": "one_shot",
+      "generator": {
+        "Uniform": {
+          "seed": 2576941057
+        }
+      },
+      "source": "generated: corpus::generate (uniform), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "7d47c847662599b8227e2e5bc6a635f543f0fcd6c7af17b006ff6a3cca99238c"
+    },
+    {
+      "id": "uniform-48000hz-1ch-s24_like-mono",
+      "class": "generated",
+      "representation_class": "noise",
+      "amplitude_class": "s24_like",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "full_width_random",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 96000,
+      "duration_ms": 2000,
+      "semantics": "one_shot",
+      "generator": {
+        "Uniform": {
+          "seed": 2576941058
+        }
+      },
+      "source": "generated: corpus::generate (uniform), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "7e1b5a6d681d3debbe75fc64573609a7f82b31bf8893bbac6d0301832b7144a3"
+    },
+    {
+      "id": "uniform-48000hz-1ch-low_byte-mono",
+      "class": "generated",
+      "representation_class": "noise",
+      "amplitude_class": "low_byte",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "full_width_random",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 96000,
+      "duration_ms": 2000,
+      "semantics": "one_shot",
+      "generator": {
+        "Uniform": {
+          "seed": 2576941056
+        }
+      },
+      "source": "generated: corpus::generate (uniform), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "f1610eb4a88026a74b38c865802bdddc18956dd038b20487a9a4c39a924bb34d"
+    },
+    {
+      "id": "scrambled-full-48000hz-1ch-full_i32-mono",
+      "class": "generated",
+      "representation_class": "noise",
+      "amplitude_class": "full_i32",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "scrambled",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 96000,
+      "duration_ms": 2000,
+      "semantics": "one_shot",
+      "generator": {
+        "Scrambled": {
+          "seed": 2882339107
+        }
+      },
+      "source": "generated: corpus::generate (scrambled), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "c420a12e446480a73e241c7a3f346590164b6a46dfd6884c6b50e4de4cad80f5"
+    },
+    {
+      "id": "scrambled-full-48000hz-2ch-full_i32-independent_stereo",
+      "class": "generated",
+      "representation_class": "noise",
+      "amplitude_class": "full_i32",
+      "channel_structure": "independent_stereo",
+      "temporal_class": "stationary",
+      "entropy_class": "scrambled",
+      "sample_rate_hz": 48000,
+      "channels": 2,
+      "frames": 96000,
+      "duration_ms": 2000,
+      "semantics": "one_shot",
+      "generator": {
+        "Scrambled": {
+          "seed": 2882356583
+        }
+      },
+      "source": "generated: corpus::generate (scrambled), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "ecc7eb408541daf604813d7c6b9eba84520dedb83fc6c927df1c50e4fded76bc"
+    },
+    {
+      "id": "scrambled-full-48000hz-8ch-full_i32-multichannel",
+      "class": "generated",
+      "representation_class": "noise",
+      "amplitude_class": "full_i32",
+      "channel_structure": "multichannel",
+      "temporal_class": "stationary",
+      "entropy_class": "scrambled",
+      "sample_rate_hz": 48000,
+      "channels": 8,
+      "frames": 24000,
+      "duration_ms": 500,
+      "semantics": "one_shot",
+      "generator": {
+        "Scrambled": {
+          "seed": 2882374059
+        }
+      },
+      "source": "generated: corpus::generate (scrambled), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "6db766be08b0c8a28df5aba3bd839408a6932c21de1b4ba3c3d3c3e7d2c0dd36"
+    },
+    {
+      "id": "osc-220-44100hz-1ch-s16_like-mono",
+      "class": "generated",
+      "representation_class": "oscillator",
+      "amplitude_class": "s16_like",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "highly_predictable",
+      "sample_rate_hz": 44100,
+      "channels": 1,
+      "frames": 132300,
+      "duration_ms": 3000,
+      "semantics": "one_shot",
+      "generator": {
+        "Oscillator": {
+          "hz": 220
+        }
+      },
+      "source": "generated: corpus::generate (oscillator), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "5d3f878dca23d2f27721fe5bee4309f1be465cd143b3f58ab1619c2d69c3a71e"
+    },
+    {
+      "id": "osc-440-48000hz-1ch-s16_like-mono",
+      "class": "generated",
+      "representation_class": "oscillator",
+      "amplitude_class": "s16_like",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "highly_predictable",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 144000,
+      "duration_ms": 3000,
+      "semantics": "one_shot",
+      "generator": {
+        "Oscillator": {
+          "hz": 440
+        }
+      },
+      "source": "generated: corpus::generate (oscillator), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "581250dcb8ead9f32771d54659c0952fd7fba08e49ce18757aaf8b06ccff73b3"
+    },
+    {
+      "id": "osc-880-48000hz-1ch-s16_like-mono",
+      "class": "generated",
+      "representation_class": "oscillator",
+      "amplitude_class": "s16_like",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "highly_predictable",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 144000,
+      "duration_ms": 3000,
+      "semantics": "one_shot",
+      "generator": {
+        "Oscillator": {
+          "hz": 880
+        }
+      },
+      "source": "generated: corpus::generate (oscillator), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "fa2f7f46d2ed3adf4a97d96dc60a430ca63806a2a714f419bc9b884496f248bd"
+    },
+    {
+      "id": "osc-3520-48000hz-1ch-s16_like-mono",
+      "class": "generated",
+      "representation_class": "oscillator",
+      "amplitude_class": "s16_like",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "highly_predictable",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 144000,
+      "duration_ms": 3000,
+      "semantics": "one_shot",
+      "generator": {
+        "Oscillator": {
+          "hz": 3520
+        }
+      },
+      "source": "generated: corpus::generate (oscillator), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "cc96cce5f0cc220eaaad4d117d19b3972b5a6818f349cb7478a59b2ceaa82a76"
+    },
+    {
+      "id": "osc-220-96000hz-1ch-s16_like-mono",
+      "class": "generated",
+      "representation_class": "oscillator",
+      "amplitude_class": "s16_like",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "highly_predictable",
+      "sample_rate_hz": 96000,
+      "channels": 1,
+      "frames": 144000,
+      "duration_ms": 1500,
+      "semantics": "one_shot",
+      "generator": {
+        "Oscillator": {
+          "hz": 220
+        }
+      },
+      "source": "generated: corpus::generate (oscillator), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "6a1f9e983202264a72b35c90add80967a8d38986c3fb30f4fcbc4b86404669c2"
+    },
+    {
+      "id": "osc-220-192000hz-1ch-s16_like-mono",
+      "class": "generated",
+      "representation_class": "oscillator",
+      "amplitude_class": "s16_like",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "highly_predictable",
+      "sample_rate_hz": 192000,
+      "channels": 1,
+      "frames": 144000,
+      "duration_ms": 750,
+      "semantics": "one_shot",
+      "generator": {
+        "Oscillator": {
+          "hz": 220
+        }
+      },
+      "source": "generated: corpus::generate (oscillator), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "898c5bf88e63633b4f8a14f87ecfe73b43cf43d2b6af015fa45c518c55bb94a1"
+    },
+    {
+      "id": "harmonic-p4-48000hz-1ch-s16_like-mono",
+      "class": "generated",
+      "representation_class": "oscillator",
+      "amplitude_class": "s16_like",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "locally_predictable",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 144000,
+      "duration_ms": 3000,
+      "semantics": "one_shot",
+      "generator": {
+        "Harmonic": {
+          "hz": 220,
+          "partials": 4
+        }
+      },
+      "source": "generated: corpus::generate (harmonic), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "59424b3b00c06442749374a07dc88d5f4e32f1c068a072c063b895ba277a6758"
+    },
+    {
+      "id": "harmonic-110-48000hz-1ch-s16_like-mono",
+      "class": "generated",
+      "representation_class": "oscillator",
+      "amplitude_class": "s16_like",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "locally_predictable",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 144000,
+      "duration_ms": 3000,
+      "semantics": "one_shot",
+      "generator": {
+        "Harmonic": {
+          "hz": 110,
+          "partials": 16
+        }
+      },
+      "source": "generated: corpus::generate (harmonic), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "16815b41fe5ac5d96102fd0423d67ed3905f3020db0a42f6d2c8861e0a9a3b92"
+    },
+    {
+      "id": "harmonic-220-96000hz-2ch-s16_like-identical_stereo",
+      "class": "generated",
+      "representation_class": "oscillator",
+      "amplitude_class": "s16_like",
+      "channel_structure": "identical_stereo",
+      "temporal_class": "stationary",
+      "entropy_class": "locally_predictable",
+      "sample_rate_hz": 96000,
+      "channels": 2,
+      "frames": 144000,
+      "duration_ms": 1500,
+      "semantics": "one_shot",
+      "generator": {
+        "Harmonic": {
+          "hz": 220,
+          "partials": 8
+        }
+      },
+      "source": "generated: corpus::generate (harmonic), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "a248aa6752c77dab6291d3374d63e984ce591e1be739bf47610aa8e9679b0e72"
+    },
+    {
+      "id": "repeat-shape-44100hz-1ch-s16_like-mono",
+      "class": "generated",
+      "representation_class": "exact_repetition",
+      "amplitude_class": "s16_like",
+      "channel_structure": "mono",
+      "temporal_class": "loop",
+      "entropy_class": "globally_periodic",
+      "sample_rate_hz": 44100,
+      "channels": 1,
+      "frames": 132300,
+      "duration_ms": 3000,
+      "semantics": "loop",
+      "repeat_period_frames": 441,
+      "generator": {
+        "ExactRepeat": {
+          "period": 441,
+          "shape": "sine"
+        }
+      },
+      "source": "generated: corpus::generate (exact_repeat), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "bd68af6a723cad6757ef7afee25d01daf2efc575158b193084a5f2412d4cac00"
+    },
+    {
+      "id": "repeat-shape-96000hz-1ch-s16_like-mono",
+      "class": "generated",
+      "representation_class": "exact_repetition",
+      "amplitude_class": "s16_like",
+      "channel_structure": "mono",
+      "temporal_class": "loop",
+      "entropy_class": "globally_periodic",
+      "sample_rate_hz": 96000,
+      "channels": 1,
+      "frames": 144000,
+      "duration_ms": 1500,
+      "semantics": "loop",
+      "repeat_period_frames": 960,
+      "generator": {
+        "ExactRepeat": {
+          "period": 960,
+          "shape": "sine"
+        }
+      },
+      "source": "generated: corpus::generate (exact_repeat), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "ebc367eefcaffc5ef3da49f488dbf97e03dacedb4f9dc2cb8f62c0e867f428b3"
+    },
+    {
+      "id": "repeat-shape-192000hz-1ch-s16_like-mono",
+      "class": "generated",
+      "representation_class": "exact_repetition",
+      "amplitude_class": "s16_like",
+      "channel_structure": "mono",
+      "temporal_class": "loop",
+      "entropy_class": "globally_periodic",
+      "sample_rate_hz": 192000,
+      "channels": 1,
+      "frames": 144000,
+      "duration_ms": 750,
+      "semantics": "loop",
+      "repeat_period_frames": 1920,
+      "generator": {
+        "ExactRepeat": {
+          "period": 1920,
+          "shape": "sine"
+        }
+      },
+      "source": "generated: corpus::generate (exact_repeat), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "0b6b6277c66ea8b8a9b7dc71c737120314771a6a2c23a8871af25949736239ab"
+    },
+    {
+      "id": "wavetable-saw-1k-44100hz-1ch-s16_like-mono",
+      "class": "generated",
+      "representation_class": "wavetable",
+      "amplitude_class": "s16_like",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "globally_periodic",
+      "sample_rate_hz": 44100,
+      "channels": 1,
+      "frames": 132300,
+      "duration_ms": 3000,
+      "semantics": "loop",
+      "repeat_period_frames": 44,
+      "generator": {
+        "Wavetable": {
+          "period": 44,
+          "shape": "saw"
+        }
+      },
+      "source": "generated: corpus::generate (wavetable), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "1e74da6caca37d7d4da4303ce50971032722f482c34d3f2b67f9532e7ce00978"
+    },
+    {
+      "id": "wavetable-tri-500-48000hz-2ch-s24_like-identical_stereo",
+      "class": "generated",
+      "representation_class": "wavetable",
+      "amplitude_class": "s24_like",
+      "channel_structure": "identical_stereo",
+      "temporal_class": "stationary",
+      "entropy_class": "globally_periodic",
+      "sample_rate_hz": 48000,
+      "channels": 2,
+      "frames": 144000,
+      "duration_ms": 3000,
+      "semantics": "loop",
+      "repeat_period_frames": 96,
+      "generator": {
+        "Wavetable": {
+          "period": 96,
+          "shape": "triangle"
+        }
+      },
+      "source": "generated: corpus::generate (wavetable), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "03d7633dc6f86572135243b43eb500ef1c5c73c97f059c62787fe2dafbe70baf"
+    },
+    {
+      "id": "wavetable-sq-2k-48000hz-2ch-s16_like-correlated_stereo",
+      "class": "generated",
+      "representation_class": "wavetable",
+      "amplitude_class": "s16_like",
+      "channel_structure": "correlated_stereo",
+      "temporal_class": "stationary",
+      "entropy_class": "globally_periodic",
+      "sample_rate_hz": 48000,
+      "channels": 2,
+      "frames": 144000,
+      "duration_ms": 3000,
+      "semantics": "loop",
+      "repeat_period_frames": 24,
+      "generator": {
+        "Wavetable": {
+          "period": 24,
+          "shape": "square"
+        }
+      },
+      "source": "generated: corpus::generate (wavetable), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "ceb1de74a8679ce97f032670c6011cdcf1b6ea9c370b61e19890950e30c36f02"
+    },
+    {
+      "id": "osc-1k-48000hz-2ch-s24_like-identical_stereo",
+      "class": "generated",
+      "representation_class": "oscillator",
+      "amplitude_class": "s24_like",
+      "channel_structure": "identical_stereo",
+      "temporal_class": "stationary",
+      "entropy_class": "highly_predictable",
+      "sample_rate_hz": 48000,
+      "channels": 2,
+      "frames": 144000,
+      "duration_ms": 3000,
+      "semantics": "one_shot",
+      "generator": {
+        "Oscillator": {
+          "hz": 1000
+        }
+      },
+      "source": "generated: corpus::generate (oscillator), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "d9c8fbce21dc2ffa1ffd4c48b430a16084c1f73d6f6737c554bfd389afe8c88b"
+    },
+    {
+      "id": "osc-1k-48000hz-2ch-full_i32-identical_stereo",
+      "class": "generated",
+      "representation_class": "oscillator",
+      "amplitude_class": "full_i32",
+      "channel_structure": "identical_stereo",
+      "temporal_class": "stationary",
+      "entropy_class": "highly_predictable",
+      "sample_rate_hz": 48000,
+      "channels": 2,
+      "frames": 144000,
+      "duration_ms": 3000,
+      "semantics": "one_shot",
+      "generator": {
+        "Oscillator": {
+          "hz": 1000
+        }
+      },
+      "source": "generated: corpus::generate (oscillator), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "17d28f30920c1d1dfa3e96503cac524600899c5b3cf2bc263e3ef015e0652240"
+    },
+    {
+      "id": "osc-1k-48000hz-2ch-s24_like-correlated_stereo",
+      "class": "generated",
+      "representation_class": "oscillator",
+      "amplitude_class": "s24_like",
+      "channel_structure": "correlated_stereo",
+      "temporal_class": "stationary",
+      "entropy_class": "highly_predictable",
+      "sample_rate_hz": 48000,
+      "channels": 2,
+      "frames": 144000,
+      "duration_ms": 3000,
+      "semantics": "one_shot",
+      "generator": {
+        "Oscillator": {
+          "hz": 1000
+        }
+      },
+      "source": "generated: corpus::generate (oscillator), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "6e8b6675790a284e184bb7412ef77d152a5e7f92163fb2b307017843321564d9"
+    },
+    {
+      "id": "osc-1k-48000hz-2ch-s24_like-anticorrelated_stereo",
+      "class": "generated",
+      "representation_class": "oscillator",
+      "amplitude_class": "s24_like",
+      "channel_structure": "anticorrelated_stereo",
+      "temporal_class": "stationary",
+      "entropy_class": "highly_predictable",
+      "sample_rate_hz": 48000,
+      "channels": 2,
+      "frames": 144000,
+      "duration_ms": 3000,
+      "semantics": "one_shot",
+      "generator": {
+        "Oscillator": {
+          "hz": 1000
+        }
+      },
+      "source": "generated: corpus::generate (oscillator), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "0525e757b7d99e94f8e52fba84a04c39d8677fc160d55b19c357175924d76621"
+    },
+    {
+      "id": "osc-1k-48000hz-2ch-full_i32-anticorrelated_stereo",
+      "class": "generated",
+      "representation_class": "oscillator",
+      "amplitude_class": "full_i32",
+      "channel_structure": "anticorrelated_stereo",
+      "temporal_class": "stationary",
+      "entropy_class": "highly_predictable",
+      "sample_rate_hz": 48000,
+      "channels": 2,
+      "frames": 144000,
+      "duration_ms": 3000,
+      "semantics": "one_shot",
+      "generator": {
+        "Oscillator": {
+          "hz": 1000
+        }
+      },
+      "source": "generated: corpus::generate (oscillator), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "712fce2b57f203f209b1027a45f6f2bd6affe4c967d6998f2cc545a1f2e8e935"
+    },
+    {
+      "id": "dc-stereo-48000hz-2ch-s24_like-independent_stereo",
+      "class": "generated",
+      "representation_class": "literal",
+      "amplitude_class": "s24_like",
+      "channel_structure": "independent_stereo",
+      "temporal_class": "stationary",
+      "entropy_class": "highly_predictable",
+      "sample_rate_hz": 48000,
+      "channels": 2,
+      "frames": 96000,
+      "duration_ms": 2000,
+      "semantics": "one_shot",
+      "generator": {
+        "Dc": {
+          "amp_milli": 700
+        }
+      },
+      "source": "generated: corpus::generate (dc), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "d120476c1b17e9ac3786e990b056a1cab1432b75df58794691ba52d06e76d10e"
+    },
+    {
+      "id": "silence-48000hz-2ch-full_i32-identical_stereo",
+      "class": "generated",
+      "representation_class": "literal",
+      "amplitude_class": "full_i32",
+      "channel_structure": "identical_stereo",
+      "temporal_class": "stationary",
+      "entropy_class": "highly_predictable",
+      "sample_rate_hz": 48000,
+      "channels": 2,
+      "frames": 96000,
+      "duration_ms": 2000,
+      "semantics": "one_shot",
+      "generator": "Silence",
+      "source": "generated: corpus::generate (silence), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "351a8054b23144894668c6a51d5dbba82f56523ef43cc45b6f4d7060a969c31a"
+    },
+    {
+      "id": "am-440-48000hz-1ch-s24_like-mono",
+      "class": "generated",
+      "representation_class": "compound",
+      "amplitude_class": "s24_like",
+      "channel_structure": "mono",
+      "temporal_class": "strongly_modulated",
+      "entropy_class": "locally_predictable",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 144000,
+      "duration_ms": 3000,
+      "semantics": "one_shot",
+      "generator": {
+        "Am": {
+          "carrier_hz": 440,
+          "mod_hz": 3,
+          "depth_milli": 700
+        }
+      },
+      "source": "generated: corpus::generate (am), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "35cf7c86a1b5a64f9255840309fe82b91147aeb1d6ced37ff86b30cf88c8b5e0"
+    },
+    {
+      "id": "am-440-48000hz-1ch-full_i32-mono",
+      "class": "generated",
+      "representation_class": "compound",
+      "amplitude_class": "full_i32",
+      "channel_structure": "mono",
+      "temporal_class": "strongly_modulated",
+      "entropy_class": "locally_predictable",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 144000,
+      "duration_ms": 3000,
+      "semantics": "one_shot",
+      "generator": {
+        "Am": {
+          "carrier_hz": 440,
+          "mod_hz": 3,
+          "depth_milli": 700
+        }
+      },
+      "source": "generated: corpus::generate (am), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "7c0e906fb079dae138028d31b490493a83deafe7d042678c8573c81aa967add2"
+    },
+    {
+      "id": "fm-880-48000hz-1ch-s24_like-mono",
+      "class": "generated",
+      "representation_class": "compound",
+      "amplitude_class": "s24_like",
+      "channel_structure": "mono",
+      "temporal_class": "strongly_modulated",
+      "entropy_class": "locally_predictable",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 144000,
+      "duration_ms": 3000,
+      "semantics": "one_shot",
+      "generator": {
+        "Fm": {
+          "carrier_hz": 880,
+          "dev_hz": 7,
+          "index_milli": 2200
+        }
+      },
+      "source": "generated: corpus::generate (fm), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "4a4e516b1fb3f88871bc90b56df24bc8e243a2b56e70f555ad7fb6d95b97c80b"
+    },
+    {
+      "id": "voice-96k-96000hz-1ch-s16_like-mono",
+      "class": "generated",
+      "representation_class": "residual",
+      "amplitude_class": "s16_like",
+      "channel_structure": "mono",
+      "temporal_class": "slowly_varying",
+      "entropy_class": "sparse_residual",
+      "sample_rate_hz": 96000,
+      "channels": 1,
+      "frames": 144000,
+      "duration_ms": 1500,
+      "semantics": "one_shot",
+      "generator": {
+        "Voice": {
+          "f0_hz": 130,
+          "formant_shift": 1,
+          "vibrato_hz": 5
+        }
+      },
+      "source": "generated: corpus::generate (voice), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "3e29212e93d24b846fe96417cd76b2516743b411f12ce51d54528f4cfcfb549b"
+    },
+    {
+      "id": "voice-192k-192000hz-1ch-s24_like-mono",
+      "class": "generated",
+      "representation_class": "residual",
+      "amplitude_class": "s24_like",
+      "channel_structure": "mono",
+      "temporal_class": "slowly_varying",
+      "entropy_class": "sparse_residual",
+      "sample_rate_hz": 192000,
+      "channels": 1,
+      "frames": 144000,
+      "duration_ms": 750,
+      "semantics": "one_shot",
+      "generator": {
+        "Voice": {
+          "f0_hz": 90,
+          "formant_shift": 0,
+          "vibrato_hz": 6
+        }
+      },
+      "source": "generated: corpus::generate (voice), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "5b9063f587eb4b141219d087bea9a04b72bdd8dce7097b5af3043dadb211c6f7"
+    },
+    {
+      "id": "perc-16-48000hz-1ch-s16_like-mono",
+      "class": "generated",
+      "representation_class": "compound",
+      "amplitude_class": "s16_like",
+      "channel_structure": "mono",
+      "temporal_class": "one_shot",
+      "entropy_class": "sparse_residual",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 144000,
+      "duration_ms": 3000,
+      "semantics": "one_shot",
+      "generator": {
+        "Percussive": {
+          "hits": 16,
+          "decay_shift": 5
+        }
+      },
+      "source": "generated: corpus::generate (percussive), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "03ffd74638516ebc38309943f7afc4eea474d76595204cf5e0314ca487eafa76"
+    },
+    {
+      "id": "perc-128-48000hz-1ch-s24_like-mono",
+      "class": "generated",
+      "representation_class": "compound",
+      "amplitude_class": "s24_like",
+      "channel_structure": "mono",
+      "temporal_class": "transient",
+      "entropy_class": "sparse_residual",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 144000,
+      "duration_ms": 3000,
+      "semantics": "one_shot",
+      "generator": {
+        "Percussive": {
+          "hits": 128,
+          "decay_shift": 3
+        }
+      },
+      "source": "generated: corpus::generate (percussive), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "92746178ce3b9d9d16a375cea482ebc122469dd95f5f7771bcec54347a9a4b49"
+    },
+    {
+      "id": "perc-32-96k-96000hz-1ch-s16_like-mono",
+      "class": "generated",
+      "representation_class": "compound",
+      "amplitude_class": "s16_like",
+      "channel_structure": "mono",
+      "temporal_class": "transient",
+      "entropy_class": "sparse_residual",
+      "sample_rate_hz": 96000,
+      "channels": 1,
+      "frames": 144000,
+      "duration_ms": 1500,
+      "semantics": "one_shot",
+      "generator": {
+        "Percussive": {
+          "hits": 32,
+          "decay_shift": 5
+        }
+      },
+      "source": "generated: corpus::generate (percussive), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "f45992535123149ec572aa05c2abd39856a4440c278233a282e5287d2c448a44"
+    },
+    {
+      "id": "impulses-64-48000hz-1ch-s16_like-mono",
+      "class": "generated",
+      "representation_class": "residual",
+      "amplitude_class": "s16_like",
+      "channel_structure": "mono",
+      "temporal_class": "transient",
+      "entropy_class": "sparse_residual",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 144000,
+      "duration_ms": 3000,
+      "semantics": "loop",
+      "repeat_period_frames": 64,
+      "generator": {
+        "Impulses": {
+          "spacing": 64,
+          "decay_shift": 4
+        }
+      },
+      "source": "generated: corpus::generate (impulses), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "3767595a09c223e0b7e764ddde183ba7edb33f295419c11cc31f6fc76c8b289e"
+    },
+    {
+      "id": "impulses-1024-48000hz-1ch-s16_like-mono",
+      "class": "generated",
+      "representation_class": "residual",
+      "amplitude_class": "s16_like",
+      "channel_structure": "mono",
+      "temporal_class": "transient",
+      "entropy_class": "sparse_residual",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 144000,
+      "duration_ms": 3000,
+      "semantics": "loop",
+      "repeat_period_frames": 1024,
+      "generator": {
+        "Impulses": {
+          "spacing": 1024,
+          "decay_shift": 7
+        }
+      },
+      "source": "generated: corpus::generate (impulses), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "f407623cd660c2ccdadac3edcfe006457f91f1672678a7bb713509f92041eb6e"
+    },
+    {
+      "id": "onepole-1k-48000hz-1ch-s16_like-mono",
+      "class": "generated",
+      "representation_class": "noise",
+      "amplitude_class": "s16_like",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "spectrally_structured",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 144000,
+      "duration_ms": 3000,
+      "semantics": "one_shot",
+      "generator": {
+        "OnePole": {
+          "cutoff_milli": 1000,
+          "seed": 1024
+        }
+      },
+      "source": "generated: corpus::generate (one_pole), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "df9897c01b848d9567c0e117211b26f0f2854906fc93eb4ba3d7f6b6eb9ea2bc"
+    },
+    {
+      "id": "onepole-96k-96000hz-1ch-s24_like-mono",
+      "class": "generated",
+      "representation_class": "noise",
+      "amplitude_class": "s24_like",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "spectrally_structured",
+      "sample_rate_hz": 96000,
+      "channels": 1,
+      "frames": 144000,
+      "duration_ms": 1500,
+      "semantics": "one_shot",
+      "generator": {
+        "OnePole": {
+          "cutoff_milli": 120,
+          "seed": 1280
+        }
+      },
+      "source": "generated: corpus::generate (one_pole), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "0c58da825b92e7f7e3e462bc0b8fdddc72915e2648adb953159d09bafb5de933"
+    },
+    {
+      "id": "onepole-192k-192000hz-1ch-s16_like-mono",
+      "class": "generated",
+      "representation_class": "noise",
+      "amplitude_class": "s16_like",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "spectrally_structured",
+      "sample_rate_hz": 192000,
+      "channels": 1,
+      "frames": 144000,
+      "duration_ms": 750,
+      "semantics": "one_shot",
+      "generator": {
+        "OnePole": {
+          "cutoff_milli": 300,
+          "seed": 1536
+        }
+      },
+      "source": "generated: corpus::generate (one_pole), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "3d45644e945f0bb88eb2e4055d453ca83c816bf8a9dafa23a62edd499a7b4351"
+    },
+    {
+      "id": "sparse-full-48000hz-1ch-full_i32-mono",
+      "class": "generated",
+      "representation_class": "residual",
+      "amplitude_class": "full_i32",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "sparse_residual",
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "frames": 144000,
+      "duration_ms": 3000,
+      "semantics": "one_shot",
+      "generator": {
+        "SparseResidual": {
+          "hz": 330,
+          "corrections": 1024,
+          "seed": 3072
+        }
+      },
+      "source": "generated: corpus::generate (sparse_residual), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "bbaf9016dec639c3c4029d6e78b0a166bb0fe5ab880e1818a8116f52e59e9e6d"
+    },
+    {
+      "id": "sparse-44k-44100hz-1ch-s16_like-mono",
+      "class": "generated",
+      "representation_class": "residual",
+      "amplitude_class": "s16_like",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "sparse_residual",
+      "sample_rate_hz": 44100,
+      "channels": 1,
+      "frames": 132300,
+      "duration_ms": 3000,
+      "semantics": "one_shot",
+      "generator": {
+        "SparseResidual": {
+          "hz": 330,
+          "corrections": 128,
+          "seed": 3328
+        }
+      },
+      "source": "generated: corpus::generate (sparse_residual), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "5f2b2f6053198d40f99263b62752111ae4266ef0573f0efd6f01b3546b2a3ba9"
+    },
+    {
+      "id": "poly-4-48000hz-4ch-s16_like-multichannel",
+      "class": "generated",
+      "representation_class": "compound",
+      "amplitude_class": "s16_like",
+      "channel_structure": "multichannel",
+      "temporal_class": "stationary",
+      "entropy_class": "locally_predictable",
+      "sample_rate_hz": 48000,
+      "channels": 4,
+      "frames": 72000,
+      "duration_ms": 1500,
+      "semantics": "one_shot",
+      "generator": {
+        "Polyphony": {
+          "voices": 4,
+          "base_hz": 110
+        }
+      },
+      "source": "generated: corpus::generate (polyphony), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "95416453e11941056499663386dddc566df3f1117e62a5b52197d7b06c4ac220"
+    },
+    {
+      "id": "poly-6-44100hz-6ch-s16_like-multichannel",
+      "class": "generated",
+      "representation_class": "compound",
+      "amplitude_class": "s16_like",
+      "channel_structure": "multichannel",
+      "temporal_class": "stationary",
+      "entropy_class": "locally_predictable",
+      "sample_rate_hz": 44100,
+      "channels": 6,
+      "frames": 66150,
+      "duration_ms": 1500,
+      "semantics": "one_shot",
+      "generator": {
+        "Polyphony": {
+          "voices": 6,
+          "base_hz": 110
+        }
+      },
+      "source": "generated: corpus::generate (polyphony), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "2264a8aae0d718e7a6c1af18f6052152d78ed099810ff35a0afd1979f601e503"
+    },
+    {
+      "id": "poly-12-96000hz-12ch-s24_like-multichannel",
+      "class": "generated",
+      "representation_class": "compound",
+      "amplitude_class": "s24_like",
+      "channel_structure": "multichannel",
+      "temporal_class": "stationary",
+      "entropy_class": "locally_predictable",
+      "sample_rate_hz": 96000,
+      "channels": 12,
+      "frames": 48000,
+      "duration_ms": 500,
+      "semantics": "one_shot",
+      "generator": {
+        "Polyphony": {
+          "voices": 12,
+          "base_hz": 110
+        }
+      },
+      "source": "generated: corpus::generate (polyphony), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1_NOT_APPLICABLE_BY_FORMAT_DOMAIN",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": false,
+      "canonical_i32_sha256": "30245589917f9b0f5a54d6ab2caa83341f64681d08e29d6f2407f5c23c9d0db8"
+    },
+    {
+      "id": "poly-16-stress-48000hz-16ch-s16_like-multichannel",
+      "class": "generated",
+      "representation_class": "compound",
+      "amplitude_class": "s16_like",
+      "channel_structure": "multichannel",
+      "temporal_class": "stationary",
+      "entropy_class": "locally_predictable",
+      "sample_rate_hz": 48000,
+      "channels": 16,
+      "frames": 12000,
+      "duration_ms": 250,
+      "semantics": "one_shot",
+      "generator": {
+        "Polyphony": {
+          "voices": 12,
+          "base_hz": 110
+        }
+      },
+      "source": "generated: corpus::generate (polyphony), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1_NOT_APPLICABLE_BY_FORMAT_DOMAIN",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": false,
+      "canonical_i32_sha256": "97a8b8f4c40f581bc6aed4e0ead8bc6e9aaf2d07952c949cf25ffeffc51b8c15"
+    },
+    {
+      "id": "noise-6ch-48000hz-6ch-s16_like-multichannel",
+      "class": "generated",
+      "representation_class": "noise",
+      "amplitude_class": "s16_like",
+      "channel_structure": "multichannel",
+      "temporal_class": "stationary",
+      "entropy_class": "spectrally_structured",
+      "sample_rate_hz": 48000,
+      "channels": 6,
+      "frames": 24000,
+      "duration_ms": 500,
+      "semantics": "one_shot",
+      "generator": {
+        "Uniform": {
+          "seed": 24582
+        }
+      },
+      "source": "generated: corpus::generate (uniform), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "f3ff3793ae8ad4ef83d5a20628a6f586132c2790ca15929afb2a3d51c6a930fb"
+    },
+    {
+      "id": "scrambled-44k-44100hz-1ch-full_i32-mono",
+      "class": "generated",
+      "representation_class": "noise",
+      "amplitude_class": "full_i32",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "scrambled",
+      "sample_rate_hz": 44100,
+      "channels": 1,
+      "frames": 132300,
+      "duration_ms": 3000,
+      "semantics": "one_shot",
+      "generator": {
+        "Scrambled": {
+          "seed": 2882391535
+        }
+      },
+      "source": "generated: corpus::generate (scrambled), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "4ab0e4f4dffac17b66295193c142813543b7ab39e85e1094b3abf36fa1247cef"
+    },
+    {
+      "id": "scrambled-96k-96000hz-1ch-full_i32-mono",
+      "class": "generated",
+      "representation_class": "noise",
+      "amplitude_class": "full_i32",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "scrambled",
+      "sample_rate_hz": 96000,
+      "channels": 1,
+      "frames": 144000,
+      "duration_ms": 1500,
+      "semantics": "one_shot",
+      "generator": {
+        "Scrambled": {
+          "seed": 4027388177
+        }
+      },
+      "source": "generated: corpus::generate (scrambled), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "0768f0c5504f1854b4c2c6d4db78bc925f9ba55eda7d5405dd92fb9dada9c91d"
+    },
+    {
+      "id": "scrambled-192k-192000hz-1ch-full_i32-mono",
+      "class": "generated",
+      "representation_class": "noise",
+      "amplitude_class": "full_i32",
+      "channel_structure": "mono",
+      "temporal_class": "stationary",
+      "entropy_class": "scrambled",
+      "sample_rate_hz": 192000,
+      "channels": 1,
+      "frames": 144000,
+      "duration_ms": 750,
+      "semantics": "one_shot",
+      "generator": {
+        "Scrambled": {
+          "seed": 4027392546
+        }
+      },
+      "source": "generated: corpus::generate (scrambled), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "a24fb26fe40fef21770a56f35006365d31732c85afcc4bbac4d1321d41805c77"
+    },
+    {
+      "id": "uniform-4ch-96000hz-4ch-full_i32-multichannel",
+      "class": "generated",
+      "representation_class": "noise",
+      "amplitude_class": "full_i32",
+      "channel_structure": "multichannel",
+      "temporal_class": "stationary",
+      "entropy_class": "full_width_random",
+      "sample_rate_hz": 96000,
+      "channels": 4,
+      "frames": 48000,
+      "duration_ms": 500,
+      "semantics": "one_shot",
+      "generator": {
+        "Uniform": {
+          "seed": 610800471
+        }
+      },
+      "source": "generated: corpus::generate (uniform), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "f0a4cb496c539912934d35ec38ca24fd828748f7304b5c37ae3fab0f7117dea5"
+    },
+    {
+      "id": "uniform-44k-44100hz-2ch-full_i32-independent_stereo",
+      "class": "generated",
+      "representation_class": "noise",
+      "amplitude_class": "full_i32",
+      "channel_structure": "independent_stereo",
+      "temporal_class": "stationary",
+      "entropy_class": "full_width_random",
+      "sample_rate_hz": 44100,
+      "channels": 2,
+      "frames": 132300,
+      "duration_ms": 3000,
+      "semantics": "one_shot",
+      "generator": {
+        "Uniform": {
+          "seed": 324478056
+        }
+      },
+      "source": "generated: corpus::generate (uniform), splitmix64/Q30 sine table, integer-only",
+      "conversion": "none: canonical i32 generated directly (no decode, shift, dither or resampling)",
+      "expected_inclusion_surfaces": [
+        "B0",
+        "B1",
+        "B5",
+        "B6"
+      ],
+      "b1_comparable": true,
+      "canonical_i32_sha256": "2556487589acb0efdab04d9543e812fff7db7f7a6424aa56636fffd24c073dc2"
+    }
+  ],
+  "corpus_sha256": "c0fc62ff05afbacd41a8dac8057cff2460f79464b20af4992dc8c18496937f64"
 }

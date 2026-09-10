@@ -18,7 +18,8 @@ USAGE:
 COMMANDS (current build):
     probe                 Capture environment + hardware evidence summary
     court <name>          Run an executable court (semantic, authored, simd, facts,
-                          inverse, inverse-search, conventional, flattening, cuda, d1, rocm,
+                          inverse, inverse-search, conventional, corpus, flattening,
+                          cuda, d1, rocm,
                           rocm-d0, rocm-d1, entropy-rans, entropy-literal,
                           entropy-residual, entropy-pages, entropy-partial,
                           entropy-simd, entropy-cuda, entropy-d1, entropyfs,
@@ -41,11 +42,17 @@ COMMANDS (current build):
                           trees (receipts/ target/ scripts/out/ docs/ .git/);
                           the identity a seal compares
     version               Print version and build identity
+    corpus list           List the frozen flagship corpus objects and classes
+    corpus verify         Regenerate every object and prove the frozen manifest
+                          (missing/extra/mutated/mis-sized/wrong-rate/wrong-hash
+                          all fail; exits nonzero on failure) [--receipts DIR]
+    corpus freeze         Rewrite the manifest from the frozen membership
+                          (the freeze act; run once, deliberately) [--out PATH]
     help                  Show this help
 
 Planned commands arrive with their phases (inspect/verify/encode/observe/play,
-bench/corpus, court d2|depth|conventional|random-access|negative|interference,
-and probe cuda|rocm|alsa|d1|d2). Until implemented they exit with
+bench, court d2|depth|random-access|negative|interference, and probe
+cuda|rocm|alsa|d1|d2). Until implemented they exit with
 NOT_IMPLEMENTED (3); the CLI never implies support that is absent.
 
 example:
@@ -97,8 +104,9 @@ fn run(args: &[String]) -> Result<u8> {
         "probe" => cmd_probe(&args[2..]),
         "receipt" => cmd_receipt(&args[2..]),
         "court" => cmd_court(&args[2..]),
+        "corpus" => cmd_corpus(&args[2..]),
         "seal" => cmd_seal(&args[2..]),
-        "inspect" | "verify" | "encode" | "observe" | "play" | "bench" | "corpus" => {
+        "inspect" | "verify" | "encode" | "observe" | "play" | "bench" => {
             // Declared-but-not-yet-implemented surface: exit 3 (NOT_IMPLEMENTED);
             // the CLI never implies support that is absent.
             eprintln!(
@@ -331,7 +339,7 @@ fn cmd_seal_verify(args: &[String]) -> Result<u8> {
     let mut historical = false;
     let mut expect = "semantic=SUPPORTED,authored=SUPPORTED,simd=SUPPORTED,\
                        facts=SUPPORTED,inverse=SUPPORTED,flattening=SUPPORTED,\
-                       inverse-search=SUPPORTED,conventional=SUPPORTED,\
+                       inverse-search=SUPPORTED,conventional=SUPPORTED,corpus=SUPPORTED,\
                        cuda=SUPPORTED,d1=SUPPORTED,h2=SUPPORTED,\
                        rocm=UNSUPPORTED_BY_HARDWARE|UNSUPPORTED_BY_API|INCONCLUSIVE,\
                        rocm-d0=UNSUPPORTED_BY_HARDWARE|UNSUPPORTED_BY_API|INCONCLUSIVE,\
@@ -455,6 +463,111 @@ fn cmd_court(args: &[String]) -> Result<u8> {
     let verdict = vole_audio::courts::run(name, &receipts)?;
     println!("court {name}: {verdict}");
     Ok(0)
+}
+
+fn cmd_corpus(args: &[String]) -> Result<u8> {
+    match args.first().map(String::as_str) {
+        None | Some("list") => {
+            let m = vole_audio::corpus::manifest()?;
+            println!(
+                "flagship corpus: {} objects ({} B1-comparable, {} excluded by format domain)",
+                m.populations.whole_corpus_objects,
+                m.populations.b1_comparable_objects,
+                m.populations.b1_excluded_objects
+            );
+            println!("  schema: {}  state: {}", m.schema, m.state);
+            println!("  corpus sha256: {}", m.corpus_sha256);
+            for o in &m.objects {
+                println!(
+                    "  {:<44} {:>6} Hz {:>2}ch {:>8} f  {}/{}/{}/{}/{}  {}",
+                    o.id,
+                    o.sample_rate_hz,
+                    o.channels,
+                    o.frames,
+                    o.representation_class,
+                    o.amplitude_class,
+                    o.channel_structure,
+                    o.temporal_class,
+                    o.entropy_class,
+                    if o.b1_comparable { "B1" } else { "B1-N/A" },
+                );
+            }
+            Ok(0)
+        }
+        Some("verify") => {
+            let mut receipts = std::path::PathBuf::from("receipts");
+            let mut i = 1;
+            while i < args.len() {
+                match args[i].as_str() {
+                    "--receipts" => {
+                        i += 1;
+                        receipts =
+                            std::path::PathBuf::from(args.get(i).ok_or_else(|| {
+                                Error::malformed("--receipts requires a directory")
+                            })?);
+                    }
+                    other => {
+                        return Err(Error::malformed(format!("unknown corpus flag '{other}'")));
+                    }
+                }
+                i += 1;
+            }
+            // Unlike a court, this is a verification command: a failed corpus
+            // gate exits nonzero so a script cannot ignore it. The receipt is
+            // written either way.
+            let verdict = vole_audio::courts::corpus::run(&receipts)?;
+            match verdict {
+                vole_audio::status::Verdict::Supported => Ok(0),
+                other => {
+                    eprintln!("corpus verify: {other}");
+                    Ok(1)
+                }
+            }
+        }
+        Some("freeze") => {
+            let mut out = std::path::PathBuf::from("corpus/manifest.json");
+            let mut i = 1;
+            while i < args.len() {
+                match args[i].as_str() {
+                    "--out" => {
+                        i += 1;
+                        out = std::path::PathBuf::from(
+                            args.get(i)
+                                .ok_or_else(|| Error::malformed("--out requires a path"))?,
+                        );
+                    }
+                    other => {
+                        return Err(Error::malformed(format!("unknown corpus flag '{other}'")));
+                    }
+                }
+                i += 1;
+            }
+            let specs = vole_audio::corpus::specs::specs();
+            let m = vole_audio::corpus::frozen_manifest(&specs)?;
+            let json = serde_json::to_string_pretty(&m)?;
+            std::fs::write(&out, format!("{json}\n"))?;
+            println!(
+                "corpus freeze: wrote {} objects to {}",
+                m.objects.len(),
+                out.display()
+            );
+            println!(
+                "  populations: whole {} / b1-comparable {} / excluded {}",
+                m.populations.whole_corpus_objects,
+                m.populations.b1_comparable_objects,
+                m.populations.b1_excluded_objects
+            );
+            println!("  corpus sha256: {}", m.corpus_sha256);
+            println!(
+                "  manifest sha256: {}",
+                vole_audio::hash::sha256::hex(&vole_audio::corpus::manifest_sha256(&m))
+            );
+            Ok(0)
+        }
+        Some(other) => Err(Error::malformed(format!(
+            "unknown corpus subcommand '{other}' (list | verify | freeze)"
+        ))),
+    }
 }
 
 fn cmd_receipt(args: &[String]) -> Result<u8> {
