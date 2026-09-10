@@ -142,10 +142,11 @@ Seal run (release, `--all-features`, clean tree, version 0.11.0):
 
 ## Where this goes next
 
-1. **Seals 2–7 — the corpus is frozen, verified and review-closed; the flagship
+1. **Seals 2–8 — the corpus is frozen, verified and review-closed; the flagship
    B0/B1 conventional baseline is measured; the full-object container mechanism
-   and its parser are frozen; and the true B1-vs-VOLE result exists with clean
-   population arithmetic.**
+   and its parser are frozen; the B1-vs-VOLE result exists with clean population
+   arithmetic; and the entropy complete-cost oracle equals the physical
+   artifact.**
 2. B2–B4 (PCM-resident / disk-streaming / compressed-file playback) beside the
    selected full-object VOLE artifact, then the `depth` / `random-access` /
    `negative` courts and the crossover surface.
@@ -511,3 +512,65 @@ Because the serializer itself was already canonical, no stored bytes moved, and
 both frozen hashes are preserved. Seal run: seal subject `0e30bdcc…`; tests
 **418 passed / 12 ignored** all-features and **408 passed / 12 ignored**
 default-features.
+
+*(Seal 8 supersedes the VOLE totals in this seal after the complete-cost framing
+fix; see below.)*
+
+### Seal 8 — entropy complete-cost physical framing (2026-09-10)
+
+The full-object layer did exactly what it was built to do: once "accounted
+bytes" and "actual bytes" existed side by side, the mismatch became observable.
+
+**Root cause.** `RepresentedLiteral::cost`/`RepresentedResidual::cost` omitted
+serialized framing — the container prefix/pool-count/page-count shortfall and
+every block's 32-byte header plus its one-byte integrity flag (and optional
+digest). An all-RANS literal under-reported by exactly `7 + 33 × rans_blocks`,
+which let an entropy `Literal` win a Phase-K selection on a discounted price and
+then store a larger physical artifact. `docs/ENTROPY_ACCOUNTING.md` already
+required block headers, indexes and integrity in the complete cost; the
+implementation did not match its own normative document.
+
+**Fix.** The cost decomposition now sums to exactly the canonical serialized
+length — `CompleteCost::complete_bytes == serialized_bytes()` — with every
+physical byte given a home:
+
+```text
+metadata      container prefix + shared-model pool count
+hypothesis    semantic model (residual)
+model         pool models + inline models + per-block shared refs
+payload       encoded bodies
+index         page-count field + page index records
+integrity     per-block header + integrity flag + optional digest
+```
+
+`serialized_bytes()` is public on both representations; `cost()` carries a debug
+invariant of equality; the block framing constants are public. An invariant
+battery sweeps every literal symbolization × page size × model mode × integrity
+× 1/2 channels and every residual page size, and the full-object layer now
+enforces `segment.objective_bytes == segment.stored_bytes` (in
+`compile_full_object` and in `court fullobj`). `court entropy-literal` and
+`court entropy-residual` require cost == serialized/container bytes. The frozen
+reviewer regression (`old objective 3115` / `old physical 7082`,
+`7 + 33 × 120 = 3967`) can no longer recur.
+
+**Selection rerun** (nothing else changed — corpus, segmentation, search budget
+and candidate vocabulary are untouched):
+
+```text
+court inverse    6 -> 7 non-literal explanations        hash 5b836006…
+court fullobj    same fixture selections                hash 0969a4f4…
+court flagship   VOLE comparable 28,257,411 -> 28,228,300 B
+                 B1/VOLE 0.905 -> 0.906 (VOLE 1.104x B1)
+                 buckets 55/0/55 -> 57/0/53; within 1% 16
+                 all-literal/procedural/mixed 60/52/3
+                 kinds literal 128, exact_repeat 104, constant 10,
+                 residual_zero 8, silence 4, residual_constant 1
+                 hash 8f37fab0…
+```
+
+As expected, the corrected physical total is **≤** the previous one (the old
+selected candidate remains available; the objective can only become more
+honest), and a handful of segments switched representation. Corpus hashes, the
+B1 conventional result, semantic behaviour and device artifacts are untouched.
+Seal run: seal subject `bb49eb48…`; tests **419 passed / 12 ignored**
+all-features and **409 passed / 12 ignored** default-features.

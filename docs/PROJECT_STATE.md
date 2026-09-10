@@ -1195,6 +1195,37 @@ flagship).
 - Seal subject `0e30bdcc…`; 418 passed / 12 ignored all-features, 408 passed /
   12 ignored default-features.
 
+### Phase M Seal 8 — entropy complete-cost physical framing (v0.18.0)
+
+The full-object layer exposed an H.2 accounting bug: `RepresentedLiteral::cost`
+and `RepresentedResidual::cost` omitted serialized framing (container prefix/
+pool-count/page-count shortfall, every block's 32-byte header and one-byte
+integrity flag plus optional digest), so an all-RANS literal under-reported by
+exactly `7 + 33 x rans_blocks`. An entropy `Literal` could win a Phase-K
+selection on a discounted price and then store a larger artifact, so "minimum
+complete bytes" was not yet a physical-storage claim.
+
+- `cost()` now sums to exactly the canonical serialized length
+  (`complete_bytes == serialized_bytes()`), with every physical byte given a
+  home: container prefix/pool count (metadata), semantic model (hypothesis),
+  pool + inline models + shared refs (model), encoded bodies (payload),
+  page-count field + page index records (index), block header + integrity
+  flag/digest (integrity). `docs/ENTROPY_ACCOUNTING.md` already required this.
+- Public `serialized_bytes()` on both representations; debug invariant in
+  `cost()`; public block framing constants; an invariant battery over every
+  symbolization x page size x model mode x integrity x channels; the
+  full-object invariant `segment.objective_bytes == segment.stored_bytes` in
+  `compile_full_object` and `court fullobj`; and cost == serialized/container
+  bytes enforced in `court entropy-literal`/`court entropy-residual`.
+- Selection rerun: `court inverse` 6 -> 7 non-literal explanations
+  (`5b836006…`); `court fullobj` same selections (`0969a4f4…`); `court flagship`
+  VOLE comparable 28,257,411 -> **28,228,300 B**, B1/VOLE **0.906**, buckets
+  **57/0/53** (`8f37fab0…`). The corrected total is <= the previous one, as
+  expected, and a few segments switched representation.
+- Corpus hashes, the B1 conventional result, semantic behaviour and device
+  artifacts are untouched. Seal subject `bb49eb48…`; 419 passed / 12 ignored
+  all-features, 409 passed / 12 ignored default-features.
+
 ## Next work (exact order — the implementation contract is executed in sequence)
 
 Phase H.2 is complete (entropy-native core: all ten H.2 courts SUPPORTED on
@@ -1215,9 +1246,10 @@ re-verified by the exact evaluator (`court inverse-search`), and the placement
 policy keeps the measured-faster host surface (`SearchBudget::placement`,
 `Auto`).
 
-1. Phase M — remaining increments (B2–B4 beside the selected full-object VOLE
-   artifact; depth / random-access / negative / interference courts; crossover
-   surface; energy);
+1. Phase M — remaining increments (the B2–B4 runtime baselines beside the selected
+   full-object VOLE artifact, with a bounded `FullObjectReader` and a verified
+   `FlacArtifact`; then depth / random-access / negative / interference courts;
+   crossover surface; energy);
    Phase N — transport/archive
    (embeds H.2 canonical records); Phase O — learned deterministic prediction
    addendum (judged by the H.2 complete-cost API).
