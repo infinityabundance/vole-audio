@@ -2,6 +2,7 @@
 //! archive lands in Phase N. All parsers are length-checked and hostile-input
 //! tested; the media format is explicit binary, never serde/bincode.
 
+pub mod archive;
 pub mod wav;
 
 pub use wav::{DecodedWav, PcmFormat};
