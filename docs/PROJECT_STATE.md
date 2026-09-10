@@ -867,25 +867,33 @@ authority.
 - `inverse/observe.rs`: identity-voice scalar observation and intrinsic
   reconstruction for every candidate class (both must be exact — "close" is
   never accepted).
-- `inverse/cost.rs`: complete dependency accounting; entropy-bearing
-  representations are priced by the frozen H.2 complete-cost API
-  (`entropy_literal` / `entropy_residual`), the rest by canonical object
-  bytes; abstract universe work is a static structural count.
+- `inverse/cost.rs`: complete dependency accounting in three separate
+  measurements — **storage** (the eight H.2 components, with `complete_bytes`
+  taken verbatim from the H.2 `CompleteCost` for entropy-carrying
+  representations, and the canonical object length for the rest),
+  **state/exposure** (`persistent_sample_domain_bytes`, `state_bytes`), and
+  **baseline** (`raw_sample_bytes`, `canonical_literal_bytes`); only the eight
+  storage components are summed.
 - `inverse/propose.rs`: bounded deterministic proposals — literal (always),
   silence, constant (mode), exact-repeat (minimal KMP frame period), residual
   zero/constant/periodic (bounded scan), and exact shared references against a
-  reference library.
+  reference library. `max_candidates == 0` is rejected; a zero period scan
+  disables the periodic family literally.
 - `inverse/frontier.rs`: a genuine Pareto set over static objectives
   `(complete_bytes, total_ops, seek_ops)` with a validity self-check; measured
   wall times are reported per candidate but are deliberately not objectives,
   so the frontier is reproducible.
 - `court inverse`: 14 fixtures (frozen H.2 corpus window), every candidate
   exact on intrinsic closure + scalar observation + a bounded seek window;
-  11/14 fixtures explained more cheaply by a non-literal candidate; negative
-  controls never "compressed" by a hypothesis; frontier validity/coverage,
-  determinism, archive dedup (32 dependency bytes, 0 persistent) and a
-  procedural-library reference all gated; frozen static-result hash
-  `9effb3c3…`.
+  with the corrected H.2 cost adaptation **6/14** fixtures have a non-literal
+  explanation (silence 46 B vs literal 183 B, DC 50 B vs 327 B, single-sine
+  574 B at an exact period of 64, quasi-periodic 15937 B, am-signal 1420 B at
+  residual period 128); `impulse-train`/`transient-heavy` and all three
+  negative controls are honestly cheapest as entropy-coded literals (the
+  earlier residual “wins” were an artefact of double-charging the deltas);
+  frontier validity/coverage, determinism, archive dedup (32 dependency bytes,
+  0 sample-domain bytes) and a procedural-library reference all gated; frozen
+  static-result hash `e0b2e35c…`.
 - `court flattening`: `flat == scalar` bit-for-bit over the frozen fixtures
   and 252 adversarial battery worlds (764 windows), with host residual-closure
   materialization and upload bytes accounted rather than hidden.

@@ -161,14 +161,16 @@ evidence today:
 - `cargo run -- court inverse` — Phase K inverse compiler: over the frozen
   corpus window, every accepted candidate reproduces the observed samples
   exactly through **both** its intrinsic closure and the scalar evaluator
-  (plus a bounded seek window); complete costs come from the H.2 cost oracle
-  and are reduced to a deterministic Pareto frontier over static objectives.
-  On the frozen corpus 11/14 fixtures have a non-literal exact explanation
-  (silence 46 B, DC 50 B, an exact period-64 cycle 574 B, …) while the
-  negative controls are never "compressed" by a hypothesis and
-  `harmonic-tone`/`fm-signal`/`stereo-correlated` honestly stay cheapest as
-  entropy-coded literals. The explanation search, archive deduplication and a
-  procedural-library reference are reported separately;
+  (plus a bounded seek window); storage costs come from the H.2 complete-cost
+  oracle and are reduced to a deterministic Pareto frontier over static
+  objectives. On the frozen corpus 6/14 fixtures have a cheaper exact
+  non-literal explanation (silence 46 B vs literal 183 B, DC 50 B vs 327 B,
+  single-sine 574 B at an exact period of 64, quasi-periodic 15937 B,
+  am-signal 1420 B at residual period 128), while `impulse-train`,
+  `transient-heavy`, `harmonic-tone`, `fm-signal`, `stereo-correlated` and the
+  three negative controls are honestly cheapest as entropy-coded literals. The
+  explanation search, archive deduplication and a procedural-library reference
+  are reported separately;
 - `cargo run -- court flattening` — Phase K host flat-evaluator parity:
   `flat == scalar` bit-for-bit over the frozen fixtures and an adversarial
   battery, with residual-closure materialization and upload bytes accounted

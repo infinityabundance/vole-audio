@@ -36,7 +36,7 @@ use crate::universe::layout::Layout;
 use super::observe;
 use super::{Candidate, CandidateKind, Intrinsic, SearchBudget};
 
-/// Smallest number of frames a period scan can distinguish.
+/// Smallest period the bounded scan can evaluate.
 const MIN_PERIOD: u32 = 1;
 
 /// Propose the bounded candidate set for one intrinsic window.
@@ -45,6 +45,7 @@ pub fn propose(
     library: &ReferenceLibrary,
     budget: SearchBudget,
 ) -> Result<Vec<Candidate>> {
+    budget.validate()?;
     let layout = observe::layout_of(intrinsic.channels)?;
     let frames = intrinsic.frames as usize;
     let channels = usize::from(intrinsic.channels);
@@ -275,11 +276,15 @@ fn minimal_frame_period(samples: &[i32], channels: usize, frames: usize) -> usiz
 /// Bounded period scan for the periodic residual family: residual record count
 /// for every `p` in `[MIN_PERIOD, min(max_scan, frames - 1)]`, ranked by
 /// (record count ascending, period ascending) and truncated to `keep`.
+///
+/// `max_scan == 0` or `keep == 0` means the periodic residual family is
+/// **disabled**: no period is scanned, so a caller asking for zero periods
+/// never silently gets period 1.
 fn scan_periods(samples: &[i32], frames: usize, max_scan: u32, keep: usize) -> Vec<(usize, usize)> {
-    if frames < 2 || keep == 0 {
+    if frames < 2 || max_scan == 0 || keep == 0 {
         return Vec::new();
     }
-    let limit = (max_scan as usize).min(frames - 1).max(MIN_PERIOD as usize);
+    let limit = (max_scan as usize).min(frames - 1);
     let mut rows: Vec<(usize, usize)> = Vec::new();
     for p in MIN_PERIOD as usize..=limit {
         let cycle = samples[..p].to_vec();
@@ -323,12 +328,18 @@ impl ReferenceLibrary {
 
     /// Register canonical literal content.
     pub fn register_literal(&mut self, channels: u8, samples: Vec<i32>) -> Result<ContentId> {
-        let frames = (samples.len() / usize::from(channels)) as u64;
-        if frames * u64::from(channels) != samples.len() as u64 {
+        // Validate the channel count BEFORE any arithmetic on it: a zero
+        // channel count is malformed input, never a division by zero.
+        let layout = observe::layout_of(channels)?;
+        let ch = usize::from(channels);
+        let frames = samples.len() / ch;
+        if !samples.len().is_multiple_of(ch) {
             return Err(Error::malformed("library literal is not frame-aligned"));
         }
-        let layout = observe::layout_of(channels)?;
-        let desc = ObjectDescriptor::new(Representation::Literal, frames, layout, None)
+        if frames == 0 {
+            return Err(Error::malformed("library literal is empty"));
+        }
+        let desc = ObjectDescriptor::new(Representation::Literal, frames as u64, layout, None)
             .ok_or_else(|| Error::malformed("library literal descriptor out of domain"))?;
         let data = Literal::new(&desc, samples)
             .ok_or_else(|| Error::malformed("library literal payload out of domain"))?;

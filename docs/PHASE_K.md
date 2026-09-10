@@ -82,9 +82,65 @@ candidate vocabulary, accounting rules and frontier semantics is
     `receipts_written_before_an_additive_field_still_verify`,
     `tampered_receipt_body_is_rejected`, `canonical_forms_agree_for_the_pointer_style`.
 
+## Review amendment 1 (corrected H.2 cost adaptation)
+
+The first external review of Phase K found that `CandidateCost` was folding
+three different measurements into one number, so the *economic ranking* (not
+the exactness evidence) was wrong:
+
+* the literal candidate's storage cost summed the H.2 metadata + entropy
+  payload **plus the raw samples it replaced**, while dropping the H.2
+  `model_bytes` / `index_bytes` / `integrity_bytes` — roughly a 2× distortion
+  on RAW-fallback content (white-noise literal reported 32 839 B instead of
+  the H.2 16 519 B);
+* residual candidates were charged for both their entropy-coded body and the
+  unencoded delta bytes.
+
+Fixed at the type level. `CandidateCost` now preserves the H.2 decomposition
+verbatim (`metadata`, `hypothesis`, `model`, `payload`, `index`, `checkpoint`,
+`dependency`, `integrity`, `complete_bytes`) and separates:
+
+* **storage cost** — the eight components, with `complete_bytes` taken
+  directly from the H.2 `CompleteCost` for entropy-carrying representations
+  (no re-summing under a different interpretation);
+* **state/exposure** — `persistent_sample_domain_bytes`, `state_bytes`
+  (sample-domain content that may exist while evaluating; never summed);
+* **baseline** — `raw_sample_bytes`, `canonical_literal_bytes` (never summed).
+
+For representations with no entropy body the decomposition is over the
+canonical object bytes and sums to exactly that length.
+
+Three bounded-search contract bugs are fixed with it:
+
+1. `SearchBudget::max_candidates == 0` is now **rejected** (`Literal` is
+   always a candidate; truncating to zero would have dropped the universal
+   fallback silently);
+2. `max_period_scan == 0` (and `max_residual_period_candidates == 0`) now
+   mean the periodic residual family is **disabled literally** — no period is
+   scanned, so a caller asking for zero periods no longer silently gets
+   period 1;
+3. `ReferenceLibrary::register_literal` validates the channel count before
+   dividing by it, so `channels == 0` is malformed input rather than a
+   division-by-zero panic.
+
+Hostile tests: `zero_max_candidates_is_rejected_not_silently_no_literal`,
+`minimum_budget_still_yields_the_literal_fallback`,
+`zero_period_scan_disables_the_periodic_family_literally`,
+`register_literal_with_zero_channels_is_malformed_not_a_panic`,
+`cost_decomposition_is_consistent_for_every_accepted_candidate`, plus the
+cost-unit invariants (`literal_cost_equals_the_h2_complete_cost`,
+`residual_cost_does_not_double_charge_the_deltas`,
+`cycle_table_is_storage_payload_and_also_reported_as_state`).
+
 ## Seal history
 
 ### Seal 1 — Phase K implementation + clean-tree battery (2026-09-10)
+
+> **Superseded for economics (not for exactness).** The exactness evidence in
+> this seal stands, but its cost numbers folded baselines and sample-domain
+> state into the storage sum; the candidate ranking, the
+> `non_literal_wins` count and the frozen result hash were therefore produced
+> under the wrong cost transformation. See “Review amendment 1” and Seal 2.
 
 Seal run (release, `--all-features`, clean tree `7652c6b`, version 0.8.0):
 
@@ -114,7 +170,8 @@ Seal run (release, `--all-features`, clean tree `7652c6b`, version 0.8.0):
     persistent bytes) for every fixture; a procedural (`ExactRepeat`) library
     object is referenceable;
   - frozen static-result hash
-    `9effb3c31b0b0fb0aa224084b3aa82820981ae3c2e89cbac769b0463f3de0a3a`.
+    `9effb3c31b0b0fb0aa224084b3aa82820981ae3c2e89cbac769b0463f3de0a3a`
+    (superseded by Seal 2).
 - `court flattening` SUPPORTED: 254 worlds (frozen semantic fixture, frozen
   authored fixture, 252 adversarial battery worlds), 764 windows compared,
   `flat == scalar` bit-for-bit on every window; 84 336 bytes of residual
@@ -132,6 +189,39 @@ Seal run (release, `--all-features`, clean tree `7652c6b`, version 0.8.0):
 - `vole-audio seal verify` PASSes on the 12-row matrix in **default mode** at
   the battery tree and (after rebuilding from the release head) at the head
   itself; every receipt `source_binding: bound` and carries one seal subject.
+
+### Seal 2 — review-1 closure: corrected H.2 cost adaptation (2026-09-10)
+
+Seal run (release, `--all-features`, clean tree at the corrected implementation
+commit, version 0.8.1):
+
+Re-runs the whole battery after the cost fix. The corrected economics are
+worse and more honest, and the court was **not** tuned to keep the old result:
+
+- `court inverse`: **6/14** fixtures now have a non-literal exact explanation
+  (down from 11/14 under the wrong accounting): `silence` 46 B vs literal
+  183 B, `dc`/`dc-negative` 50 B vs 327 B, `single-sine` 574 B (exact period
+  64) vs 6331 B, `quasi-periodic` 15937 B vs 16169 B, `am-signal` 1420 B
+  (residual period 128) vs 8185 B. The literal floor now matches the H.2 cost
+  exactly (the 4096-frame mono white-noise literal is 16 519 B = 71 metadata +
+  16 384 payload + 64 index, not 32 839 B);
+- honest reversals: `impulse-train` (literal 219 B) and `transient-heavy`
+  (literal 633 B) are now cheapest as entropy-coded literals — the earlier
+  “residual wins” were an artefact of double-charging the deltas — and all
+  three negative controls (`white-noise`, `random-control`,
+  `scrambled-control`) now correctly fall back to the literal, instead of the
+  residual appearing 1–5 % cheaper;
+- frozen static-result hash re-frozen at
+  `e0b2e35ca31f64b84e232d79e3f348a252e6b408195a33fc1173acc593e95a23`;
+  archive dedup still accepted for every fixture (32 dependency bytes, 0
+  persistent bytes).
+- Exactness evidence unchanged: every accepted candidate still reproduces the
+  window through both reconstructions plus a bounded seek window, and
+  `court flattening` still reports `flat == scalar`.
+- Host tests: **371 passed, 5 ignored** all-features (361 passed, 5 ignored
+  default-features; +8 over Seal 1: the cost decomposition invariants and the
+  budget/channel hostile tests); clippy `-D warnings` and
+  `cargo fmt --check` clean.
 
 ## Execution record (implementation summary)
 

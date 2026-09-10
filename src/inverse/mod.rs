@@ -72,10 +72,12 @@ pub const MAX_INVERSE_FRAMES: u64 = crate::limits::MAX_QUANTUM_FRAMES as u64;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SearchBudget {
     /// Largest period evaluated by the bounded residual period scan.
+    /// `0` disables the periodic residual family entirely.
     pub max_period_scan: u32,
     /// How many scanned periods may become residual candidates.
+    /// `0` disables the periodic residual family entirely.
     pub max_residual_period_candidates: usize,
-    /// Hard ceiling on proposed candidates.
+    /// Hard ceiling on proposed candidates (must be `>= 1`).
     pub max_candidates: usize,
 }
 
@@ -86,6 +88,25 @@ impl Default for SearchBudget {
             max_residual_period_candidates: 4,
             max_candidates: 64,
         }
+    }
+}
+
+impl SearchBudget {
+    /// Reject a budget that cannot honour the public contract.
+    ///
+    /// `max_candidates == 0` is invalid: `Literal` is **always** a candidate,
+    /// so the minimum meaningful budget is one. (Silently truncating to zero
+    /// would drop the universal fallback.) `max_period_scan == 0` and
+    /// `max_residual_period_candidates == 0` are *valid* and mean the periodic
+    /// residual family is disabled — the bound is honoured literally, never
+    /// rounded up to one period.
+    pub fn validate(&self) -> Result<()> {
+        if self.max_candidates == 0 {
+            return Err(Error::malformed(
+                "search budget max_candidates must be >= 1 (Literal is always a candidate)",
+            ));
+        }
+        Ok(())
     }
 }
 
@@ -264,6 +285,7 @@ pub fn compile(
     library: &ReferenceLibrary,
     budget: SearchBudget,
 ) -> Result<SearchReport> {
+    budget.validate()?;
     let sw = Stopwatch::start();
     let candidates = propose::propose(intrinsic, library, budget)?;
     let proposed = candidates.len();
@@ -396,9 +418,10 @@ fn accept(
             cost::canonical_object_cost(&descriptor, other, intrinsic.frames, intrinsic.channels)?
         }
     };
+    debug_assert!(cost.decomposition_is_consistent());
     let work = cost::abstract_work(&data, intrinsic.frames, intrinsic.channels);
     let accounted_peak_bytes = (intrinsic.samples.len() as u64) * 4
-        + cost.persistent_bytes
+        + cost.persistent_sample_domain_bytes
         + u64::from(seek_frames) * u64::from(intrinsic.channels) * 4;
 
     Ok(Some(Acceptance {
@@ -424,4 +447,95 @@ fn accept(
         seek_ops: work.window(u64::from(seek_frames), intrinsic.frames),
         total_ops: work.total(),
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn intrinsic(name: &str, channels: u8, samples: Vec<i32>) -> Intrinsic {
+        Intrinsic::new(name, channels, samples).unwrap()
+    }
+
+    fn tone(frames: usize) -> Vec<i32> {
+        (0..frames).map(|i| ((i % 64) as i32) << 16).collect()
+    }
+
+    #[test]
+    fn zero_max_candidates_is_rejected_not_silently_no_literal() {
+        let fx = intrinsic("tone", 1, tone(1024));
+        let budget = SearchBudget {
+            max_candidates: 0,
+            ..SearchBudget::default()
+        };
+        let err = compile(&fx, &ReferenceLibrary::new(), budget).unwrap_err();
+        assert!(err.to_string().contains("max_candidates"), "{err}");
+    }
+
+    #[test]
+    fn minimum_budget_still_yields_the_literal_fallback() {
+        let fx = intrinsic("tone", 1, tone(1024));
+        let budget = SearchBudget {
+            max_candidates: 1,
+            ..SearchBudget::default()
+        };
+        let r = compile(&fx, &ReferenceLibrary::new(), budget).unwrap();
+        assert!(r.literal_accepted());
+        assert_eq!(r.accepted.len(), 1);
+    }
+
+    #[test]
+    fn zero_period_scan_disables_the_periodic_family_literally() {
+        // Content with an exact period of 64: with a normal budget the
+        // compiler proposes exact-repeat and periodic residual candidates;
+        // with the scan disabled it must not silently search period 1.
+        let fx = intrinsic("tone", 1, tone(1024));
+        let enabled = compile(&fx, &ReferenceLibrary::new(), SearchBudget::default()).unwrap();
+        assert!(
+            enabled
+                .accepted
+                .iter()
+                .any(|a| a.label.starts_with("residual(period=")),
+            "default budget should propose periodic residual candidates"
+        );
+        let disabled = compile(
+            &fx,
+            &ReferenceLibrary::new(),
+            SearchBudget {
+                max_period_scan: 0,
+                ..SearchBudget::default()
+            },
+        )
+        .unwrap();
+        assert!(
+            disabled
+                .accepted
+                .iter()
+                .all(|a| !a.label.starts_with("residual(period=")),
+            "a zero period scan must disable the family, not search period 1"
+        );
+        assert!(disabled.literal_accepted());
+    }
+
+    #[test]
+    fn register_literal_with_zero_channels_is_malformed_not_a_panic() {
+        let mut lib = ReferenceLibrary::new();
+        let err = lib.register_literal(0, vec![0; 8]).unwrap_err();
+        assert!(err.to_string().contains("channel"), "{err}");
+        assert!(lib.is_empty());
+    }
+
+    #[test]
+    fn cost_decomposition_is_consistent_for_every_accepted_candidate() {
+        let fx = intrinsic("tone", 1, tone(1024));
+        let r = compile(&fx, &ReferenceLibrary::new(), SearchBudget::default()).unwrap();
+        assert!(!r.accepted.is_empty());
+        for a in &r.accepted {
+            assert!(
+                a.cost.decomposition_is_consistent(),
+                "{}: storage components do not sum to complete_bytes",
+                a.label
+            );
+        }
+    }
 }

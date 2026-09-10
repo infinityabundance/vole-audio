@@ -174,5 +174,9 @@ pub fn timed_intrinsic_reconstruction(
 
 /// Layout for an intrinsic channel count.
 pub fn layout_of(channels: u8) -> Result<Layout> {
-    Layout::checked(channels).ok_or_else(|| Error::malformed("intrinsic layout out of domain"))
+    Layout::checked(channels).ok_or_else(|| {
+        Error::malformed(
+            "intrinsic channel count out of domain (channels must be 1..=MAX_CHANNELS)",
+        )
+    })
 }

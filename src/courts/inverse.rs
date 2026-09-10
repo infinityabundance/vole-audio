@@ -57,7 +57,7 @@ pub const INVERSE_RATE_HZ: u32 = 48_000;
 /// Frozen static-result hash: the court fails if a change silently alters the
 /// inverse results. Re-freeze only with a documented reason.
 pub const INVERSE_RESULT_SHA256: &str =
-    "9effb3c31b0b0fb0aa224084b3aa82820981ae3c2e89cbac769b0463f3de0a3a";
+    "e0b2e35ca31f64b84e232d79e3f348a252e6b408195a33fc1173acc593e95a23";
 
 /// Build the bounded inverse fixture set from the frozen corpus.
 pub fn fixtures() -> crate::error::Result<Vec<Intrinsic>> {
@@ -99,7 +99,7 @@ fn static_result_hash(reports: &[SearchReport]) -> [u8; 32] {
             h.update(&[0]);
             h.update(&a.cost.complete_bytes.to_le_bytes());
             h.update(&a.cost.dependency_bytes.to_le_bytes());
-            h.update(&a.cost.persistent_bytes.to_le_bytes());
+            h.update(&a.cost.persistent_sample_domain_bytes.to_le_bytes());
             h.update(&a.total_ops.to_le_bytes());
             h.update(&a.seek_ops.to_le_bytes());
             h.update(&a.content_id.to_bytes());
@@ -122,14 +122,17 @@ fn acceptance_cell(a: &Acceptance) -> serde_json::Value {
         "complete_bytes": a.cost.complete_bytes,
         "metadata_bytes": a.cost.metadata_bytes,
         "hypothesis_bytes": a.cost.hypothesis_bytes,
-        "residual_bytes": a.cost.residual_bytes,
-        "persistent_bytes": a.cost.persistent_bytes,
-        "dependency_bytes": a.cost.dependency_bytes,
+        "model_bytes": a.cost.model_bytes,
+        "payload_bytes": a.cost.payload_bytes,
+        "index_bytes": a.cost.index_bytes,
         "checkpoint_bytes": a.cost.checkpoint_bytes,
-        "state_bytes": a.cost.state_bytes,
+        "dependency_bytes": a.cost.dependency_bytes,
+        "integrity_bytes": a.cost.integrity_bytes,
         "cost_source": a.cost.cost_source,
         "raw_sample_bytes": a.cost.raw_sample_bytes,
         "canonical_literal_bytes": a.cost.canonical_literal_bytes,
+        "persistent_sample_domain_bytes": a.cost.persistent_sample_domain_bytes,
+        "state_bytes": a.cost.state_bytes,
         "generator_ops": a.work.generator_ops,
         "residual_ops": a.work.residual_ops,
         "lookup_ops": a.work.lookup_ops,
@@ -323,10 +326,14 @@ pub fn run(receipts_root: &Path) -> crate::error::Result<Verdict> {
                     fx.name
                 ))
             })?;
-        if reference.cost.dependency_bytes != 32 || reference.cost.persistent_bytes != 0 {
+        if reference.cost.dependency_bytes != 32
+            || reference.cost.persistent_sample_domain_bytes != 0
+        {
             return fail(&format!(
                 "{}: shared reference accounting wrong (dep={}, persistent={})",
-                fx.name, reference.cost.dependency_bytes, reference.cost.persistent_bytes
+                fx.name,
+                reference.cost.dependency_bytes,
+                reference.cost.persistent_sample_domain_bytes
             ));
         }
         let literal = r
@@ -591,8 +598,9 @@ mod tests {
                 .find(|a| a.kind == CandidateKind::SharedReference)
                 .unwrap_or_else(|| panic!("{}: no shared reference", fx.name));
             assert_eq!(reference.cost.dependency_bytes, 32);
-            assert_eq!(reference.cost.persistent_bytes, 0);
+            assert_eq!(reference.cost.persistent_sample_domain_bytes, 0);
             assert_eq!(reference.cost.complete_bytes, 103);
+            assert!(reference.cost.decomposition_is_consistent());
         }
     }
 }

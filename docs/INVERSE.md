@@ -72,36 +72,49 @@ Their status is recorded in the Phase-K ledger; nothing claims them.
 
 ## 3. Complete dependency accounting
 
-Every accepted candidate reports the contract's complete cost fields:
+Three quantities are kept strictly apart, because they are different
+measurements:
 
-| field | meaning |
-| ----- | ------- |
-| `metadata_bytes` | container/descriptor/version bytes |
-| `hypothesis_bytes` | procedural model state (cycle prefixes, reference transpose/loop state, constant level) |
-| `residual_bytes` | entropy-coded residual payload (0 when not a residual object) |
-| `persistent_bytes` | stored sample-domain payload owned by the representation |
-| `dependency_bytes` | referenced content ids (32 per reference) |
-| `checkpoint_bytes` | checkpoint records (0 in Phase K; the field exists so Phase N candidates need no cost-API surgery) |
-| `state_bytes` | resident sample-domain state |
-| `complete_bytes` | sum of the stored fields — the comparable objective |
+```text
+STORAGE COST        physical representation bytes
+                      complete_bytes = metadata + hypothesis + model
+                                     + payload + index + checkpoint
+                                     + dependency + integrity
+STATE / EXPOSURE    sample-domain content that may exist while evaluating
+                      persistent_sample_domain_bytes, state_bytes
+                      (NEVER added to complete_bytes)
+BASELINE            the original/raw/canonical sample bytes
+                      raw_sample_bytes, canonical_literal_bytes
+                      (NEVER part of the sum)
+```
 
-`raw_sample_bytes` and `canonical_literal_bytes` are **comparison baselines**
-and are never part of the sum.
-
-Where an entropy body exists the cost comes from the frozen H.2 complete-cost
-API, so the inverse compiler and the entropy encoder cannot disagree:
+Where an entropy body exists the storage cost **is** the frozen H.2 complete
+cost: `CandidateCost` carries the eight H.2 components through unchanged and
+`complete_bytes` is the H.2 `complete_bytes` — the inverse compiler and the
+entropy encoder cannot disagree:
 
 * `Literal` is priced by the best frozen literal representation
   (`entropy_literal`): symbolization × page size, minimum `complete_bytes`;
 * residual candidates are priced by the best frozen residual encoding
-  (`entropy_residual`): page sizes 256/512/1024, minimum `complete_bytes`;
-* representations with no entropy body (silence, constant, cycle, shared
-  reference) are priced by their canonical object bytes
-  (`canonical_object`), and every canonical byte lands in exactly one bucket
-  (asserted in debug builds).
+  (`entropy_residual`): page sizes 256/512/1024, minimum `complete_bytes`.
 
-A resident table is never free: a stored cycle is `persistent_bytes` and
-`state_bytes`; a shared reference is `dependency_bytes`, never zero.
+For representations with no entropy body (silence, constant, cycle, shared
+reference) the decomposition is over the canonical object bytes and sums to
+exactly that length (`canonical_object`). A resident table is never free: a
+stored cycle is storage `payload`; a shared reference's target content id is
+`dependency_bytes`, never zero. `debug_assert!`s check the invariant, and
+`CandidateCost::decomposition_is_consistent()` exposes it to tests.
+
+Sample-domain content that a representation owns (literal samples, cycle
+samples, residual deltas) is reported as **state/exposure**, not storage: it
+is never charged a second time on top of the entropy-coded body that replaces
+it. For example, the 4096-frame mono white-noise window is:
+
+```text
+raw samples        16 384 B        (baseline)
+literal storage       71 metadata + 16 384 payload + 64 index = 16 519 B
+state/residency    16 384 B        (reported, not summed)
+```
 
 ## 4. Abstract universe work
 
@@ -175,7 +188,8 @@ membership, and the per-fixture dedup row.
   reports the best of a bounded, documented candidate set.
 * It does **not** claim perceptual or lossy quality — acceptance is exactness.
 * A negative result (literal wins) is a result and is reported as one: on the
-  frozen corpus, `harmonic-tone`, `fm-signal`, and `stereo-correlated` are
-  cheaper as entropy-coded literals than as any hypothesis in the current
-  candidate set.
+  frozen corpus, `harmonic-tone`, `fm-signal`, `stereo-correlated`,
+  `impulse-train`, `transient-heavy` and all three negative controls are
+  cheapest as entropy-coded literals — the procedural hypothesis is available
+  and exact, but it is not cheaper.
 * GPU inverse search is Phase L; nothing here claims parallel search.
