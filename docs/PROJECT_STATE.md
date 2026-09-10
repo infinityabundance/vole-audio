@@ -1019,8 +1019,9 @@ conventional baseline ladder's foundation:
   step (or panic) between `cuCtxCreate` and the RAII owner destroys the context
   and leaves the caller's context stack unchanged.
 
-Not yet in Phase M: the flagship B1/VOLE comparison (Seal 2 froze and verified
-the corpus but ran no flagship measurement), B2–B4,
+Not yet in Phase M: the B1-vs-VOLE comparison (Seal 4 now measures the flagship
+conventional B0/B1 baselines over the frozen corpus, but the selected-
+representation VOLE side needs the exact full-object inverse container), B2–B4,
 `court depth|random-access|negative|interference|all`, the crossover surface,
 energy, and the adversarial real-time load matrix.
 
@@ -1090,6 +1091,28 @@ AMDGPU `5c30a4bc…`); semantic/authored/inverse/inverse-search frozen hashes
 unchanged; 407 passed / 12 ignored all-features, 397 passed / 12 ignored
 default-features. The flagship comparison is still the next increment.
 
+### Phase M Seal 4 — flagship conventional baseline (v0.14.0)
+
+**The box is opened.** `court conventional` now verifies the frozen manifest and
+then measures the **flagship population** (115 objects; 110 B1-comparable, 5
+`NOT_APPLICABLE_BY_FORMAT_DOMAIN`), bound to manifest sha256, corpus sha256,
+object order, and each object's canonical i32 hash / rate / channels / frames.
+It is the **flagship B0/B1 conventional-baseline result**, not the B1-vs-VOLE
+result (the `u1` literal row is the universal fallback, not the selected
+representation).
+
+Measured: B0 71,277,600 B, B1(level 5) 25,577,431 B, u1 literal 71,283,810 B
+(B1/u1 0.359, B1/B0 over the comparable subset 0.390), 330 exact round trips,
+reference `flac 1.5.0` 110/110 exact (reference/B1 0.990, non-authoritative).
+Per-axis surfaces (B1/B0, B1-comparable subset): entropy — highly predictable
+0.195, scrambled 1.001; amplitude — low_byte 0.135, full_i32 0.762; channel
+structure — identical stereo 0.180, independent stereo 0.751; source structure —
+literal 0.032, noise 0.844. Frozen result
+`acfdaa32b9b69cdc0ee3ab2c0fb10387233603bc7a13d816575e12f7d2988b9b`; seal
+subject `40c4c8e6…`; 409 passed / 12 ignored all-features, 399 passed / 12
+ignored default-features. The axes are descriptive surfaces of this frozen
+population, not controlled causal effects.
+
 ## Next work (exact order — the implementation contract is executed in sequence)
 
 Phase H.2 is complete (entropy-native core: all ten H.2 courts SUPPORTED on
@@ -1110,8 +1133,8 @@ re-verified by the exact evaluator (`court inverse-search`), and the placement
 policy keeps the measured-faster host surface (`SearchBudget::placement`,
 `Auto`).
 
-1. Phase M — remaining increments (flagship B1/VOLE comparison on the frozen
-   corpus; B2–B4; depth /
+1. Phase M — remaining increments (the exact full-object inverse container → the
+   true flagship B1-vs-selected-VOLE comparison; B2–B4; depth /
    random-access / negative / interference courts; crossover surface; energy);
    Phase N — transport/archive
    (embeds H.2 canonical records); Phase O — learned deterministic prediction

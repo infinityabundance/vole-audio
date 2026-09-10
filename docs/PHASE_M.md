@@ -102,12 +102,13 @@ the context and leaves the caller's context stack exactly as it was.
 
 ## What is *not* in this increment
 
-Stated plainly so the gap is visible (updated at Seal 3 — the corpus freeze and
-its review closure are done; the rest is not):
+Stated plainly so the gap is visible (updated at Seal 4 — the corpus is frozen
+and the flagship conventional baseline is now measured; the rest is not):
 
-* the flagship **B1/VOLE comparison has not been run**. Seal 2 froze and Seal 3
-  closed the freeze's integrity, but the comparison is a later increment, so no
-  flagship performance claim exists yet;
+* the **B1-vs-VOLE comparison has not been run**. Seal 4 measures the
+  conventional baselines (B0/B1) over the frozen corpus; the selected-VOLE-
+  representation comparison needs an exact full-object inverse container and is
+  a later increment, so no flagship VOLE performance claim exists yet;
 * B2–B4 (sampler / disk-streaming / compressed-file playback) are
   `NOT_IMPLEMENTED`;
 * `court depth`, `court random-access`, `court negative`, `court interference`,
@@ -142,11 +143,12 @@ Seal run (release, `--all-features`, clean tree, version 0.11.0):
 
 ## Where this goes next
 
-1. **Seals 2–3 — the flagship corpus is frozen, verified and review-closed**, all
-   before any flagship measurement exists.
-2. Open the box: run the flagship B1 comparison over the frozen corpus under the
-   population rule, then implement B2–B4, the `depth` / `random-access` /
-   `negative` courts and the crossover surface.
+1. **Seals 2–4 — the corpus is frozen, verified, review-closed, and the
+   flagship B0/B1 conventional baseline is measured.**
+2. The exact full-object inverse container → the true flagship **B1-vs-selected-
+   VOLE** result; and B2–B4 (PCM-resident / disk-streaming / compressed-file
+   playback), then the `depth` / `random-access` / `negative` courts and the
+   crossover surface.
 3. Adversarial real-time load (§49) and energy where measurable.
 
 ### Seal 2 — flagship corpus freeze (2026-09-10)
@@ -239,3 +241,83 @@ the **15-row `seal verify` matrix passes** at seal subject `793a07f9…`; 25 fre
 receipts; `court corpus` SUPPORTED (115/115 regenerated and hash-matched);
 tests **407 passed / 12 ignored** all-features and **397 passed / 12 ignored**
 default-features. No flagship performance claim exists yet.
+
+### Seal 4 — flagship conventional baseline (2026-09-10)
+
+**The box is opened.** `court conventional` no longer measures the H.2 entropy
+fixtures; it measures the **frozen flagship population** and produces the first
+precommitted flagship measurement. It is deliberately named the *flagship B0/B1
+conventional-baseline result*, not the B1-vs-VOLE result.
+
+What the court does:
+
+* it verifies the frozen manifest **before** measuring anything (canonical
+  object comparison, membership, order, derived B1 eligibility), then iterates
+  the frozen order and requires each regenerated object to match its frozen
+  canonical i32 hash;
+* all 115 objects get `B0` and the `u1` literal figure; the 110 derived
+  B1-comparable objects get FLAC levels 0/5/8 plus the optional reference
+  oracle; the five `>8`-channel objects are recorded explicitly as
+  `NOT_APPLICABLE_BY_FORMAT_DOMAIN` and never enter a B1 aggregate;
+* the static result is bound to the population: manifest sha256, corpus sha256,
+  object order, and every object's canonical i32 hash, rate, channels, frames
+  and byte rows;
+* the receipt reports per-axis surfaces (source structure, amplitude, channel
+  structure, temporal, entropy, sample rate) over the B1-comparable subset.
+
+Observed (release, `--all-features`, version 0.14.0):
+
+```text
+objects            115   (110 B1-comparable, 5 excluded by format domain)
+B0 raw PCM          71,277,600 B
+B1 level 5          25,577,431 B      B1(0) 29,901,976 B   B1(8) 24,808,874 B
+u1 literal          71,283,810 B
+B1 / u1 literal          0.359
+B1 / B0 (comparable)     0.390
+reference flac 1.5.0     25,319,928 B  reference/B1 0.990   (110/110 exact, non-authoritative)
+exact round trips   330  (110 objects x levels 0/5/8)
+frozen result       acfdaa32b9b69cdc0ee3ab2c0fb10387233603bc7a13d816575e12f7d2988b9b
+corpus sha256       4c94b841…      manifest sha256 f67c73cf…
+```
+
+The stratification is the point: instead of one compression number, the frozen
+pre-result axes separate cleanly under a *common* exact codec.
+
+```text
+entropy class          B1/B0        amplitude class   B1/B0
+  highly predictable    0.195         low_byte          0.135
+  locally predictable   0.241         s16_like          0.217
+  sparse residual       0.286         s24_like          0.379
+  globally periodic     0.310         full_i32          0.762
+  spectrally struct.    0.653
+  full-width random     0.898       channel structure  B1/B0
+  scrambled             1.001         identical stereo  0.180
+                                       anti-correlated   0.241
+source structure       B1/B0          mono              0.379
+  literal               0.032         multichannel      0.399
+  exact repetition      0.171         correlated        0.415
+  compound              0.206         independent       0.751
+  oscillator            0.234
+  residual              0.360
+  wavetable             0.381
+  noise                 0.844
+```
+
+The negative controls behave as designed (`scrambled` 1.001 — FLAC adds framing
+to incompressible 32-bit noise; `full_width_random` 0.898 — the remaining gain
+is the cross-channel structure the hostile population deliberately excludes).
+The axes are **descriptive surfaces of this frozen population, not controlled
+causal effects**: objects differ by rate and structure at once, so e.g. the
+per-rate figures reflect which objects sit at each rate, not an isolated rate
+effect.
+
+Seal run: the **15-row `seal verify` matrix passes** at seal subject `40c4c8e6…`;
+25 fresh receipts; tests **409 passed / 12 ignored** all-features and
+**399 passed / 12 ignored** default-features.
+
+**Not yet B1-vs-VOLE.** The `u1_literal_bytes` row is the canonical universal
+*fallback*, not the inverse compiler's *selected* representation. The
+selected-representation comparison needs an exact full-object inverse container
+(deterministic segmentation to the 65,536-frame Phase-K ceiling, complete-cost
+accounting of segment framing + index + container metadata, and an exact
+total-extent reconstruction); it is the next increment, alongside B2–B4.
