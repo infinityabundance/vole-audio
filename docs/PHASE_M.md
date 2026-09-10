@@ -142,9 +142,10 @@ Seal run (release, `--all-features`, clean tree, version 0.11.0):
 
 ## Where this goes next
 
-1. **Seals 2–6 — the corpus is frozen, verified and review-closed; the flagship
+1. **Seals 2–7 — the corpus is frozen, verified and review-closed; the flagship
    B0/B1 conventional baseline is measured; the full-object container mechanism
-   is frozen; and the true B1-vs-VOLE result exists.**
+   and its parser are frozen; and the true B1-vs-VOLE result exists with clean
+   population arithmetic.**
 2. B2–B4 (PCM-resident / disk-streaming / compressed-file playback) beside the
    selected full-object VOLE artifact, then the `depth` / `random-access` /
    `negative` courts and the crossover surface.
@@ -415,6 +416,13 @@ every extent             reconstructed sample-for-sample; semantics preserved
 frozen result           76fe5dcff1dec0a173ed67dc69effcc6befc093e340519c81ec2b32ea3b1a17b
 ```
 
+**Superseded for the aggregate only (Seal 7).** This seal's `VOLE (container)`
+total and `B1 / VOLE` ratio mixed populations — all 115 objects for VOLE versus
+the 110 B1-comparable for B1. The correct comparable-population figures are
+**VOLE 28,257,411 B, B1 / VOLE 0.905 (VOLE 1.105× B1)**. The per-object vector,
+the 55/0/55 buckets and every per-axis surface in this receipt were already
+computed over the comparable population and stand unchanged.
+
 The aggregate hides the shape, which is the point of reporting the buckets and
 the axes. Under a *common* exact test the current compiler wins decisively where
 its vocabulary fits and loses where it does not:
@@ -439,3 +447,67 @@ full-width random content where both systems pay framing on noise.
 Seal run: seal subject `ef8a57d1…`; 26 fresh receipts; the 16-row `seal verify`
 matrix passes; tests **417 passed / 12 ignored** all-features and **407 passed /
 12 ignored** default-features.
+
+### Seal 7 — flagship aggregate + container-integrity review closure (2026-09-10)
+
+One narrow review closure before B2–B4. **Nothing about the experiment changed**:
+no corpus, segmentation rule, search budget, candidate vocabulary or selected
+representation was touched, and both frozen static result hashes survive
+(`4b517ea0…` container, `76fe5dcf…` flagship).
+
+**1. Population arithmetic (the headline was wrong).** `court flagship`
+accumulated `vole_total` over all 115 objects while `b1_total` covered only the
+110 B1-comparable objects, so the published headline compared different
+populations. Every total is now tracked for both populations, and every B1 ratio
+uses the comparable population only. Corrected headline over the **same 110
+objects**:
+
+```text
+                     all 115        B1-comparable 110
+B0                   71,277,600 B        65,517,600 B
+literal equivalent   71,283,810 B        65,523,540 B
+B1 FLAC-5                    —           25,577,431 B
+VOLE complete        31,118,702 B        28,257,411 B
+B1 / VOLE                    —                0.905
+VOLE / B1                    —               1.105x
+```
+
+The corrected result is *stronger* for VOLE: within the same format-comparable
+population the current bounded compiler is about **10.5% larger than FLAC-5 in
+aggregate**, not 21.7%. The 55/0/55 bucket result, the per-object vector and the
+per-axis surfaces were already computed over the comparable population and are
+unchanged.
+
+**2. The hostile battery reached less validation than it claimed.** The old
+checks mutated structural fields *without* recomputing the trailing digest, so
+almost every case proved only "the digest caught it". There are now two classes:
+
+```text
+integrity-hostile      mutate, do NOT reseal   -> must fail the outer digest
+structurally hostile   mutate AND reseal       -> must reach and fail the
+                                                  format validators
+```
+
+Seal run reports **144 integrity-hostile** and **432 resealed structural-hostile**
+rejections (12 structural mutations × 36 fixtures), so the parser's own
+invariants are now actually exercised.
+
+**3. The index could lie about `content_id`.** Materialization never checked it,
+so a validly re-sealed container could carry a wrong content identity.
+Materialization now reconstructs the semantic U1 object of each segment and
+requires `canonical_content_id(descriptor, data) == index.content_id` (for
+literal/residual segments this is the *derived semantic* identity, not the
+physical entropy-container hash).
+
+**4. Candidate-tag/representation compatibility** is enforced on decode, so
+`silence` + `residual_periodic` is rejected rather than decoded.
+
+**5. Canonical payload layout.** Offsets must be the serializer's contiguous
+block — first at the payload start, each next at the previous end, final end at
+the body end — rejecting gaps, overlaps, aliases and unreferenced trailing
+bytes.
+
+Because the serializer itself was already canonical, no stored bytes moved, and
+both frozen hashes are preserved. Seal run: seal subject `0e30bdcc…`; tests
+**418 passed / 12 ignored** all-features and **408 passed / 12 ignored**
+default-features.

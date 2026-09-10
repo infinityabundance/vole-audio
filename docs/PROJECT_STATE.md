@@ -1157,7 +1157,9 @@ segment is priced standalone (empty reference library).
   0.822). VOLE is cheaper on **55**, equal on 0, larger on **55** of the 110
   comparable objects (within 1% on 15). Objects all-literal 61, all-procedural
   49, mixed 5; segments selected literal 133, exact_repeat 103, constant 10,
-  silence 4, residual_zero 3, residual_constant 2.
+  silence 4, residual_zero 3, residual_constant 2.  [aggregate superseded by
+  Seal 7: the correct comparable-population figures are VOLE 28,257,411 B, B1/VOLE
+  0.905, VOLE 1.105x B1; the per-object vector and 55/0/55 buckets stand]
 - The aggregate hides the shape. VOLE wins where the vocabulary fits
   (`literal` 51.5x, `exact_repetition` 7.1x, `identical_stereo` 9.0x,
   `globally_periodic` 3.05x, `wavetable` 2.70x, `oscillator` 1.53x) and loses
@@ -1168,6 +1170,30 @@ segment is priced standalone (empty reference library).
 `76fe5dcff1dec0a173ed67dc69effcc6befc093e340519c81ec2b32ea3b1a17b`; seal
 subject `ef8a57d1…`; 417 passed / 12 ignored all-features, 407 passed / 12
 ignored default-features.
+
+### Phase M Seal 7 — flagship aggregate + container-integrity review closure (v0.17.0)
+
+A narrow closure before B2–B4. Nothing about the experiment changed (no corpus,
+segmentation, search budget, candidate vocabulary or selected representation),
+and both frozen static hashes survive (`4b517ea0…` container, `76fe5dcf…`
+flagship).
+
+- **Population arithmetic.** `court flagship` mixed populations (VOLE over 115
+  objects, B1 over 110). Every total is now tracked for both populations and
+  every B1 ratio uses the comparable population only. Corrected headline over
+  the same 110 objects: B0 65,517,600 B, literal 65,523,540 B, B1 25,577,431 B,
+  VOLE 28,257,411 B, B1/VOLE **0.905** (VOLE **1.105x** B1, not 1.217x).
+- **Two-class hostile battery.** integrity-hostile (mutate, no reseal → digest
+  fails) and resealed structural-hostile (mutate + recompute digest → format
+  validators must reject). `court fullobj` reports 144 + 432 rejections.
+- **`content_id` bound to the stored segment**: materialization requires
+  `canonical_content_id(descriptor, data) == index.content_id` for the derived
+  semantic U1 object.
+- **Candidate-tag/representation compatibility** enforced on decode; **payload
+  offsets** must be the canonical contiguous block (no gaps/overlaps/aliases/
+  trailing bytes).
+- Seal subject `0e30bdcc…`; 418 passed / 12 ignored all-features, 408 passed /
+  12 ignored default-features.
 
 ## Next work (exact order — the implementation contract is executed in sequence)
 
