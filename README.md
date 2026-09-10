@@ -99,6 +99,7 @@ src/
   audio/              ALSA endpoint, directness, topology   (Phase H+)
   format/             canonical `.volea` archive + WAV ingest   (Phase E/N)
   inverse/            bounded inverse-proceduralization + search placement (K/L)
+  learned/            Phase O learned deterministic prediction (experimental profile)
   transport/          deterministic framing + receiver + clock  (Phase N)
   evidence/           receipts/counters/timing/environment  (Phase A)
   courts/             executable courts                     (Phase C+)
@@ -316,7 +317,13 @@ random-access, negative, interference, all, archive, transport). `inverse`,
 `flattening` and `inverse-search` are Phases K/L; `d2`, `depth`, `conventional`,
 `random-access`, `negative`, `interference` and `all` arrive with Phase M; the
 canonical `.volea` archive and deterministic transport (`archive`, `transport`,
-`phase-n`) arrive with Phase N.
+`phase-n`) arrive with Phase N. The learned deterministic prediction courts
+(`learned-determinism`, `learned-residual-codec`, `learned-linear`,
+`learned-intrinsic`, `learned-transfer`, `learned-residual`,
+`learned-quantization`, `learned-capacity`, `learned-shared`,
+`learned-random-access`, `learned-gpu`, `learned-training-cost`,
+`learned-inverse`, `learned`) arrive with Phase O under the experimental
+`vole.audio.learned.exp1` profile.
 
 ## Non-claims
 

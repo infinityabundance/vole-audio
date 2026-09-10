@@ -15,6 +15,8 @@ pub mod backend;
 #[cfg(feature = "std")]
 pub mod battery;
 #[cfg(feature = "std")]
+pub mod learned_simd;
+#[cfg(feature = "std")]
 pub mod scalar;
 #[cfg(feature = "std")]
 pub mod simd;

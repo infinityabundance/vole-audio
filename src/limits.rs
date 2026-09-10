@@ -176,6 +176,76 @@ pub const MAX_ENTROPY_SCRATCH_BYTES: u32 = 1 << 26;
 /// Worst-case rANS encoded bytes per symbol (renorm bytes + slack).
 pub const RANS_MAX_BYTES_PER_SYMBOL: u32 = 4;
 
+// ---------------------------------------------------------------------------
+// Phase O learned deterministic prediction (experimental profile
+// `vole.audio.learned.exp1`). These ceilings bound the new denial-of-service
+// surface a learned hypothesis introduces (O.30/O.45). They are part of the
+// experimental learned profile, never of `u1/v1`.
+// ---------------------------------------------------------------------------
+
+/// Maximum causal taps (receptive-field length) of one learned predictor.
+pub const MAX_LEARNED_TAPS: u32 = 4096;
+
+/// Maximum nodes in one learned evaluator graph.
+pub const MAX_LEARNED_GRAPH_NODES: u32 = 4096;
+
+/// Maximum depth of one learned evaluator graph (no recursion, no cycles).
+pub const MAX_LEARNED_GRAPH_DEPTH: u32 = 64;
+
+/// Maximum tensor rank in one learned graph.
+pub const MAX_LEARNED_TENSOR_RANK: u32 = 4;
+
+/// Maximum total tensor elements across one learned model.
+pub const MAX_LEARNED_TENSOR_ELEMENTS: u64 = 1 << 22;
+
+/// Maximum canonical learned-weight bytes in one model.
+pub const MAX_LEARNED_WEIGHT_BYTES: u64 = 1 << 22;
+
+/// Maximum persistent learned state bytes (recurrent/stateful family).
+pub const MAX_LEARNED_STATE_BYTES: u64 = 1 << 18;
+
+/// Maximum block-local latent bytes across one learned object.
+pub const MAX_LEARNED_LATENT_BYTES: u64 = 1 << 20;
+
+/// Maximum activation-table bytes in one learned model.
+pub const MAX_LEARNED_ACTIVATION_TABLE_BYTES: u64 = 1 << 16;
+
+/// Maximum checkpoints declared by one stateful learned object.
+pub const MAX_LEARNED_CHECKPOINTS: u32 = 1 << 16;
+
+/// Maximum learned dependencies (models, sources, shared tables) per object.
+pub const MAX_LEARNED_DEPENDENCIES: u32 = 256;
+
+/// Maximum receptive field (in frames) of one learned predictor/operator.
+pub const MAX_LEARNED_RECEPTIVE_FIELD: u32 = 1 << 20;
+
+/// Maximum declared abstract operations per output sample.
+pub const MAX_LEARNED_OPS_PER_SAMPLE: u64 = 1 << 20;
+
+/// Maximum declared abstract operations per block.
+pub const MAX_LEARNED_OPS_PER_BLOCK: u64 = 1 << 24;
+
+/// Maximum declared abstract operations for one object's nominal extent.
+pub const MAX_LEARNED_DECODE_OPS: u64 = 1 << 30;
+
+/// Maximum encoded residual bytes in one learned object.
+pub const MAX_LEARNED_RESIDUAL_BYTES: u64 = 1 << 30;
+
+/// Maximum frames per independently-materializable block-local block.
+pub const MAX_LEARNED_BLOCK_FRAMES: u32 = MAX_QUANTUM_FRAMES;
+
+/// Maximum shared learned models referenced by one learned object.
+pub const MAX_LEARNED_SHARED_MODELS: u32 = 64;
+
+/// Maximum canonical learned object bytes.
+pub const MAX_LEARNED_OBJECT_BYTES: u64 = 1 << 32;
+
+/// Frozen fixed-point fraction bits of canonical learned weights (Q12).
+pub const LEARNED_WEIGHT_Q: u32 = 12;
+
+/// Frozen number of residual codec kinds the canonical family implements.
+pub const LEARNED_RESIDUAL_CODECS: u32 = 6;
+
 #[cfg(test)]
 mod tests {
     use super::*;

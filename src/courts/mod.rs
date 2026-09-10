@@ -65,6 +65,36 @@ pub mod inverse;
 #[cfg(feature = "std")]
 pub mod inverse_search;
 #[cfg(feature = "std")]
+pub mod learned;
+#[cfg(feature = "std")]
+pub mod learned_capacity;
+#[cfg(feature = "std")]
+pub(crate) mod learned_common;
+#[cfg(feature = "std")]
+pub mod learned_determinism;
+#[cfg(feature = "std")]
+pub mod learned_gpu;
+#[cfg(feature = "std")]
+pub mod learned_intrinsic;
+#[cfg(feature = "std")]
+pub mod learned_inverse;
+#[cfg(feature = "std")]
+pub mod learned_linear;
+#[cfg(feature = "std")]
+pub mod learned_quantization;
+#[cfg(feature = "std")]
+pub mod learned_random_access;
+#[cfg(feature = "std")]
+pub mod learned_residual;
+#[cfg(feature = "std")]
+pub mod learned_residual_codec;
+#[cfg(feature = "std")]
+pub mod learned_shared;
+#[cfg(feature = "std")]
+pub mod learned_training_cost;
+#[cfg(feature = "std")]
+pub mod learned_transfer;
+#[cfg(feature = "std")]
 pub(crate) mod measure;
 #[cfg(feature = "std")]
 pub mod negative;
@@ -211,6 +241,79 @@ deterministic xrun recovery outcomes (contract §36/§37)",
 SUPPORTED only when all of them are",
     ),
     (
+        "learned-determinism",
+        "Phase O learned canonical determinism: exact closure, repeated-evaluation and \
+serialization identity, chunked == contiguous, seek == sequential for every implemented learned \
+family",
+    ),
+    (
+        "learned-residual-codec",
+        "Phase O exact residual codec family: SparseDelta / DenseI32 / ZigZagVarint / BlockRice / \
+PredictiveRice / LiteralResidual over representative and corpus residuals",
+    ),
+    (
+        "learned-linear",
+        "Phase O minimum linear proof: a learned linear finite-field predictor vs the literal \
+floor, the existing VOLE inverse compiler, FLAC-5 and simple exact predictors",
+    ),
+    (
+        "learned-intrinsic",
+        "Phase O learned intrinsic families (linear, block-local, stateful, nonlinear) vs the \
+existing VOLE hypotheses and conventional baselines over the frozen intrinsic corpus",
+    ),
+    (
+        "learned-transfer",
+        "Phase O learned transfer operators vs analytic baselines (identity, gain, affine, delay, \
+FIR, IIR, convolution, polynomial, piecewise, moving average) with standalone and marginal \
+accounting",
+    ),
+    (
+        "learned-residual",
+        "Phase O residual shape and residual-cost-aware training: zero fraction, run lengths, \
+magnitude statistics, selected codec, and MSE-optimal vs residual-aware fits",
+    ),
+    (
+        "learned-quantization",
+        "Phase O canonical precision: post-training quantization vs quantization-aware training at \
+the implemented i16 Q12 precision, with exact SIMD parity and explicit i8/mixed unavailability",
+    ),
+    (
+        "learned-capacity",
+        "Phase O multi-capacity Pareto surface: several bounded tap capacities per target with \
+model/residual/complete bytes, decode work and seek cost; no capacity is privileged",
+    ),
+    (
+        "learned-shared",
+        "Phase O shared-model amortization: whole-corpus bytes and the amortization crossover N* \
+(or an explicit no-crossover) for identical and distinct object regimes",
+    ),
+    (
+        "learned-random-access",
+        "Phase O bounded access: contiguous, chunked, single-frame, small/large range, randomized \
+and reverse order, cold/warm repetition, and a stateful checkpoint-spacing sweep",
+    ),
+    (
+        "learned-gpu",
+        "Phase O execution surfaces: scalar == SIMD with exact parity and measured throughput; \
+CUDA/ROCm learned kernels reported as explicitly unavailable (the frozen device artifact must \
+stay byte-identical)",
+    ),
+    (
+        "learned-training-cost",
+        "Phase O training cost: wall time, candidates, iterations, quantization attempts, peak \
+host RSS and the declared search budget, reported separately from playback",
+    ),
+    (
+        "learned-inverse",
+        "Phase O inverse-compiler integration: exact learned candidates admitted only by measured \
+Pareto improvement over the existing VOLE best, with typed negative-result reasons",
+    ),
+    (
+        "learned",
+        "Phase O aggregate: runs every learned court in sequence and is SUPPORTED only when all of \
+them are",
+    ),
+    (
         "cuda",
         "Phase G CUDA D0: scalar == CUDA parity on frozen fixtures + facts on the device\
 surface + strategy comparison + fixture-level throughput",
@@ -314,6 +417,20 @@ pub fn run(name: &str, receipts_root: &Path) -> crate::error::Result<Verdict> {
         "negative" => negative::run(receipts_root),
         "depth" => depth::run(receipts_root),
         "interference" => interference::run(receipts_root),
+        "learned-determinism" => learned_determinism::run(receipts_root),
+        "learned-residual-codec" => learned_residual_codec::run(receipts_root),
+        "learned-linear" => learned_linear::run(receipts_root),
+        "learned-intrinsic" => learned_intrinsic::run(receipts_root),
+        "learned-transfer" => learned_transfer::run(receipts_root),
+        "learned-residual" => learned_residual::run(receipts_root),
+        "learned-quantization" => learned_quantization::run(receipts_root),
+        "learned-capacity" => learned_capacity::run(receipts_root),
+        "learned-shared" => learned_shared::run(receipts_root),
+        "learned-random-access" => learned_random_access::run(receipts_root),
+        "learned-gpu" => learned_gpu::run(receipts_root),
+        "learned-training-cost" => learned_training_cost::run(receipts_root),
+        "learned-inverse" => learned_inverse::run(receipts_root),
+        "learned" => learned::run(receipts_root),
         "all" => all::run(receipts_root),
         "archive" => archive::run(receipts_root),
         "transport" => transport::run(receipts_root),

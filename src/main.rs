@@ -25,7 +25,12 @@ COMMANDS (current build):
                           rocm-d0, rocm-d1, entropy-rans, entropy-literal,
                           entropy-residual, entropy-pages, entropy-partial,
                           entropy-simd, entropy-cuda, entropy-d1, entropyfs,
-                          dsfb-entropy, h2)
+                          dsfb-entropy, h2,
+                          learned-determinism, learned-residual-codec, learned-linear,
+                          learned-intrinsic, learned-transfer, learned-residual,
+                          learned-quantization, learned-capacity, learned-shared,
+                          learned-random-access, learned-gpu, learned-training-cost,
+                          learned-inverse, learned)
                           [--receipts DIR]; court d1 accepts --emit-audio (court
                           entropy-d1 honors VOLE_ENTROPY_D1_EMIT_AUDIO=1)
     receipt show <file>   Verify and print an evidence receipt
@@ -349,6 +354,13 @@ fn cmd_seal_verify(args: &[String]) -> Result<u8> {
                        random-access=SUPPORTED,negative=SUPPORTED,depth=SUPPORTED,\
                        interference=SUPPORTED,all=SUPPORTED,\
                        archive=SUPPORTED,transport=SUPPORTED,phase-n=SUPPORTED,\
+                       learned-determinism=SUPPORTED,learned-residual-codec=SUPPORTED,\
+                       learned-linear=SUPPORTED,learned-intrinsic=SUPPORTED,\
+                       learned-transfer=SUPPORTED,learned-residual=SUPPORTED,\
+                       learned-quantization=SUPPORTED,learned-capacity=SUPPORTED,\
+                       learned-shared=SUPPORTED,learned-random-access=SUPPORTED,\
+                       learned-gpu=SUPPORTED,learned-training-cost=SUPPORTED,\
+                       learned-inverse=SUPPORTED,learned=SUPPORTED,\
                        cuda=SUPPORTED,d1=SUPPORTED,h2=SUPPORTED,\
                        rocm=UNSUPPORTED_BY_HARDWARE|UNSUPPORTED_BY_API|INCONCLUSIVE,\
                        rocm-d0=UNSUPPORTED_BY_HARDWARE|UNSUPPORTED_BY_API|INCONCLUSIVE,\

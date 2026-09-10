@@ -1448,6 +1448,60 @@ reproducible manifests.
   bundle import and a seekable transport remain future extensions; the transport
   is deliberately not a network stack.
 
+### Phase O — learned deterministic prediction (complete at Seal 1 / v0.24.0)
+
+Charter: [`docs/PHASE_O.md`](PHASE_O.md). An addendum phase executed after A–N
+are sealed. Learned predictions are one more bounded, falsifiable hypothesis
+class inside the existing exact residual-closure architecture; `u1/v1` is
+untouched and learned objects live under the experimental profile
+`vole.audio.learned.exp1`.
+
+- **Namespace + identity.** Explicit experimental profile, container magic
+  `vole.learned`, version 1, evidence schema. Learned objects are not `u1/v1`
+  `SampleObject`s and do not extend the frozen `Representation` taxonomy.
+- **Residual codec foundation (O1).** Six canonical exact codecs — `SparseDelta`,
+  `DenseI32`, `ZigZagVarint`, `BlockRice`, `PredictiveRice`, `LiteralResidual` —
+  with a deterministic minimum-bytes selection and ascending-id tie break. The
+  same family prices every baseline, so dense small residuals are not punished.
+- **Learned arithmetic (O2/O29).** i16 Q12 weights, i32 Q12 biases, i64 exact
+  accumulators, frozen round-half-away-from-zero, proven overflow safety for
+  every legal tap count, and a proof that integer reduction order cannot change
+  the result (which is why SIMD parity is exact by construction).
+- **Families.** `LearnedFiniteField` (closed-loop causal FIR), block-local
+  (history resets per block; independent blocks), `LearnedStateful` (closed-loop
+  recurrent decoding with canonical checkpoints and deterministic replay), a
+  bounded nonlinear integer graph with frozen integer activations, and a
+  `LearnedTransferOperator` (source dependency + exact target residual).
+- **Serialization + accounting (O4/O12/O13).** One explicit little-endian
+  container whose decomposition is required to sum **exactly** to the canonical
+  byte length, with model sub-components also summing exactly to `model_bytes`.
+  Source dependencies are never free: standalone and marginal regimes are
+  reported separately and never combined into one ratio.
+- **Training (O5/O9/O10/O20/O21).** No generic autodiff: ridge/least squares
+  (normal equations, partial-pivot Gaussian elimination), coordinate descent
+  over the canonical quantized parameters, and quantization-aware training that
+  minimizes the **actual** encoded object size.
+- **SIMD (O6/O36).** AVX2 per-sample dot product with exact scalar parity; no
+  semantic duplication. Device artifacts are deliberately **not** modified, so
+  Phase G/J PTX/AMDGPU bytes stay frozen.
+- **Corpora (O16).** A deterministic intrinsic corpus (periodic, quasi-periodic,
+  transient, sparse, noise, speech-/music-like, stationary/nonstationary,
+  adversarial) and a paired transfer corpus with deliberately simple analytic
+  relationships, both byte-reproducible and license-clean.
+- **Courts (O46–O58).** `learned-determinism` `a0c9f027…`,
+  `learned-residual-codec` `49f8d5c6…`, `learned-linear` `db4aed44…`,
+  `learned-intrinsic` `6080d106…`, `learned-transfer` `10fc0eb6…`,
+  `learned-residual` `80c3fbbf…`, `learned-quantization` `0d8b1250…`,
+  `learned-capacity` `7879ecc8…`, `learned-shared` `eab4d545…`,
+  `learned-random-access` `62b5d41d…`, `learned-gpu` `542afe4f…`,
+  `learned-training-cost` `5527eadd…`, `learned-inverse` `6ce95cb0…`, aggregate
+  `learned` `3e3073f7…`.
+- **Honest limitations.** CUDA/ROCm learned execution is `NOT_IMPLEMENTED` /
+  `UNSUPPORTED_BY_HARDWARE` because the frozen device artifact must stay
+  byte-identical; i8/mixed precision are `NOT_IMPLEMENTED`; nonlinear, stateful
+  and stateful-realization families are mono-only; wall time and peak memory are
+  evidence, never part of a frozen result hash.
+
 ## Next work (exact order — the implementation contract is executed in sequence)
 
 Phase H.2 is complete (entropy-native core: all ten H.2 courts SUPPORTED on
@@ -1479,8 +1533,9 @@ policy keeps the measured-faster host surface (`SearchBudget::placement`,
    blockers. Release: 0.19.0/0.20.0 published, 0.21.0/0.22.0 deliberately
    unpublished, **0.22.1 tagged and awaiting the quota**.
 2. **Phase N — transport/archive** — **complete at Seal 1 / v0.23.0** (charter
-   [`docs/PHASE_N.md`](PHASE_N.md)): the finalized canonical `.volea` archive with
-   object and event/checkpoint/dependency sections, deterministic transport + a
-   bounded receiver, clock recovery, and reproducible manifests, sealed by
-   `court archive` / `court transport` / `court phase-n`. Next: **Phase O —
-   learned deterministic prediction** (judged by the H.2 complete-cost API).
+   [`docs/PHASE_N.md`](PHASE_N.md)).
+3. **Phase O — learned deterministic prediction** — **complete at Seal 1 /
+   v0.24.0** (charter [`docs/PHASE_O.md`](PHASE_O.md)). Learned hypotheses are a
+   bounded experimental candidate family under `vole.audio.learned.exp1`; the
+   literal fallback and exact closure remain unchanged, and no learned
+   representation is claimed to be universally better.
