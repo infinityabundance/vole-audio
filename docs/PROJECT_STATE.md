@@ -1501,6 +1501,10 @@ untouched and learned objects live under the experimental profile
   byte-identical; i8/mixed precision are `NOT_IMPLEMENTED`; nonlinear, stateful
   and stateful-realization families are mono-only; wall time and peak memory are
   evidence, never part of a frozen result hash.
+- **Seal 1:** subject `a347bb22…`; **40-row** `seal verify` matrix; 513 passed /
+  12 ignored all-features, 503 passed / 12 ignored default-features. Device
+  artifacts rebuilt at the seal commit and byte-identical (`d13d22c3…` PTX,
+  `5c30a4bc…` AMDGPU). Release **v0.24.0**.
 
 ## Next work (exact order — the implementation contract is executed in sequence)
 
