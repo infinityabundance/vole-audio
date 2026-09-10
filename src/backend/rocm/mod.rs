@@ -26,8 +26,10 @@ pub mod kernel;
 pub mod loader;
 pub mod probe;
 pub mod runtime;
+pub mod search;
 
 pub use elf::{ElfInfo, inspect_amdgcn_code_object};
 pub use loader::Lib;
 pub use probe::{AmdGpu, KfdState, RocmProbe, RuntimeAttempt};
 pub use runtime::{Arg, DeviceBuffer, Function, Module, RegistrationAttempt, Rocm};
+pub use search::SearchWorldRocm;

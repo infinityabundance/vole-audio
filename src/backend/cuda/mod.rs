@@ -16,7 +16,9 @@ pub mod entropy;
 pub mod ffi;
 pub mod kernel;
 pub mod probe;
+pub mod search;
 
 pub use direct::{HostRegistration, PointerEvidence, RegisterRange};
 pub use driver::{Cuda, DeviceBuffer, DeviceInfo, Event, Function, GraphExec, Module, Stream};
 pub use kernel::KernelWorld;
+pub use search::SearchWorld;

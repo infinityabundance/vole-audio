@@ -25,6 +25,7 @@
 use crate::device::entropy_shared::{EntropyJobDesc, FlatPage, FlatStream};
 use crate::device::geom::Grid;
 use crate::device::kernel_shared::{FlatState, FlatVoice, render_sample};
+use crate::device::search_shared::period_records;
 use crate::sampler::procedural::Partial;
 
 /// Defensive entry guard shared by every kernel: invalid launch geometry
@@ -125,6 +126,48 @@ pub extern "gpu-kernel" fn vole_upmix_mono_dup(
             for c in 0..channels as usize {
                 *dst.add(base + c) = v;
             }
+            g += stride;
+        }
+    }
+}
+
+/// Rank candidate periods for the inverse compiler's bounded period scan
+/// (Phase L semantics on the AMD surface): one workitem per candidate period,
+/// grid-stride over `0..period_limit`; workitem `g` writes the exact periodic
+/// residual record count for period `g + 1` into `counts[g]` (or
+/// `PERIOD_NOT_CLOSEABLE`).
+///
+/// The kernel produces a *ranking*, never an accepted representation: every
+/// proposal it ranks is re-verified by the normative exact evaluator on the
+/// host, so it has zero authority. Geometric validation uses the same frozen
+/// `device::geom` contract as the other AMD kernels.
+///
+/// # Safety
+/// `x` must hold at least `frames` i32 samples and `counts` at least
+/// `period_limit` u32 slots; `x` is never mutated. The host builds both
+/// exactly; nothing here is user input.
+#[unsafe(no_mangle)]
+pub extern "gpu-kernel" fn vole_period_scan(
+    x: *const i32,
+    frames: u32,
+    period_limit: u32,
+    counts: *mut u32,
+    blocks_x: u32,
+    threads_x: u32,
+) {
+    let grid = Grid::new(blocks_x, threads_x);
+    // Defensive: zero geometry must not hang the grid-stride loop.
+    let Some((mut g, stride)) = guard(grid) else {
+        return;
+    };
+    if frames < 2 || period_limit == 0 {
+        return;
+    }
+    unsafe {
+        let xs = core::slice::from_raw_parts(x, frames as usize);
+        let limit = (period_limit as usize).min(frames as usize - 1);
+        while g < limit as u64 {
+            *counts.add(g as usize) = period_records(xs, frames, (g + 1) as u32);
             g += stride;
         }
     }

@@ -199,16 +199,26 @@ at stored content.
   max_candidates: 64 }`, with deterministic truncation.
 * `court inverse` re-compiles every fixture and requires identical static
   results, and freezes a static-result hash over every report.
+* **Search placement has no semantics** (Phase L): the bounded period scan may
+  run sequentially, on host threads, or on a device (`vole_period_scan`), and
+  every surface produces identical per-period counts because they call the
+  same `device::search_shared::period_records`. `inverse::compile_with`
+  accepts an externally ranked period list, which changes only *which*
+  periodic hypotheses are proposed — never whether one is accepted. See
+  `PHASE_L.md`.
 
 ## 8. Running it
 
 ```
 vole-audio court inverse --receipts receipts
+vole-audio court inverse-search --receipts receipts   # Phase L placement
 ```
 
-writes `receipts/inverse/`. The receipt contains, per fixture, every accepted
-candidate with its complete cost, abstract work, measured times, frontier
-membership, and the per-fixture dedup row.
+`court inverse` writes `receipts/inverse/` with, per fixture, every accepted
+candidate, its complete cost, abstract work, measured times, frontier
+membership, and the per-fixture dedup row. `court inverse-search` writes
+`receipts/inverse-search/` with the cross-surface scan equality, the ranked
+periods, the measured per-surface times, and the ROCm gate row.
 
 ## 9. Non-claims
 

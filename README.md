@@ -91,12 +91,14 @@ src/
   entropy/            native rANS + models + pages + residual coding + corpus
                       + EmbeddedStore + DSFB observer       (Phase H.2)
   device/             flat kernel semantics (no_std); nvptx entry live (G);
-                      amdgcn entry live (I; code object per gfx target)
-  backend/            flatten (G); cuda/ host runtime live (G); rocm/ probe
-                      + artifact (I); entropy_flat (H.2) host flat-job builder
+                      amdgcn entry live (I; code object per gfx target);
+                      shared period-scan search primitive (L)
+  backend/            flatten (G); cuda/ host runtime live (G) + entropy (H.2)
+                      + search (L); rocm/ probe + artifact (I), runtime (J),
+                      search (L); entropy_flat (H.2) host flat-job builder
   audio/              ALSA endpoint, directness, topology   (Phase H+)
   format/             canonical archive + WAV ingest        (Phase E)
-  inverse/            bounded inverse-proceduralization     (Phase K)
+  inverse/            bounded inverse-proceduralization + search placement (K/L)
   transport/          deterministic framing                 (Phase N+)
   evidence/           receipts/counters/timing/environment  (Phase A)
   courts/             executable courts                     (Phase C+)
@@ -117,7 +119,7 @@ scripts/              device build + court drivers (repo only)
 
 ## Current status
 
-Phases A–K are complete: A–E the exact representation model on the scalar
+Phases A–L are complete: A–E the exact representation model on the scalar
 oracle, F the honest SIMD baseline (scalar == AVX2 == AVX-512), G the CUDA D0
 buffered-diagnostic backend (scalar == SIMD == CUDA bit-for-bit; semantic
 facts F01–F14 verified on the device; F15 is authority-level and
@@ -142,7 +144,12 @@ deterministic proposal search for the cheapest *exact* deterministic
 `SampleObject` explanation of an observed window, priced with the H.2
 complete-cost oracle and reported as a deterministic Pareto frontier
 (see
-[INVERSE.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/INVERSE.md)).
+[INVERSE.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/INVERSE.md)),
+and L the **GPU inverse search** placement of that compiler's bounded period
+scan on scalar / host-parallel / CUDA / ROCm surfaces — identical rankings on
+all surfaces, with every device-ranked proposal re-verified by the exact
+evaluator (see
+[PHASE_L.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/PHASE_L.md)).
 Executable
 evidence today:
 
@@ -175,6 +182,14 @@ evidence today:
   `flat == scalar` bit-for-bit over the frozen fixtures and an adversarial
   battery, with residual-closure materialization and upload bytes accounted
   rather than hidden;
+- `cargo run -- court inverse-search` — Phase L search placement: the bounded
+  period scan over 14 fixtures × 512 candidate periods on scalar,
+  16-thread parallel and CUDA surfaces, requiring identical per-period counts
+  on every surface and requiring the device-ranked proposals to reproduce
+  exactly the sequential accepted set (re-verified by the exact evaluator).
+  Measured ratios are reported as-is, with no claim that the GPU wins; the
+  ROCm row is a typed negative on this host while the `vole_period_scan` entry
+  is part of the AMDGPU compile surface;
 - `cargo run -- court cuda` — Phase G CUDA D0: `scalar == CUDA` bit-exact on
   the frozen fixture worlds across standard / high-priority / captured-graph
   submission, semantic facts F01–F14 re-verified on the device, a random
@@ -244,7 +259,9 @@ with its normative documents (`ENTROPY_NATIVE.md`, `RANS.md`,
 the Phase K inverse compiler and its seal ledger live in
 [INVERSE.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/INVERSE.md)
 and
-[PHASE_K.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/PHASE_K.md).
+[PHASE_K.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/PHASE_K.md);
+the Phase L search placement is in
+[PHASE_L.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/PHASE_L.md).
 Fixture-level measurements are in
 [PERFORMANCE.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/PERFORMANCE.md);
 the spec is
@@ -295,9 +312,9 @@ see the
 measurement-boundary notes (repository-only). Courts arrive with their phases;
 the court list is fixed in the implementation contract (semantic, authored,
 simd, facts, inverse, flattening, cuda, rocm, d1, d2, depth, conventional,
-random-access, negative, interference, all). `inverse` and `flattening` are
-Phase K; `d2`, `depth`, `conventional`, `random-access`, `negative`,
-`interference` and `all` arrive with Phases L/M.
+random-access, negative, interference, all). `inverse`, `flattening` and
+`inverse-search` are Phases K/L; `d2`, `depth`, `conventional`,
+`random-access`, `negative`, `interference` and `all` arrive with Phases M.
 
 ## Non-claims
 

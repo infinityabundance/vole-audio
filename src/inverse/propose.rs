@@ -34,16 +34,28 @@ use crate::object::{
 use crate::universe::layout::Layout;
 
 use super::observe;
-use super::{Candidate, CandidateKind, Intrinsic, SearchBudget};
+use super::{Candidate, CandidateKind, Intrinsic, SearchBudget, search};
 
-/// Smallest period the bounded scan can evaluate.
-const MIN_PERIOD: u32 = 1;
-
-/// Propose the bounded candidate set for one intrinsic window.
+/// Propose the bounded candidate set for one intrinsic window, using the
+/// sequential host scan to rank periodic residual candidates.
 pub fn propose(
     intrinsic: &Intrinsic,
     library: &ReferenceLibrary,
     budget: SearchBudget,
+) -> Result<Vec<Candidate>> {
+    propose_with(intrinsic, library, budget, None)
+}
+
+/// Propose the bounded candidate set, optionally over an **externally ranked**
+/// period list (Phase L: a parallel or device scan decides *which* periods to
+/// try, never whether they are accepted). External periods are deduplicated,
+/// bounded to `[1, frames - 1]`, truncated to the budget and sorted
+/// deterministically; the candidate set that results is otherwise identical.
+pub fn propose_with(
+    intrinsic: &Intrinsic,
+    library: &ReferenceLibrary,
+    budget: SearchBudget,
+    periods: Option<&[u32]>,
 ) -> Result<Vec<Candidate>> {
     budget.validate()?;
     let layout = observe::layout_of(intrinsic.channels)?;
@@ -148,19 +160,24 @@ pub fn propose(
         out.push(cand);
     }
 
-    // 8. PredictorResidual(Periodic p) for the best K bounded-scan periods
-    //    (the v1 periodic model is mono, so this family is mono-only).
+    // 8. PredictorResidual(Periodic p) for the best bounded-scan periods
+    //    (the v1 periodic model is mono, so this family is mono-only). The
+    //    period list may come from the sequential scan or, in Phase L, from a
+    //    parallel/device scan — the *selection* rule below is identical.
     if intrinsic.channels == 1 {
         let sw = Stopwatch::start();
-        let scanned = scan_periods(
-            &intrinsic.samples,
-            frames,
-            budget.max_period_scan,
-            budget.max_residual_period_candidates,
-        );
+        let selected: Vec<u32> = match periods {
+            Some(list) => bounded_period_list(list, frames, budget.max_residual_period_candidates),
+            None => search::scan_scalar(
+                &intrinsic.samples,
+                intrinsic.frames as u32,
+                budget.max_period_scan,
+            )
+            .periods(budget.max_residual_period_candidates),
+        };
         let mut proposal_ns = sw.elapsed_ns().max(0) as u64;
-        for (period, _records) in scanned {
-            let cycle = intrinsic.samples[..period].to_vec();
+        for period in selected {
+            let cycle = intrinsic.samples[..period as usize].to_vec();
             if let Some(cand) = residual_candidate(
                 intrinsic,
                 layout,
@@ -182,6 +199,25 @@ pub fn propose(
         out.truncate(budget.max_candidates);
     }
     Ok(out)
+}
+
+/// Normalize an externally supplied period ranking: keep periods in
+/// `[1, frames - 1]`, deduplicate, sort ascending, and truncate to `keep`.
+/// Deterministic regardless of the surface that produced the list.
+fn bounded_period_list(periods: &[u32], frames: usize, keep: usize) -> Vec<u32> {
+    if keep == 0 || frames < 2 {
+        return Vec::new();
+    }
+    let max = (frames - 1) as u32;
+    let mut list: Vec<u32> = periods
+        .iter()
+        .copied()
+        .filter(|&p| p >= 1 && p <= max)
+        .collect();
+    list.sort_unstable();
+    list.dedup();
+    list.truncate(keep);
+    list
 }
 
 /// Build the `ExactRepeat` payload for an exact frame period.
@@ -271,35 +307,6 @@ fn minimal_frame_period(samples: &[i32], channels: usize, frames: usize) -> usiz
         pi[i] = k;
     }
     frames - pi[frames - 1]
-}
-
-/// Bounded period scan for the periodic residual family: residual record count
-/// for every `p` in `[MIN_PERIOD, min(max_scan, frames - 1)]`, ranked by
-/// (record count ascending, period ascending) and truncated to `keep`.
-///
-/// `max_scan == 0` or `keep == 0` means the periodic residual family is
-/// **disabled**: no period is scanned, so a caller asking for zero periods
-/// never silently gets period 1.
-fn scan_periods(samples: &[i32], frames: usize, max_scan: u32, keep: usize) -> Vec<(usize, usize)> {
-    if frames < 2 || max_scan == 0 || keep == 0 {
-        return Vec::new();
-    }
-    let limit = (max_scan as usize).min(frames - 1);
-    let mut rows: Vec<(usize, usize)> = Vec::new();
-    for p in MIN_PERIOD as usize..=limit {
-        let cycle = samples[..p].to_vec();
-        let model = ResidualModel::Periodic { cycle };
-        let Some(records) = Residual::closing_residual(samples, 1, &model) else {
-            continue;
-        };
-        rows.push((records.len(), p));
-    }
-    rows.sort_by_key(|&(count, p)| (count, p));
-    rows.truncate(keep);
-    // Stable, deterministic final order by period so proposal order is
-    // independent of the ranking tie structure.
-    rows.sort_by_key(|&(_count, p)| p);
-    rows.into_iter().map(|(count, p)| (p, count)).collect()
 }
 
 /// A reference library: objects whose content is already stored, used to

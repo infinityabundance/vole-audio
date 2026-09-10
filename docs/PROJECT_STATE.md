@@ -916,9 +916,40 @@ authority.
 
 ## Known blockers
 
-- None for Phases F/G/H/H.2/K. ROCm hardware absent (evidence row only). The D1
-  result is per-device/per-driver: another host's endpoint may register,
+- None for Phases F/G/H/H.2/K/L. ROCm hardware absent (evidence row only). The
+  D1 result is per-device/per-driver: another host's endpoint may register,
   refuse registration, or lack mmap — the court records whichever happens.
+
+### Phase L — GPU inverse search (complete)
+
+Charter + seal ledger: `docs/PHASE_L.md`. Phase L places the inverse
+compiler's dominant search cost — the bounded period scan — on four surfaces
+and proves that placement is a **performance** question only:
+
+- `device/search_shared.rs`: one shared `no_std` implementation
+  (`period_records`, `scan_into`) that is *exactly* the p-dependent part of
+  `Residual::closing_residual` for the mono periodic model (equivalence is
+  asserted against the normative construction over the corpus).
+- Device surface grows by exactly one entry (`vole_period_scan`, NVPTX +
+  AMDGCN) with no per-backend semantics; the AMDGPU ELF validator and both
+  build scripts require four entries now.
+- `backend/cuda/search.rs` / `backend/rocm/search.rs`: host wrappers
+  (`SearchWorld`, `SearchWorldRocm`) driving the entry; the AMD path follows
+  the frozen `device::geom` launch contract.
+- `inverse/search.rs`: `PeriodScan`, the scalar and host-parallel scan
+  surfaces, and the frozen ranking rule (`rank_periods`).
+- `inverse::compile_with` accepts an externally ranked period list; it can
+  change *which* periodic hypotheses are proposed, never whether one is
+  accepted (`inverse::compile` remains the default sequential path).
+- `court inverse-search`: 14 fixtures × 512 periods; CUDA counts exactly equal
+  the scalar counts on all 14 fixtures, 80 accepted candidates re-verified by
+  the exact evaluator, and every accepted set identical between the
+  sequential scan and the externally fed ranking. Measured on this host:
+  parallel 0.198×, CUDA 0.406× the sequential scan wall time (CUDA includes
+  transfers) — reported as-is, with an explicit limitation that no claim is
+  made that the GPU wins. ROCm is a typed `UNSUPPORTED_BY_HARDWARE` row.
+- Artifacts change because the kernel surface grew: PTX `d13d22c3…`, AMDGPU
+  `5c30a4bc…` (still byte-deterministic across isolated builds).
 
 ## Next work (exact order — the implementation contract is executed in sequence)
 
@@ -933,11 +964,11 @@ host; their positive paths execute when a D0/D1-ready ROCm stack + AMD device
 are present. Phase K (inverse compiler) is complete: bounded deterministic
 proposals, exact acceptance through two independent reconstructions, complete
 H.2-priced dependency accounting, and a deterministic Pareto frontier, sealed
-by `court inverse` + `court flattening`. Next:
+by `court inverse` + `court flattening`. Phase L (GPU inverse search) is
+complete: the bounded period scan runs on scalar / host-parallel / CUDA /
+ROCm surfaces with identical counts, and the device-ranked proposals are
+re-verified by the exact evaluator (`court inverse-search`). Next:
 
-1. Phase L — GPU inverse search (parallel candidate sweeps; CPU vs CUDA vs
-   ROCm comparison) — the inverse compiler has zero decoder authority, so
-   search placement is a performance question only;
-2. Phase M — production depth/courts/corpus; Phase N — transport/archive
+1. Phase M — production depth/courts/corpus; Phase N — transport/archive
    (embeds H.2 canonical records); Phase O — learned deterministic prediction
    addendum (judged by the H.2 complete-cost API).

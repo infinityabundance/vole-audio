@@ -40,18 +40,20 @@ supported features, and every backend's observation is compared by hash.
   because mixing is order-independent i64 accumulation with one final
   saturation).
 - `device/` — GPU ABI: `kernel_shared` (descriptors + layout shared with
-  host), `nvptx_entry`, `amdgcn_entry` (thin kernels only; AMDGCN entry
-  lands in Phase I, geometry passed as kernel parameters).
-- `backend/` — host runtimes: `cuda/` (Driver API via audited FFI + dlopen),
-  `rocm/` (Phase I: filesystem/sysfs presence probe + artifact contract;
-  the HIP/HSA launch runtime is Phase J, where ROCm hardware validates it).
-  Probes, memory, streams, graphs, direct paths.
+  host), `search_shared` (the shared period-scan primitive; Phase L),
+  `nvptx_entry`, `amdgcn_entry` (thin kernels only; geometry passed as kernel
+  parameters on AMD).
+- `backend/` — host runtimes: `cuda/` (Driver API via audited FFI + dlopen;
+  render, entropy decode, and the Phase-L period-scan search), `rocm/`
+  (probe + artifact contract, the HIP/HSA runtime, and the same search
+  kernel on the AMD surface). Probes, memory, streams, graphs, direct paths.
 - `audio/` — ALSA endpoint (mmap discipline), endpoint clock, directness
   (D0..D3), topology. `directness.rs` and `topology.rs` are pure vocabulary;
   the endpoint implementation is deliberately separate.
 - `format/` — canonical binary `.voleaudio` archive (explicit encoding, no
   bincode/serde-normative), WAV ingest, manifest.
-- `inverse/` — bounded proposal search + residual closure + Pareto frontier.
+- `inverse/` — bounded proposal search + residual closure + Pareto frontier,
+  and its search placement (Phase L).
 - `transport/` — deterministic framing of OBJECT/EVENT/STATE/CHECKPOINT/...;
   integrity; recovery.
 - `evidence/` — `vole.audio.evidence.v1` receipts, counters, timing, energy,

@@ -192,8 +192,11 @@ impl CandidateCost {
             == self.complete_bytes
     }
 
-    /// Total transient sample-domain materialization (decoded content only).
-    pub fn decoded_state_bytes(&self) -> u64 {
+    /// Sum of the decoded surfaces. This is an explicitly **additive** view
+    /// of distinct reported surfaces (a decoded literal and its observation
+    /// window can be the same buffer), so it is named accordingly and must
+    /// not be read as peak transient residency.
+    pub fn decoded_surface_bytes_sum(&self) -> u64 {
         self.decoded_sample_state_bytes
             .saturating_add(self.decoded_residual_state_bytes)
             .saturating_add(self.decoded_window_state_bytes)
@@ -585,7 +588,7 @@ mod tests {
         // A canonical cycle DOES persist its baked table.
         assert_eq!(c.persistent_sample_domain_bytes, 256);
         // Nothing is decoded transiently for a canonical object.
-        assert_eq!(c.decoded_state_bytes(), 0);
+        assert_eq!(c.decoded_surface_bytes_sum(), 0);
     }
 
     #[test]

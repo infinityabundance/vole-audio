@@ -19,7 +19,48 @@
 
 use crate::device::entropy_shared::{EntropyJobDesc, FlatPage, FlatStream};
 use crate::device::kernel_shared::{FlatState, FlatVoice, render_sample};
+use crate::device::search_shared::period_records;
 use crate::sampler::procedural::Partial;
+
+/// Rank candidate periods for the inverse compiler's bounded period scan
+/// (Phase L): one thread per candidate period, grid-stride over
+/// `0..period_limit`; thread `g` writes the exact periodic residual record
+/// count for period `g + 1` into `counts[g]` (or `PERIOD_NOT_CLOSEABLE`).
+///
+/// This is the **only** Phase-L device surface: it produces a *ranking*, never
+/// an accepted representation. Every proposal it ranks is re-verified by the
+/// normative exact evaluator on the host, so the kernel has zero authority.
+///
+/// # Safety
+/// `x` must hold at least `frames` i32 samples and `counts` at least
+/// `period_limit` u32 slots; `x` is the observation window and is never
+/// mutated. The host builds both exactly (`backend::cuda::SearchWorld`);
+/// nothing here is user input.
+#[unsafe(no_mangle)]
+pub extern "ptx-kernel" fn vole_period_scan(
+    x: *const i32,
+    frames: u32,
+    period_limit: u32,
+    counts: *mut u32,
+) {
+    unsafe {
+        let tid = core::arch::nvptx::_thread_idx_x() as usize;
+        let nthreads = core::arch::nvptx::_block_dim_x() as usize;
+        let bid = core::arch::nvptx::_block_idx_x() as usize;
+        let nblocks = core::arch::nvptx::_grid_dim_x() as usize;
+        if frames < 2 || period_limit == 0 {
+            return;
+        }
+        let xs = core::slice::from_raw_parts(x, frames as usize);
+        let limit = (period_limit as usize).min(frames as usize - 1);
+        let stride = nthreads * nblocks;
+        let mut g = bid * nthreads + tid;
+        while g < limit {
+            *counts.add(g) = period_records(xs, frames, (g + 1) as u32);
+            g += stride;
+        }
+    }
+}
 
 /// Decode entropy pages into a bounded output arena (Phase H.2).
 ///

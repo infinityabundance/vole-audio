@@ -20,6 +20,7 @@
 
 pub mod entropy_shared;
 pub mod kernel_shared;
+pub mod search_shared;
 
 // Device ABI entries exist only when actually compiling for a GPU target.
 // The host build never sees them (they need the device ABI feature gates).

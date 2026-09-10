@@ -96,6 +96,12 @@ cat > "$OUT/vole_audio.ptx.json" <<EOF
   "artifact": "vole_audio.ptx",
   "sha256": "$SHA",
   "entry": "vole_render_d0",
+  "entries": [
+    "vole_render_d0",
+    "vole_entropy_decode",
+    "vole_upmix_mono_dup",
+    "vole_period_scan"
+  ],
   "rustc": "$RUSTC_VER",
   "llvm": "$LLVM_VER",
   "target": "nvptx64-nvidia-cuda",

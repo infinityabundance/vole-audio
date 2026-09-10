@@ -36,8 +36,9 @@
 # measured evidence instead of prose.
 #
 # Artifacts (scripts/out/, gitignored):
-#   vole_audio.amdgcn.elf     AMDGPU code object (entry: vole_render_d0,
-#                             vole_entropy_decode, vole_upmix_mono_dup)
+#   vole_audio.amdgcn.elf     AMDGPU code object (entries: vole_render_d0,
+#                             vole_entropy_decode, vole_upmix_mono_dup,
+#                             vole_period_scan)
 #   vole_audio.amdgcn.sha256  artifact SHA-256
 #   vole_audio.amdgcn.elf.json  provenance metadata (rustc/LLVM, target,
 #                             gfx, source hash, entries; legacy
@@ -156,7 +157,8 @@ cat > "$SIDECAR" <<EOF
   "entries": [
     "vole_render_d0",
     "vole_entropy_decode",
-    "vole_upmix_mono_dup"
+    "vole_upmix_mono_dup",
+    "vole_period_scan"
   ],
   "rustc": "$RUSTC_VER",
   "rustc_commit_hash": "$RUSTC_COMMIT",

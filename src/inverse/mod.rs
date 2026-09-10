@@ -50,6 +50,7 @@ pub mod cost;
 pub mod frontier;
 pub mod observe;
 pub mod propose;
+pub mod search;
 
 use crate::error::{Error, Result};
 use crate::evidence::timing::Stopwatch;
@@ -60,6 +61,7 @@ use crate::object::{ObjectData, ObjectStore};
 pub use cost::{AbstractWork, CandidateCost};
 pub use frontier::Frontier;
 pub use propose::ReferenceLibrary;
+pub use search::{PeriodScan, ScanSurface};
 
 /// Bounded seek window for the measured seek-latency cell.
 pub const SEEK_FRAMES: u32 = 512;
@@ -303,9 +305,23 @@ pub fn compile(
     library: &ReferenceLibrary,
     budget: SearchBudget,
 ) -> Result<SearchReport> {
+    compile_with(intrinsic, library, budget, None)
+}
+
+/// Run the bounded inverse search with an **externally ranked** period list
+/// (Phase L): a parallel or device scan decides which periods to try, never
+/// whether a candidate is accepted. `None` uses the sequential host scan.
+/// Either way the acceptance path is identical, so a search surface can never
+/// change what is accepted — only how fast the ranking is found.
+pub fn compile_with(
+    intrinsic: &Intrinsic,
+    library: &ReferenceLibrary,
+    budget: SearchBudget,
+    periods: Option<&[u32]>,
+) -> Result<SearchReport> {
     budget.validate()?;
     let sw = Stopwatch::start();
-    let candidates = propose::propose(intrinsic, library, budget)?;
+    let candidates = propose::propose_with(intrinsic, library, budget, periods)?;
     let proposed = candidates.len();
     let mut accepted: Vec<Acceptance> = Vec::with_capacity(proposed);
     let mut rejected = 0usize;
@@ -559,5 +575,90 @@ mod tests {
                 a.label
             );
         }
+    }
+
+    fn static_projection(r: &SearchReport) -> Vec<u8> {
+        let mut out = Vec::new();
+        for a in &r.accepted {
+            out.push(a.kind.tag());
+            out.extend_from_slice(a.label.as_bytes());
+            out.push(0);
+            out.extend_from_slice(&a.cost.complete_bytes.to_le_bytes());
+        }
+        out
+    }
+
+    /// The accepted set minus the periodic-residual family (the only family an
+    /// external ranking can influence).
+    fn non_periodic_projection(r: &SearchReport) -> Vec<u8> {
+        let mut out = Vec::new();
+        for a in &r.accepted {
+            if a.kind == CandidateKind::ResidualPeriodic {
+                continue;
+            }
+            out.push(a.kind.tag());
+            out.extend_from_slice(a.label.as_bytes());
+            out.push(0);
+            out.extend_from_slice(&a.cost.complete_bytes.to_le_bytes());
+        }
+        out
+    }
+
+    fn residual_periods(r: &SearchReport) -> Vec<u32> {
+        let mut v: Vec<u32> = r
+            .accepted
+            .iter()
+            .filter(|a| a.kind == CandidateKind::ResidualPeriodic)
+            .filter_map(|a| {
+                a.label
+                    .strip_prefix("residual(period=")
+                    .and_then(|s| s.strip_suffix(')'))
+                    .and_then(|s| s.parse::<u32>().ok())
+            })
+            .collect();
+        v.sort_unstable();
+        v
+    }
+
+    #[test]
+    fn external_period_ranking_does_not_change_the_accepted_set() {
+        // Phase L: a parallel/device scan decides *which* periods to try.
+        // Feeding the scan's own ranking through `compile_with` must produce
+        // exactly the sequential candidate set — search placement has no
+        // acceptance semantics.
+        let fx = intrinsic("tone", 1, tone(1024));
+        let lib = ReferenceLibrary::new();
+        let budget = SearchBudget::default();
+        let base = compile(&fx, &lib, budget).unwrap();
+        let scan = search::scan_scalar(&fx.samples, fx.frames as u32, budget.max_period_scan);
+        let periods = scan.periods(budget.max_residual_period_candidates);
+        let fed = compile_with(&fx, &lib, budget, Some(&periods)).unwrap();
+        assert_eq!(static_projection(&base), static_projection(&fed));
+
+        // An unrelated period list changes which periodic hypotheses are
+        // *proposed* — never which non-periodic candidates are accepted, and
+        // never whether a periodic one is exact.
+        let unrelated = [3u32, 5, 7];
+        let alt = compile_with(&fx, &lib, budget, Some(&unrelated)).unwrap();
+        assert_eq!(
+            non_periodic_projection(&base),
+            non_periodic_projection(&alt)
+        );
+        assert_eq!(residual_periods(&alt), vec![3, 5, 7]);
+        for a in &alt.accepted {
+            assert!(
+                a.intrinsic_exact && a.evaluator_exact && a.seek_exact,
+                "{}: an externally ranked proposal was accepted without exactness",
+                a.label
+            );
+        }
+
+        // Out-of-range and duplicate periods are normalized away (0 and
+        // u32::MAX drop; duplicates collapse), and the universal fallback
+        // survives.
+        let messy = [0u32, 1, 1, u32::MAX, 1000];
+        let messy_report = compile_with(&fx, &lib, budget, Some(&messy)).unwrap();
+        assert!(messy_report.literal_accepted());
+        assert_eq!(residual_periods(&messy_report), vec![1, 1000]);
     }
 }

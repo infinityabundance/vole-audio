@@ -47,6 +47,8 @@ pub mod h2;
 #[cfg(feature = "std")]
 pub mod inverse;
 #[cfg(feature = "std")]
+pub mod inverse_search;
+#[cfg(feature = "std")]
 pub mod rocm;
 #[cfg(feature = "std")]
 pub mod rocm_d0;
@@ -91,6 +93,12 @@ evaluator; complete dependency accounting and a deterministic Pareto frontier",
         "Phase K host flat-evaluator parity: flat == scalar bit-for-bit over the frozen \
 fixtures and an adversarial battery, with honest residual-closure materialization and \
 upload accounting",
+    ),
+    (
+        "inverse-search",
+        "Phase L search placement: the bounded period scan on scalar / host-parallel / \
+CUDA / ROCm surfaces must produce identical rankings, and the device-ranked proposals \
+must produce exactly the sequential candidate set re-verified by the exact evaluator",
     ),
     (
         "cuda",
@@ -186,6 +194,7 @@ pub fn run(name: &str, receipts_root: &Path) -> crate::error::Result<Verdict> {
         "simd" => simd::run(receipts_root),
         "facts" => facts::run(receipts_root),
         "inverse" => inverse::run(receipts_root),
+        "inverse-search" => inverse_search::run(receipts_root),
         "flattening" => flattening::run(receipts_root),
         "cuda" => cuda::run(receipts_root),
         "d1" => d1::run(receipts_root),

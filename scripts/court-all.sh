@@ -2,9 +2,9 @@
 # Run the full court battery of the CURRENT build.
 #
 # Courts arrive by phase; `court-all.sh` runs every always-runnable court this
-# build ships (semantic, authored, simd, facts, inverse, flattening, cuda, d1,
-# rocm, entropy-rans, entropy-literal, entropy-residual, entropy-pages,
-# entropy-partial, entropy-simd) and reports their verdicts.
+# build ships (semantic, authored, simd, facts, inverse, inverse-search,
+# flattening, cuda, d1, rocm, entropy-rans, entropy-literal, entropy-residual,
+# entropy-pages, entropy-partial, entropy-simd) and reports their verdicts.
 # Each court writes its own immutable receipt under receipts/<court>/ and
 # exits 0 whether its verdict is SUPPORTED or an honest negative — this
 # script fails only on operational errors, never on a negative result.
@@ -48,7 +48,7 @@ run_court() {
 }
 
 rc=0
-for court in semantic authored simd facts inverse flattening cuda d1 rocm entropy-rans entropy-literal \
+for court in semantic authored simd facts inverse inverse-search flattening cuda d1 rocm entropy-rans entropy-literal \
     entropy-residual entropy-pages entropy-partial entropy-simd; do
     if ! run_court "$court"; then
         echo "court $court: operational failure" >&2

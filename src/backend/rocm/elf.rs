@@ -16,6 +16,7 @@ pub const REQUIRED_ENTRIES: &[&str] = &[
     "vole_render_d0",
     "vole_entropy_decode",
     "vole_upmix_mono_dup",
+    "vole_period_scan",
 ];
 
 /// ELF machine id for AMDGPU (gfx code objects).
