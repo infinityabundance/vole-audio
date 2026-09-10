@@ -33,6 +33,7 @@ use crate::evidence::timing::Stopwatch;
 use crate::hash::sha256::Sha256;
 use crate::object::ObjectData;
 use crate::object::descriptor::ObjectDescriptor;
+use std::sync::Arc;
 
 /// A container verified once, bound to its exact outer SHA-256.
 #[derive(Debug, Clone)]
@@ -120,20 +121,36 @@ pub struct ReadStats {
 }
 
 /// Bounded reader over a [`VerifiedFullObject`].
+///
+/// The verified container is shared, so a *fresh reader* (B5's primary
+/// first-play architecture, one per repeat) is cheap and never re-verifies the
+/// container; only the lazily parsed segment state is per-reader.
 pub struct FullObjectReader {
-    verified: VerifiedFullObject,
+    verified: Arc<VerifiedFullObject>,
     prepared: Vec<Option<Prepared>>,
     working_state_bytes: u64,
 }
 
 impl FullObjectReader {
-    pub fn new(verified: VerifiedFullObject) -> Self {
+    pub fn new(verified: Arc<VerifiedFullObject>) -> Self {
         let n = verified.decoded.segments.len();
         FullObjectReader {
             verified,
             prepared: (0..n).map(|_| None).collect(),
             working_state_bytes: 0,
         }
+    }
+
+    /// Parse every segment's encoded representation before measurement.
+    ///
+    /// This is the optional *prepared* B5 control: parse cost is removed from
+    /// the timed reads so steady-state bounded materialization can be measured
+    /// separately from first-play. It is never averaged with first-play.
+    pub fn prepare_all(&mut self) -> Result<()> {
+        for i in 0..self.verified.decoded.segments.len() {
+            self.prepare(i)?;
+        }
+        Ok(())
     }
 
     pub fn verified(&self) -> &VerifiedFullObject {
@@ -377,7 +394,7 @@ mod tests {
         let verified = VerifiedFullObject::verify(obj.bytes.clone()).unwrap();
         assert_eq!(verified.total_frames(), total);
         assert_eq!(verified.channels(), channels);
-        let mut reader = FullObjectReader::new(verified);
+        let mut reader = FullObjectReader::new(Arc::new(verified));
         let ch = usize::from(channels);
         let mut dst = vec![0i32; 512 * ch];
         // Sequential 512-frame windows, including the straddling and final ones.
@@ -429,7 +446,8 @@ mod tests {
             budget(),
         )
         .unwrap();
-        let mut reader = FullObjectReader::new(VerifiedFullObject::verify(obj.bytes).unwrap());
+        let mut reader =
+            FullObjectReader::new(Arc::new(VerifiedFullObject::verify(obj.bytes).unwrap()));
         assert_eq!(
             reader.verified().semantics(),
             FullSemantics::Loop { period_frames: 64 }

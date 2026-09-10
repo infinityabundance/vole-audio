@@ -2,9 +2,9 @@
 //!
 //! Every backend receives the **same** `[start, frames)` request and the **same**
 //! caller-owned destination, and must return the exact canonical interleaved
-//! `i32` window. Artifact construction (inverse search, FLAC encoding) is
-//! deliberately *outside* this interface: those are authoring/compile
-//! operations, not playback.
+//! `i32` window. Artifact construction (inverse search, FLAC encoding, raw PCM
+//! file writing) is deliberately *outside* this interface: those are
+//! authoring/compile operations, not playback.
 //!
 //! ```text
 //! B2  PCM-resident sampler         canonical i32 in memory
@@ -13,39 +13,67 @@
 //! B5  bounded VOLE materialization verified full-object container, page-bounded
 //! ```
 //!
-//! The frozen trace is sequential 512-frame windows at each object's native rate
-//! and channel count: this court is about **source materialization**, not
-//! endpoint resampling, so there are no gains, pans, filters or random seeks.
+//! **The latency boundary belongs to the harness, not the source.** A source
+//! cannot decide which part of its work counts: the measurement layer wraps the
+//! whole `read()` call, so every architecture is timed over the same operation.
+//! For the same reason a source never performs `/proc/self/io` instrumentation
+//! inside `read()`; physical read traffic is sampled by the harness at traversal
+//! boundaries (and separately, in a dedicated instrumentation mode, if wanted).
+//!
+//! The frozen trace is sequential [`QUANTUM_FRAMES`]-frame windows at each
+//! object's native rate and channel count: this court is about **source
+//! materialization**, not endpoint resampling, so there are no gains, pans,
+//! filters or random seeks.
 
 pub mod cache;
+pub mod protocol;
 pub mod sources;
 
 pub use cache::{CacheEvidence, CacheState, proc_self_io};
-pub use sources::{DiskPcmSource, FlacPreloadSource, ResidentPcmSource, VoleBoundedSource};
+pub use protocol::{WindowPlan, rotate_order};
+pub use sources::{
+    DiskPcmArtifact, DiskPcmSource, FlacPreloadSource, ResidentPcmSource, VoleBoundedSource,
+};
 
 use crate::error::{Error, Result};
 
 /// Frozen measurement quantum (frames per read).
 pub const QUANTUM_FRAMES: u32 = 512;
 
+/// Frozen number of trace traversals per source *and* per object. Each repeat
+/// starts from equivalent initial source state ([`RuntimeSource::reset`]) and
+/// the traversal order of sources is rotated deterministically per repeat.
+pub const REPEATS: u32 = 3;
+
 /// Source identity and persistent residency. A property of the prepared source,
 /// not of any one read.
+///
+/// Storage and residency are **separate** quantities: bytes that live in a file
+/// are not resident sample-domain bytes, and a decoded-PCM source does not keep
+/// its compressed artifact resident.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SourceInfo {
     pub name: &'static str,
     pub channels: u8,
     pub total_frames: u64,
     pub sample_rate_hz: u32,
-    /// Persistently stored encoded bytes (0 for raw PCM sources).
-    pub persistent_encoded_bytes: u64,
-    /// Persistently resident sample-domain bytes (0 for a purely encoded source).
-    pub persistent_sample_domain_bytes: u64,
-    /// One-time preparation time (ns): file write, FLAC decode, verification.
-    pub setup_ns: u64,
+    /// Bytes the artifact occupies **in storage** (0 for a purely in-memory
+    /// source; the compressed/decompressed file size otherwise).
+    pub artifact_storage_bytes: u64,
+    /// Sample-domain bytes **persistently resident in the process**.
+    pub resident_sample_domain_bytes: u64,
+    /// Encoded bytes **persistently resident in the process**.
+    pub resident_encoded_bytes: u64,
+    /// Runtime setup: open/load/decode/preload (ns). Artifact construction is
+    /// not part of this and is reported separately by the court.
+    pub runtime_setup_ns: u64,
     pub setup_detail: String,
 }
 
 /// Architecture-explicit evidence for one bounded read.
+///
+/// Deliberately contains **no timing**: latency, the frame deadline and the
+/// deadline verdict are computed by the harness around the whole `read()` call.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct ReadEvidence {
     pub requested_frames: u32,
@@ -54,8 +82,6 @@ pub struct ReadEvidence {
 
     /// Bytes of the logical source stream corresponding to the window.
     pub logical_source_bytes_read: u64,
-    /// Bytes actually fetched from block storage (where measurable).
-    pub storage_bytes_read: u64,
 
     /// Encoded payload bytes examined to produce the window.
     pub encoded_bytes_examined: u64,
@@ -64,8 +90,10 @@ pub struct ReadEvidence {
     /// Sample-domain bytes materialized for the window.
     pub sample_domain_bytes_materialized: u64,
 
-    pub persistent_encoded_bytes: u64,
-    pub persistent_sample_domain_bytes: u64,
+    /// Encoded bytes persistently retained by the source.
+    pub resident_encoded_bytes: u64,
+    /// Sample-domain bytes persistently retained by the source.
+    pub resident_sample_domain_bytes: u64,
     /// Parsed encoded state retained by the source (cumulative).
     pub working_state_bytes: u64,
     /// Peak transient buffer for this read.
@@ -73,12 +101,6 @@ pub struct ReadEvidence {
 
     pub segments_touched: u32,
     pub pages_touched: u32,
-
-    /// Measured wall time of this read (ns).
-    pub latency_ns: u64,
-    /// Frame deadline for the window at the object's native rate (ns).
-    pub deadline_ns: u64,
-    pub deadline_missed: bool,
 }
 
 /// The common runtime contract.
@@ -89,6 +111,16 @@ pub trait RuntimeSource {
     /// Read `[start_frame, start_frame + frames)` into `dst`
     /// (`dst.len() == frames * channels`), exactly.
     fn read(&mut self, start_frame: u64, frames: u32, dst: &mut [i32]) -> Result<ReadEvidence>;
+
+    /// Restore initial source state before a repeated traversal.
+    ///
+    /// B5's primary architecture is *first-play*: a fresh bounded reader per
+    /// repeat, so the lazy per-segment parse cost occurs naturally inside the
+    /// measured traversal. The default is a no-op (B2/B3/B4 are stateless
+    /// readers or are re-controlled externally for B3's cold/warm repeats).
+    fn reset(&mut self) -> Result<()> {
+        Ok(())
+    }
 }
 
 /// Frame deadline for a window at a native rate (ns), using integer math.
