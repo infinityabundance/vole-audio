@@ -102,13 +102,14 @@ the context and leaves the caller's context stack exactly as it was.
 
 ## What is *not* in this increment
 
-Stated plainly so the gap is visible (updated at Seal 4 — the corpus is frozen
-and the flagship conventional baseline is now measured; the rest is not):
+Stated plainly so the gap is visible (updated at Seal 5 — the corpus is frozen,
+the flagship conventional baseline is measured, and the full-object container
+mechanism is frozen; the true B1-vs-VOLE result is not):
 
-* the **B1-vs-VOLE comparison has not been run**. Seal 4 measures the
-  conventional baselines (B0/B1) over the frozen corpus; the selected-VOLE-
-  representation comparison needs an exact full-object inverse container and is
-  a later increment, so no flagship VOLE performance claim exists yet;
+* the **B1-vs-selected-VOLE comparison has not been run**. Seal 4 measures the
+  conventional baselines; Seal 5 freezes the container mechanism. Seal 6 opens
+  the second box: the 115 frozen objects through the container, priced against
+  the frozen FLAC-5 bytes;
 * B2–B4 (sampler / disk-streaming / compressed-file playback) are
   `NOT_IMPLEMENTED`;
 * `court depth`, `court random-access`, `court negative`, `court interference`,
@@ -143,12 +144,12 @@ Seal run (release, `--all-features`, clean tree, version 0.11.0):
 
 ## Where this goes next
 
-1. **Seals 2–4 — the corpus is frozen, verified, review-closed, and the
-   flagship B0/B1 conventional baseline is measured.**
-2. The exact full-object inverse container → the true flagship **B1-vs-selected-
-   VOLE** result; and B2–B4 (PCM-resident / disk-streaming / compressed-file
-   playback), then the `depth` / `random-access` / `negative` courts and the
-   crossover surface.
+1. **Seals 2–5 — the corpus is frozen, verified and review-closed; the flagship
+   B0/B1 conventional baseline is measured; and the full-object container
+   mechanism is frozen.**
+2. Seal 6 — the true flagship **B1-vs-current-VOLE** result; then B2–B4
+   (PCM-resident / disk-streaming / compressed-file playback), the `depth` /
+   `random-access` / `negative` courts and the crossover surface.
 3. Adversarial real-time load (§49) and energy where measurable.
 
 ### Seal 2 — flagship corpus freeze (2026-09-10)
@@ -321,3 +322,62 @@ selected-representation comparison needs an exact full-object inverse container
 (deterministic segmentation to the 65,536-frame Phase-K ceiling, complete-cost
 accounting of segment framing + index + container metadata, and an exact
 total-extent reconstruction); it is the next increment, alongside B2–B4.
+
+### Seal 5 — full-object archival container mechanism (2026-09-10)
+
+Seal 5 freezes the **mechanism** before any flagship result exists. It is
+deliberately *not* a new U1 `Representation` tag: the container is an
+object-above-objects archive whose segments are ordinary U1 SampleObjects, so
+Phase K is untouched.
+
+```text
+full frozen object
+       │
+       ▼
+min(65,536, remaining) consecutive intrinsic ranges      ← frozen rule
+       │
+       ├── exact U1 SampleObject per segment
+       └──
+       │
+       ▼
+header ∥ segment index ∥ payloads ∥ integrity            ← real serialized bytes
+```
+
+- **Frozen segmentation.** 65,536 frames is inherited *verbatim* from the
+  Phase-K observation ceiling (`MAX_INVERSE_FRAMES`), not tuned, and there are
+  no content-adaptive boundaries.
+- **Frozen selection.** The accepted exact candidate with the minimum Phase-K
+  `complete_bytes`, ties broken by the deterministic proposal order. No
+  measured quantity and no weighted score — storage economics decides.
+- **Real bytes.** `complete_bytes = header.len() + index.len() +` Σ actual
+  payload bytes `+ integrity`, with the payloads being the physical canonical
+  serialization of each selected representation (entropy container for
+  `literal`/`residual`, canonical object bytes otherwise).
+- **Standalone pricing.** Every segment compiles against an empty reference
+  library, so corpus-level deduplication can never flatter the comparison.
+- **Semantics preserved.** The root carries the finite extent and the
+  loop/one-shot identity; observation reproduces the finite extent and, for a
+  loop root, the declared loop region past it.
+- **One encoding, priced and stored.** `cost::best_literal`/`best_residual`
+  iterate the frozen encoding universe once and serve both pricing and
+  serialization, so selection and storage cannot disagree.
+
+`court fullobj` is the mechanism gate. It runs 36 **non-flagship** fixtures over
+the boundary lengths `1`, `65,535`, `65,536`, `65,537`, `131,072`, `131,073`
+frames, mono/stereo/3-channel, silence / constant / exact-repeat / full-width
+noise / mixed content, with `boundary - 1`, `boundary`, `boundary + 1`, a
+window spanning each boundary, the last frame, and the loop continuation:
+
+```text
+fixtures                 36
+boundary observations    414 exact
+hostile containers       180 rejected (truncated/corrupted/version/ceiling/empty)
+objects                  20 all-procedural, 8 all-literal, 8 mixed
+selected kinds           constant 12, exact_repeat 19, literal 23, silence 13
+every extent             reconstructed sample-for-sample; semantics preserved
+frozen result           4b517ea0d564662d0b5c004434d1cea5b7358c5e1e563df5f6628a4665993a87
+```
+
+Seal run: seal subject `837653dc…`; tests **417 passed / 12 ignored**
+all-features and **407 passed / 12 ignored** default-features. No flagship
+performance claim exists yet; Seal 6 opens the second box.

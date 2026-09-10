@@ -1113,6 +1113,34 @@ subject `40c4c8e6…`; 409 passed / 12 ignored all-features, 399 passed / 12
 ignored default-features. The axes are descriptive surfaces of this frozen
 population, not controlled causal effects.
 
+### Phase M Seal 5 — full-object archival container mechanism (v0.15.0)
+
+The bounded Phase-K compiler (65,536-frame window) now explains a whole object
+through an **object-above-objects** container; no new U1 `Representation` tag is
+introduced and Phase K is unchanged.
+
+- `src/fullobj/`: canonical container v1 `header ∥ segment index ∥ payloads ∥
+integrity`, with real serialized bytes (`complete_bytes = header + index +` Σ
+payload `+ integrity`). Segmentation is the frozen rule
+`min(65,536, remaining)`, inherited verbatim from `MAX_INVERSE_FRAMES`;
+selection is minimum Phase-K `complete_bytes` with deterministic tie order; each
+segment is priced against an **empty** reference library (standalone, no
+corpus-level dedup).
+- Root semantics (finite extent + loop/one-shot identity) are preserved and
+observation reproduces both, including the declared loop region past a loop
+root's extent.
+- `src/inverse/serialize.rs` prices and serializes the same encoding
+  (`cost::best_literal`/`best_residual` share one iteration).
+- `court fullobj`: 36 non-flagship fixtures over the boundary lengths 1, 65,535,
+  65,536, 65,537, 131,072, 131,073 frames (mono/stereo/3-channel; silence /
+  constant / exact-repeat / noise / mixed), 414 boundary observations exact, 180
+  hostile containers rejected; every extent reconstructed sample-for-sample.
+
+Measured: frozen result
+`4b517ea0d564662d0b5c004434d1cea5b7358c5e1e563df5f6628a4665993a87`; seal
+subject `837653dc…`; 417 passed / 12 ignored all-features, 407 passed / 12
+ignored default-features. The true B1-vs-VOLE result is Seal 6.
+
 ## Next work (exact order — the implementation contract is executed in sequence)
 
 Phase H.2 is complete (entropy-native core: all ten H.2 courts SUPPORTED on
@@ -1133,8 +1161,8 @@ re-verified by the exact evaluator (`court inverse-search`), and the placement
 policy keeps the measured-faster host surface (`SearchBudget::placement`,
 `Auto`).
 
-1. Phase M — remaining increments (the exact full-object inverse container → the
-   true flagship B1-vs-selected-VOLE comparison; B2–B4; depth /
+1. Phase M — remaining increments (Seal 6: the true flagship B1-vs-current-VOLE
+   result via the frozen full-object container; B2–B4; depth /
    random-access / negative / interference courts; crossover surface; energy);
    Phase N — transport/archive
    (embeds H.2 canonical records); Phase O — learned deterministic prediction
