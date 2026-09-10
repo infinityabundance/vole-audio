@@ -268,8 +268,13 @@ worse and more honest, and the court was **not** tuned to keep the old result:
 
 ### Seal 3 — review-2 closure: exposure terminology (2026-09-10)
 
-Seal run (release, `--all-features`, clean tree at the corrected commit,
-version 0.8.2):
+Seal run (release, `--all-features`, clean tree `86b029d`, version 0.8.2):
+
+- 22 receipts, every one `source_binding: bound` and carrying
+  `seal_subject_hash =
+  3135eccb99177aa4d11ce4bf65376e04f33904481d7de547246f86ad5b86a524`;
+  `seal verify` PASSes the 12-row matrix in **default mode** at the battery
+  tree and at the release head.
 
 - Re-runs the battery after the exposure/component split. **The economics are
   unchanged**: `court inverse` still reports 6/14 non-literal explanations
