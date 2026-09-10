@@ -1397,6 +1397,57 @@ Final Phase-M evidence closure.
   except `negative` is field-for-field identical to Seal 12. **0.22.1 is the
   final Phase-M release**, tagged; publication pending the crates.io quota.
 
+### Phase N — transport / archive (complete at Seal 1 / v0.23.0)
+
+Charter: [`docs/PHASE_N.md`](PHASE_N.md). Deliverables (contract §52): the
+finalized canonical archive, event/checkpoint transport, integrity, recovery and
+reproducible manifests.
+
+- **Canonical `.volea` archive** (`src/format/archive.rs`): explicit little-endian
+  binary (magic `vole.archive`, version 1, profile/universe tags, a section table
+  of `KIND/RESERVED/OFFSET/LENGTH/SHA-256`, contiguous payloads, a trailing
+  archive digest). Section kinds are explicit: `MANIFEST`, then `OBJECT`s in
+  manifest-entry order, then `EVENT`, `CHECKPOINT` and `DEPENDENCY` sections in
+  manifest-count order. The manifest freezes the session counts, so a session
+  cannot be silently trimmed or reordered; unknown kinds are rejected, never
+  skipped. Every parse is length-checked with `try_from`, never a cast.
+- **Fixed a real panic** found during the seal review: a minimum-length archive
+  whose profile/universe tags fill the buffer sliced past the end when reading
+  the section count. The read is now bounds-checked, and a regression test sweeps
+  every truncation length.
+- **Deterministic transport** (`src/transport/`): `OBJECT/EVENT/STATE/CHECKPOINT/
+  DEPENDENCY/CLOCK/INTEGRITY` framing carrying procedural/state information, never
+  mandatory PCM; the literal fallback rides as an `OBJECT` payload. The ordered,
+  bounded receiver classifies duplicates, sequence gaps, stale epochs, late
+  events, clock epoch advances and checkpoint resync; only a `CLOCK` frame may
+  re-anchor the stream. `Outcome::Clock`'s `resync` flag previously reported
+  `false` even on an epoch advance; it now reports the advance. Pending events
+  gained an explicit `consume_events` release path.
+- **Recovery** (`transport::clock::MediaClock`): `PreserveTimeline`,
+  `Discontinuity` and `RestartEpoch` are distinct, reproducible outcomes; an xrun
+  is never a silent reset.
+- **Reproducible manifests** (`src/format/manifest.rs`): deterministic
+  newline-delimited text covering objects and the session, with its own digest.
+- **Courts.** `court archive` packs the frozen corpus as full-object `OBJECT`
+  payloads plus a deterministic session (one event per object, one end
+  checkpoint, one declared external dependency): 115 objects, 115 events, 1
+  checkpoint, 1 dependency; 31,089,591 payload bytes in a 31,113,564 B archive;
+  manifest digest `826f98d6…`, archive digest `919096c8…`; encoding
+  deterministic, decode → re-encode byte-identical, and a **resealed** hostile
+  battery rejected 10 integrity and 10 structural mutations; result `81db84de…`.
+  `court transport`: 348 frames, 115 objects resolved, 115 events (0 late), 1
+  checkpoint resync, 10 hostile candidates rejected, all three recovery policies
+  recorded; result `782a46b8…`. `court phase-n` aggregate `92df23d2…`.
+- **Seal 1:** subject `70cc330a…`; **26-row** `seal verify` matrix (the Phase-M
+  matrix plus `archive`, `transport`, `phase-n`); 468 passed / 12 ignored
+  all-features, 458 passed / 12 ignored default-features. Device artifacts rebuilt
+  at the seal commit and byte-identical to the frozen values (`d13d22c3…` PTX,
+  `5c30a4bc…` AMDGPU). Release **v0.23.0**.
+- The archive's `DEPENDENCY` sections are declarations: integrity-bound but with
+  no byte accounting and no amortization claim (§31). Real-recording ingest, WAV
+  bundle import and a seekable transport remain future extensions; the transport
+  is deliberately not a network stack.
+
 ## Next work (exact order — the implementation contract is executed in sequence)
 
 Phase H.2 is complete (entropy-native core: all ten H.2 courts SUPPORTED on
@@ -1427,7 +1478,9 @@ policy keeps the measured-faster host surface (`SearchBudget::placement`,
    conditions this host cannot control — future evidence extensions, not
    blockers. Release: 0.19.0/0.20.0 published, 0.21.0/0.22.0 deliberately
    unpublished, **0.22.1 tagged and awaiting the quota**.
-2. **Phase N — transport/archive** (finalized canonical archive, event/
-   checkpoint transport, integrity, recovery, reproducible manifests; embeds
-   H.2 canonical records), then **Phase O — learned deterministic prediction**
-   (judged by the H.2 complete-cost API).
+2. **Phase N — transport/archive** — **complete at Seal 1 / v0.23.0** (charter
+   [`docs/PHASE_N.md`](PHASE_N.md)): the finalized canonical `.volea` archive with
+   object and event/checkpoint/dependency sections, deterministic transport + a
+   bounded receiver, clock recovery, and reproducible manifests, sealed by
+   `court archive` / `court transport` / `court phase-n`. Next: **Phase O —
+   learned deterministic prediction** (judged by the H.2 complete-cost API).

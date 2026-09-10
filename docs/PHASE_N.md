@@ -196,7 +196,13 @@ are.
 
 | seal | release | subject | contents |
 | ---- | ------- | ------- | -------- |
-| 1 | v0.23.0 | (recorded in receipt) | canonical archive + event/checkpoint/dependency sections, deterministic transport + receiver, clock recovery, reproducible manifests, `court archive`/`court transport`/`court phase-n` |
+| 1 | v0.23.0 | `70cc330a…` | canonical archive + event/checkpoint/dependency sections, deterministic transport + receiver, clock recovery, reproducible manifests, `court archive` (`81db84de…`), `court transport` (`782a46b8…`), `court phase-n` (`92df23d2…`). 26-row `seal verify` matrix; 468 passed / 12 ignored all-features, 458 / 12 default. Device artifacts byte-identical (`d13d22c3…` PTX, `5c30a4bc…` AMDGPU). |
+
+Archive seal evidence: 115 objects, 115 events, 1 checkpoint, 1 dependency;
+31,089,591 payload bytes in a 31,113,564 B archive; manifest digest `826f98d6…`,
+archive digest `919096c8…`; hostile battery 10 integrity + 10 structural
+rejections. Transport seal evidence: 348 frames, 115 resolved objects, 115 events
+(0 late), 1 checkpoint resync, 10 hostile rejections, all three recovery policies.
 
 ## Non-claims
 
