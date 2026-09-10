@@ -102,12 +102,12 @@ the context and leaves the caller's context stack exactly as it was.
 
 ## What is *not* in this increment
 
-Stated plainly so the gap is visible (updated at Seal 2 — the corpus freeze is
-now done; the rest is not):
+Stated plainly so the gap is visible (updated at Seal 3 — the corpus freeze and
+its review closure are done; the rest is not):
 
-* the flagship **B1/VOLE comparison has not been run**. Seal 2 freezes and
-  verifies the corpus; the comparison is a later increment, so no flagship
-  performance claim exists yet;
+* the flagship **B1/VOLE comparison has not been run**. Seal 2 froze and Seal 3
+  closed the freeze's integrity, but the comparison is a later increment, so no
+  flagship performance claim exists yet;
 * B2–B4 (sampler / disk-streaming / compressed-file playback) are
   `NOT_IMPLEMENTED`;
 * `court depth`, `court random-access`, `court negative`, `court interference`,
@@ -142,7 +142,7 @@ Seal run (release, `--all-features`, clean tree, version 0.11.0):
 
 ## Where this goes next
 
-1. **Seal 2 (this seal) — the flagship corpus is frozen and verified.**
+1. **Seal 2 — the flagship corpus is frozen and verified.**
 2. Switch the conventional/baseline courts onto the flagship corpus (population
    rule in force) and implement B2–B4, then the `depth` / `random-access` /
    `negative` courts and the crossover surface.
@@ -182,3 +182,59 @@ Seal run (release, `--all-features`, clean tree, version 0.12.0):
 - B1's integrity invariant is now enforced inside `b1_flac` itself (a
   STREAMINFO MD5 failure is an error at every compression level, for every
   caller), not only at the court's primary call site.
+
+### Seal 3 — review-found freeze-integrity closure (2026-09-10)
+
+Still **before any flagship result**. The freeze passed review; the review found
+nine freeze-integrity holes that would have let the population's *interpretation*
+be adjusted after the fact even though the sample bytes were frozen. All nine are
+closed, and the corpus was regenerated under one explicit amendment while the
+flagship comparison is still unrun:
+
+1. **B1 eligibility is derived, not trusted.** `verify_manifest` and the courts
+derive `b1_comparable` from each object's channel count
+(`generate::b1_comparable`) and require the manifest's audit field to equal the
+derivation; the comparison denominator can no longer be changed by editing a
+flag.
+2. **Whole-object canonical verification.** For each frozen `Spec`,
+`verify_manifest` regenerates the samples and compares the manifest entry
+against the canonical `object_for(spec, samples)` field for field, replacing the
+hand-maintained subset comparison; an unknown or mutated label is a mismatch
+(`identity_changed`, naming the differing fields), never a silent default.
+3. **Identity covers provenance.** `identity_bytes` now includes `class` and
+`conversion` (the latter becomes provenance-critical once real recordings
+arrive); `duration_ms` is derived and recomputed+verified, and
+`expected_inclusion_surfaces` is derived policy.
+4. **Root and state validated.** `universe`, `profile` and `state` must be the
+frozen values (`root_mismatch` otherwise), not merely the schema.
+5. **Duplicates and order rejected.** A repeated object id (`duplicate_id`) and a
+manifest whose id sequence differs from the frozen membership (`order_mismatch`)
+both fail: benchmark order is experimental state (cache, thermal, GPU-clock
+history), so the frozen *sequence*, not merely the set, is preserved.
+6. **The anticorrelated-random control is reclassified.** The full-width
+`AnticorrelatedStereo` object is kept — temporally random + perfectly
+cross-channel structured is a valuable control — but is no longer counted as
+incompressible; hostile controls now require genuinely independent channels, and
+the hostile invariants (unbiased per channel, both signs, full width, no period
+≤ 1024, distinct channel hashes, no `L == R` / `L == -R`) run over every control.
+7. **Axis renamed.** The frozen axis is now `source_structure_class`, distinct
+from the representation the inverse compiler later *selects* (`oscillator` may
+compile to `exact_repeat`; that is a result, not a contradiction).
+8. **`corpus freeze` refuses to overwrite a frozen manifest.** Amending a frozen
+corpus requires a deliberate `--amend-frozen <reason>` defining a new corpus
+identity, so the freeze act can no longer silently retune the population.
+9. **Regenerated and resealed with no flagship measurement in existence**, which
+is what makes this the one legitimate amendment to a frozen corpus.
+
+The manifest was regenerated under that amendment: corpus sha256
+`4c94b841…`, manifest sha256 `f67c73cf…`, populations unchanged at 115 objects
+(110 B1-comparable, 5 excluded by format domain). Device artifacts are
+byte-identical (PTX `d13d22c3…`, AMDGPU `5c30a4bc…`), and the semantic /
+authored / inverse / inverse-search frozen result hashes are unchanged
+(`1791816f…`, `f7e103f3…`, `217b09a7…`, `d966d98e…`).
+
+Seal run (release, `--all-features`, clean tree at `9af5a1e`, version 0.13.0):
+the **15-row `seal verify` matrix passes** at seal subject `793a07f9…`; 25 fresh
+receipts; `court corpus` SUPPORTED (115/115 regenerated and hash-matched);
+tests **407 passed / 12 ignored** all-features and **397 passed / 12 ignored**
+default-features. No flagship performance claim exists yet.

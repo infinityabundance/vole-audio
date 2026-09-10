@@ -1054,6 +1054,42 @@ Measured: corpus sha256 `c0fc62ff…`, manifest sha256 `a575bf12…`, 115/115
 objects regenerated and hash-matched. The flagship comparison itself is the next
 increment.
 
+### Phase M Seal 3 — freeze-integrity closure (v0.13.0)
+
+Still before any flagship result: the freeze passed review, and the review found
+nine ways the frozen population's *interpretation* (not its bytes) could have
+been adjusted after the fact. All are closed:
+
+- **B1 eligibility is derived** (`corpus::generate::b1_comparable(channels)`) by
+the verifier and the courts; the manifest's `b1_comparable` field must equal the
+derivation and never feeds the comparison denominator
+(`corpus::derived_b1_counts`).
+- **Whole-object canonical verification**: each frozen `Spec` is regenerated and
+the manifest entry is compared field for field against
+`corpus::object_for(spec, samples)`; the hand-maintained subset comparison and
+the fail-open class parsers are gone. `duration_ms` is recomputed and verified,
+`expected_inclusion_surfaces` is derived policy, and `identity_bytes` now covers
+`class` and `conversion`.
+- **`universe` / `profile` / `state` are validated** (`root_mismatch`), duplicate
+ids (`duplicate_id`) and reordered manifests (`order_mismatch`) are rejected, and
+`corpus freeze` refuses to overwrite a `FROZEN` manifest without a deliberate,
+reason-bearing `--amend-frozen`.
+- The frozen axis is renamed **`source_structure_class`**: it names the material
+an object was designed as, not the representation the inverse compiler later
+selects. The full-width `AnticorrelatedStereo` object is kept but excluded from
+the incompressible hostile population (`R = -L` is cross-channel structured);
+hostile invariants now run per channel over every control.
+- Manifest regenerated under the amendment: corpus sha256 `4c94b841…`, manifest
+sha256 `f67c73cf…`; populations unchanged (115 objects, 110 B1-comparable, 5
+excluded by format domain).
+
+Measured (release, `--all-features`, clean tree at `9af5a1e`): the 15-row
+`seal verify` matrix passes at seal subject `793a07f9…` (25 fresh receipts);
+`court corpus` SUPPORTED; device artifacts byte-identical (PTX `d13d22c3…`,
+AMDGPU `5c30a4bc…`); semantic/authored/inverse/inverse-search frozen hashes
+unchanged; 407 passed / 12 ignored all-features, 397 passed / 12 ignored
+default-features. The flagship comparison is still the next increment.
+
 ## Next work (exact order — the implementation contract is executed in sequence)
 
 Phase H.2 is complete (entropy-native core: all ten H.2 courts SUPPORTED on
