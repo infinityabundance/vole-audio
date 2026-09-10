@@ -49,7 +49,7 @@ use crate::inverse::{
 use crate::object::descriptor::{ObjectDescriptor, Representation};
 use crate::object::id::ContentId;
 use crate::object::wavetable::Cycle;
-use crate::object::{Constant, ObjectData};
+use crate::object::{Constant, Literal, ObjectData};
 use crate::universe::u1::PROFILE_TAG_BYTES;
 
 /// Container format tag (15 bytes, like the entropy containers).
@@ -392,6 +392,26 @@ pub struct DecodedFullObject {
     pub integrity_bytes: u64,
 }
 
+/// The set of candidate tags a stored representation may declare. The index is
+/// canonical, so an incompatible pairing (e.g. `silence` with
+/// `residual_periodic`) is a malformed container, not harmless metadata.
+fn candidate_tag_matches(rep: Representation, tag: u8) -> bool {
+    match rep {
+        Representation::Literal => tag == CandidateKind::Literal.tag(),
+        Representation::Silence => tag == CandidateKind::Silence.tag(),
+        Representation::Constant => tag == CandidateKind::Constant.tag(),
+        Representation::ExactRepeat => tag == CandidateKind::ExactRepeat.tag(),
+        Representation::PredictorResidual => matches!(
+            tag,
+            x if x == CandidateKind::ResidualZero.tag()
+                || x == CandidateKind::ResidualConstant.tag()
+                || x == CandidateKind::ResidualPeriodic.tag()
+        ),
+        Representation::Referenced => tag == CandidateKind::SharedReference.tag(),
+        _ => false,
+    }
+}
+
 fn le_u64(b: &[u8], at: usize) -> u64 {
     u64::from_le_bytes([
         b[at],
@@ -474,6 +494,11 @@ pub fn decode_full_object(bytes: &[u8]) -> Result<DecodedFullObject> {
     let payload_start = (HEADER_BYTES + index_bytes) as u64;
     let payload_end = body_len as u64;
     let mut segments = Vec::with_capacity(segment_count);
+    // The serializer writes the payloads as one canonical contiguous block, in
+    // segment order, immediately after the index. Requiring that layout rejects
+    // gaps, overlaps, aliased/duplicated offsets and unreferenced trailing bytes
+    // — noncanonical encodings of a format that claims to be canonical.
+    let mut expected_offset = payload_start;
     for (i, expect) in plan.iter().enumerate() {
         let at = HEADER_BYTES + i * INDEX_RECORD_BYTES;
         let start_frame = le_u64(body, at);
@@ -481,6 +506,11 @@ pub fn decode_full_object(bytes: &[u8]) -> Result<DecodedFullObject> {
         let representation = Representation::from_tag(body[at + 16])
             .ok_or_else(|| Error::malformed("unknown segment representation tag"))?;
         let candidate_tag = body[at + 17];
+        if !candidate_tag_matches(representation, candidate_tag) {
+            return Err(Error::malformed(
+                "full-object segment candidate tag is incompatible with its representation",
+            ));
+        }
         let mut cid = [0u8; 32];
         cid.copy_from_slice(&body[at + 18..at + 50]);
         let payload_offset = le_u64(body, at + 50);
@@ -494,14 +524,20 @@ pub fn decode_full_object(bytes: &[u8]) -> Result<DecodedFullObject> {
         if payload_length == 0 {
             return Err(Error::malformed("full-object segment payload is empty"));
         }
+        if payload_offset != expected_offset {
+            return Err(Error::malformed(
+                "full-object payload offsets are not the canonical contiguous layout",
+            ));
+        }
         let end = payload_offset
             .checked_add(payload_length)
             .ok_or_else(|| Error::malformed("full-object payload range overflow"))?;
-        if payload_offset < payload_start || end > payload_end {
+        if end > payload_end {
             return Err(Error::malformed(
                 "full-object segment payload range outside the payload region",
             ));
         }
+        expected_offset = end;
         segments.push(DecodedSegment {
             plan: *expect,
             representation,
@@ -510,6 +546,11 @@ pub fn decode_full_object(bytes: &[u8]) -> Result<DecodedFullObject> {
             payload_offset,
             payload_length,
         });
+    }
+    if expected_offset != payload_end {
+        return Err(Error::malformed(
+            "full-object container has unreferenced trailing payload bytes",
+        ));
     }
 
     Ok(DecodedFullObject {
@@ -526,14 +567,14 @@ pub fn decode_full_object(bytes: &[u8]) -> Result<DecodedFullObject> {
     })
 }
 
-/// Reconstruct one segment's exact canonical samples from its stored bytes.
-fn segment_samples(
+/// Reconstruct the exact semantic U1 object stored by one segment: the
+/// descriptor and `ObjectData` the index's `content_id` claims.
+fn segment_object(
     rep: Representation,
     payload: &[u8],
     channels: u8,
     frame_count: u64,
-) -> Result<Vec<i32>> {
-    let total = frame_count as usize * usize::from(channels);
+) -> Result<(ObjectDescriptor, ObjectData)> {
     match rep {
         Representation::Literal => {
             let rl = crate::entropy::represent::parse_literal_container(payload)?;
@@ -544,13 +585,10 @@ fn segment_samples(
                     "stored literal segment disagrees with the index geometry",
                 ));
             }
-            let out = rl.materialize_full()?;
-            if out.len() != total {
-                return Err(Error::malformed(
-                    "stored literal segment has the wrong length",
-                ));
-            }
-            Ok(out)
+            let samples = rl.materialize_full()?;
+            let lit = Literal::new(&rl.descriptor, samples)
+                .ok_or_else(|| Error::malformed("stored literal segment payload out of domain"))?;
+            Ok((rl.descriptor, ObjectData::Literal(lit)))
         }
         Representation::PredictorResidual => {
             let rr = crate::entropy::represent::parse_residual_container(payload)?;
@@ -561,29 +599,17 @@ fn segment_samples(
                     "stored residual segment disagrees with the index geometry",
                 ));
             }
-            let out = rr.materialize_closure(0, frame_count as u32)?;
-            if out.len() != total {
-                return Err(Error::malformed(
-                    "stored residual segment has the wrong length",
-                ));
-            }
-            Ok(out)
+            let residual = rr.reconstruct_full()?;
+            Ok((rr.descriptor, ObjectData::PredictorResidual(residual)))
         }
         Representation::Silence | Representation::Constant | Representation::ExactRepeat => {
             let (descriptor, data) = parse_canonical_segment(payload)?;
-            if data_representation(&data) != rep {
+            if descriptor.layout.count() != channels {
                 return Err(Error::malformed(
-                    "stored canonical segment tag disagrees with the index",
+                    "stored canonical segment channel count disagrees with the index",
                 ));
             }
-            let out =
-                crate::inverse::observe::intrinsic_reconstruction(&descriptor, &data, frame_count)?;
-            if out.len() != total {
-                return Err(Error::malformed(
-                    "stored canonical segment has the wrong length",
-                ));
-            }
-            Ok(out)
+            Ok((descriptor, data))
         }
         other => Err(Error::new(
             crate::error::Kind::Unsupported,
@@ -776,12 +802,35 @@ pub fn materialize_full_object(bytes: &[u8]) -> Result<MaterializedFullObject> {
         let payload = bytes
             .get(lo..hi)
             .ok_or_else(|| Error::malformed("full-object segment payload outside the container"))?;
-        let mut seg_samples = segment_samples(
+        let (descriptor, data) = segment_object(
             seg.representation,
             payload,
             decoded.channels,
             seg.plan.frame_count,
         )?;
+        if data_representation(&data) != seg.representation {
+            return Err(Error::malformed(
+                "stored segment representation disagrees with the index",
+            ));
+        }
+        // The index's `content_id` is the U1 content identity of the semantic
+        // object the segment stores; it must agree with what was actually
+        // stored, not merely with the outer digest.
+        let derived = crate::object::canonical_content_id(&descriptor, &data);
+        if derived != seg.content_id {
+            return Err(Error::malformed(
+                "full-object index content_id does not match the stored segment",
+            ));
+        }
+        let mut seg_samples = crate::inverse::observe::intrinsic_reconstruction(
+            &descriptor,
+            &data,
+            seg.plan.frame_count,
+        )?;
+        let expect = seg.plan.frame_count as usize * usize::from(decoded.channels);
+        if seg_samples.len() != expect {
+            return Err(Error::malformed("stored segment has the wrong length"));
+        }
         samples.append(&mut seg_samples);
     }
     let expect = decoded.total_frames as usize * usize::from(decoded.channels);
@@ -1020,6 +1069,107 @@ mod tests {
                     .all(|s| s.kind != CandidateKind::SharedReference)
             );
         }
+    }
+
+    /// Recompute the trailing integrity digest so a structural mutation reaches
+    /// the parser instead of failing the outer digest.
+    fn reseal(bytes: &mut [u8]) {
+        let n = bytes.len();
+        let body = n - INTEGRITY_BYTES as usize;
+        let digest = Sha256::digest(&bytes[..body]);
+        bytes[body..].copy_from_slice(&digest);
+    }
+
+    #[test]
+    fn resealed_structural_mutations_must_fail() {
+        // A container whose outer digest is *valid*: only the format's own
+        // invariants can reject these mutations.
+        let samples = tone(40_000, 2);
+        let obj = compile_full_object(
+            "resealed",
+            48_000,
+            2,
+            40_000,
+            FullSemantics::OneShot,
+            &samples,
+            budget(),
+        )
+        .unwrap();
+        let index0 = HEADER_BYTES;
+        type Mutation = Box<dyn Fn(&mut [u8])>;
+        let cases: Vec<(&str, Mutation)> = vec![
+            (
+                "version",
+                Box::new(|b: &mut [u8]| b[15] = FORMAT_VERSION.wrapping_add(1)),
+            ),
+            (
+                "ceiling",
+                Box::new(|b: &mut [u8]| b[38..46].copy_from_slice(&32_768u64.to_le_bytes())),
+            ),
+            ("semantics", Box::new(|b: &mut [u8]| b[21] = 0x7F)),
+            (
+                "one_shot_with_period",
+                Box::new(|b: &mut [u8]| b[22..26].copy_from_slice(&5u32.to_le_bytes())),
+            ),
+            (
+                "segment_count",
+                Box::new(|b: &mut [u8]| {
+                    let n = u32::from_le_bytes([b[34], b[35], b[36], b[37]]);
+                    b[34..38].copy_from_slice(&n.wrapping_add(1).to_le_bytes());
+                }),
+            ),
+            (
+                "boundary",
+                Box::new(move |b: &mut [u8]| {
+                    let v = u64::from_le_bytes(b[index0..index0 + 8].try_into().unwrap());
+                    b[index0..index0 + 8].copy_from_slice(&v.wrapping_add(1).to_le_bytes());
+                }),
+            ),
+            (
+                "representation_tag",
+                Box::new(move |b: &mut [u8]| b[index0 + 16] = 0x00),
+            ),
+            (
+                "candidate_tag",
+                Box::new(move |b: &mut [u8]| b[index0 + 17] = 0xFF),
+            ),
+            (
+                "content_id",
+                Box::new(move |b: &mut [u8]| b[index0 + 18] ^= 0xFF),
+            ),
+            (
+                "offset_gap",
+                Box::new(move |b: &mut [u8]| {
+                    let v = u64::from_le_bytes(b[index0 + 50..index0 + 58].try_into().unwrap());
+                    b[index0 + 50..index0 + 58].copy_from_slice(&v.wrapping_add(1).to_le_bytes());
+                }),
+            ),
+            (
+                "payload_short",
+                Box::new(move |b: &mut [u8]| {
+                    let v = u64::from_le_bytes(b[index0 + 58..index0 + 66].try_into().unwrap());
+                    if v > 1 {
+                        b[index0 + 58..index0 + 66].copy_from_slice(&(v - 1).to_le_bytes());
+                    }
+                }),
+            ),
+        ];
+        for (label, mutate) in &cases {
+            let mut candidate = obj.bytes.clone();
+            mutate(&mut candidate);
+            reseal(&mut candidate);
+            // A resealed structural mutation may be rejected at parse time or at
+            // materialization time (the `content_id` binding is the latter), but
+            // it must never be usable.
+            let usable = decode_full_object(&candidate).is_ok()
+                && materialize_full_object(&candidate).is_ok();
+            assert!(!usable, "resealed mutation '{label}' remained usable");
+        }
+        // The unmutated container still decodes and materializes exactly.
+        assert_eq!(
+            materialize_full_object(&obj.bytes).unwrap().samples(),
+            &samples[..]
+        );
     }
 
     #[test]

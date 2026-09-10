@@ -259,47 +259,144 @@ fn boundary_observations(mat: &MaterializedFullObject, samples: &[i32]) -> Resul
     Ok((checked, spanning))
 }
 
-/// Hostile decode checks on one compiled container: every mutation must fail
-/// typed rather than decode.
-fn hostile_decode_checks(bytes: &[u8]) -> Result<usize> {
+/// A structural field mutation applied to a serialized container (used by the
+/// resealed hostile battery).
+type StructuralMutation = Box<dyn Fn(&mut [u8])>;
+
+/// Recompute the container's trailing integrity digest in place, so a mutation
+/// made before this call reaches the parser rather than failing the outer
+/// digest. This is what distinguishes "the digest caught it" from "the format
+/// validator caught it".
+fn reseal(bytes: &mut [u8]) {
+    let n = bytes.len();
+    let body = n - fullobj::INTEGRITY_BYTES as usize;
+    let digest = Sha256::digest(&bytes[..body]);
+    bytes[body..].copy_from_slice(&digest);
+}
+
+/// Integrity-hostile containers: mutated without resealing. Every one must fail
+/// the outer digest (none must reach the parser).
+fn integrity_hostile_checks(bytes: &[u8]) -> Result<usize> {
     let mut rejected = 0usize;
     let check = |candidate: Vec<u8>| -> Result<()> {
         if fullobj::decode_full_object(&candidate).is_err() {
             Ok(())
         } else {
-            Err(Error::internal("a hostile container decoded"))
+            Err(Error::internal("an integrity-hostile container decoded"))
         }
     };
     if bytes.len() > 8 {
         check(bytes[..bytes.len() - 4].to_vec())?;
         rejected += 1;
     }
-    let mut corrupted = bytes.to_vec();
-    let at = fullobj::HEADER_BYTES.min(corrupted.len().saturating_sub(1));
-    corrupted[at] ^= 0xFF;
-    check(corrupted)?;
-    rejected += 1;
-    let mut version = bytes.to_vec();
-    if version.len() > 16 {
-        version[15] = fullobj::FORMAT_VERSION.wrapping_add(1);
-        check(version)?;
-        rejected += 1;
-    }
-    let mut ceiling = bytes.to_vec();
-    if ceiling.len() >= 46 {
-        ceiling[38..46].copy_from_slice(&32_768u64.to_le_bytes());
-        check(ceiling)?;
-        rejected += 1;
-    }
-    let mut empty = bytes.to_vec();
-    let len_at = fullobj::HEADER_BYTES + 58;
-    if empty.len() >= len_at + 8 {
-        empty[len_at..len_at + 8].copy_from_slice(&0u64.to_le_bytes());
-        check(empty)?;
-        rejected += 1;
+    for at in [0usize, fullobj::HEADER_BYTES, bytes.len() - 1] {
+        let mut corrupted = bytes.to_vec();
+        if at < corrupted.len() {
+            corrupted[at] ^= 0xFF;
+            check(corrupted)?;
+            rejected += 1;
+        }
     }
     // The unmutated container must decode.
     fullobj::decode_full_object(bytes)?;
+    Ok(rejected)
+}
+
+/// Structurally-hostile containers: a structural field is mutated **and the
+/// outer digest is recomputed**, so the parser's own invariants must reject it.
+/// This is the battery that actually proves the format validators.
+fn structural_hostile_checks(bytes: &[u8]) -> Result<usize> {
+    let integrity = fullobj::INTEGRITY_BYTES as usize;
+    if bytes.len() < fullobj::HEADER_BYTES + integrity {
+        return Err(Error::internal(
+            "container too small for the hostile battery",
+        ));
+    }
+    let index0 = fullobj::HEADER_BYTES;
+    let mut rejected = 0usize;
+    // (label, mutation). Each mutation is applied, the container is resealed,
+    // and decode must fail the intended invariant.
+    let mutations: Vec<(&str, StructuralMutation)> = vec![
+        (
+            "version",
+            Box::new(|b: &mut [u8]| b[15] = fullobj::FORMAT_VERSION.wrapping_add(1)),
+        ),
+        (
+            "segment_ceiling",
+            Box::new(|b: &mut [u8]| b[38..46].copy_from_slice(&32_768u64.to_le_bytes())),
+        ),
+        ("unknown_semantics", Box::new(|b: &mut [u8]| b[21] = 0x7F)),
+        (
+            "one_shot_with_period",
+            Box::new(|b: &mut [u8]| {
+                b[21] = fullobj::SEMANTICS_ONE_SHOT;
+                b[22..26].copy_from_slice(&5u32.to_le_bytes());
+            }),
+        ),
+        (
+            "segment_count",
+            Box::new(|b: &mut [u8]| {
+                let n = u32::from_le_bytes([b[34], b[35], b[36], b[37]]);
+                b[34..38].copy_from_slice(&n.wrapping_add(1).to_le_bytes());
+            }),
+        ),
+        (
+            "segment_boundary",
+            Box::new(move |b: &mut [u8]| {
+                let v = u64::from_le_bytes(b[index0..index0 + 8].try_into().unwrap());
+                b[index0..index0 + 8].copy_from_slice(&v.wrapping_add(1).to_le_bytes());
+            }),
+        ),
+        (
+            "unknown_representation_tag",
+            Box::new(move |b: &mut [u8]| b[index0 + 16] = 0x00),
+        ),
+        (
+            "incompatible_candidate_tag",
+            Box::new(move |b: &mut [u8]| b[index0 + 17] = 0xFF),
+        ),
+        (
+            "content_id",
+            Box::new(move |b: &mut [u8]| b[index0 + 18] ^= 0xFF),
+        ),
+        (
+            "payload_offset_gap",
+            Box::new(move |b: &mut [u8]| {
+                let v = u64::from_le_bytes(b[index0 + 50..index0 + 58].try_into().unwrap());
+                b[index0 + 50..index0 + 58].copy_from_slice(&v.wrapping_add(1).to_le_bytes());
+            }),
+        ),
+        (
+            "payload_length_short",
+            Box::new(move |b: &mut [u8]| {
+                let v = u64::from_le_bytes(b[index0 + 58..index0 + 66].try_into().unwrap());
+                if v > 1 {
+                    b[index0 + 58..index0 + 66].copy_from_slice(&(v - 1).to_le_bytes());
+                }
+            }),
+        ),
+        (
+            "empty_payload",
+            Box::new(move |b: &mut [u8]| {
+                b[index0 + 58..index0 + 66].copy_from_slice(&0u64.to_le_bytes());
+            }),
+        ),
+    ];
+    for (_label, mutate) in &mutations {
+        let mut candidate = bytes.to_vec();
+        mutate(&mut candidate);
+        reseal(&mut candidate);
+        // Rejected at parse time or at materialization time (`content_id` is the
+        // latter), but never usable.
+        let usable = fullobj::decode_full_object(&candidate).is_ok()
+            && fullobj::materialize_full_object(&candidate).is_ok();
+        if usable {
+            return Err(Error::internal(format!(
+                "a resealed container with a mutated {_label} remained usable"
+            )));
+        }
+        rejected += 1;
+    }
     Ok(rejected)
 }
 
@@ -363,7 +460,8 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
     let sw = Stopwatch::start();
     let mut cells: Vec<serde_json::Value> = Vec::with_capacity(fixtures.len());
     let mut total_observations = 0usize;
-    let mut hostile_rejections = 0usize;
+    let mut integrity_hostile_rejections = 0usize;
+    let mut structural_hostile_rejections = 0usize;
     let mut procedural_objects = 0usize;
     let mut literal_objects = 0usize;
     let mut mixed_objects = 0usize;
@@ -395,7 +493,8 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
         }
         let (checked, _) = boundary_observations(&mat, &fx.samples)?;
         total_observations += checked;
-        hostile_rejections += hostile_decode_checks(&obj.bytes)?;
+        integrity_hostile_rejections += integrity_hostile_checks(&obj.bytes)?;
+        structural_hostile_rejections += structural_hostile_checks(&obj.bytes)?;
 
         if obj.all_literal() {
             literal_objects += 1;
@@ -475,7 +574,8 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
             "full-object container over {} non-flagship fixtures; format v{}; frozen segment \
              ceiling {MAX_SEGMENT_FRAMES} frames (the Phase-K observation ceiling); every extent \
              reconstructed sample-for-sample; {total_observations} boundary observations exact; \
-             {hostile_rejections} hostile containers rejected; result sha256 {result_hex}",
+             {integrity_hostile_rejections} integrity-hostile and {structural_hostile_rejections} \
+             resealed structural-hostile containers rejected; result sha256 {result_hex}",
             object_count,
             fullobj::FORMAT_VERSION,
         ))
@@ -514,7 +614,10 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
             serde_json::json!({
                 "objects": cells.len(),
                 "boundary_observations": total_observations,
-                "hostile_containers_rejected": hostile_rejections,
+                "integrity_hostile_rejected": integrity_hostile_rejections,
+                "structural_hostile_rejected": structural_hostile_rejections,
+                "hostile_containers_rejected": integrity_hostile_rejections
+                    + structural_hostile_rejections,
                 "objects_all_literal": literal_objects,
                 "objects_all_procedural": procedural_objects,
                 "objects_mixed": mixed_objects,
@@ -523,6 +626,18 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
             }),
         )
         .extra("cells", serde_json::Value::Array(cells))
+        .limitation(
+            "the hostile battery has two classes: integrity-hostile containers (mutated without \
+             resealing, which must fail the outer digest) and structurally-hostile containers \
+             (a structural field mutated *and* the outer digest recomputed, which must reach and \
+             fail the format validators)",
+        )
+        .limitation(
+            "the index `content_id` is bound to the stored segment: materialization recomputes \
+             the U1 content identity of the decoded semantic object and requires it to equal the \
+             index; the payload layout is required to be the canonical contiguous block (no \
+             gaps, overlaps, aliases or unreferenced trailing bytes)",
+        )
         .limitation(
             "this court pins the container mechanism and its exactness; it makes no flagship \
              performance claim and does not touch the frozen flagship corpus",
@@ -540,8 +655,8 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
     let (_, path) = builder.finish_write(receipts_root)?;
     println!("court fullobj: {verdict}");
     println!(
-        "  fixtures: {} | boundary observations: {total_observations} | hostile rejected: {hostile_rejections}",
-        object_count
+        "  fixtures: {} | boundary observations: {total_observations} | hostile rejected: {} integrity + {} resealed structural",
+        object_count, integrity_hostile_rejections, structural_hostile_rejections
     );
     println!(
         "  objects all-literal: {literal_objects} | all-procedural: {procedural_objects} | mixed: {mixed_objects}"

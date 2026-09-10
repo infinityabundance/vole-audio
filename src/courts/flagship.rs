@@ -61,17 +61,20 @@ fn semantics_of(spec: &Spec) -> FullSemantics {
     }
 }
 
-/// Per-axis surface: counts over all objects, byte sums over the B1-comparable
-/// subset only.
+/// Per-axis surface. Counts are over all objects in the class; every byte sum is
+/// reported for both populations so no B1 ratio can silently mix them, and the
+/// ratios use the B1-comparable population only.
 fn axis_surface(cells: &[serde_json::Value], key: &str) -> serde_json::Value {
     #[derive(Default)]
     struct Agg {
         objects: usize,
         b1: usize,
-        b0_bytes: u64,
+        b0_all: u64,
+        b0_comparable: u64,
         b1_bytes: u64,
-        vole_bytes: u64,
-        literal_bytes: u64,
+        vole_comparable: u64,
+        literal_all: u64,
+        literal_comparable: u64,
         vole_wins: usize,
     }
     let mut map: BTreeMap<String, Agg> = BTreeMap::new();
@@ -82,14 +85,16 @@ fn axis_surface(cells: &[serde_json::Value], key: &str) -> serde_json::Value {
             .unwrap_or_else(|| c[key].to_string());
         let e = map.entry(class).or_default();
         e.objects += 1;
+        e.b0_all += c["b0_bytes"].as_u64().unwrap_or(0);
+        e.literal_all += c["literal_equivalent_bytes"].as_u64().unwrap_or(0);
         if c["b1_comparable"].as_bool().unwrap_or(false) {
             e.b1 += 1;
             let b1 = c["b1_bytes"].as_u64().unwrap_or(0);
             let vole = c["vole_complete_bytes"].as_u64().unwrap_or(0);
-            e.b0_bytes += c["b0_bytes"].as_u64().unwrap_or(0);
+            e.b0_comparable += c["b0_bytes"].as_u64().unwrap_or(0);
+            e.literal_comparable += c["literal_equivalent_bytes"].as_u64().unwrap_or(0);
             e.b1_bytes += b1;
-            e.vole_bytes += vole;
-            e.literal_bytes += c["literal_equivalent_bytes"].as_u64().unwrap_or(0);
+            e.vole_comparable += vole;
             if vole < b1 {
                 e.vole_wins += 1;
             }
@@ -103,12 +108,14 @@ fn axis_surface(cells: &[serde_json::Value], key: &str) -> serde_json::Value {
                 "objects": v.objects,
                 "b1_comparable_objects": v.b1,
                 "b1_excluded_objects": v.objects - v.b1,
-                "b0_bytes_b1_comparable": v.b0_bytes,
-                "b1_bytes": v.b1_bytes,
-                "vole_complete_bytes": v.vole_bytes,
-                "literal_equivalent_bytes": v.literal_bytes,
-                "b1_over_vole": ratio(v.b1_bytes, v.vole_bytes),
-                "vole_over_b1": ratio(v.vole_bytes, v.b1_bytes),
+                "b0_bytes_all_objects": v.b0_all,
+                "b0_bytes_b1_comparable": v.b0_comparable,
+                "literal_equivalent_bytes_all_objects": v.literal_all,
+                "literal_equivalent_bytes_b1_comparable": v.literal_comparable,
+                "b1_bytes_b1_comparable": v.b1_bytes,
+                "vole_complete_bytes_b1_comparable": v.vole_comparable,
+                "b1_over_vole_b1_comparable": ratio(v.b1_bytes, v.vole_comparable),
+                "vole_over_b1_b1_comparable": ratio(v.vole_comparable, v.b1_bytes),
                 "objects_vole_cheaper_than_b1": v.vole_wins,
             }),
         );
@@ -229,10 +236,16 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
 
     let sw = Stopwatch::start();
     let mut cells: Vec<serde_json::Value> = Vec::with_capacity(manifest.objects.len());
-    let mut b1_total = 0u64;
-    let mut vole_total = 0u64;
-    let mut b0_total = 0u64;
-    let mut literal_total = 0u64;
+    // Every byte total is tracked over both populations: `_all` is all 115
+    // objects, `_comparable` is the 110 inside FLAC's format domain. A ratio
+    // against B1 must only ever use the comparable population.
+    let mut b0_all = 0u64;
+    let mut b0_comparable = 0u64;
+    let mut literal_all = 0u64;
+    let mut literal_comparable = 0u64;
+    let mut b1_total = 0u64; // comparable only
+    let mut vole_all = 0u64;
+    let mut vole_comparable = 0u64;
     let mut segment_total = 0usize;
     let mut all_literal_objects = 0usize;
     let mut all_procedural_objects = 0usize;
@@ -257,13 +270,18 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
         }
         let ch = o.channels;
         let frames = o.frames;
+        let comparable = generate::b1_comparable(ch);
         let b0 = b0_raw_pcm_bytes(&samples);
         let literal = crate::inverse::cost::canonical_u1_literal_bytes(frames, ch);
-        b0_total += b0;
-        literal_total += literal;
+        b0_all += b0;
+        literal_all += literal;
+        if comparable {
+            b0_comparable += b0;
+            literal_comparable += literal;
+        }
 
         // B1 (FLAC level 5) over the exact same canonical i32 domain.
-        let (b1_bytes, b1_cell) = if generate::b1_comparable(ch) {
+        let (b1_bytes, b1_cell) = if comparable {
             let e = b1_flac(&samples, ch, o.sample_rate_hz, B1_LEVEL_PRIMARY)
                 .map_err(|err| Error::internal(format!("{}: B1: {err}", o.id)))?;
             if !e.exact_roundtrip || e.source_sha256 != e.decoded_sha256 || !e.md5_ok {
@@ -315,7 +333,10 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
             return fail(&format!("{}: VOLE semantics were not preserved", o.id));
         }
         let vole_bytes = vole.complete_bytes();
-        vole_total += vole_bytes;
+        vole_all += vole_bytes;
+        if b1_bytes.is_some() {
+            vole_comparable += vole_bytes;
+        }
         segment_total += vole.segment_count();
 
         let (all_literal, all_procedural, mixed) =
@@ -449,13 +470,14 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
         .result(verdict)
         .result_detail(format!(
             "B1 FLAC versus current bounded VOLE inverse selection over {} frozen objects \
-             ({b1_comparable_objects} B1-comparable); B1(level {B1_LEVEL_PRIMARY}) {b1_total} B, \
-             VOLE {vole_total} B, B1/VOLE {:.3}; VOLE cheaper on {vole_lt_b1}, equal on \
-             {vole_eq_b1}, larger on {vole_gt_b1} of the comparable objects; every extent \
-             reconstructed exactly; corpus sha256 {}, manifest sha256 {}; result sha256 \
-             {result_hex}",
+             ({b1_comparable_objects} B1-comparable); over the SAME comparable population: \
+             B1(level {B1_LEVEL_PRIMARY}) {b1_total} B, VOLE {vole_comparable} B, B1/VOLE {:.3} \
+             (VOLE {:.3}x B1); VOLE cheaper on {vole_lt_b1}, equal on {vole_eq_b1}, larger on \
+             {vole_gt_b1} of the comparable objects; every extent reconstructed exactly; \
+             corpus sha256 {}, manifest sha256 {}; result sha256 {result_hex}",
             cells.len(),
-            b1_total as f64 / vole_total.max(1) as f64,
+            b1_total as f64 / vole_comparable.max(1) as f64,
+            vole_comparable as f64 / b1_total.max(1) as f64,
             report.corpus_sha256,
             report.manifest_sha256,
         ))
@@ -507,16 +529,23 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
             serde_json::json!({
                 "objects": cells.len(),
                 "b1_comparable_objects": b1_comparable_objects,
+                "b1_excluded_objects": cells.len() - b1_comparable_objects,
                 "b1_exact_round_trips": b1_exact,
                 "b1_available_objects": b1_available,
-                "b0_bytes": b0_total,
-                "literal_equivalent_bytes": literal_total,
+                // Population split: a B1 ratio must only ever use the comparable
+                // population. `_all` figures are reported for completeness and
+                // must never be divided by a B1 total.
+                "b0_bytes_all_objects": b0_all,
+                "b0_bytes_b1_comparable": b0_comparable,
+                "literal_equivalent_bytes_all_objects": literal_all,
+                "literal_equivalent_bytes_b1_comparable": literal_comparable,
                 "b1_primary_bytes": b1_total,
                 "expected_b1_primary_total": EXPECTED_B1_PRIMARY_TOTAL,
-                "vole_complete_bytes": vole_total,
-                "b1_over_vole": ratio(b1_total, vole_total),
-                "vole_over_b1": ratio(vole_total, b1_total),
-                "literal_over_vole": ratio(literal_total, vole_total),
+                "vole_complete_bytes_all_objects": vole_all,
+                "vole_complete_bytes_b1_comparable": vole_comparable,
+                "b1_over_vole_b1_comparable": ratio(b1_total, vole_comparable),
+                "vole_over_b1_b1_comparable": ratio(vole_comparable, b1_total),
+                "literal_over_vole_b1_comparable": ratio(literal_comparable, vole_comparable),
                 "segments_total": segment_total,
                 "objects_all_literal": all_literal_objects,
                 "objects_all_procedural": all_procedural_objects,
@@ -573,7 +602,11 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
         object_count, b1_comparable_objects
     );
     println!(
-        "  B0 {b0_total} B | literal {literal_total} B | B1 {b1_total} B | VOLE {vole_total} B"
+        "  B0 all/comparable {b0_all}/{b0_comparable} B | literal {literal_all}/{literal_comparable} B"
+    );
+    println!(
+        "  B1 {b1_total} B | VOLE all/comparable {vole_all}/{vole_comparable} B | B1/VOLE(comparable) {:.3}",
+        b1_total as f64 / vole_comparable.max(1) as f64
     );
     println!(
         "  VOLE cheaper/equal/larger than B1: {vole_lt_b1}/{vole_eq_b1}/{vole_gt_b1} \
