@@ -132,6 +132,44 @@ cost-unit invariants (`literal_cost_equals_the_h2_complete_cost`,
 `residual_cost_does_not_double_charge_the_deltas`,
 `cycle_table_is_storage_payload_and_also_reported_as_state`).
 
+## Review amendment 2 (exposure terminology + truthful components)
+
+The second external review confirmed the economics were correct but found a
+nomenclature/measurement issue: `persistent_sample_domain_bytes` was being
+filled with the *decoded* content of entropy-coded representations, which
+collides with the normative H.2 meaning (a transient decoded page is not a
+persistent full-object waveform). Two questions were sharing one word:
+
+```text
+A. chosen representation   "does this archived representation persist baked samples?"
+B. search implementation   "did the host temporarily instantiate sample-domain state?"
+```
+
+Split explicitly. `CandidateCost` now reports, separately from the storage
+cost:
+
+* `persistent_sample_domain_bytes` — baked samples the **chosen
+  representation** persists. Zero for an entropy-coded literal or residual
+  (its persistence is the entropy state); the stored table bytes for a
+  canonical cycle.
+* `decoded_sample_state_bytes`, `decoded_residual_state_bytes`,
+  `decoded_window_state_bytes` — transient materialization required to observe
+  the representation.
+* the compiler's own search-time working set moved to `SearchAllocation`
+  (`search_input_bytes`, `candidate_semantic_state_bytes`,
+  `intrinsic_reconstruction_peak`, `oracle_observation_peak`,
+  `seek_observation_peak`), so search instrumentation never shares the word
+  *persistent*.
+
+Canonical (non-entropy) component names are also made truthful: a constant's
+level and a cycle's framing are `hypothesis_bytes`; a stored table is
+`payload_bytes`; a reference's transpose/loop parameters are `hypothesis_bytes`
+with the 32-byte target content id as `dependency_bytes`. Totals are
+unchanged (asserted), so the economics do not move: the corrected **6/14**
+result and every reported byte figure are identical to Seal 2. Only the
+frozen static-result hash changes, because it includes the exposure component
+(`e0b2e35c…` → `217b09a7…`).
+
 ## Seal history
 
 ### Seal 1 — Phase K implementation + clean-tree battery (2026-09-10)
@@ -227,6 +265,25 @@ worse and more honest, and the court was **not** tuned to keep the old result:
   default-features; +8 over Seal 1: the cost decomposition invariants and the
   budget/channel hostile tests); clippy `-D warnings` and
   `cargo fmt --check` clean.
+
+### Seal 3 — review-2 closure: exposure terminology (2026-09-10)
+
+Seal run (release, `--all-features`, clean tree at the corrected commit,
+version 0.8.2):
+
+- Re-runs the battery after the exposure/component split. **The economics are
+  unchanged**: `court inverse` still reports 6/14 non-literal explanations
+  with identical byte figures (silence 46 vs 183, DC 50 vs 327, single-sine
+  574 vs 6331, quasi-periodic 15937 vs 16169, am-signal 1420 vs 8185; the
+  literal wins are unchanged); only the frozen static-result hash is
+  re-frozen at
+  `217b09a79c0561448605706c79e87f53d5ce014f5128cbf735212e914c9155ca`.
+- Exposure semantics now match the H.2 doctrine: the 4096-frame mono
+  white-noise literal reports `persistent_sample_domain_bytes = 0` and
+  `decoded_sample_state_bytes = 16384`, while `complete_bytes` stays 16 519.
+- Host tests: **372 passed, 5 ignored** all-features (362 passed, 5 ignored
+  default-features; +1 over Seal 2: the H.2 model/index carry-through check);
+  clippy `-D warnings` and `cargo fmt --check` clean.
 
 ## Execution record (implementation summary)
 

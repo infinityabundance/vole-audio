@@ -72,21 +72,33 @@ Their status is recorded in the Phase-K ledger; nothing claims them.
 
 ## 3. Complete dependency accounting
 
-Three quantities are kept strictly apart, because they are different
-measurements:
+Four quantities are kept strictly apart, because they are different
+measurements (H.2 memory-path doctrine: a persistent representation is not a
+transient materialization and is not verification instrumentation):
 
 ```text
-STORAGE COST        physical representation bytes
-                      complete_bytes = metadata + hypothesis + model
-                                     + payload + index + checkpoint
-                                     + dependency + integrity
-STATE / EXPOSURE    sample-domain content that may exist while evaluating
-                      persistent_sample_domain_bytes, state_bytes
-                      (NEVER added to complete_bytes)
-BASELINE            the original/raw/canonical sample bytes
-                      raw_sample_bytes, canonical_literal_bytes
-                      (NEVER part of the sum)
+STORAGE COST       physical representation bytes
+                     complete_bytes = metadata + hypothesis + model
+                                    + payload + index + checkpoint
+                                    + dependency + integrity
+REPRESENTATION     does the CHOSEN representation persist baked samples?
+PERSISTENCE          persistent_sample_domain_bytes
+TRANSIENT          what must be decoded to observe it?
+MATERIALIZATION      decoded_sample_state_bytes
+                     decoded_residual_state_bytes
+                     decoded_window_state_bytes
+BASELINE           the original/raw/canonical sample bytes
+                     raw_sample_bytes, canonical_literal_bytes
+                     (NEVER part of the sum)
 ```
+
+Only the eight storage components are summed. Critically, an **entropy-coded**
+literal or residual persists *no* baked sample-domain content — its
+persistence **is** the entropy state — so its
+`persistent_sample_domain_bytes` is 0 and the decoded samples are reported as
+transient materialization. A canonical cycle *does* persist its table, so that
+counts as persistent sample-domain bytes (and also as storage `payload`; a
+resident table is never free).
 
 Where an entropy body exists the storage cost **is** the frozen H.2 complete
 cost: `CandidateCost` carries the eight H.2 components through unchanged and
@@ -99,22 +111,38 @@ entropy encoder cannot disagree:
   (`entropy_residual`): page sizes 256/512/1024, minimum `complete_bytes`.
 
 For representations with no entropy body (silence, constant, cycle, shared
-reference) the decomposition is over the canonical object bytes and sums to
-exactly that length (`canonical_object`). A resident table is never free: a
-stored cycle is storage `payload`; a shared reference's target content id is
-`dependency_bytes`, never zero. `debug_assert!`s check the invariant, and
+reference) the decomposition is over the canonical object bytes, sums to
+exactly that length (`canonical_object`), and keeps **truthful component
+names**: a constant's level and a cycle's framing are `hypothesis_bytes`
+(deterministic model state), a stored table is `payload_bytes`, and a
+reference's target content id is `dependency_bytes` (its transpose/loop
+parameters are `hypothesis_bytes`). `debug_assert!`s check the invariant, and
 `CandidateCost::decomposition_is_consistent()` exposes it to tests.
 
-Sample-domain content that a representation owns (literal samples, cycle
-samples, residual deltas) is reported as **state/exposure**, not storage: it
-is never charged a second time on top of the entropy-coded body that replaces
-it. For example, the 4096-frame mono white-noise window is:
+Worked example — the 4096-frame mono white-noise window:
 
 ```text
-raw samples        16 384 B        (baseline)
+raw samples        16 384 B   (baseline)
 literal storage       71 metadata + 16 384 payload + 64 index = 16 519 B
-state/residency    16 384 B        (reported, not summed)
+persistence            0 B    (an entropy-coded literal bakes no samples)
+decoded (transient)  16 384 B (materialization, reported, never summed)
 ```
+
+## 3a. Search-time allocations (separate from cost and persistence)
+
+The compiler also reports, per candidate, its own working set while
+proposing/verifying (accounted, not allocator-instrumented):
+
+| field | meaning |
+| ----- | ------- |
+| `search_input_bytes` | the intrinsic window held constant for the compile |
+| `candidate_semantic_state_bytes` | candidate state instantiated while proposing/accepting (record vectors, sample vectors, stored tables) |
+| `intrinsic_reconstruction_peak` | peak sample-domain buffer during intrinsic closure |
+| `oracle_observation_peak` | peak sample-domain buffer during the full scalar-oracle observation |
+| `seek_observation_peak` | peak sample-domain buffer during the bounded seek observation |
+
+This is the inverse compiler's instrumentation, not a property of the chosen
+representation — which is why it does not share the word *persistent*.
 
 ## 4. Abstract universe work
 

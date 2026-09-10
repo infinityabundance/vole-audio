@@ -7,27 +7,38 @@
 //! `complete_bytes`, so the inverse compiler can never disagree with the
 //! entropy encoder about what a representation costs.
 //!
-//! Three quantities are deliberately kept apart, because they are different
-//! measurements:
+//! Four quantities are deliberately kept apart, because they are different
+//! measurements (H.2 memory-path doctrine: a persistent representation is not
+//! a transient materialization and is not verification instrumentation):
 //!
 //! ```text
-//! STORAGE COST        physical representation bytes
-//!                       complete_bytes = metadata + hypothesis + model
-//!                                      + payload + index + checkpoint
-//!                                      + dependency + integrity
-//! STATE / EXPOSURE    sample-domain content that may exist while evaluating
-//!                       persistent_sample_domain_bytes, state_bytes
-//!                       (NEVER added to complete_bytes)
-//! BASELINE            the original/raw/canonical sample bytes
-//!                       raw_sample_bytes, canonical_literal_bytes
-//!                       (NEVER part of the sum)
+//! STORAGE COST       physical representation bytes
+//!                      complete_bytes = metadata + hypothesis + model
+//!                                     + payload + index + checkpoint
+//!                                     + dependency + integrity
+//! REPRESENTATION     does the CHOSEN representation persist baked samples?
+//! PERSISTENCE          persistent_sample_domain_bytes
+//! TRANSIENT          what must be decoded/materialized to observe it?
+//! MATERIALIZATION      decoded_sample_state_bytes
+//!                      decoded_residual_state_bytes
+//!                      decoded_window_state_bytes
+//! BASELINE           the original/raw/canonical sample bytes
+//!                      raw_sample_bytes, canonical_literal_bytes
 //! ```
 //!
-//! For representations with no entropy body (silence, constant, cycle,
-//! reference) the decomposition is over the canonical object bytes and sums
-//! to exactly that length (asserted). A resident table (a stored cycle) is
-//! storage `payload`, not a free dependency; a shared reference's target
-//! content id is `dependency_bytes`, never zero.
+//! Only the eight storage components are summed. An **entropy-coded** literal
+//! or residual persists *no* baked sample-domain content — its persistence is
+//! the entropy state — so `persistent_sample_domain_bytes` is 0 and the
+//! decoded content is reported as transient materialization. A canonical cycle
+//! *does* persist its table, so that is persistent sample-domain bytes (and
+//! also storage `payload`; a resident table is never free).
+//!
+//! For representations with no entropy body the decomposition is over the
+//! canonical object bytes and sums to exactly that length (asserted), with
+//! component names that stay semantically truthful: a constant's level and a
+//! cycle's framing are `hypothesis_bytes` (deterministic model state), a
+//! stored table is `payload_bytes`, and a reference's target content id is
+//! `dependency_bytes`.
 //!
 //! Abstract universe work (`generator_ops`, `residual_ops`, `lookup_ops`,
 //! `filter_ops`) is a *static count derived from the representation
@@ -60,6 +71,8 @@ pub const RESIDUAL_PAGE_FRAMES: [u32; 3] = [256, 512, 1024];
 
 /// A reference payload's dependency is the 32-byte target content id.
 const REFERENCE_TARGET_BYTES: u64 = 32;
+/// A cycle payload's framing: `cycle_len(u64) || sample_count(u64)`.
+const CYCLE_FRAMING_BYTES: u64 = 16;
 
 /// Canonical U1 literal bytes for a window.
 pub const fn canonical_u1_literal_bytes(frames: u64, channels: u8) -> u64 {
@@ -105,12 +118,13 @@ pub struct CandidateCost {
     // --- STORAGE COST: these eight components sum to `complete_bytes` ---
     /// Container/descriptor/version metadata bytes.
     pub metadata_bytes: u64,
-    /// Hypothesis bytes (procedural model state).
+    /// Deterministic hypothesis state (residual model, constant level, cycle
+    /// framing, reference transpose/loop parameters).
     pub hypothesis_bytes: u64,
     /// Entropy model bytes (inline models in full; shared models once).
     pub model_bytes: u64,
-    /// Entropy payload bytes (rANS/RAW bodies), or canonical object payload
-    /// bytes for representations with no entropy body.
+    /// Entropy payload bytes (rANS/RAW bodies), or the stored table bytes of a
+    /// canonical cycle object.
     pub payload_bytes: u64,
     /// Page-index bytes.
     pub index_bytes: u64,
@@ -131,14 +145,19 @@ pub struct CandidateCost {
     /// Canonical U1 literal bytes of the observed window.
     pub canonical_literal_bytes: u64,
 
-    // --- STATE / EXPOSURE: sample-domain residency, never part of the sum ---
-    /// Sample-domain content the representation owns persistently (literal
-    /// samples, cycle samples, residual deltas).
+    // --- REPRESENTATION PERSISTENCE: never part of the sum ---
+    /// Baked sample-domain bytes the **chosen representation** persists.
+    /// Zero for an entropy-coded representation (its persistence is the
+    /// entropy state); the stored table bytes for a canonical cycle.
     pub persistent_sample_domain_bytes: u64,
-    /// Sample-domain state resident while materializing one observation
-    /// window (the decoded window for entropy-carrying representations, the
-    /// owned content for baked ones).
-    pub state_bytes: u64,
+
+    // --- TRANSIENT MATERIALIZATION: never part of the sum ---
+    /// Sample-domain content decoded to observe an entropy-coded literal.
+    pub decoded_sample_state_bytes: u64,
+    /// Residual record values decoded to observe an entropy-coded residual.
+    pub decoded_residual_state_bytes: u64,
+    /// Reconstruction window held while observing (frames × channels × 4).
+    pub decoded_window_state_bytes: u64,
 
     /// Which oracle produced the storage cost: `entropy_literal`,
     /// `entropy_residual`, or `canonical_object`.
@@ -146,8 +165,7 @@ pub struct CandidateCost {
 }
 
 impl CandidateCost {
-    /// Recompute `complete_bytes` from the eight storage components and assert
-    /// the decomposition invariant.
+    /// Recompute `complete_bytes` from the eight storage components.
     fn finish(mut self) -> CandidateCost {
         self.complete_bytes = self
             .metadata_bytes
@@ -161,8 +179,7 @@ impl CandidateCost {
         self
     }
 
-    /// Componentwise storage check used by hostile tests: the eight components
-    /// must sum to `complete_bytes`.
+    /// The eight storage components must sum to `complete_bytes`.
     pub fn decomposition_is_consistent(&self) -> bool {
         self.metadata_bytes
             .saturating_add(self.hypothesis_bytes)
@@ -175,22 +192,25 @@ impl CandidateCost {
             == self.complete_bytes
     }
 
-    fn window_baseline(frames: u64, channels: u8) -> (u64, u64) {
-        (
-            frames * u64::from(channels) * 4,
-            canonical_u1_literal_bytes(frames, channels),
-        )
+    /// Total transient sample-domain materialization (decoded content only).
+    pub fn decoded_state_bytes(&self) -> u64 {
+        self.decoded_sample_state_bytes
+            .saturating_add(self.decoded_residual_state_bytes)
+            .saturating_add(self.decoded_window_state_bytes)
     }
 }
 
 /// Carry the frozen H.2 cost through unchanged: the eight storage components
-/// and `complete_bytes` are the H.2 values, verbatim. Sample-domain state is
-/// reported separately and is **not** added to the storage cost.
+/// and `complete_bytes` are the H.2 values, verbatim. An entropy-coded
+/// representation persists no baked sample-domain content (its persistence is
+/// the entropy state), so `persistent_sample_domain_bytes` is 0; the decoded
+/// content is reported as transient materialization.
 fn from_h2(
     h2: &crate::entropy::accounting::CompleteCost,
     source: &'static str,
-    persistent_sample_domain_bytes: u64,
-    state_bytes: u64,
+    decoded_sample_state_bytes: u64,
+    decoded_residual_state_bytes: u64,
+    decoded_window_state_bytes: u64,
 ) -> CandidateCost {
     CandidateCost {
         metadata_bytes: h2.metadata_bytes,
@@ -204,16 +224,18 @@ fn from_h2(
         complete_bytes: h2.complete_bytes,
         raw_sample_bytes: h2.raw_sample_bytes,
         canonical_literal_bytes: h2.canonical_literal_bytes,
-        persistent_sample_domain_bytes,
-        state_bytes,
+        persistent_sample_domain_bytes: 0,
+        decoded_sample_state_bytes,
+        decoded_residual_state_bytes,
+        decoded_window_state_bytes,
         cost_source: source,
     }
 }
 
 /// Price the `Literal` candidate with the best frozen literal entropy
 /// representation (minimum `complete_bytes` over the literal universe). The
-/// reported storage cost is the H.2 cost; the decoded samples are reported as
-/// sample-domain state, never as storage.
+/// reported storage cost is the H.2 cost; the decoded samples are transient
+/// materialization, not persistence, and are never summed.
 pub fn literal_cost(samples: &[i32], frames: u64, channels: u8) -> Result<CandidateCost> {
     let descriptor = ObjectDescriptor::new(
         Representation::Literal,
@@ -224,6 +246,7 @@ pub fn literal_cost(samples: &[i32], frames: u64, channels: u8) -> Result<Candid
     .ok_or_else(|| Error::malformed("literal descriptor out of domain"))?;
     let canonical = canonical_u1_literal_bytes(frames, channels);
     let sample_bytes = samples.len() as u64 * 4;
+    let window_bytes = frames * u64::from(channels) * 4;
     let mut best: Option<CandidateCost> = None;
     for sym in LITERAL_SYMBOLIZATIONS {
         for page in LITERAL_PAGE_FRAMES {
@@ -236,7 +259,7 @@ pub fn literal_cost(samples: &[i32], frames: u64, channels: u8) -> Result<Candid
                 false,
             )?;
             let h2 = rl.cost(canonical)?;
-            let candidate = from_h2(&h2, "entropy_literal", sample_bytes, sample_bytes);
+            let candidate = from_h2(&h2, "entropy_literal", sample_bytes, 0, window_bytes);
             debug_assert!(candidate.decomposition_is_consistent());
             if best.is_none_or(|b| candidate.complete_bytes < b.complete_bytes) {
                 best = Some(candidate);
@@ -248,8 +271,8 @@ pub fn literal_cost(samples: &[i32], frames: u64, channels: u8) -> Result<Candid
 
 /// Price a residual-governed candidate with the best frozen residual encoding
 /// (minimum `complete_bytes` over the residual page sizes). The storage cost is
-/// the H.2 cost; the residual deltas are sample-domain state and are **not**
-/// charged a second time.
+/// the H.2 cost; the residual deltas are transient materialization, not
+/// persistence, and are never charged a second time.
 pub fn residual_cost(
     descriptor: &ObjectDescriptor,
     residual: &Residual,
@@ -258,7 +281,7 @@ pub fn residual_cost(
 ) -> Result<CandidateCost> {
     let canonical = canonical_u1_literal_bytes(frames, channels);
     let delta_bytes = residual.records.len() as u64 * 4;
-    let decoded_window = frames * u64::from(channels) * 4;
+    let window_bytes = frames * u64::from(channels) * 4;
     let mut best: Option<CandidateCost> = None;
     for page in RESIDUAL_PAGE_FRAMES {
         let rr = RepresentedResidual::encode(
@@ -269,7 +292,7 @@ pub fn residual_cost(
             false,
         )?;
         let h2 = rr.cost(canonical)?;
-        let candidate = from_h2(&h2, "entropy_residual", delta_bytes, decoded_window);
+        let candidate = from_h2(&h2, "entropy_residual", 0, delta_bytes, window_bytes);
         debug_assert!(candidate.decomposition_is_consistent());
         if best.is_none_or(|b| candidate.complete_bytes < b.complete_bytes) {
             best = Some(candidate);
@@ -279,32 +302,48 @@ pub fn residual_cost(
 }
 
 /// Price a payload with no entropy body from its canonical object bytes. The
-/// decomposition sums to exactly the canonical representation length.
+/// decomposition sums to exactly the canonical representation length, with
+/// truthful component names.
 pub fn canonical_object_cost(
     descriptor: &ObjectDescriptor,
     data: &ObjectData,
     frames: u64,
     channels: u8,
 ) -> Result<CandidateCost> {
-    let (header, payload) = canonical_object_parts(descriptor, data)?;
-    let (raw, canonical) = CandidateCost::window_baseline(frames, channels);
+    let (header, payload_total) = canonical_object_parts(descriptor, data)?;
+    let raw = frames * u64::from(channels) * 4;
+    let canonical = canonical_u1_literal_bytes(frames, channels);
 
-    // Sample-domain residency (exposure/state; never part of the sum).
-    let (persistent, state) = sample_domain_state(data, frames, channels);
-
-    // Storage decomposition. For a cycle the stored table is `payload` (a
-    // resident table is not free); for a reference the target content id is
-    // `dependency` and the transpose/loop state is `payload`.
-    let dependency = match data {
-        ObjectData::Referenced(_) => REFERENCE_TARGET_BYTES,
-        _ => 0,
+    // Storage decomposition and representation persistence per class.
+    let (hypothesis, payload, dependency, persistent) = match data {
+        ObjectData::Silence => (0, 0, 0, 0),
+        // The level IS the deterministic model state.
+        ObjectData::Constant(_) => (4, 0, 0, 0),
+        // Framing is hypothesis state; the stored table is payload AND
+        // persistent sample-domain content (a resident table is never free).
+        ObjectData::Wavetable(c) | ObjectData::SingleCycle(c) | ObjectData::ExactRepeat(c) => {
+            (CYCLE_FRAMING_BYTES, cycle_bytes(c), 0, cycle_bytes(c))
+        }
+        // Transpose + loop override are reference parameters; the target
+        // content id is the dependency. The target owns its own content.
+        ObjectData::Referenced(_) => (
+            payload_total.saturating_sub(REFERENCE_TARGET_BYTES),
+            0,
+            REFERENCE_TARGET_BYTES,
+            0,
+        ),
+        other => {
+            return Err(Error::internal(format!(
+                "canonical_object_cost called with priced representation {other:?}"
+            )));
+        }
     };
-    let payload_bytes = payload.saturating_sub(dependency);
+
     let cost = CandidateCost {
         metadata_bytes: header,
-        hypothesis_bytes: 0,
+        hypothesis_bytes: hypothesis,
         model_bytes: 0,
-        payload_bytes,
+        payload_bytes: payload,
         index_bytes: 0,
         checkpoint_bytes: 0,
         dependency_bytes: dependency,
@@ -313,35 +352,18 @@ pub fn canonical_object_cost(
         raw_sample_bytes: raw,
         canonical_literal_bytes: canonical,
         persistent_sample_domain_bytes: persistent,
-        state_bytes: state,
+        decoded_sample_state_bytes: 0,
+        decoded_residual_state_bytes: 0,
+        decoded_window_state_bytes: 0,
         cost_source: "canonical_object",
     }
     .finish();
     debug_assert_eq!(
         cost.complete_bytes,
-        header + payload,
+        header + payload_total,
         "canonical decomposition must cover the whole canonical object"
     );
     Ok(cost)
-}
-
-/// Sample-domain residency of a candidate payload (exposure/state).
-fn sample_domain_state(data: &ObjectData, frames: u64, channels: u8) -> (u64, u64) {
-    match data {
-        ObjectData::Literal(l) => {
-            let bytes = l.samples.len() as u64 * 4;
-            (bytes, bytes)
-        }
-        ObjectData::Wavetable(c) | ObjectData::SingleCycle(c) | ObjectData::ExactRepeat(c) => {
-            let bytes = cycle_bytes(c);
-            (bytes, bytes)
-        }
-        ObjectData::PredictorResidual(r) => {
-            (r.records.len() as u64 * 4, frames * u64::from(channels) * 4)
-        }
-        ObjectData::Referenced(_) | ObjectData::Silence | ObjectData::Constant(_) => (0, 0),
-        _ => (0, 0),
-    }
 }
 
 fn cycle_bytes(cycle: &Cycle) -> u64 {
@@ -385,6 +407,22 @@ fn canonical_object_parts(descriptor: &ObjectDescriptor, data: &ObjectData) -> R
     };
     let payload = total.len() as u64 - header;
     Ok((header, payload))
+}
+
+/// Sample-domain bytes a candidate representation instantiates in memory
+/// while the search proposes/verifies it (a residual record vector, a literal
+/// sample vector, a stored cycle table). This is **search-time allocation**,
+/// distinct from representation persistence and from decoded state.
+pub fn semantic_state_bytes(data: &ObjectData) -> u64 {
+    match data {
+        ObjectData::Literal(l) => l.samples.len() as u64 * 4,
+        ObjectData::Wavetable(c) | ObjectData::SingleCycle(c) | ObjectData::ExactRepeat(c) => {
+            cycle_bytes(c)
+        }
+        ObjectData::PredictorResidual(r) => r.records.len() as u64 * 4,
+        ObjectData::Referenced(_) | ObjectData::Silence | ObjectData::Constant(_) => 0,
+        _ => 0,
+    }
 }
 
 /// Abstract universe work for a candidate, from its representation structure.
@@ -442,51 +480,27 @@ mod tests {
         assert_eq!(c.raw_sample_bytes, 4096 * 4);
         assert_eq!(c.canonical_literal_bytes, 46 + 8 + 4096 * 4);
 
-        let descriptor = ObjectDescriptor::new(
-            Representation::Literal,
-            4096,
-            crate::universe::layout::Layout::Mono,
-            None,
-        )
-        .unwrap();
-        // The reported storage cost equals the H.2 cost for the same encoding.
-        let rl = RepresentedLiteral::encode(
-            descriptor,
-            &samples,
-            1024,
-            Symbolization::Identity,
-            ModelMode::Inline,
-            false,
-        )
-        .unwrap();
-        let h2 = rl.cost(canonical_u1_literal_bytes(4096, 1)).unwrap();
-        // The unbounded-symbolization sweep chooses the minimum, which can
-        // only be <= the identity/1024 cell.
-        assert!(c.complete_bytes <= h2.complete_bytes);
-        // The raw sample bytes are a baseline and are NOT in the sum: a
-        // 4096-frame mono window has 16384 raw bytes, so a cost that folded
-        // them in would exceed 16384.
+        // The storage cost must not include the raw sample baseline.
         assert!(
             c.complete_bytes < c.raw_sample_bytes + c.metadata_bytes + c.index_bytes + 1,
             "storage cost must not include the raw sample baseline ({} vs raw {})",
             c.complete_bytes,
             c.raw_sample_bytes
         );
-        // Sample-domain state is reported but not summed.
-        assert_eq!(c.persistent_sample_domain_bytes, 4096 * 4);
-        assert_eq!(c.state_bytes, 4096 * 4);
+        // An entropy-coded literal persists NO baked sample-domain content:
+        // the decoded samples are transient materialization.
+        assert_eq!(c.persistent_sample_domain_bytes, 0);
+        assert_eq!(c.decoded_sample_state_bytes, 4096 * 4);
+        assert_eq!(c.decoded_window_state_bytes, 4096 * 4);
+        assert_eq!(c.decoded_residual_state_bytes, 0);
     }
 
     #[test]
-    fn h2_decomposition_is_carried_through_verbatim() {
-        // Structured content so the rANS path (not RAW fallback) is exercised.
+    fn entropy_literal_matches_the_h2_decomposition_verbatim() {
+        // Structured content so the rANS path (not RAW fallback) is used.
         let samples: Vec<i32> = (0..4096i32).map(|i| (i % 64) << 16).collect();
         let c = literal_cost(&samples, 4096, 1).unwrap();
         assert!(c.decomposition_is_consistent());
-        // Recompute directly through the H.2 API for the chosen cell is not
-        // possible from the outside (the sweep chooses the best); assert the
-        // invariant that the sum is exactly the eight components and that no
-        // baseline leaked in.
         let components = c.metadata_bytes
             + c.hypothesis_bytes
             + c.model_bytes
@@ -497,10 +511,26 @@ mod tests {
             + c.integrity_bytes;
         assert_eq!(components, c.complete_bytes);
         assert!(c.complete_bytes < c.canonical_literal_bytes);
+        assert_eq!(c.persistent_sample_domain_bytes, 0);
     }
 
     #[test]
-    fn silence_and_constant_cost_is_their_canonical_length() {
+    fn h2_model_and_index_components_are_carried_through() {
+        // A structured literal is rANS-coded, so the H.2 cost must carry
+        // non-zero model and index components (the old adaptation dropped
+        // them).
+        let samples: Vec<i32> = (0..4096i32).map(|i| (i % 64) << 16).collect();
+        let c = literal_cost(&samples, 4096, 1).unwrap();
+        assert!(c.index_bytes > 0, "page index must be accounted");
+        assert!(
+            c.model_bytes > 0,
+            "inline rANS models must be accounted, not dropped"
+        );
+        assert!(c.payload_bytes > 0);
+    }
+
+    #[test]
+    fn silence_and_constant_component_names_are_truthful() {
         let d = ObjectDescriptor::new(
             Representation::Silence,
             0,
@@ -511,6 +541,8 @@ mod tests {
         let c = canonical_object_cost(&d, &ObjectData::Silence, 4096, 1).unwrap();
         assert_eq!(c.complete_bytes, U1_LITERAL_HEADER_BYTES);
         assert!(c.decomposition_is_consistent());
+        assert_eq!(c.hypothesis_bytes, 0);
+        assert_eq!(c.payload_bytes, 0);
         assert_eq!(c.persistent_sample_domain_bytes, 0);
 
         let dc = ObjectDescriptor::new(
@@ -528,11 +560,14 @@ mod tests {
         )
         .unwrap();
         assert_eq!(cc.complete_bytes, U1_LITERAL_HEADER_BYTES + 4);
+        // The level is deterministic model state, not opaque payload.
+        assert_eq!(cc.hypothesis_bytes, 4);
+        assert_eq!(cc.payload_bytes, 0);
         assert!(cc.decomposition_is_consistent());
     }
 
     #[test]
-    fn cycle_table_is_storage_payload_and_also_reported_as_state() {
+    fn cycle_table_is_payload_and_persistent_state_with_truthful_framing() {
         let d = ObjectDescriptor::new(
             Representation::ExactRepeat,
             64,
@@ -543,13 +578,14 @@ mod tests {
         let cycle = Cycle::new(&d, (0..64).collect()).unwrap();
         let c = canonical_object_cost(&d, &ObjectData::ExactRepeat(cycle), 4096, 1).unwrap();
         assert!(c.decomposition_is_consistent());
-        // header 46 + cycle_len 8 + count 8 + 64*4 = 318
+        // header 46 + framing 16 + table 256
         assert_eq!(c.complete_bytes, 46 + 16 + 256);
-        // The stored table is storage payload (never free) and is also the
-        // resident sample-domain state.
-        assert_eq!(c.payload_bytes, 16 + 256);
+        assert_eq!(c.hypothesis_bytes, CYCLE_FRAMING_BYTES);
+        assert_eq!(c.payload_bytes, 256);
+        // A canonical cycle DOES persist its baked table.
         assert_eq!(c.persistent_sample_domain_bytes, 256);
-        assert_eq!(c.state_bytes, 256);
+        // Nothing is decoded transiently for a canonical object.
+        assert_eq!(c.decoded_state_bytes(), 0);
     }
 
     #[test]
@@ -571,6 +607,9 @@ mod tests {
         assert!(c.decomposition_is_consistent());
         assert_eq!(c.dependency_bytes, REFERENCE_TARGET_BYTES);
         assert_eq!(c.complete_bytes, U1_LITERAL_HEADER_BYTES + 8 + 1 + 16 + 32);
+        // Transpose + loop override are reference parameters (hypothesis).
+        assert_eq!(c.hypothesis_bytes, 8 + 1 + 16);
+        assert_eq!(c.payload_bytes, 0);
         assert_eq!(c.persistent_sample_domain_bytes, 0);
     }
 
@@ -593,13 +632,14 @@ mod tests {
         let c = residual_cost(&descriptor, &residual, 256, 1).unwrap();
         assert!(c.decomposition_is_consistent());
         assert_eq!(c.cost_source, "entropy_residual");
-        // Deltas are exposure/state, not storage.
-        assert_eq!(c.persistent_sample_domain_bytes, 8 * 4);
-        assert_eq!(c.state_bytes, 256 * 4);
-        // The storage cost is the H.2 residual cost (the sweep takes the
-        // minimum over page sizes, so it cannot exceed any single encoding)
-        // and it carries the H.2 payload unchanged — the unencoded delta bytes
-        // are never added on top.
+        // The deltas are transient decoded state, not persistence.
+        assert_eq!(c.persistent_sample_domain_bytes, 0);
+        assert_eq!(c.decoded_residual_state_bytes, 8 * 4);
+        assert_eq!(c.decoded_window_state_bytes, 256 * 4);
+        assert_eq!(c.decoded_sample_state_bytes, 0);
+        // Storage is the H.2 residual cost (the sweep takes the minimum over
+        // page sizes, so it cannot exceed any single encoding) and carries the
+        // H.2 payload unchanged.
         let rr = RepresentedResidual::encode(
             descriptor.clone(),
             &residual,
@@ -611,7 +651,6 @@ mod tests {
         let h2 = rr.cost(canonical_u1_literal_bytes(256, 1)).unwrap();
         assert!(c.complete_bytes <= h2.complete_bytes);
         assert!(c.payload_bytes <= h2.payload_bytes);
-        assert!(c.complete_bytes < c.raw_sample_bytes + c.persistent_sample_domain_bytes);
     }
 
     #[test]

@@ -867,13 +867,16 @@ authority.
 - `inverse/observe.rs`: identity-voice scalar observation and intrinsic
   reconstruction for every candidate class (both must be exact — "close" is
   never accepted).
-- `inverse/cost.rs`: complete dependency accounting in three separate
+- `inverse/cost.rs`: complete dependency accounting in four separate
   measurements — **storage** (the eight H.2 components, with `complete_bytes`
   taken verbatim from the H.2 `CompleteCost` for entropy-carrying
-  representations, and the canonical object length for the rest),
-  **state/exposure** (`persistent_sample_domain_bytes`, `state_bytes`), and
-  **baseline** (`raw_sample_bytes`, `canonical_literal_bytes`); only the eight
-  storage components are summed.
+  representations, and the canonical object length, truthfully decomposed, for
+  the rest), **representation persistence**
+  (`persistent_sample_domain_bytes`: 0 for entropy-coded representations,
+  which bake no samples), **transient materialization**
+  (`decoded_sample_state_bytes` / `decoded_residual_state_bytes` /
+  `decoded_window_state_bytes`), and **baseline** (`raw_sample_bytes`,
+  `canonical_literal_bytes`); only the eight storage components are summed.
 - `inverse/propose.rs`: bounded deterministic proposals — literal (always),
   silence, constant (mode), exact-repeat (minimal KMP frame period), residual
   zero/constant/periodic (bounded scan), and exact shared references against a
@@ -893,7 +896,7 @@ authority.
   earlier residual “wins” were an artefact of double-charging the deltas);
   frontier validity/coverage, determinism, archive dedup (32 dependency bytes,
   0 sample-domain bytes) and a procedural-library reference all gated; frozen
-  static-result hash `e0b2e35c…`.
+  static-result hash `217b09a7…`.
 - `court flattening`: `flat == scalar` bit-for-bit over the frozen fixtures
   and 252 adversarial battery worlds (764 windows), with host residual-closure
   materialization and upload bytes accounted rather than hidden.

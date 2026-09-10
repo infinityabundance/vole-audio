@@ -115,7 +115,7 @@ mod tests {
             intrinsic_ns: 0,
             seek_start: 0,
             seek_frames: 0,
-            accounted_peak_bytes: 0,
+            alloc: Default::default(),
             proposal_ns: 0,
             seek_ops,
             total_ops,

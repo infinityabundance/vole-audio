@@ -57,7 +57,7 @@ pub const INVERSE_RATE_HZ: u32 = 48_000;
 /// Frozen static-result hash: the court fails if a change silently alters the
 /// inverse results. Re-freeze only with a documented reason.
 pub const INVERSE_RESULT_SHA256: &str =
-    "e0b2e35ca31f64b84e232d79e3f348a252e6b408195a33fc1173acc593e95a23";
+    "217b09a79c0561448605706c79e87f53d5ce014f5128cbf735212e914c9155ca";
 
 /// Build the bounded inverse fixture set from the frozen corpus.
 pub fn fixtures() -> crate::error::Result<Vec<Intrinsic>> {
@@ -132,7 +132,9 @@ fn acceptance_cell(a: &Acceptance) -> serde_json::Value {
         "raw_sample_bytes": a.cost.raw_sample_bytes,
         "canonical_literal_bytes": a.cost.canonical_literal_bytes,
         "persistent_sample_domain_bytes": a.cost.persistent_sample_domain_bytes,
-        "state_bytes": a.cost.state_bytes,
+        "decoded_sample_state_bytes": a.cost.decoded_sample_state_bytes,
+        "decoded_residual_state_bytes": a.cost.decoded_residual_state_bytes,
+        "decoded_window_state_bytes": a.cost.decoded_window_state_bytes,
         "generator_ops": a.work.generator_ops,
         "residual_ops": a.work.residual_ops,
         "lookup_ops": a.work.lookup_ops,
@@ -147,7 +149,13 @@ fn acceptance_cell(a: &Acceptance) -> serde_json::Value {
         "intrinsic_ns": a.intrinsic_ns,
         "seek_start": a.seek_start,
         "seek_frames": a.seek_frames,
-        "accounted_peak_bytes": a.accounted_peak_bytes,
+        "alloc": {
+            "search_input_bytes": a.alloc.search_input_bytes,
+            "candidate_semantic_state_bytes": a.alloc.candidate_semantic_state_bytes,
+            "intrinsic_reconstruction_peak": a.alloc.intrinsic_reconstruction_peak,
+            "oracle_observation_peak": a.alloc.oracle_observation_peak,
+            "seek_observation_peak": a.alloc.seek_observation_peak,
+        },
         "proposal_ns": a.proposal_ns,
     })
 }

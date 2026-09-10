@@ -224,10 +224,9 @@ pub struct Acceptance {
     pub intrinsic_ns: u64,
     pub seek_start: u64,
     pub seek_frames: u32,
-    /// Accounted sample-domain transient for one full observation (bytes).
-    /// This is an accounting figure over the buffers the evaluator allocates,
-    /// not an allocator-instrumented peak; the docs say so.
-    pub accounted_peak_bytes: u64,
+    /// Search-time sample-domain allocations (accounted; not allocator-
+    /// instrumented, and not part of the storage cost).
+    pub alloc: SearchAllocation,
     /// Proposal wall time attributed to this candidate (ns).
     pub proposal_ns: u64,
     pub seek_ops: u64,
@@ -240,6 +239,25 @@ impl Acceptance {
     pub fn objective(&self) -> [u64; 3] {
         [self.cost.complete_bytes, self.total_ops, self.seek_ops]
     }
+}
+
+/// Search-time sample-domain allocations for one candidate (accounted, not
+/// allocator-instrumented). These are the inverse compiler's own working set
+/// while proposing/verifying a candidate — deliberately separate from the
+/// chosen representation's storage cost and from its persistence.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct SearchAllocation {
+    /// The intrinsic window held constant for the whole compile.
+    pub search_input_bytes: u64,
+    /// Candidate semantic state instantiated while proposing/accepting
+    /// (record vectors, sample vectors, stored cycle tables).
+    pub candidate_semantic_state_bytes: u64,
+    /// Peak sample-domain buffer during intrinsic reconstruction.
+    pub intrinsic_reconstruction_peak: u64,
+    /// Peak sample-domain buffer during the full scalar-oracle observation.
+    pub oracle_observation_peak: u64,
+    /// Peak sample-domain buffer during the bounded seek observation.
+    pub seek_observation_peak: u64,
 }
 
 /// Result of one bounded inverse search over one intrinsic window.
@@ -420,9 +438,13 @@ fn accept(
     };
     debug_assert!(cost.decomposition_is_consistent());
     let work = cost::abstract_work(&data, intrinsic.frames, intrinsic.channels);
-    let accounted_peak_bytes = (intrinsic.samples.len() as u64) * 4
-        + cost.persistent_sample_domain_bytes
-        + u64::from(seek_frames) * u64::from(intrinsic.channels) * 4;
+    let alloc = SearchAllocation {
+        search_input_bytes: intrinsic.samples.len() as u64 * 4,
+        candidate_semantic_state_bytes: cost::semantic_state_bytes(&data),
+        intrinsic_reconstruction_peak: intrinsic_samples.len() as u64 * 4,
+        oracle_observation_peak: observed.len() as u64 * 4,
+        seek_observation_peak: u64::from(seek_frames) * u64::from(intrinsic.channels) * 4,
+    };
 
     Ok(Some(Acceptance {
         kind: cand.kind,
@@ -442,7 +464,7 @@ fn accept(
         intrinsic_ns,
         seek_start,
         seek_frames,
-        accounted_peak_bytes,
+        alloc,
         proposal_ns: cand.proposal_ns,
         seek_ops: work.window(u64::from(seek_frames), intrinsic.frames),
         total_ops: work.total(),
