@@ -51,6 +51,7 @@ pub mod frontier;
 pub mod observe;
 pub mod propose;
 pub mod search;
+pub mod serialize;
 
 use crate::error::{Error, Result};
 use crate::evidence::timing::Stopwatch;
@@ -62,6 +63,7 @@ pub use cost::{AbstractWork, CandidateCost};
 pub use frontier::Frontier;
 pub use propose::ReferenceLibrary;
 pub use search::{PeriodScan, ScanSurface, SearchPlacement};
+pub use serialize::SelectedPayload;
 
 /// Bounded seek window for the measured seek-latency cell.
 pub const SEEK_FRAMES: u32 = 512;
@@ -331,33 +333,97 @@ pub fn compile_with(
     budget: SearchBudget,
     periods: Option<&[u32]>,
 ) -> Result<SearchReport> {
+    Ok(compile_selected(intrinsic, library, budget, periods)?.0)
+}
+
+/// Run the bounded inverse search and also return the **selected** candidate's
+/// canonical serialized representation.
+///
+/// Selection is frozen: the accepted exact candidate with the minimum
+/// [`CandidateCost::complete_bytes`], ties broken by the accepted order (which
+/// is the deterministic candidate-proposal order). No measured quantity and no
+/// weighted score participates — storage economics decides.
+pub fn compile_selected(
+    intrinsic: &Intrinsic,
+    library: &ReferenceLibrary,
+    budget: SearchBudget,
+    periods: Option<&[u32]>,
+) -> Result<(SearchReport, Option<SelectedPayload>)> {
     budget.validate()?;
     let sw = Stopwatch::start();
     let candidates = propose::propose_with(intrinsic, library, budget, periods)?;
     let proposed = candidates.len();
     let mut accepted: Vec<Acceptance> = Vec::with_capacity(proposed);
     let mut rejected = 0usize;
+    let mut best: Option<Selected> = None;
     for cand in &candidates {
         match accept(intrinsic, library, cand)? {
-            Some(a) => accepted.push(a),
+            Some(a) => {
+                let AcceptedCandidate {
+                    acceptance,
+                    descriptor,
+                    data,
+                } = a;
+                if acceptance.cost.complete_bytes < best.as_ref().map_or(u64::MAX, |b| b.objective)
+                {
+                    best = Some(Selected {
+                        kind: acceptance.kind,
+                        descriptor,
+                        data,
+                        objective: acceptance.cost.complete_bytes,
+                    });
+                }
+                accepted.push(acceptance);
+            }
             None => rejected += 1,
         }
     }
     let frontier = Frontier::build(&accepted);
+    let selected = match &best {
+        Some(s) => Some(serialize::serialize_candidate(
+            s.kind,
+            &s.descriptor,
+            &s.data,
+            intrinsic.frames,
+            intrinsic.channels,
+        )?),
+        None => None,
+    };
     let search_ns = sw.elapsed_ns().max(0) as u64;
-    Ok(SearchReport {
-        intrinsic_name: intrinsic.name.clone(),
-        intrinsic_sha256: intrinsic.content_sha256(),
-        channels: intrinsic.channels,
-        frames: intrinsic.frames,
-        proposed,
-        evaluated: proposed,
-        rejected,
-        accepted,
-        frontier,
-        budget,
-        search_ns,
-    })
+    Ok((
+        SearchReport {
+            intrinsic_name: intrinsic.name.clone(),
+            intrinsic_sha256: intrinsic.content_sha256(),
+            channels: intrinsic.channels,
+            frames: intrinsic.frames,
+            proposed,
+            evaluated: proposed,
+            rejected,
+            accepted,
+            frontier,
+            budget,
+            search_ns,
+        },
+        selected,
+    ))
+}
+
+/// The selected candidate's payload, retained only while the cheapest candidate
+/// is tracked (never the whole accepted set).
+struct Selected {
+    kind: CandidateKind,
+    descriptor: ObjectDescriptor,
+    data: ObjectData,
+    objective: u64,
+}
+
+/// The result of exact acceptance: the accounted [`Acceptance`] plus the exact
+/// payload that produced it (kept internally so the container can serialize the
+/// selected representation without a second search).
+struct AcceptedCandidate {
+    acceptance: Acceptance,
+    descriptor: ObjectDescriptor,
+    data: ObjectData,
 }
 
 /// Exact acceptance of one candidate: build the evaluation store, require the
@@ -367,7 +433,7 @@ fn accept(
     intrinsic: &Intrinsic,
     library: &ReferenceLibrary,
     cand: &Candidate,
-) -> Result<Option<Acceptance>> {
+) -> Result<Option<AcceptedCandidate>> {
     let layout = observe::layout_of(intrinsic.channels)?;
     let mut store: ObjectStore = library.store().clone();
     let (descriptor, data) = match cand.kind {
@@ -474,28 +540,32 @@ fn accept(
         seek_observation_peak: u64::from(seek_frames) * u64::from(intrinsic.channels) * 4,
     };
 
-    Ok(Some(Acceptance {
-        kind: cand.kind,
-        label: cand.label.clone(),
-        cost,
-        work,
-        content_id: store
-            .get(id)
-            .map(|o| o.content_id)
-            .map_err(|e| Error::internal(format!("accepted candidate vanished: {e}")))?,
-        reference_target: cand.reference,
-        intrinsic_exact: true,
-        evaluator_exact: true,
-        seek_exact: true,
-        materialize_ns,
-        seek_latency_ns,
-        intrinsic_ns,
-        seek_start,
-        seek_frames,
-        alloc,
-        proposal_ns: cand.proposal_ns,
-        seek_ops: work.window(u64::from(seek_frames), intrinsic.frames),
-        total_ops: work.total(),
+    Ok(Some(AcceptedCandidate {
+        acceptance: Acceptance {
+            kind: cand.kind,
+            label: cand.label.clone(),
+            cost,
+            work,
+            content_id: store
+                .get(id)
+                .map(|o| o.content_id)
+                .map_err(|e| Error::internal(format!("accepted candidate vanished: {e}")))?,
+            reference_target: cand.reference,
+            intrinsic_exact: true,
+            evaluator_exact: true,
+            seek_exact: true,
+            materialize_ns,
+            seek_latency_ns,
+            intrinsic_ns,
+            seek_start,
+            seek_frames,
+            alloc,
+            proposal_ns: cand.proposal_ns,
+            seek_ops: work.window(u64::from(seek_frames), intrinsic.frames),
+            total_ops: work.total(),
+        },
+        descriptor,
+        data,
     }))
 }
 

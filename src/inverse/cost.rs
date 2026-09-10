@@ -44,6 +44,7 @@
 //! `filter_ops`) is a *static count derived from the representation
 //! structure*, not a measurement.
 
+use crate::entropy::accounting::CompleteCost;
 use crate::entropy::represent::{ModelMode, RepresentedLiteral, RepresentedResidual};
 use crate::entropy::symbol::Symbolization;
 use crate::error::{Error, Result};
@@ -240,6 +241,23 @@ fn from_h2(
 /// reported storage cost is the H.2 cost; the decoded samples are transient
 /// materialization, not persistence, and are never summed.
 pub fn literal_cost(samples: &[i32], frames: u64, channels: u8) -> Result<CandidateCost> {
+    let sample_bytes = samples.len() as u64 * 4;
+    let window_bytes = frames * u64::from(channels) * 4;
+    let (_, h2) = best_literal(samples, frames, channels)?;
+    let candidate = from_h2(&h2, "entropy_literal", sample_bytes, 0, window_bytes);
+    debug_assert!(candidate.decomposition_is_consistent());
+    Ok(candidate)
+}
+
+/// The minimum-`complete_bytes` encoding of the frozen literal universe, with
+/// its H.2 cost. One iteration serves pricing *and* serialization, so the
+/// representation that is priced is exactly the representation that is stored.
+/// Ties keep the first (the universe order is frozen).
+pub fn best_literal(
+    samples: &[i32],
+    frames: u64,
+    channels: u8,
+) -> Result<(RepresentedLiteral, CompleteCost)> {
     let descriptor = ObjectDescriptor::new(
         Representation::Literal,
         frames,
@@ -248,9 +266,7 @@ pub fn literal_cost(samples: &[i32], frames: u64, channels: u8) -> Result<Candid
     )
     .ok_or_else(|| Error::malformed("literal descriptor out of domain"))?;
     let canonical = canonical_u1_literal_bytes(frames, channels);
-    let sample_bytes = samples.len() as u64 * 4;
-    let window_bytes = frames * u64::from(channels) * 4;
-    let mut best: Option<CandidateCost> = None;
+    let mut best: Option<(RepresentedLiteral, CompleteCost)> = None;
     for sym in LITERAL_SYMBOLIZATIONS {
         for page in LITERAL_PAGE_FRAMES {
             let rl = RepresentedLiteral::encode(
@@ -262,10 +278,11 @@ pub fn literal_cost(samples: &[i32], frames: u64, channels: u8) -> Result<Candid
                 false,
             )?;
             let h2 = rl.cost(canonical)?;
-            let candidate = from_h2(&h2, "entropy_literal", sample_bytes, 0, window_bytes);
-            debug_assert!(candidate.decomposition_is_consistent());
-            if best.is_none_or(|b| candidate.complete_bytes < b.complete_bytes) {
-                best = Some(candidate);
+            if best
+                .as_ref()
+                .is_none_or(|(_, b)| h2.complete_bytes < b.complete_bytes)
+            {
+                best = Some((rl, h2));
             }
         }
     }
@@ -282,10 +299,24 @@ pub fn residual_cost(
     frames: u64,
     channels: u8,
 ) -> Result<CandidateCost> {
-    let canonical = canonical_u1_literal_bytes(frames, channels);
     let delta_bytes = residual.records.len() as u64 * 4;
     let window_bytes = frames * u64::from(channels) * 4;
-    let mut best: Option<CandidateCost> = None;
+    let (_, h2) = best_residual(descriptor, residual, frames, channels)?;
+    let candidate = from_h2(&h2, "entropy_residual", 0, delta_bytes, window_bytes);
+    debug_assert!(candidate.decomposition_is_consistent());
+    Ok(candidate)
+}
+
+/// The minimum-`complete_bytes` residual encoding over the frozen residual page
+/// sizes, with its H.2 cost. One iteration serves pricing and serialization.
+pub fn best_residual(
+    descriptor: &ObjectDescriptor,
+    residual: &Residual,
+    frames: u64,
+    channels: u8,
+) -> Result<(RepresentedResidual, CompleteCost)> {
+    let canonical = canonical_u1_literal_bytes(frames, channels);
+    let mut best: Option<(RepresentedResidual, CompleteCost)> = None;
     for page in RESIDUAL_PAGE_FRAMES {
         let rr = RepresentedResidual::encode(
             descriptor.clone(),
@@ -295,10 +326,11 @@ pub fn residual_cost(
             false,
         )?;
         let h2 = rr.cost(canonical)?;
-        let candidate = from_h2(&h2, "entropy_residual", 0, delta_bytes, window_bytes);
-        debug_assert!(candidate.decomposition_is_consistent());
-        if best.is_none_or(|b| candidate.complete_bytes < b.complete_bytes) {
-            best = Some(candidate);
+        if best
+            .as_ref()
+            .is_none_or(|(_, b)| h2.complete_bytes < b.complete_bytes)
+        {
+            best = Some((rr, h2));
         }
     }
     best.ok_or_else(|| Error::internal("residual page universe is empty"))

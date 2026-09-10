@@ -47,6 +47,8 @@ pub mod facts;
 #[cfg(feature = "std")]
 pub mod flattening;
 #[cfg(feature = "std")]
+pub mod fullobj;
+#[cfg(feature = "std")]
 pub mod h2;
 #[cfg(feature = "std")]
 pub mod inverse;
@@ -115,6 +117,12 @@ with the full B0-B9 ladder visible and every FLAC row required to round-trip exa
         "Phase M flagship-corpus gate: the frozen manifest's identity (schema, corpus hash, \
 class assignments, rates, sizes, canonical i32 hashes) must regenerate exactly and agree \
 with the frozen membership; missing/extra/mutated/mis-sized/wrong-rate/wrong-hash all fail",
+    ),
+    (
+        "fullobj",
+        "Phase M full-object archival container mechanism: frozen 65,536-frame segmentation, \
+exact U1 segments, real serialized bytes, semantics-preserving reconstruction, boundary \
+observation and hostile-container rejection over non-flagship fixtures",
     ),
     (
         "cuda",
@@ -213,6 +221,7 @@ pub fn run(name: &str, receipts_root: &Path) -> crate::error::Result<Verdict> {
         "inverse-search" => inverse_search::run(receipts_root),
         "conventional" => conventional::run(receipts_root),
         "corpus" => corpus::run(receipts_root),
+        "fullobj" => fullobj::run(receipts_root),
         "flattening" => flattening::run(receipts_root),
         "cuda" => cuda::run(receipts_root),
         "d1" => d1::run(receipts_root),

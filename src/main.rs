@@ -18,7 +18,8 @@ USAGE:
 COMMANDS (current build):
     probe                 Capture environment + hardware evidence summary
     court <name>          Run an executable court (semantic, authored, simd, facts,
-                          inverse, inverse-search, conventional, corpus, flattening,
+                          inverse, inverse-search, conventional, corpus, fullobj,
+                          flattening,
                           cuda, d1, rocm,
                           rocm-d0, rocm-d1, entropy-rans, entropy-literal,
                           entropy-residual, entropy-pages, entropy-partial,
@@ -344,6 +345,7 @@ fn cmd_seal_verify(args: &[String]) -> Result<u8> {
     let mut expect = "semantic=SUPPORTED,authored=SUPPORTED,simd=SUPPORTED,\
                        facts=SUPPORTED,inverse=SUPPORTED,flattening=SUPPORTED,\
                        inverse-search=SUPPORTED,conventional=SUPPORTED,corpus=SUPPORTED,\
+                       fullobj=SUPPORTED,\
                        cuda=SUPPORTED,d1=SUPPORTED,h2=SUPPORTED,\
                        rocm=UNSUPPORTED_BY_HARDWARE|UNSUPPORTED_BY_API|INCONCLUSIVE,\
                        rocm-d0=UNSUPPORTED_BY_HARDWARE|UNSUPPORTED_BY_API|INCONCLUSIVE,\

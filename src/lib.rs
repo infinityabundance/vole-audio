@@ -85,6 +85,8 @@ pub mod facts;
 #[cfg(feature = "std")]
 pub mod format;
 #[cfg(feature = "std")]
+pub mod fullobj;
+#[cfg(feature = "std")]
 pub mod inverse;
 #[cfg(feature = "std")]
 pub mod object;

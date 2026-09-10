@@ -267,10 +267,11 @@ impl ObjectStore {
     }
 }
 
-/// Canonical content identity of an object: SHA-256 over the canonical bytes
-/// of (descriptor header + representation payload).
-pub fn canonical_content_id(descriptor: &ObjectDescriptor, data: &ObjectData) -> ContentId {
-    let bytes: Vec<u8> = match data {
+/// Canonical bytes of an object: descriptor header followed by the
+/// representation-specific payload. This is the byte form whose SHA-256 is the
+/// object's content identity.
+pub fn canonical_object_bytes(descriptor: &ObjectDescriptor, data: &ObjectData) -> Vec<u8> {
+    match data {
         ObjectData::Literal(l) => l.canonical_bytes(descriptor),
         ObjectData::Referenced(r) => r.canonical_bytes(descriptor),
         ObjectData::Silence => simple::canonical_bytes(descriptor, Representation::Silence, &[]),
@@ -292,8 +293,15 @@ pub fn canonical_content_id(descriptor: &ObjectDescriptor, data: &ObjectData) ->
             simple::canonical_bytes(descriptor, Representation::Noise, &n.seed.to_le_bytes())
         }
         ObjectData::PredictorResidual(r) => r.canonical_bytes(descriptor),
-    };
-    ContentId(crate::hash::sha256::Sha256::digest(&bytes))
+    }
+}
+
+/// Canonical content identity of an object: SHA-256 over the canonical bytes
+/// of (descriptor header + representation payload).
+pub fn canonical_content_id(descriptor: &ObjectDescriptor, data: &ObjectData) -> ContentId {
+    ContentId(crate::hash::sha256::Sha256::digest(
+        &canonical_object_bytes(descriptor, data),
+    ))
 }
 
 /// Validate a payload against its descriptor before insertion.
