@@ -41,7 +41,11 @@ pub mod entropyfs;
 #[cfg(feature = "std")]
 pub mod facts;
 #[cfg(feature = "std")]
+pub mod flattening;
+#[cfg(feature = "std")]
 pub mod h2;
+#[cfg(feature = "std")]
+pub mod inverse;
 #[cfg(feature = "std")]
 pub mod rocm;
 #[cfg(feature = "std")]
@@ -74,6 +78,19 @@ pub const COURT_NAMES: &[(&str, &str)] = &[
         "facts",
         "independent semantic facts: first-principles oracles for every representation/\
 transform on every host surface",
+    ),
+    (
+        "inverse",
+        "Phase K bounded inverse compiler: deterministic proposals (literal, silence, \
+constant, exact-repeat, residual zero/constant/periodic, shared reference) accepted only \
+when they reproduce the window exactly through both the intrinsic closure and the scalar \
+evaluator; complete dependency accounting and a deterministic Pareto frontier",
+    ),
+    (
+        "flattening",
+        "Phase K host flat-evaluator parity: flat == scalar bit-for-bit over the frozen \
+fixtures and an adversarial battery, with honest residual-closure materialization and \
+upload accounting",
     ),
     (
         "cuda",
@@ -168,6 +185,8 @@ pub fn run(name: &str, receipts_root: &Path) -> crate::error::Result<Verdict> {
         "authored" => authored::run(receipts_root),
         "simd" => simd::run(receipts_root),
         "facts" => facts::run(receipts_root),
+        "inverse" => inverse::run(receipts_root),
+        "flattening" => flattening::run(receipts_root),
         "cuda" => cuda::run(receipts_root),
         "d1" => d1::run(receipts_root),
         "entropy-rans" => entropy_rans::run(receipts_root),

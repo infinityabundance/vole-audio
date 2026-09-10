@@ -96,7 +96,7 @@ src/
                       + artifact (I); entropy_flat (H.2) host flat-job builder
   audio/              ALSA endpoint, directness, topology   (Phase H+)
   format/             canonical archive + WAV ingest        (Phase E)
-  inverse/            bounded inverse-proceduralization     (Phase K+)
+  inverse/            bounded inverse-proceduralization     (Phase K)
   transport/          deterministic framing                 (Phase N+)
   evidence/           receipts/counters/timing/environment  (Phase A)
   courts/             executable courts                     (Phase C+)
@@ -117,7 +117,7 @@ scripts/              device build + court drivers (repo only)
 
 ## Current status
 
-Phases A–I are complete: A–E the exact representation model on the scalar
+Phases A–K are complete: A–E the exact representation model on the scalar
 oracle, F the honest SIMD baseline (scalar == AVX2 == AVX-512), G the CUDA D0
 buffered-diagnostic backend (scalar == SIMD == CUDA bit-for-bit; semantic
 facts F01–F14 verified on the device; F15 is authority-level and
@@ -127,14 +127,23 @@ evidence), H.2 the entropy-native core — a deterministic native rANS
 codec with canonical models, block-addressable pages and mandatory RAW
 fallback; literal + exact-residual entropy representations; optional
 EntropyFS persistence and DSFB search governance; CUDA entropy decode; the
-flagship **fused entropy -> CUDA -> D1 endpoint** court — and I the ROCm
+flagship **fused entropy -> CUDA -> D1 endpoint** court — I the ROCm
 device surface: a clean `amdgcn-amd-amdhsa` code-object build
 (`scripts/build-rocm-device.sh`, thin kernels over the same shared no_std
 semantics; byte-deterministic across isolated builds), the `backend::rocm`
 loader probe (GPU -> amdgpu -> KFD -> HIP/HSA) and `court rocm` /
 `probe rocm` evidence (two-dimensional, fail-closed; hardware-unavailable
-on this host; the differential scalar == ROCm battery is Phase J on ROCm
-hardware). Executable
+on this host), J the ROCm D0/D1 runtime (`backend::rocm` HIP host runtime
+with structural resource lifetimes and device affinity; `court rocm-d0`
+differential scalar == ROCm and `court rocm-d1` endpoint experiment, both
+typed to this host's missing device), and K the **inverse compiler**
+(`src/inverse/`, `court inverse`, `court flattening`) — bounded
+deterministic proposal search for the cheapest *exact* deterministic
+`SampleObject` explanation of an observed window, priced with the H.2
+complete-cost oracle and reported as a deterministic Pareto frontier
+(see
+[INVERSE.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/INVERSE.md)).
+Executable
 evidence today:
 
 - `cargo run -- court semantic` — scalar oracle determinism battery
@@ -149,6 +158,21 @@ evidence today:
   every host surface (F01–F14 additionally device-verified in `court cuda`;
   F15 is authority-level and surface-independent — see
   [SEMANTIC_FACTS.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/SEMANTIC_FACTS.md));
+- `cargo run -- court inverse` — Phase K inverse compiler: over the frozen
+  corpus window, every accepted candidate reproduces the observed samples
+  exactly through **both** its intrinsic closure and the scalar evaluator
+  (plus a bounded seek window); complete costs come from the H.2 cost oracle
+  and are reduced to a deterministic Pareto frontier over static objectives.
+  On the frozen corpus 11/14 fixtures have a non-literal exact explanation
+  (silence 46 B, DC 50 B, an exact period-64 cycle 574 B, …) while the
+  negative controls are never "compressed" by a hypothesis and
+  `harmonic-tone`/`fm-signal`/`stereo-correlated` honestly stay cheapest as
+  entropy-coded literals. The explanation search, archive deduplication and a
+  procedural-library reference are reported separately;
+- `cargo run -- court flattening` — Phase K host flat-evaluator parity:
+  `flat == scalar` bit-for-bit over the frozen fixtures and an adversarial
+  battery, with residual-closure materialization and upload bytes accounted
+  rather than hidden;
 - `cargo run -- court cuda` — Phase G CUDA D0: `scalar == CUDA` bit-exact on
   the frozen fixture worlds across standard / high-priority / captured-graph
   submission, semantic facts F01–F14 re-verified on the device, a random
@@ -214,7 +238,11 @@ item — is
 (repository-only). The H.2 phase charter and seal ledger live in
 [PHASE_H2.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/PHASE_H2.md)
 with its normative documents (`ENTROPY_NATIVE.md`, `RANS.md`,
-`ENTROPY_ACCOUNTING.md`, `ENTROPYFS.md`, `DSFB_SEARCH.md`, ADRs 0001–0005).
+`ENTROPY_ACCOUNTING.md`, `ENTROPYFS.md`, `DSFB_SEARCH.md`, ADRs 0001–0005);
+the Phase K inverse compiler and its seal ledger live in
+[INVERSE.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/INVERSE.md)
+and
+[PHASE_K.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/PHASE_K.md).
 Fixture-level measurements are in
 [PERFORMANCE.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/PERFORMANCE.md);
 the spec is
@@ -265,7 +293,9 @@ see the
 measurement-boundary notes (repository-only). Courts arrive with their phases;
 the court list is fixed in the implementation contract (semantic, authored,
 simd, facts, inverse, flattening, cuda, rocm, d1, d2, depth, conventional,
-random-access, negative, interference, all).
+random-access, negative, interference, all). `inverse` and `flattening` are
+Phase K; `d2`, `depth`, `conventional`, `random-access`, `negative`,
+`interference` and `all` arrive with Phases L/M.
 
 ## Non-claims
 

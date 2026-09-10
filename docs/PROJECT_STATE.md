@@ -855,9 +855,48 @@ chain) — no kernel execution is pretended.
   re-select the owner is reported with the veol-side sentinel rc, never a
   fabricated HIP code.
 
+### Phase K — inverse compiler (complete)
+
+Charter + seal ledger: `docs/PHASE_K.md`; the compiler's contract (candidate
+families, accounting rules, frontier semantics, non-claims) is
+`docs/INVERSE.md`. The inverse compiler answers the dual question — *what is
+the cheapest exact deterministic SampleObject explanation of these observed
+samples?* — as a **bounded deterministic proposal search** with zero decoder
+authority.
+
+- `inverse/observe.rs`: identity-voice scalar observation and intrinsic
+  reconstruction for every candidate class (both must be exact — "close" is
+  never accepted).
+- `inverse/cost.rs`: complete dependency accounting; entropy-bearing
+  representations are priced by the frozen H.2 complete-cost API
+  (`entropy_literal` / `entropy_residual`), the rest by canonical object
+  bytes; abstract universe work is a static structural count.
+- `inverse/propose.rs`: bounded deterministic proposals — literal (always),
+  silence, constant (mode), exact-repeat (minimal KMP frame period), residual
+  zero/constant/periodic (bounded scan), and exact shared references against a
+  reference library.
+- `inverse/frontier.rs`: a genuine Pareto set over static objectives
+  `(complete_bytes, total_ops, seek_ops)` with a validity self-check; measured
+  wall times are reported per candidate but are deliberately not objectives,
+  so the frontier is reproducible.
+- `court inverse`: 14 fixtures (frozen H.2 corpus window), every candidate
+  exact on intrinsic closure + scalar observation + a bounded seek window;
+  11/14 fixtures explained more cheaply by a non-literal candidate; negative
+  controls never "compressed" by a hypothesis; frontier validity/coverage,
+  determinism, archive dedup (32 dependency bytes, 0 persistent) and a
+  procedural-library reference all gated; frozen static-result hash
+  `9effb3c3…`.
+- `court flattening`: `flat == scalar` bit-for-bit over the frozen fixtures
+  and 252 adversarial battery worlds (764 windows), with host residual-closure
+  materialization and upload bytes accounted rather than hidden.
+- Deferred (documented, not approximated): delta/linear-predictor and
+  partial/harmonic hypotheses require a residual-model vocabulary extension
+  beyond the frozen u1 v1 models, so they are a universe amendment, not a
+  Phase-K implementation detail.
+
 ## Known blockers
 
-- None for Phases F/G/H/H.2. ROCm hardware absent (evidence row only). The D1
+- None for Phases F/G/H/H.2/K. ROCm hardware absent (evidence row only). The D1
   result is per-device/per-driver: another host's endpoint may register,
   refuse registration, or lack mmap — the court records whichever happens.
 
@@ -871,10 +910,14 @@ path sealed). Phase I (ROCm) is complete: clean amdgcn code-object build +
 complete as code + courts: `court rocm-d0` (differential scalar == ROCm) and
 `court rocm-d1` (D1 endpoint experiment) exist and record typed causes on this
 host; their positive paths execute when a D0/D1-ready ROCm stack + AMD device
-are present. Next:
+are present. Phase K (inverse compiler) is complete: bounded deterministic
+proposals, exact acceptance through two independent reconstructions, complete
+H.2-priced dependency accounting, and a deterministic Pareto frontier, sealed
+by `court inverse` + `court flattening`. Next:
 
-1. Phase K — inverse compiler (H.2 is its storage-cost oracle); Phase L — GPU
-   inverse search;
+1. Phase L — GPU inverse search (parallel candidate sweeps; CPU vs CUDA vs
+   ROCm comparison) — the inverse compiler has zero decoder authority, so
+   search placement is a performance question only;
 2. Phase M — production depth/courts/corpus; Phase N — transport/archive
    (embeds H.2 canonical records); Phase O — learned deterministic prediction
    addendum (judged by the H.2 complete-cost API).

@@ -18,10 +18,10 @@ USAGE:
 COMMANDS (current build):
     probe                 Capture environment + hardware evidence summary
     court <name>          Run an executable court (semantic, authored, simd, facts,
-                          cuda, d1, rocm, rocm-d0, rocm-d1, entropy-rans,
-                          entropy-literal, entropy-residual, entropy-pages,
-                          entropy-partial, entropy-simd, entropy-cuda, entropy-d1,
-                          entropyfs, dsfb-entropy, h2)
+                          inverse, flattening, cuda, d1, rocm, rocm-d0, rocm-d1,
+                          entropy-rans, entropy-literal, entropy-residual,
+                          entropy-pages, entropy-partial, entropy-simd,
+                          entropy-cuda, entropy-d1, entropyfs, dsfb-entropy, h2)
                           [--receipts DIR]; court d1 accepts --emit-audio (court
                           entropy-d1 honors VOLE_ENTROPY_D1_EMIT_AUDIO=1)
     receipt show <file>   Verify and print an evidence receipt
@@ -43,10 +43,9 @@ COMMANDS (current build):
     help                  Show this help
 
 Planned commands arrive with their phases (inspect/verify/encode/observe/play,
-bench/corpus, court inverse|flattening|rocm|d1|d2|depth|conventional|
-random-access|negative|interference, and probe cuda|rocm|alsa|d1|d2). Until
-implemented they exit with NOT_IMPLEMENTED (3); the CLI never implies support
-that is absent.
+bench/corpus, court d2|depth|conventional|random-access|negative|interference,
+and probe cuda|rocm|alsa|d1|d2). Until implemented they exit with
+NOT_IMPLEMENTED (3); the CLI never implies support that is absent.
 
 example:
     vole-audio court simd          # Phase F SIMD parity battery
@@ -295,13 +294,13 @@ fn cmd_probe(args: &[String]) -> Result<u8> {
 }
 
 /// `vole-audio seal verify`: executable phase-seal gate over the newest
-/// receipts (see `seal::verify_seal`). Default expectations: the six
-/// always-expected A–H courts and `h2` SUPPORTED, and `rocm` restricted to
-/// the explicit allowed set `UNSUPPORTED_BY_HARDWARE | UNSUPPORTED_BY_API |
-/// INCONCLUSIVE` (never the corruption/execution-failure classes). The
-/// default invariant is `verifier seal subject == receipt seal subject` (all
-/// bound); `--historical` relaxes the verifier requirement and accepts
-/// pre-amendment receipts without a subject. `vole-audio seal subject`
+/// receipts (see `seal::verify_seal`). Default expectations: the always-expected
+/// A–H courts, `inverse`/`flattening` (Phase K), and `h2` SUPPORTED, and `rocm`
+/// restricted to the explicit allowed set `UNSUPPORTED_BY_HARDWARE |
+/// UNSUPPORTED_BY_API | INCONCLUSIVE` (never the corruption/execution-failure
+/// classes). The default invariant is `verifier seal subject == receipt seal
+/// subject` (all bound); `--historical` relaxes the verifier requirement and
+/// accepts pre-amendment receipts without a subject. `vole-audio seal subject`
 /// prints the current subject hash for inspection.
 fn cmd_seal(args: &[String]) -> Result<u8> {
     let sub = args.first().map(String::as_str).unwrap_or("verify");
@@ -330,7 +329,8 @@ fn cmd_seal_verify(args: &[String]) -> Result<u8> {
     let mut receipts = std::path::PathBuf::from("receipts");
     let mut historical = false;
     let mut expect = "semantic=SUPPORTED,authored=SUPPORTED,simd=SUPPORTED,\
-                       facts=SUPPORTED,cuda=SUPPORTED,d1=SUPPORTED,h2=SUPPORTED,\
+                       facts=SUPPORTED,inverse=SUPPORTED,flattening=SUPPORTED,\
+                       cuda=SUPPORTED,d1=SUPPORTED,h2=SUPPORTED,\
                        rocm=UNSUPPORTED_BY_HARDWARE|UNSUPPORTED_BY_API|INCONCLUSIVE,\
                        rocm-d0=UNSUPPORTED_BY_HARDWARE|UNSUPPORTED_BY_API|INCONCLUSIVE,\
                        rocm-d1=UNSUPPORTED_BY_HARDWARE|UNSUPPORTED_BY_API|INCONCLUSIVE"
