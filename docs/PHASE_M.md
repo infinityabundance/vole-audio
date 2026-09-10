@@ -82,11 +82,12 @@ The receipt carries every ladder row with its status, and none is deleted:
 ```text
 B0 literal PCM                         MEASURED          court conventional
 B1 conventional lossless (FLAC-5)      MEASURED          court conventional
-B2 PCM-resident sampler                NOT_IMPLEMENTED   Phase M
-B3 disk-streaming sampler              NOT_IMPLEMENTED   Phase M (must record read
-                                                         traffic, cache state, underruns)
-B4 compressed-file decode + playback   NOT_IMPLEMENTED   Phase M
-B5 VOLE scalar                         MEASURED_ELSEWHERE court semantic/facts/inverse
+B2 PCM-resident sampler                MEASURED          court runtime (Seal 10)
+B3 disk-streaming sampler              MEASURED          court runtime (cold/warm verified,
+                                                         read traffic, cache state)
+B4 compressed-file decode + playback   MEASURED          court runtime (exact B1 artifact)
+B5 VOLE scalar                         MEASURED          court runtime (bounded full object),
+                                                         semantic/facts/inverse
 B6 VOLE CUDA buffered                  MEASURED_ELSEWHERE court cuda
 B7 VOLE ROCm buffered                  MEASURED_ELSEWHERE court rocm-d0 (hardware-gated)
 B8 VOLE D1 attempt                     MEASURED_ELSEWHERE court d1 / entropy-d1
@@ -106,13 +107,12 @@ Stated plainly so the gap is visible (updated at Seal 6 — the corpus is frozen
 the conventional baseline is measured, the container mechanism is frozen, and
 the true B1-vs-VOLE result now exists):
 
-* B2–B4 (sampler / disk-streaming / compressed-file playback) now exist as the
-  common runtime substrate (Seal 9) beside the bounded B5 full-object VOLE
-  source; the **comparative** B2/B3/B4/B5 measurement (repeated traversals,
-  rotated source order, latency distributions, the crossover table) is the next
-  increment and has not been run;
+* B2–B5 now exist as a measured common runtime substrate (Seals 9–10) with
+  harness-owned latency, split storage/residency accounting and a stratified
+  crossover surface; the *remaining* Phase-M courts below are still absent;
 * `court depth`, `court random-access`, `court negative`, `court interference`,
   `court all` are not implemented;
+* the **long run** (soak stability) is not run;
 * energy and the adversarial real-time load matrix (§49) are not measured;
 * the **license-clean real-recording stratum is declared and vacant** (see
   `corpus/README.md`); no production claim rests on real recordings yet, and
@@ -143,16 +143,16 @@ Seal run (release, `--all-features`, clean tree, version 0.11.0):
 
 ## Where this goes next
 
-1. **Seals 2–9 — the corpus is frozen, verified and review-closed; the flagship
+1. **Seals 2–10 — the corpus is frozen, verified and review-closed; the flagship
    B0/B1 conventional baseline is measured; the full-object container mechanism
    and its parser are frozen; the B1-vs-VOLE result exists with clean population
    arithmetic; the entropy complete-cost oracle equals the physical artifact;
-   and the common runtime substrate is frozen and proven exact on every
-   source.**
-2. **Seal 10 — the B2/B3/B4/B5 runtime measurement** (repeated traversals with
-   deterministically rotated source order, raw per-quantum latencies, derived
-   distributions and the crossover table), then the `depth` / `random-access` /
-   `negative` courts and the crossover surface.
+   and the runtime substrate is measured under a frozen protocol with a
+   stratified crossover surface.**
+2. **The remaining Phase-M courts** — `depth` (depth sweep), `random-access`,
+   `negative`, `interference`, `all` — then the **long run** soak, energy where
+   measurable and the adversarial real-time load matrix (§49); and the
+   license-clean real-recording stratum.
 3. Adversarial real-time load (§49) and energy where measurable.
 
 ### Seal 2 — flagship corpus freeze (2026-09-10)
@@ -674,3 +674,98 @@ value was repeating the pre-Seal-8 number (Seal 7 and earlier, where it was
 correct); Seal 9 itself changed nothing. Every Seal-9 receipt was compared
 field-for-field against its Seal-8 predecessor and all 27 pre-existing courts are
 identical.
+
+### Seal 10 — runtime measurement protocol (2026-09-10)
+
+The Seal-9 mechanism was sound but its **measurement instrumentation was not
+comparable**, and the review found four things to close before any official
+runtime number could be reported.
+
+**1. The latency boundary.** B3 previously allocated a byte buffer and read
+`/proc/self/io` *before* starting its stopwatch, stopped it after
+`read_exact_at()`, and only then converted bytes to `i32` — so B3 was effectively
+timed as “kernel file read” while B2/B4 timed their copy to `dst` and B5 timed its
+materialization. Latency is now **harness-owned**: the stopwatch wraps the whole
+`RuntimeSource::read` call in `run_traversal`, and `ReadEvidence` no longer has
+timing fields at all, so a source cannot choose which part of its work counts.
+`/proc/self/io` moved to traversal boundaries, outside every timer. A timer
+calibration is reported (`timer_overhead_ns`, min 10 ns / median 20 ns) so
+sub-100 ns rows are read as near the apparatus floor.
+
+**2. Residency accounting.** `SourceInfo::persistent_sample_domain_bytes`
+counted B3's whole on-disk file as “resident in the process”. It is now split:
+
+```text
+artifact_storage_bytes       bytes the artifact occupies in storage
+resident_sample_domain_bytes PCM persistently resident in the process
+resident_encoded_bytes       encoded bytes persistently resident
+```
+
+So B3 has storage 71,277,600 B and **zero** resident PCM; B4 holds its decoded
+PCM resident but not its FLAC artifact; B5 holds its container as resident
+*encoded* bytes and zero resident PCM.
+
+**3. Setup separation.** B3's `prepare` serialized, wrote, `sync_all`ed and
+opened the file inside `setup_ns`, so B3's setup included authoring while B4/B5's
+did not. `DiskPcmArtifact::create` (authoring) is now separate from
+`DiskPcmSource::open` (runtime setup), and artifact build / verification /
+runtime setup are reported as distinct quantities.
+
+**4. Repeat, state and population.** The aggregate counted only B2's windows and
+labelled them “per source”. Window counts are now per source; **every aggregate
+is computed inside an explicit population** (all 115 with B2/B3/B5/B5-prepared,
+and the 110 B1-domain objects adding B4), and no ratio mixes them. The trace is
+repeated 3 times with **deterministically rotated source order**; each repeat
+starts from equivalent state (B3 re-verifies cold/warm; B5 first-play gets a
+fresh bounded reader). B3 eligibility is per repeat: only `COLD_VERIFIED` /
+`WARM_VERIFIED` repeats count. B5 first-play is primary; a **prepared** control
+(all segments parsed before measurement) is reported separately and never
+averaged with it. Timed correctness is checked against window digests
+precomputed during preparation, so verifying a window never walks the canonical
+vector.
+
+**Frozen protocol.** `PROTOCOL_SCHEMA = vole.audio.runtime.protocol.v2`;
+quantum 512; 3 repeats; rotated source order; no gain/pan/filter/resample/seek;
+native rate and channels. Static result:
+
+```text
+d7d11681141f5f92baf1a22d572b40d5cb7e1813f902d2f5067a2e1dbd54ba79
+```
+
+covering protocol, artifact identities, deterministic counters and the
+correctness vector — 115 objects, 23,229 windows per traversal, 2,055
+traversals, every window exact; latency, physical storage traffic and setup
+times are measured evidence excluded from it and written to a trace under
+`receipts/traces/`.
+
+**Measured** (pooled over all 115 objects; p50 / p99 / max in ns):
+
+```text
+B2           120 / 701 / 29095        resident PCM 71.28 MB, storage 0
+B3-cold      141 / 27572 / 1545604    storage 71.28 MB, resident 0, disk reads 214 MB (3x object)
+B3-warm      141 / 632 / 28904        storage 71.28 MB, resident 0, disk reads 0
+B4           60 / 511 / 85150         storage 25.58 MB, resident PCM 65.52 MB, setup 323 ms
+B5           912 / 305774 / 1283111   storage 31.09 MB, resident encoded 31.09 MB, 0 resident PCM
+B5-prepared  911 / 305614 / 1336461   same, setup 2.25 ms (all segments parsed before measurement)
+```
+
+0 deadline misses on every source. Over the 110 B1-domain objects B5 stores
+28,228,300 B against B4's 25,577,431 B — a byte ratio of **1.104×**, the same
+figure the flagship court reports. Crossover surfaces (p50 and stored bytes per
+frozen axis) are in the receipt; the structure is emphatic — B5 is 15× B4 at
+p50 overall but stores **0.019×** B4 for `literal`, **0.11×** for
+`identical_stereo`, **0.33×** for `globally_periodic`, while paying ~200–900×
+B2's p50 on `correlated_stereo`, `multichannel` and residual/transient classes.
+The prepared control's p50 is within 0.2% of first-play, so at the median the
+lazy per-segment parse is not the cost — page materialization is — and the parse
+cost appears in setup (2.25 ms vs 8 µs), not the tail.
+
+Seal 9's `a6677455…` receipt is retained unchanged as historical mechanism
+evidence; this seal supersedes its residency/window-count/timing instrumentation.
+That is the **only** row whose hash changed: every other court's Seal-10 receipt
+was compared field-for-field against its Seal-9 predecessor and is identical.
+Seal run: seal subject `3e7e6e2a…`; tests **430 passed / 12 ignored**
+all-features and **420 passed / 12 ignored** default-features.
+
+**Real-time load, depth, random-access, interference, long run and energy are
+not measured here** — see “What is *not* in this increment”.

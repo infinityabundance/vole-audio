@@ -1268,6 +1268,41 @@ object's native rate/channels, the same caller-owned destination, exact output.
   the court's static result includes). Prose carrying `d966d98e…` was repeating
   the pre-Seal-8 number; Seal 9 changed nothing.
 
+### Phase M Seal 10 — runtime measurement protocol (v0.20.0)
+
+The Seal-9 mechanism was sound; its **measurement instrumentation was not
+comparable**. Four corrections, then the first official runtime measurement.
+
+- **Harness-owned latency.** The stopwatch wraps the whole
+  `RuntimeSource::read` call; `ReadEvidence` has no timing fields, so B3 can no
+  longer report “kernel read” while B2/B4 time their copy to `dst`.
+  `/proc/self/io` moved to traversal boundaries; a timer calibration
+  (`timer_overhead_ns`, min 10 ns / median 20 ns) contextualizes sub-100 ns rows.
+- **Split storage/residency.** `artifact_storage_bytes` /
+  `resident_sample_domain_bytes` / `resident_encoded_bytes`: B3 now reports zero
+  resident PCM, B4 does not retain its FLAC artifact, B5 reports its container as
+  resident encoded bytes.
+- **Setup separation.** `DiskPcmArtifact::create` (authoring) is distinct from
+  `DiskPcmSource::open` (runtime setup); artifact build/verify/runtime setup are
+  reported separately.
+- **Repeat/state/population.** Per-source window counts; two explicit
+  populations (all 115 with B2/B3/B5/B5-prepared, and the 110 B1-domain adding
+  B4) with no mixed ratio; 3 repeats with rotated source order; per-repeat B3
+  cold/warm eligibility; B5 first-play primary with a separately reported
+  prepared control; correctness against window digests precomputed during
+  preparation.
+- Frozen protocol `vole.audio.runtime.protocol.v2`; static result
+  `d7d11681…`; 115 objects, 23,229 windows per traversal, 2,055 traversals, all
+  exact. Measured p50 ns (all 115): B2 120, B3-cold 141, B3-warm 141, B4 60,
+  B5 912, B5-prepared 911; 0 deadline misses; B3-cold reads 214 MB physical
+  (3x the object), elsewhere 0; stored bytes B3 71,277,600, B4 25,577,431,
+  B5 31,089,591 (28,228,300 over the 110 B1-domain objects → B5/B4 = 1.104x).
+  Crossover surfaces per frozen axis are in the receipt.
+- Runtime is the **only** changed row vs Seal 9; every other court's receipt is
+  field-for-field identical. Seal subject `3e7e6e2a…`; 18-row `seal verify`
+  matrix; 430 passed / 12 ignored all-features, 420 passed / 12 ignored
+  default-features.
+
 ## Next work (exact order — the implementation contract is executed in sequence)
 
 Phase H.2 is complete (entropy-native core: all ten H.2 courts SUPPORTED on
@@ -1288,14 +1323,13 @@ re-verified by the exact evaluator (`court inverse-search`), and the placement
 policy keeps the measured-faster host surface (`SearchBudget::placement`,
 `Auto`).
 
-1. Phase M — remaining increments. The common runtime substrate (B2 resident
-   PCM, B3 raw disk cold/warm-verified, B4 the exact B1 FLAC-5 artifact, B5
-   bounded VOLE) is frozen with a verified `FlacArtifact`, `VerifiedFullObject`
-   and a bounded `FullObjectReader`, and proven exact on every source (Seal 9).
-   Next: the **B2/B3/B4/B5 measurement** (Seal 10: repeated traversals with
-   deterministically rotated source order, raw per-quantum latencies, derived
-   distributions, stratified crossover table), then depth / random-access /
-   negative / interference courts; crossover surface; energy;
+1. Phase M — remaining increments. The common runtime substrate is **measured**
+   under a frozen protocol (Seal 10): harness-owned latency, split
+   storage/residency, two explicit populations, rotated repeats and a stratified
+   crossover surface. Remaining: `court depth` (depth sweep), `court
+   random-access`, `court negative`, `court interference`, `court all`; the long
+   run soak; energy where measurable; the adversarial real-time load matrix
+   (§49); and the license-clean real-recording stratum. Then
    Phase N — transport/archive
    (embeds H.2 canonical records); Phase O — learned deterministic prediction
    addendum (judged by the H.2 complete-cost API).
