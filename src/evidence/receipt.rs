@@ -144,7 +144,11 @@ pub struct ReceiptEnvelope {
 }
 
 impl ReceiptEnvelope {
-    /// Verify the embedded self-hash over the canonical receipt JSON.
+    /// Verify the embedded self-hash over the canonical receipt JSON of the
+    /// **current** schema (typed round-trip). File-level verification is
+    /// [`ReceiptEnvelope::from_json_bytes`], which hashes the receipt exactly
+    /// as the file carries it and therefore also verifies receipts produced
+    /// before an additive schema field existed.
     pub fn verify(&self) -> Result<()> {
         if self.schema != EVIDENCE_SCHEMA || self.schema_version != EVIDENCE_SCHEMA_VERSION {
             return Err(Error::new(
@@ -168,10 +172,59 @@ impl ReceiptEnvelope {
     }
 
     /// Parse and verify an envelope from canonical (compact or pretty) JSON.
+    ///
+    /// The self-hash is checked against the canonical compact encoding of the
+    /// `receipt` value **exactly as the file carries it** (object key order
+    /// preserved). That makes the hash a pure function of the stored bytes, so
+    /// a receipt remains verifiable after the schema grows additively: a
+    /// receipt written before a field existed still hashes its own field set.
+    /// (Hashing the typed struct instead would silently invalidate every older
+    /// receipt whenever a field is added.)
     pub fn from_json_bytes(bytes: &[u8]) -> Result<Self> {
+        let value: serde_json::Value = serde_json::from_slice(bytes)?;
+        Self::verify_value(&value)?;
         let env: Self = serde_json::from_slice(bytes)?;
-        env.verify()?;
         Ok(env)
+    }
+
+    /// Verify a parsed envelope value (order-preserving) against its embedded
+    /// self-hash.
+    fn verify_value(value: &serde_json::Value) -> Result<()> {
+        let obj = value
+            .as_object()
+            .ok_or_else(|| Error::integrity("receipt envelope is not a JSON object"))?;
+        let schema = obj
+            .get("schema")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| Error::integrity("receipt envelope has no schema string"))?;
+        let version = obj
+            .get("schema_version")
+            .and_then(|v| v.as_u64())
+            .ok_or_else(|| Error::integrity("receipt envelope has no schema_version"))?;
+        if schema != EVIDENCE_SCHEMA || version != u64::from(EVIDENCE_SCHEMA_VERSION) {
+            return Err(Error::new(
+                Kind::Unsupported,
+                format!(
+                    "receipt schema {schema}/v{version} != expected {EVIDENCE_SCHEMA}/v{EVIDENCE_SCHEMA_VERSION}"
+                ),
+            ));
+        }
+        let receipt = obj
+            .get("receipt")
+            .ok_or_else(|| Error::integrity("receipt envelope has no receipt body"))?;
+        let stored = obj
+            .get("receipt_sha256")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| Error::integrity("receipt envelope has no receipt_sha256"))?;
+        let canonical = serde_json::to_vec(receipt)?;
+        let digest = Sha256::digest(&canonical);
+        let expect = crate::hash::sha256::hex(&digest);
+        if expect != stored {
+            return Err(Error::integrity(format!(
+                "receipt self-hash mismatch: stored {stored} computed {expect}"
+            )));
+        }
+        Ok(())
     }
 }
 
@@ -441,5 +494,68 @@ mod tests {
         let d = DurationNs(2_500_000_000);
         let s = d.to_string();
         assert!(s.contains("s"), "{s}");
+    }
+
+    #[test]
+    fn canonical_forms_agree_for_the_pointer_style() {
+        // The producer hashes `to_vec(receipt)`; verification hashes
+        // `to_vec(to_value(receipt))` from the stored bytes. These must be the
+        // same encoding, or a receipt could never verify itself.
+        let env = sample_builder().finish().unwrap();
+        let typed = env.receipt.canonical_bytes().unwrap();
+        let value = serde_json::to_value(&env.receipt).unwrap();
+        let via_value = serde_json::to_vec(&value).unwrap();
+        assert_eq!(typed, via_value, "producer and verifier encodings differ");
+    }
+
+    #[test]
+    fn float_heavy_extras_roundtrip_byte_exactly() {
+        // A float whose shortest decimal form is 1 ULP-sensitive under a
+        // non-round-tripping parser: it must still verify from disk.
+        let mut b = sample_builder();
+        b.extra("ratio", serde_json::json!(32506.0f64 / 32839.0f64));
+        b.extra("integral", serde_json::json!(0.1f64 + 0.2f64));
+        let env = b.finish().unwrap();
+        let bytes = serde_json::to_vec_pretty(&env).unwrap();
+        let parsed = ReceiptEnvelope::from_json_bytes(&bytes).expect("verifies from disk");
+        assert_eq!(parsed.receipt_sha256, env.receipt_sha256);
+    }
+
+    #[test]
+    fn receipts_written_before_an_additive_field_still_verify() {
+        // Simulate schema growth: drop a field from the stored receipt body,
+        // rehash the body as stored, and require file-level verification to
+        // accept it (a typed re-serialization would have added the field back
+        // and rejected a byte-honest old receipt).
+        let env = sample_builder().finish().unwrap();
+        let mut value = serde_json::to_value(&env).unwrap();
+        let digest = {
+            let receipt = value.get_mut("receipt").unwrap();
+            let obj = receipt.as_object_mut().unwrap();
+            let provenance = obj.get_mut("provenance").unwrap().as_object_mut().unwrap();
+            assert!(provenance.remove("endpoint_hash").is_some());
+            let canonical = serde_json::to_vec(receipt).unwrap();
+            Sha256::digest(&canonical)
+        };
+        value.as_object_mut().unwrap().insert(
+            "receipt_sha256".into(),
+            serde_json::Value::String(crate::hash::sha256::hex(&digest)),
+        );
+        let bytes = serde_json::to_vec_pretty(&value).unwrap();
+        ReceiptEnvelope::from_json_bytes(&bytes).expect("older-shape receipt verifies");
+    }
+
+    #[test]
+    fn tampered_receipt_body_is_rejected() {
+        let env = sample_builder().finish().unwrap();
+        let mut value = serde_json::to_value(&env).unwrap();
+        value
+            .get_mut("receipt")
+            .unwrap()
+            .as_object_mut()
+            .unwrap()
+            .insert("result".into(), serde_json::json!("FAILED_CORRECTNESS"));
+        let bytes = serde_json::to_vec_pretty(&value).unwrap();
+        assert!(ReceiptEnvelope::from_json_bytes(&bytes).is_err());
     }
 }

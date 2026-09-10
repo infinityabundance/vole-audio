@@ -52,15 +52,35 @@ xruns, energy method, result, limitations.
 **Immutability.** Receipts are written with `create_new` semantics under
 `receipts/<court>/`; an existing receipt is never rewritten after code
 changes. Each receipt self-verifies (`receipt show <file>` recomputes the
-canonical-JSON self-hash).
+self-hash).
+
+**Canonicalization (what the self-hash covers).** `receipt_sha256` is the
+SHA-256 of the compact JSON encoding of the `receipt` body *exactly as the
+file carries it* (object key order preserved; `serde_json`'s
+`preserve_order`). Verification therefore re-derives the hash purely from the
+stored bytes, which is what makes the receipt hash stable under **additive**
+schema growth: a receipt written before a new field existed still hashes its
+own field set, whether the newer code omits absent fields or writes them as
+`null`. (Hashing the typed struct instead would silently invalidate every
+older receipt the moment a field is added — the failure mode this rule
+exists to prevent.)
+
+Float-valued fields are encoded exactly: the receipt parser uses
+`serde_json`'s `float_roundtrip` feature so that a shortest-decimal `f64`
+re-parses to the same bits it was written from. Without it, a receipt
+containing a float such as `0.9898596181369713` parses 1 ULP low and cannot
+reproduce its own self-hash. Both features are load-bearing for evidence
+integrity, not optimizations.
 
 **Source anchors.** Each receipt records the git commit SHA, the committed
 source-tree hash (`git rev-parse HEAD^{tree}` — a content anchor that stays
 meaningful even when the work tree is dirty), and a source dirty flag. The
 dirty computation excludes `receipts/` by pathspec: writing evidence must
 never, by itself, mark the very tree it attests as dirty. Uncommitted source
-changes still do. New optional environment fields are appended and omitted
-when absent, so archived receipts continue to re-verify byte-identically.
+changes still do. New fields may be added over time (the schema is versioned
+and additive); archived receipts keep re-verifying because the self-hash
+follows the stored shape, not the current struct (see Canonicalization
+below).
 
 Each receipt also records the **seal subject** (`environment.seal_subject_hash`,
 see `evidence::subject`): a SHA-256 over every tracked source file except the

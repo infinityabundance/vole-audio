@@ -61,7 +61,16 @@ dsfb = ["std", "dep:dsfb"]
 # Host-only. Never enabled on device targets (feature-gated above).
 libc = { version = "0.2.172", optional = true }
 serde = { version = "1.0", features = ["derive"], optional = true }
-serde_json = { version = "1.0", optional = true }
+# `float_roundtrip` is REQUIRED for evidence integrity: without correctly
+# rounded f64 parsing, a receipt body containing a float whose shortest
+# decimal form parses 1 ULP off cannot reproduce its own self-hash, so
+# `receipt show` / `seal verify` would reject a byte-identical receipt.
+# `preserve_order` is REQUIRED for the same reason across schema growth: the
+# receipt hash covers the canonical compact encoding of the receipt *as its
+# producer serialized it*, so a receipt written before an additive field
+# existed must re-hash with the field set it actually carries (see
+# `ReceiptEnvelope::from_json_bytes`).
+serde_json = { version = "1.0", features = ["float_roundtrip", "preserve_order"], optional = true }
 # Real published EntropyFS engine (feature `entropyfs-store`, default-off).
 # default-features = false drops the fuse/ublk/uring/tracing frontends: the
 # embeddable kernel-free Engine facade (content-addressed blobs over the
@@ -71,7 +80,7 @@ entropyfs = { version = "=0.7.17", default-features = false, optional = true }
 dsfb = { version = "=0.1.2", optional = true }
 
 [dev-dependencies]
-serde_json = "1.0"
+serde_json = { version = "1.0", features = ["float_roundtrip", "preserve_order"] }
 # Independent rANS byte-parity oracle (H.2.2). TEST-ONLY: never linked into
 # normative materialization. The oracle's division-based and reciprocal paths
 # are byte-compatible with the frozen in-crate primitive (docs/RANS.md).
