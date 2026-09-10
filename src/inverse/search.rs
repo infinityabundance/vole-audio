@@ -40,6 +40,90 @@ impl ScanSurface {
     }
 }
 
+/// Where the compiler should place the bounded period scan.
+///
+/// Placement is a **performance** choice with no semantic content: every
+/// surface calls the same `period_records` and produces identical counts
+/// (`court inverse-search` asserts it), so the accepted candidate set is
+/// unaffected. `Scalar` remains the reference surface.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SearchPlacement {
+    /// Sequential host scan (reference surface).
+    Scalar,
+    /// Host threads over disjoint period ranges.
+    Parallel { threads: usize },
+    /// Pick the faster host surface from the estimated comparison count.
+    #[default]
+    Auto,
+}
+
+impl SearchPlacement {
+    pub const fn label(self) -> &'static str {
+        match self {
+            SearchPlacement::Scalar => "scalar",
+            SearchPlacement::Parallel { .. } => "parallel",
+            SearchPlacement::Auto => "auto",
+        }
+    }
+}
+
+/// Comparison count above which `SearchPlacement::Auto` prefers the parallel
+/// host surface. A measured placement policy, never a semantic one.
+pub const PARALLEL_SCAN_THRESHOLD: u64 = 1 << 20;
+
+/// Exact comparison count of a scan over periods `1..=period_limit`:
+/// `period_records` compares frames `period..frames` for each period, so
+/// `work(p) = frames - p` and the total is `P*F - P*(P+1)/2` with
+/// `P = min(period_limit, frames - 1)`.
+///
+/// (This is **not** `O(frames / p)`: a larger period bound does not make each
+/// candidate progressively cheap.)
+pub fn estimated_comparisons(frames: u32, period_limit: u32) -> u64 {
+    let p = u64::from(scan_bound(frames, period_limit));
+    let f = u64::from(frames);
+    if p == 0 {
+        return 0;
+    }
+    p.saturating_mul(f)
+        .saturating_sub(p.saturating_mul(p + 1) / 2)
+}
+
+/// Host threads available for a parallel scan (`1` when unavailable).
+pub fn available_threads() -> usize {
+    std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(1)
+}
+
+/// Run the bounded period scan on the requested host placement.
+///
+/// The device surfaces are *not* selected here: they are explicit court
+/// surfaces (`backend::cuda::SearchWorld` / `SearchWorldRocm`), because on
+/// this host the release-build measurement shows the host-parallel scan wins
+/// for this family (see `docs/PHASE_L.md`).
+pub fn scan_with_placement(
+    x: &[i32],
+    frames: u32,
+    period_limit: u32,
+    placement: SearchPlacement,
+) -> Result<PeriodScan> {
+    match placement {
+        SearchPlacement::Scalar => Ok(scan_scalar(x, frames, period_limit)),
+        SearchPlacement::Parallel { threads } => {
+            scan_parallel(x, frames, period_limit, threads.max(1))
+        }
+        SearchPlacement::Auto => {
+            let threads = available_threads();
+            if threads > 1 && estimated_comparisons(frames, period_limit) >= PARALLEL_SCAN_THRESHOLD
+            {
+                scan_parallel(x, frames, period_limit, threads)
+            } else {
+                Ok(scan_scalar(x, frames, period_limit))
+            }
+        }
+    }
+}
+
 /// A completed period scan: `counts[i]` is the exact periodic residual record
 /// count for period `i + 1`, or [`PERIOD_NOT_CLOSEABLE`].
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -232,6 +316,40 @@ mod tests {
         assert_eq!(scan_bound(100, 512), 99);
         assert_eq!(scan_bound(1, 512), 0);
         assert_eq!(scan_bound(0, 512), 0);
+    }
+
+    #[test]
+    fn complex_count_matches_the_frames_minus_period_sum() {
+        // F = 4096, P = 512: sum over p in 1..=512 of (4096 - p).
+        let expected = 512u64 * 4096 - 512 * 513 / 2;
+        assert_eq!(estimated_comparisons(4096, 512), expected);
+        // The bound is `min(period_limit, frames - 1)`.
+        assert_eq!(estimated_comparisons(100, 512), 99 * 100 - 99 * 100 / 2);
+        assert_eq!(estimated_comparisons(1, 512), 0);
+    }
+
+    #[test]
+    fn auto_placement_matches_the_measured_policy() {
+        // The sealed workload (4096 x 512) exceeds the parallel threshold...
+        assert!(estimated_comparisons(4096, 512) >= PARALLEL_SCAN_THRESHOLD);
+        // ...and a small window stays on the reference surface.
+        assert!(estimated_comparisons(256, 8) < PARALLEL_SCAN_THRESHOLD);
+    }
+
+    #[test]
+    fn every_placement_agrees_with_the_scalar_reference() {
+        let fx = corpus::named("harmonic-tone").unwrap();
+        let frames = 2048usize;
+        let x = &fx.samples[..frames];
+        let scalar = scan_scalar(x, frames as u32, 128);
+        for placement in [
+            SearchPlacement::Scalar,
+            SearchPlacement::Parallel { threads: 4 },
+            SearchPlacement::Auto,
+        ] {
+            let got = scan_with_placement(x, frames as u32, 128, placement).unwrap();
+            assert!(scans_agree(&scalar, &got), "{placement:?} diverged");
+        }
     }
 
     #[test]

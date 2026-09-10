@@ -11,9 +11,9 @@
 //! the CUDA ranking to equal the host ranking exactly (both call the shared
 //! `device::search_shared` function).
 
-use super::driver::{Cuda, DeviceBuffer, Function, Module, Stream};
-use super::ffi::Fns;
+use super::driver::{Cuda, CudaContext, DeviceBuffer, Function, Module, Stream};
 use crate::error::{Error, Result};
+use std::sync::Arc;
 
 /// PTX entry of the period-scan kernel.
 pub const SEARCH_KERNEL_ENTRY: &str = "vole_period_scan";
@@ -26,7 +26,8 @@ const BLOCK_THREADS: u32 = 128;
 /// The window length and period bound are fixed at construction (the scan
 /// output is sized once), so a court scans many fixtures without reallocating.
 pub struct SearchWorld {
-    fns: Fns,
+    /// Shared context owner (retained by every buffer and by `function`).
+    ctx: Arc<CudaContext>,
     /// Owning session (None when sharing a caller session).
     session: Option<Cuda>,
     /// Module handle (None when the caller keeps the module alive).
@@ -67,7 +68,7 @@ impl SearchWorld {
         let module = cuda.load_module(ptx_bytes)?;
         let function = module.function(SEARCH_KERNEL_ENTRY)?;
         let mut world = SearchWorld::build(
-            &cuda.fns,
+            &cuda.ctx,
             function,
             cuda.create_stream()?,
             frames,
@@ -78,7 +79,7 @@ impl SearchWorld {
     }
 
     fn build(
-        fns: &Fns,
+        ctx: &Arc<CudaContext>,
         function: Function,
         stream: Stream,
         frames: u32,
@@ -93,13 +94,13 @@ impl SearchWorld {
         // The device scan covers periods 1..=min(period_limit, frames - 1).
         let limit = period_limit.min(frames - 1);
         Ok(SearchWorld {
-            fns: *fns,
+            ctx: ctx.clone(),
             session: None,
             module: None,
             function,
             stream,
-            d_x: DeviceBuffer::alloc(fns, frames as usize * 4)?,
-            d_counts: DeviceBuffer::alloc(fns, limit as usize * 4)?,
+            d_x: DeviceBuffer::alloc(ctx, frames as usize * 4)?,
+            d_counts: DeviceBuffer::alloc(ctx, limit as usize * 4)?,
             frames,
             period_limit: limit,
         })
@@ -146,9 +147,9 @@ impl SearchWorld {
         self.session.is_some()
     }
 
-    /// Driver function table (evidence/tests).
-    pub fn fns(&self) -> &Fns {
-        &self.fns
+    /// The shared context owner (evidence/tests).
+    pub fn ctx(&self) -> &Arc<CudaContext> {
+        &self.ctx
     }
 }
 

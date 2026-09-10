@@ -36,8 +36,9 @@ use crate::universe::layout::Layout;
 use super::observe;
 use super::{Candidate, CandidateKind, Intrinsic, SearchBudget, search};
 
-/// Propose the bounded candidate set for one intrinsic window, using the
-/// sequential host scan to rank periodic residual candidates.
+/// Propose the bounded candidate set for one intrinsic window, ranking periodic
+/// residual candidates with the bounded period scan on
+/// [`SearchBudget::placement`].
 pub fn propose(
     intrinsic: &Intrinsic,
     library: &ReferenceLibrary,
@@ -48,9 +49,11 @@ pub fn propose(
 
 /// Propose the bounded candidate set, optionally over an **externally ranked**
 /// period list (Phase L: a parallel or device scan decides *which* periods to
-/// try, never whether they are accepted). External periods are deduplicated,
-/// bounded to `[1, frames - 1]`, truncated to the budget and sorted
-/// deterministically; the candidate set that results is otherwise identical.
+/// try, never whether they are accepted). External periods are filtered to
+/// `[1, frames - 1]`, deduplicated in rank order, truncated to the budget's
+/// candidate count and then canonicalized ascending; the candidate set that
+/// results is otherwise identical. When no list is supplied the bounded scan
+/// runs on [`SearchBudget::placement`].
 pub fn propose_with(
     intrinsic: &Intrinsic,
     library: &ReferenceLibrary,
@@ -168,11 +171,12 @@ pub fn propose_with(
         let sw = Stopwatch::start();
         let selected: Vec<u32> = match periods {
             Some(list) => bounded_period_list(list, frames, budget.max_residual_period_candidates),
-            None => search::scan_scalar(
+            None => search::scan_with_placement(
                 &intrinsic.samples,
                 intrinsic.frames as u32,
                 budget.max_period_scan,
-            )
+                budget.placement,
+            )?
             .periods(budget.max_residual_period_candidates),
         };
         let mut proposal_ns = sw.elapsed_ns().max(0) as u64;
@@ -201,23 +205,31 @@ pub fn propose_with(
     Ok(out)
 }
 
-/// Normalize an externally supplied period ranking: keep periods in
-/// `[1, frames - 1]`, deduplicate, sort ascending, and truncate to `keep`.
-/// Deterministic regardless of the surface that produced the list.
+/// Normalize an externally supplied **ranked** period list: keep periods in
+/// `[1, frames - 1]`, drop duplicates (first occurrence wins, preserving the
+/// caller's rank), then take the first `keep`. Only the selected set is
+/// re-sorted ascending so proposal construction stays deterministic.
+///
+/// Rank is preserved deliberately: a caller that supplies `[400, 300, 2, 1]`
+/// with `keep = 2` means "try 400 then 300", and must not be silently
+/// converted into "try the two smallest periods" by sorting before truncation.
 fn bounded_period_list(periods: &[u32], frames: usize, keep: usize) -> Vec<u32> {
     if keep == 0 || frames < 2 {
         return Vec::new();
     }
     let max = (frames - 1) as u32;
-    let mut list: Vec<u32> = periods
-        .iter()
-        .copied()
-        .filter(|&p| p >= 1 && p <= max)
-        .collect();
-    list.sort_unstable();
-    list.dedup();
-    list.truncate(keep);
-    list
+    let mut chosen: Vec<u32> = Vec::with_capacity(keep.min(periods.len()));
+    for &p in periods {
+        if p < 1 || p > max || chosen.contains(&p) {
+            continue;
+        }
+        chosen.push(p);
+        if chosen.len() == keep {
+            break;
+        }
+    }
+    chosen.sort_unstable();
+    chosen
 }
 
 /// Build the `ExactRepeat` payload for an exact frame period.
@@ -402,3 +414,32 @@ impl ReferenceLibrary {
 /// `Residual::new`; this re-export keeps the type visible to callers that
 /// build residuals directly.
 pub type Records = Vec<ResidualRecord>;
+
+#[cfg(test)]
+mod tests {
+    use super::bounded_period_list;
+
+    #[test]
+    fn external_rank_order_is_preserved_before_truncation() {
+        // A ranked list means "try these in this order": truncation must keep
+        // the caller's best candidates, never silently convert the request into
+        // "the numerically smallest periods".
+        let ranked = [400u32, 300, 2, 1];
+        assert_eq!(bounded_period_list(&ranked, 4096, 2), vec![300, 400]);
+        assert_eq!(bounded_period_list(&ranked, 4096, 4), vec![1, 2, 300, 400]);
+        // Deduplication keeps the first (best-ranked) occurrence.
+        assert_eq!(
+            bounded_period_list(&[300, 300, 400], 4096, 2),
+            vec![300, 400]
+        );
+        // Invalid periods are dropped without consuming rank budget.
+        assert_eq!(
+            bounded_period_list(&[0, 4096, 3, 7, 4095], 4096, 2),
+            vec![3, 7]
+        );
+        // A disabled family proposes nothing; a window too short to scan does
+        // the same.
+        assert!(bounded_period_list(&ranked, 4096, 0).is_empty());
+        assert!(bounded_period_list(&ranked, 1, 4).is_empty());
+    }
+}

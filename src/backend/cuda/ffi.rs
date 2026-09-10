@@ -383,6 +383,14 @@ impl Drop for Driver {
     }
 }
 
+// SAFETY: `Driver` owns the only reference to its dlopen handle and closes it
+// exactly once on drop; the resolved function pointers are process-global code
+// addresses. Sharing the handle across threads is therefore sound, and it is
+// what lets a CUDA context be held by an `Arc` shared with every resource (see
+// `driver::CudaContext`).
+unsafe impl Send for Driver {}
+unsafe impl Sync for Driver {}
+
 /// Format a CUDA result into an `Error` with the driver's error string.
 pub fn cuda_error(fns: &Fns, what: &str, rc: CUresult) -> Error {
     Error::new(

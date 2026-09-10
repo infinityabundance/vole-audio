@@ -40,9 +40,24 @@ the host.
 | `cuda` | `backend::cuda::SearchWorld` → `vole_period_scan` | one device thread per period |
 | `rocm` | `backend::rocm::SearchWorldRocm` → same entry in the AMDGPU code object | frozen `device::geom` launch contract |
 
-All four call the same shared, `no_std` `device::search_shared::period_records`
-function, so their agreement is structural rather than a coincidence — and
-`court inverse-search` re-verifies it anyway.
+All of them call the same shared, `no_std`
+`device::search_shared::period_records` function, so their agreement is
+structural rather than a coincidence — and `court inverse-search` re-verifies
+it for every surface that executes on the host. (`scalar` and `parallel` are
+host surfaces and always execute; `cuda` executes when the PTX artifact and a
+device are present; `rocm` executes only when an AMD compute candidate passes
+the Phase-J HIP D0 gate, and is otherwise a compile-only, hardware-pending
+surface. The receipt states the executed-surface count explicitly.)
+
+### Placement policy
+
+The default is `SearchPlacement::Auto`: a scan whose exact comparison count
+(`P*F - P*(P+1)/2`) is below `PARALLEL_SCAN_THRESHOLD` runs on the scalar
+reference surface, and a larger scan runs on the host-parallel surface, whose
+placement has been measured to win. `SearchPlacement::Scalar` remains
+available as the reference placement, and the device surfaces are explicit
+court surfaces — never selected implicitly — because they lost the measured
+family on this host.
 
 ## The two invariants the court asserts
 
@@ -57,11 +72,13 @@ function, so their agreement is structural rather than a coincidence — and
 
 The court additionally records the measured wall time of each surface and the
 implied ratio. It makes **no** claim that the GPU wins: work per period is
-`O(frames / p)`, so the balance depends on the period bound and the window
-length, and the receipt carries the numbers as they came out. On this host, in
-the release build, the sequential host scan is actually **faster** than the
-CUDA scan (see the Seal 1 ledger), so the default placement stays on the host
-and the device path is kept as a verified-equal surface.
+`O(frames - p)` (a period `p` compares frames `p..frames`), so a scan of periods
+`1..=P` does `P*F - P*(P+1)/2` comparisons; the balance therefore depends on the
+period bound and the window length, and the receipt carries the numbers as they
+came out. On this host, in the release build, the sequential host scan is
+actually **slower** than the 16-thread parallel host scan and **faster** than
+the CUDA scan (see the Seal 1/2 ledger), so the default placement selects the
+host surface and the device path is kept as a verified-equal surface.
 
 ## Seal history
 
@@ -114,7 +131,12 @@ Seal run (release, `--all-features`, clean tree `3ddf66f`, version 0.9.0):
   `device::search_shared` is the single implementation, and the NVPTX/AMDGCN
   entries are thin ABI wrappers.
 - Search placement has zero decoder authority and cannot affect the archive:
-  `inverse::compile` (sequential) remains the default path, and `compile_with`
-  differs only in which periodic hypotheses are proposed.
+  `inverse::compile` ranks its periodic candidates through
+  `SearchBudget::placement` (`Auto` by default, which selects the measured-faster
+  host surface), and `compile_with` differs only in which periodic hypotheses
+  are proposed.
 - ROCm compute is still unexecuted on this host; the court reports that as a
-  typed negative and the compile surface carries the new entry.
+  typed negative and the compile surface carries the new entry. When AMD
+  hardware is present the ROCm row runs the **same 14-fixture battery** as CUDA
+  (a single-fixture smoke test would let an all-zero kernel pass, because the
+  first fixture is silence).

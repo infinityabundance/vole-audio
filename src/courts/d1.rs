@@ -541,7 +541,7 @@ mod linux {
                     t.registered = true;
                     t.device_pointer = Some(format!("0x{dev_ptr:x}"));
                     t.pointer_evidence =
-                        Some(PointerEvidence::query(&r.fns, r.host_ptr as usize, dev_ptr));
+                        Some(PointerEvidence::query(&r.ctx, r.host_ptr as usize, dev_ptr));
                     t.class = Verdict::NotApplicable;
                     t.class_detail =
                         "registration probe succeeded; playback not attempted (an earlier \
@@ -1111,7 +1111,7 @@ mod linux {
             // SAFETY: the ALSA mapping is live for the whole trial (pcm holds
             // it); the registration dies before pcm in this scope.
             let attempt = unsafe {
-                crate::backend::cuda::direct::attempt_register(&cuda.fns, base, len as usize)
+                crate::backend::cuda::direct::attempt_register(&cuda.ctx, base, len as usize)
             };
             let mut trial = DeviceTrial {
                 device: dev.clone(),
@@ -1135,7 +1135,7 @@ mod linux {
                     trial.registered = true;
                     trial.device_pointer = Some(format!("0x{dev_ptr:x}"));
                     trial.pointer_evidence = Some(PointerEvidence::query(
-                        &cuda.fns,
+                        &cuda.ctx,
                         r.host_ptr as usize,
                         dev_ptr,
                     ));
@@ -1289,7 +1289,7 @@ mod linux {
                     // dies before pcm.
                     let attempt = unsafe {
                         crate::backend::cuda::direct::attempt_register(
-                            &cuda.fns,
+                            &cuda.ctx,
                             base,
                             len as usize,
                         )

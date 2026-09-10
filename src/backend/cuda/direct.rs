@@ -13,6 +13,7 @@
 //! (page rounding, rc classification) are unit-tested; the driver calls are
 //! thin audited wrappers over `ffi::Fns`.
 
+use crate::backend::cuda::driver::CudaContext;
 use crate::backend::cuda::ffi::{
     CU_MEMHOSTREGISTER_DEVICEMAP, CUDA_ERROR_HOST_MEMORY_ALREADY_REGISTERED,
     CUDA_ERROR_INVALID_CONTEXT, CUDA_ERROR_INVALID_VALUE, CUDA_ERROR_NOT_PERMITTED,
@@ -24,6 +25,7 @@ use crate::error::Error;
 use crate::status::Verdict;
 use serde::{Deserialize, Serialize};
 use std::ffi::{c_int, c_void};
+use std::sync::Arc;
 
 /// Registration flag set used by the D1 attempt: DEVICEMAP (map into the
 /// CUDA address space so the device can write the region). PORTABLE is
@@ -117,7 +119,8 @@ impl PointerEvidence {
     /// pointer registered, `dev_ptr` the pointer returned by
     /// `cuMemHostGetDevicePointer`. Best effort per query: each row records
     /// rc + driver string + value.
-    pub fn query(fns: &Fns, host_ptr: usize, dev_ptr: CUdeviceptr) -> PointerEvidence {
+    pub fn query(ctx: &Arc<CudaContext>, host_ptr: usize, dev_ptr: CUdeviceptr) -> PointerEvidence {
+        let fns = &ctx.fns;
         let mut ev = PointerEvidence::default();
         let attribute_name = |a: c_int| -> &'static str {
             match a {
@@ -209,10 +212,10 @@ impl PointerEvidence {
     }
 }
 
-/// A registered host-memory range (RAII): unregistered on drop. Drop order is
-/// the caller's concern (must precede CUDA context teardown).
+/// A registered host-memory range (RAII): unregistered on drop. Retains the
+/// context, so it cannot be unregistered against a destroyed context.
 pub struct HostRegistration {
-    pub fns: Fns,
+    pub ctx: Arc<CudaContext>,
     /// Exact host pointer passed to cuMemHostRegister.
     pub host_ptr: *mut c_void,
     /// Exact byte length passed to cuMemHostRegister.
@@ -243,7 +246,12 @@ pub enum RegistrationAttempt {
 /// `base..base+len` must be a live, mapped, writable host range for the whole
 /// call and for the lifetime of the returned `HostRegistration`; the caller
 /// (the D1 court) holds the ALSA mapping open for that window.
-pub unsafe fn attempt_register(fns: &Fns, base: usize, len: usize) -> RegistrationAttempt {
+pub unsafe fn attempt_register(
+    ctx: &Arc<CudaContext>,
+    base: usize,
+    len: usize,
+) -> RegistrationAttempt {
+    let fns = &ctx.fns;
     if !fns.d1_surface_complete() {
         let missing = [
             ("cuMemHostRegister", fns.cuMemHostRegister.is_some()),
@@ -287,7 +295,7 @@ pub unsafe fn attempt_register(fns: &Fns, base: usize, len: usize) -> Registrati
         };
     }
     RegistrationAttempt::Registered(HostRegistration {
-        fns: *fns,
+        ctx: ctx.clone(),
         host_ptr,
         bytes: len,
         flags: D1_REGISTER_FLAGS,
@@ -356,7 +364,7 @@ impl Drop for HostRegistration {
         if !self.host_ptr.is_null() {
             // SAFETY: unregister exactly what was registered; the caller
             // guarantees the mapping outlives this drop.
-            unsafe { (self.fns.cuMemHostUnregister.expect("bound"))(self.host_ptr) };
+            unsafe { (self.ctx.fns.cuMemHostUnregister.expect("bound"))(self.host_ptr) };
         }
     }
 }

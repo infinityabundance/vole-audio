@@ -2,16 +2,24 @@
 //! device buffers — all RAII, all through the audited `ffi::Fns`.
 //!
 //! Threading rule: driver API calls are bound to the *current* context of
-//! the calling thread. `CudaContext::create` makes the new context current
-//! for this thread, and every subsequent call in this module happens on the
-//! same thread (courts run single-threaded), so no context juggling is
-//! needed. Drop order matters: streams/events/buffers must die before the
-//! module and context (Rust drops fields in declaration order; the context is
-//! declared last and is also the last field to drop).
+//! the calling thread. `Cuda::open` makes the new context current for this
+//! thread, and every subsequent call in this module happens on the same
+//! thread (courts run single-threaded), so no context juggling is needed.
+//!
+//! Ownership (structural, mirroring the HIP graph fixed in Phase J): the
+//! driver library, the context, and the device identity live in one
+//! [`CudaContext`], and every GPU resource (`Module`, `Function`, `Stream`,
+//! `Event`, `DeviceBuffer`, `GraphExec`) retains an `Arc<CudaContext>`. The
+//! context therefore cannot be destroyed — and the driver cannot be dlclosed —
+//! while any dependent resource is still alive, whatever order the owner
+//! drops its fields in. `Function` additionally retains its `Module`, so a
+//! kernel handle cannot outlive its module.
 
 use crate::error::{Error, Result};
 use std::ffi::{CString, c_void};
+use std::ops::Deref;
 use std::path::Path;
+use std::sync::Arc;
 
 use super::ffi::{
     ATTR_CLOCK_RATE, ATTR_CONCURRENT_MANAGED_ACCESS, ATTR_GLOBAL_L1_CACHE_SUPPORTED,
@@ -116,8 +124,13 @@ impl DeviceInfo {
     }
 }
 
-/// A CUDA driver handle + context + device (owns the whole session).
-pub struct Cuda {
+/// The CUDA driver + context + device identity, owned together.
+///
+/// Declared so that `Drop::drop` (which destroys the context) runs while
+/// `fns` and the dlopen'd driver are still alive: for a struct with a manual
+/// `Drop`, the body runs first and the fields are dropped afterwards in
+/// declaration order.
+pub struct CudaContext {
     pub fns: Fns,
     /// Driver version (e.g. 13030 for 13.3).
     pub driver_version: i32,
@@ -133,13 +146,47 @@ pub struct Cuda {
     _driver: Driver,
 }
 
-impl std::fmt::Debug for Cuda {
+impl std::fmt::Debug for CudaContext {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Cuda")
+        f.debug_struct("CudaContext")
             .field("driver_version", &self.driver_version)
             .field("device", &self.device.name)
             .field("sm", &self.device.sm)
             .finish()
+    }
+}
+
+impl Drop for CudaContext {
+    fn drop(&mut self) {
+        // SAFETY: context destroy (best effort at teardown). Every resource
+        // that needs this context holds an `Arc` to it, so this runs last.
+        if self.context != 0 {
+            unsafe { (self.fns.cuCtxDestroy.expect("bound"))(self.context) };
+        }
+    }
+}
+
+/// A CUDA session: a shared handle to the driver/context/device identity.
+///
+/// `Cuda` is a thin owner; the heavy state lives in [`CudaContext`], which
+/// every resource keeps alive. `Deref` keeps the historical `cuda.fns` /
+/// `cuda.device` / `cuda.context` field reads meaningful while the ownership
+/// graph underneath is structural.
+#[derive(Clone)]
+pub struct Cuda {
+    pub ctx: Arc<CudaContext>,
+}
+
+impl Deref for Cuda {
+    type Target = CudaContext;
+    fn deref(&self) -> &CudaContext {
+        &self.ctx
+    }
+}
+
+impl std::fmt::Debug for Cuda {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Cuda").field("ctx", &*self.ctx).finish()
     }
 }
 
@@ -210,14 +257,21 @@ impl Cuda {
             unsafe { (fns.cuCtxGetStreamPriorityRange.expect("bound"))(&mut least, &mut greatest) };
         check(&fns, "cuCtxGetStreamPriorityRange", rc)?;
         Ok(Cuda {
-            fns,
-            driver_version: version,
-            device,
-            context,
-            priority_least: least,
-            priority_greatest: greatest,
-            _driver: driver,
+            ctx: Arc::new(CudaContext {
+                fns,
+                driver_version: version,
+                device,
+                context,
+                priority_least: least,
+                priority_greatest: greatest,
+                _driver: driver,
+            }),
         })
+    }
+
+    /// The shared context owner (retained by every resource).
+    pub fn ctx(&self) -> &Arc<CudaContext> {
+        &self.ctx
     }
 
     /// Highest available stream priority. `cuCtxGetStreamPriorityRange`
@@ -241,7 +295,7 @@ impl Cuda {
 
     /// Load a module from PTX/cubin bytes.
     pub fn load_module(&self, image: &[u8]) -> Result<Module> {
-        Module::load(&self.fns, image)
+        Module::load(&self.ctx, image)
     }
 
     /// Load a module from a file (PTX text or cubin).
@@ -251,28 +305,19 @@ impl Cuda {
     }
 
     pub fn create_stream(&self) -> Result<Stream> {
-        Stream::create(&self.fns, 0)
+        Stream::create(&self.ctx, 0)
     }
 
     pub fn create_stream_priority(&self, priority: i32) -> Result<Stream> {
-        Stream::create_priority(&self.fns, priority)
+        Stream::create_priority(&self.ctx, priority)
     }
 
     pub fn create_event(&self, disable_timing: bool) -> Result<Event> {
-        Event::create(&self.fns, disable_timing)
+        Event::create(&self.ctx, disable_timing)
     }
 
     pub fn alloc(&self, bytes: usize) -> Result<DeviceBuffer> {
-        DeviceBuffer::alloc(&self.fns, bytes)
-    }
-}
-
-impl Drop for Cuda {
-    fn drop(&mut self) {
-        // SAFETY: context destroy (best effort at teardown).
-        if self.context != 0 {
-            unsafe { (self.fns.cuCtxDestroy.expect("bound"))(self.context) };
-        }
+        DeviceBuffer::alloc(&self.ctx, bytes)
     }
 }
 
@@ -280,14 +325,34 @@ impl Drop for Cuda {
 // Module
 // ---------------------------------------------------------------------------
 
-/// Loaded CUDA module (PTX or cubin image).
+/// Loaded CUDA module (PTX or cubin image) — retains the context, and is
+/// retained by every `Function` resolved from it.
 pub struct Module {
-    pub fns: Fns,
+    pub inner: Arc<ModuleInner>,
+}
+
+/// The module handle + its owning context. `cuModuleUnload` runs when the
+/// last `Arc<ModuleInner>` drops — i.e. only after every `Function` resolved
+/// from the module is gone, and only while the context is still alive.
+pub struct ModuleInner {
+    pub ctx: Arc<CudaContext>,
     pub handle: CUmodule,
 }
 
+impl Drop for ModuleInner {
+    fn drop(&mut self) {
+        if self.handle != 0 {
+            // SAFETY: module unload (best effort); the context is alive
+            // because this struct retains it, and no `Function` outlives it
+            // by construction.
+            unsafe { (self.ctx.fns.cuModuleUnload.expect("bound"))(self.handle) };
+        }
+    }
+}
+
 impl Module {
-    fn load(fns: &Fns, image: &[u8]) -> Result<Module> {
+    fn load(ctx: &Arc<CudaContext>, image: &[u8]) -> Result<Module> {
+        let fns = &ctx.fns;
         // Module load goes through cuModuleLoadDataEx (never the plain entry,
         // which fails PTX JIT with rc 218 on the tested driver), with the
         // correct JIT options: CU_JIT_ERROR_LOG_BUFFER (=5) + its required
@@ -338,42 +403,58 @@ impl Module {
             };
             return Err(crate::error::Error::new(crate::error::Kind::External, msg));
         }
-        Ok(Module { fns: *fns, handle })
+        Ok(Module {
+            inner: Arc::new(ModuleInner {
+                ctx: ctx.clone(),
+                handle,
+            }),
+        })
     }
 
-    /// Look up a kernel entry by (mangled-free) export name.
+    /// Look up a kernel entry by (mangled-free) export name. The returned
+    /// `Function` retains this module (and therefore the context).
     pub fn function(&self, name: &str) -> Result<Function> {
         let cname = CString::new(name).map_err(|_| Error::malformed("kernel name has NUL"))?;
         let mut f: usize = 0;
-        // SAFETY: out-param; cname lives for the call.
+        // SAFETY: out-param; cname lives for the call; the module handle is
+        // owned by `self.inner` and alive.
         let rc = unsafe {
-            (self.fns.cuModuleGetFunction.expect("bound"))(&mut f, self.handle, cname.as_ptr())
+            (self.inner.ctx.fns.cuModuleGetFunction.expect("bound"))(
+                &mut f,
+                self.inner.handle,
+                cname.as_ptr(),
+            )
         };
-        check(&self.fns, "cuModuleGetFunction", rc)?;
+        check(&self.inner.ctx.fns, "cuModuleGetFunction", rc)?;
         Ok(Function {
-            fns: self.fns,
+            module: self.inner.clone(),
             handle: f,
+            entry: name.to_string(),
         })
     }
-}
 
-impl Drop for Module {
-    fn drop(&mut self) {
-        if self.handle != 0 {
-            // SAFETY: module unload (best effort).
-            unsafe { (self.fns.cuModuleUnload.expect("bound"))(self.handle) };
-        }
+    /// The context this module belongs to.
+    pub fn ctx(&self) -> &Arc<CudaContext> {
+        &self.inner.ctx
     }
 }
 
-/// A kernel function handle.
-#[derive(Clone, Copy)]
+/// A kernel function handle. Retains its module owner (and thereby the
+/// context), so it cannot outlive either.
+#[derive(Clone)]
 pub struct Function {
-    pub fns: Fns,
+    module: Arc<ModuleInner>,
     pub handle: usize,
+    /// Export name (evidence).
+    pub entry: String,
 }
 
 impl Function {
+    /// The context this function belongs to.
+    pub fn ctx(&self) -> &Arc<CudaContext> {
+        &self.module.ctx
+    }
+
     /// Launch with parameters given as 8-byte little-endian values in order
     /// (device pointers and 64-bit scalars; the kernel ABI takes one 64-bit
     /// parameter slot each).
@@ -384,6 +465,7 @@ impl Function {
         stream: CUstream,
         params: &[u64],
     ) -> Result<()> {
+        let fns = &self.module.ctx.fns;
         // The driver expects an array of pointers, each pointing at one
         // parameter's bytes. Build a local value buffer and point into it
         // (the call is synchronous in the sense that the driver copies the
@@ -397,7 +479,7 @@ impl Function {
         // `buf` (kept alive for the call); `extra` is NULL; the kernel is
         // `vole_render_d0` (no shared memory requested).
         let rc = unsafe {
-            (self.fns.cuLaunchKernel.expect("bound"))(
+            (fns.cuLaunchKernel.expect("bound"))(
                 self.handle,
                 grid.0,
                 grid.1,
@@ -411,7 +493,7 @@ impl Function {
                 std::ptr::null_mut(),
             )
         };
-        check(&self.fns, "cuLaunchKernel", rc)
+        check(fns, "cuLaunchKernel", rc)
     }
 }
 
@@ -419,41 +501,48 @@ impl Function {
 // Streams / events
 // ---------------------------------------------------------------------------
 
-/// A CUDA stream (RAII). `raw()` exposes the handle for launch calls.
+/// A CUDA stream (RAII). Retains the context, so it cannot outlive it.
 pub struct Stream {
-    pub fns: Fns,
+    ctx: Arc<CudaContext>,
     pub handle: CUstream,
 }
 
 impl Stream {
-    fn create(fns: &Fns, flags: u32) -> Result<Stream> {
+    fn create(ctx: &Arc<CudaContext>, flags: u32) -> Result<Stream> {
         let mut handle: CUstream = 0;
         // SAFETY: out-param.
-        let rc = unsafe { (fns.cuStreamCreate.expect("bound"))(&mut handle, flags) };
-        check(fns, "cuStreamCreate", rc)?;
-        Ok(Stream { fns: *fns, handle })
+        let rc = unsafe { (ctx.fns.cuStreamCreate.expect("bound"))(&mut handle, flags) };
+        check(&ctx.fns, "cuStreamCreate", rc)?;
+        Ok(Stream {
+            ctx: ctx.clone(),
+            handle,
+        })
     }
 
-    fn create_priority(fns: &Fns, priority: i32) -> Result<Stream> {
+    fn create_priority(ctx: &Arc<CudaContext>, priority: i32) -> Result<Stream> {
         let mut handle: CUstream = 0;
         // SAFETY: out-param.
-        let rc =
-            unsafe { (fns.cuStreamCreateWithPriority.expect("bound"))(&mut handle, 0, priority) };
-        check(fns, "cuStreamCreateWithPriority", rc)?;
-        Ok(Stream { fns: *fns, handle })
+        let rc = unsafe {
+            (ctx.fns.cuStreamCreateWithPriority.expect("bound"))(&mut handle, 0, priority)
+        };
+        check(&ctx.fns, "cuStreamCreateWithPriority", rc)?;
+        Ok(Stream {
+            ctx: ctx.clone(),
+            handle,
+        })
     }
 
     pub fn synchronize(&self) -> Result<()> {
         // SAFETY: stream synchronize.
-        let rc = unsafe { (self.fns.cuStreamSynchronize.expect("bound"))(self.handle) };
-        check(&self.fns, "cuStreamSynchronize", rc)
+        let rc = unsafe { (self.ctx.fns.cuStreamSynchronize.expect("bound"))(self.handle) };
+        check(&self.ctx.fns, "cuStreamSynchronize", rc)
     }
 
     pub fn priority(&self) -> Result<i32> {
         let mut p = 0;
         // SAFETY: out-param.
-        let rc = unsafe { (self.fns.cuStreamGetPriority.expect("bound"))(self.handle, &mut p) };
-        check(&self.fns, "cuStreamGetPriority", rc)?;
+        let rc = unsafe { (self.ctx.fns.cuStreamGetPriority.expect("bound"))(self.handle, &mut p) };
+        check(&self.ctx.fns, "cuStreamGetPriority", rc)?;
         Ok(p)
     }
 }
@@ -461,20 +550,21 @@ impl Stream {
 impl Drop for Stream {
     fn drop(&mut self) {
         if self.handle != 0 {
-            // SAFETY: stream destroy (best effort).
-            unsafe { (self.fns.cuStreamDestroy.expect("bound"))(self.handle) };
+            // SAFETY: stream destroy (best effort); the context is alive
+            // because this struct retains it.
+            unsafe { (self.ctx.fns.cuStreamDestroy.expect("bound"))(self.handle) };
         }
     }
 }
 
-/// A CUDA event (RAII).
+/// A CUDA event (RAII). Retains the context.
 pub struct Event {
-    pub fns: Fns,
+    ctx: Arc<CudaContext>,
     pub handle: usize,
 }
 
 impl Event {
-    fn create(fns: &Fns, disable_timing: bool) -> Result<Event> {
+    fn create(ctx: &Arc<CudaContext>, disable_timing: bool) -> Result<Event> {
         let flags = if disable_timing {
             super::ffi::CU_EVENT_DISABLE_TIMING
         } else {
@@ -482,21 +572,24 @@ impl Event {
         };
         let mut handle: usize = 0;
         // SAFETY: out-param.
-        let rc = unsafe { (fns.cuEventCreate.expect("bound"))(&mut handle, flags) };
-        check(fns, "cuEventCreate", rc)?;
-        Ok(Event { fns: *fns, handle })
+        let rc = unsafe { (ctx.fns.cuEventCreate.expect("bound"))(&mut handle, flags) };
+        check(&ctx.fns, "cuEventCreate", rc)?;
+        Ok(Event {
+            ctx: ctx.clone(),
+            handle,
+        })
     }
 
     pub fn record(&self, stream: CUstream) -> Result<()> {
         // SAFETY: event record.
-        let rc = unsafe { (self.fns.cuEventRecord.expect("bound"))(self.handle, stream) };
-        check(&self.fns, "cuEventRecord", rc)
+        let rc = unsafe { (self.ctx.fns.cuEventRecord.expect("bound"))(self.handle, stream) };
+        check(&self.ctx.fns, "cuEventRecord", rc)
     }
 
     pub fn synchronize(&self) -> Result<()> {
         // SAFETY: event synchronize.
-        let rc = unsafe { (self.fns.cuEventSynchronize.expect("bound"))(self.handle) };
-        check(&self.fns, "cuEventSynchronize", rc)
+        let rc = unsafe { (self.ctx.fns.cuEventSynchronize.expect("bound"))(self.handle) };
+        check(&self.ctx.fns, "cuEventSynchronize", rc)
     }
 
     /// Milliseconds between `start` and `self` (both timing-enabled).
@@ -504,9 +597,9 @@ impl Event {
         let mut ms = 0.0f32;
         // SAFETY: out-param.
         let rc = unsafe {
-            (self.fns.cuEventElapsedTime.expect("bound"))(&mut ms, start.handle, self.handle)
+            (self.ctx.fns.cuEventElapsedTime.expect("bound"))(&mut ms, start.handle, self.handle)
         };
-        check(&self.fns, "cuEventElapsedTime", rc)?;
+        check(&self.ctx.fns, "cuEventElapsedTime", rc)?;
         Ok(f64::from(ms))
     }
 }
@@ -514,8 +607,9 @@ impl Event {
 impl Drop for Event {
     fn drop(&mut self) {
         if self.handle != 0 {
-            // SAFETY: event destroy (best effort).
-            unsafe { (self.fns.cuEventDestroy.expect("bound"))(self.handle) };
+            // SAFETY: event destroy (best effort); the context is alive
+            // because this struct retains it.
+            unsafe { (self.ctx.fns.cuEventDestroy.expect("bound"))(self.handle) };
         }
     }
 }
@@ -524,26 +618,27 @@ impl Drop for Event {
 // Device memory
 // ---------------------------------------------------------------------------
 
-/// A device memory allocation (RAII).
+/// A device memory allocation (RAII). Retains the context, so `cuMemFree`
+/// targets a live context and the driver cannot be dlclosed underneath it.
 pub struct DeviceBuffer {
-    pub fns: Fns,
+    ctx: Arc<CudaContext>,
     pub ptr: CUdeviceptr,
     pub bytes: usize,
 }
 
 impl DeviceBuffer {
-    pub fn alloc(fns: &Fns, bytes: usize) -> Result<DeviceBuffer> {
+    pub fn alloc(ctx: &Arc<CudaContext>, bytes: usize) -> Result<DeviceBuffer> {
         if bytes == 0 {
             // The driver rejects zero-size allocations; allocate one byte so
             // empty arenas still have a valid (never-dereferenced) pointer.
-            return DeviceBuffer::alloc(fns, 1);
+            return DeviceBuffer::alloc(ctx, 1);
         }
         let mut ptr: CUdeviceptr = 0;
         // SAFETY: out-param.
-        let rc = unsafe { (fns.cuMemAlloc.expect("bound"))(&mut ptr, bytes) };
-        check(fns, "cuMemAlloc", rc)?;
+        let rc = unsafe { (ctx.fns.cuMemAlloc.expect("bound"))(&mut ptr, bytes) };
+        check(&ctx.fns, "cuMemAlloc", rc)?;
         Ok(DeviceBuffer {
-            fns: *fns,
+            ctx: ctx.clone(),
             ptr,
             bytes,
         })
@@ -553,22 +648,26 @@ impl DeviceBuffer {
         debug_assert_eq!(host.len(), self.bytes);
         // SAFETY: host bytes length == allocation size; synchronous copy.
         let rc = unsafe {
-            (self.fns.cuMemcpyHtoD.expect("bound"))(self.ptr, host.as_ptr() as *const _, host.len())
+            (self.ctx.fns.cuMemcpyHtoD.expect("bound"))(
+                self.ptr,
+                host.as_ptr() as *const _,
+                host.len(),
+            )
         };
-        check(&self.fns, "cuMemcpyHtoD", rc)
+        check(&self.ctx.fns, "cuMemcpyHtoD", rc)
     }
 
     pub fn download(&self, host: &mut [u8]) -> Result<()> {
         debug_assert_eq!(host.len(), self.bytes);
         // SAFETY: host buffer length == allocation size.
         let rc = unsafe {
-            (self.fns.cuMemcpyDtoH.expect("bound"))(
+            (self.ctx.fns.cuMemcpyDtoH.expect("bound"))(
                 host.as_mut_ptr() as *mut _,
                 self.ptr,
                 host.len(),
             )
         };
-        check(&self.fns, "cuMemcpyDtoH", rc)
+        check(&self.ctx.fns, "cuMemcpyDtoH", rc)
     }
 
     /// Download only the leading `host.len()` bytes of the allocation (the
@@ -578,41 +677,41 @@ impl DeviceBuffer {
         debug_assert!(host.len() <= self.bytes);
         // SAFETY: host buffer length <= allocation size.
         let rc = unsafe {
-            (self.fns.cuMemcpyDtoH.expect("bound"))(
+            (self.ctx.fns.cuMemcpyDtoH.expect("bound"))(
                 host.as_mut_ptr() as *mut _,
                 self.ptr,
                 host.len(),
             )
         };
-        check(&self.fns, "cuMemcpyDtoH", rc)
+        check(&self.ctx.fns, "cuMemcpyDtoH", rc)
     }
 
     pub fn upload_async(&self, host: &[u8], stream: CUstream) -> Result<()> {
         debug_assert_eq!(host.len(), self.bytes);
         // SAFETY: as upload but stream-ordered.
         let rc = unsafe {
-            (self.fns.cuMemcpyHtoDAsync.expect("bound"))(
+            (self.ctx.fns.cuMemcpyHtoDAsync.expect("bound"))(
                 self.ptr,
                 host.as_ptr() as *const _,
                 host.len(),
                 stream,
             )
         };
-        check(&self.fns, "cuMemcpyHtoDAsync", rc)
+        check(&self.ctx.fns, "cuMemcpyHtoDAsync", rc)
     }
 
     pub fn download_async(&self, host: &mut [u8], stream: CUstream) -> Result<()> {
         debug_assert_eq!(host.len(), self.bytes);
         // SAFETY: as download but stream-ordered.
         let rc = unsafe {
-            (self.fns.cuMemcpyDtoHAsync.expect("bound"))(
+            (self.ctx.fns.cuMemcpyDtoHAsync.expect("bound"))(
                 host.as_mut_ptr() as *mut _,
                 self.ptr,
                 host.len(),
                 stream,
             )
         };
-        check(&self.fns, "cuMemcpyDtoHAsync", rc)
+        check(&self.ctx.fns, "cuMemcpyDtoHAsync", rc)
     }
 
     /// Raw device pointer for kernel parameters.
@@ -624,8 +723,9 @@ impl DeviceBuffer {
 impl Drop for DeviceBuffer {
     fn drop(&mut self) {
         if self.ptr != 0 {
-            // SAFETY: device free (best effort).
-            unsafe { (self.fns.cuMemFree.expect("bound"))(self.ptr) };
+            // SAFETY: device free (best effort); the context is alive because
+            // this struct retains it.
+            unsafe { (self.ctx.fns.cuMemFree.expect("bound"))(self.ptr) };
         }
     }
 }
@@ -635,19 +735,20 @@ impl Drop for DeviceBuffer {
 // ---------------------------------------------------------------------------
 
 /// A captured+instantiated CUDA graph executable (RAII) for one fixed
-/// (kernel, grid, buffers) launch shape.
+/// (kernel, grid, buffers) launch shape. Retains the context.
 pub struct GraphExec {
-    pub fns: Fns,
+    ctx: Arc<CudaContext>,
     pub handle: CUgraphExec,
 }
 
 impl GraphExec {
     /// Capture the given closure's kernel launches on `stream` and
     /// instantiate. `stream` must be otherwise idle.
-    pub fn capture<F>(fns: &Fns, stream: CUstream, launch: F) -> Result<GraphExec>
+    pub fn capture<F>(ctx: &Arc<CudaContext>, stream: CUstream, launch: F) -> Result<GraphExec>
     where
         F: FnOnce() -> Result<()>,
     {
+        let fns = &ctx.fns;
         // SAFETY: begin capture in relaxed mode.
         let rc = unsafe {
             (fns.cuStreamBeginCapture.expect("bound"))(
@@ -669,23 +770,24 @@ impl GraphExec {
         unsafe { (fns.cuGraphDestroy.expect("bound"))(graph) };
         check(fns, "cuGraphInstantiateWithFlags", rc)?;
         Ok(GraphExec {
-            fns: *fns,
+            ctx: ctx.clone(),
             handle: exec,
         })
     }
 
     pub fn launch(&self, stream: CUstream) -> Result<()> {
         // SAFETY: graph launch on a stream.
-        let rc = unsafe { (self.fns.cuGraphLaunch.expect("bound"))(self.handle, stream) };
-        check(&self.fns, "cuGraphLaunch", rc)
+        let rc = unsafe { (self.ctx.fns.cuGraphLaunch.expect("bound"))(self.handle, stream) };
+        check(&self.ctx.fns, "cuGraphLaunch", rc)
     }
 }
 
 impl Drop for GraphExec {
     fn drop(&mut self) {
         if self.handle != 0 {
-            // SAFETY: graph exec destroy (best effort).
-            unsafe { (self.fns.cuGraphExecDestroy.expect("bound"))(self.handle) };
+            // SAFETY: graph exec destroy (best effort); the context is alive
+            // because this struct retains it.
+            unsafe { (self.ctx.fns.cuGraphExecDestroy.expect("bound"))(self.handle) };
         }
     }
 }

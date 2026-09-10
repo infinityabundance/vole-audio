@@ -400,6 +400,7 @@ pub fn run(receipts_root: &Path) -> crate::error::Result<Verdict> {
                 "max_period_scan": budget.max_period_scan,
                 "max_residual_period_candidates": budget.max_residual_period_candidates,
                 "max_candidates": budget.max_candidates,
+                "placement": budget.placement.label(),
             }),
         )
         .extra("procedural_library_reference", procedural.cell)

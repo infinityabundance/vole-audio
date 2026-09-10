@@ -923,8 +923,8 @@ authority.
 ### Phase L — GPU inverse search (complete)
 
 Charter + seal ledger: `docs/PHASE_L.md`. Phase L places the inverse
-compiler's dominant search cost — the bounded period scan — on four surfaces
-and proves that placement is a **performance** question only:
+compiler's dominant search cost — the bounded period scan — across four
+possible surfaces and proves that placement is a **performance** question only:
 
 - `device/search_shared.rs`: one shared `no_std` implementation
   (`period_records`, `scan_into`) that is *exactly* the p-dependent part of
@@ -937,10 +937,13 @@ and proves that placement is a **performance** question only:
   (`SearchWorld`, `SearchWorldRocm`) driving the entry; the AMD path follows
   the frozen `device::geom` launch contract.
 - `inverse/search.rs`: `PeriodScan`, the scalar and host-parallel scan
-  surfaces, and the frozen ranking rule (`rank_periods`).
-- `inverse::compile_with` accepts an externally ranked period list; it can
-  change *which* periodic hypotheses are proposed, never whether one is
-  accepted (`inverse::compile` remains the default sequential path).
+  surfaces, `SearchPlacement`, and the frozen ranking rule (`rank_periods`).
+- `inverse::compile_with` accepts an externally ranked period list and preserves
+  the caller's rank order (filter → dedup-by-first-occurrence → take `keep` →
+  canonicalize); it can change *which* periodic hypotheses are proposed, never
+  whether one is accepted. `inverse::compile` ranks through
+  `SearchBudget::placement` (`Auto` by default, which selects the measured-faster
+  host surface; `Scalar` is the reference placement).
 - `court inverse-search`: 14 fixtures × 512 periods; CUDA counts exactly equal
   the scalar counts on all 14 fixtures, 80 accepted candidates re-verified by
   the exact evaluator, and every accepted set identical between the
@@ -948,9 +951,12 @@ and proves that placement is a **performance** question only:
   build: parallel **0.228×** and CUDA **1.779×** the sequential scan wall time
   — the host-parallel scan wins and the CUDA scan is *slower* here (per-launch
   and transfer overhead dominates a scan this small), so the default placement
-  stays on the host and the device path is kept as a verified-equal surface.
-  The receipt records both ratios with explicit limitations. ROCm is a typed
-  `UNSUPPORTED_BY_HARDWARE` row.
+  keeps the host surface and the device path is kept as a verified-equal
+  surface. Work per period is `O(frames - p)`, so a scan of periods `1..=P`
+  costs `P*F - P*(P+1)/2` comparisons. The receipt states the executed-surface
+  count explicitly and records both ratios with explicit limitations. ROCm is a
+  typed `UNSUPPORTED_BY_HARDWARE` row; when AMD hardware is present the ROCm row
+  runs the same 14-fixture battery as CUDA.
 - Artifacts change because the kernel surface grew: PTX `d13d22c3…`, AMDGPU
   `5c30a4bc…` (still byte-deterministic across isolated builds).
 

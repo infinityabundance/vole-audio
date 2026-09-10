@@ -204,8 +204,11 @@ at stored content.
   every surface produces identical per-period counts because they call the
   same `device::search_shared::period_records`. `inverse::compile_with`
   accepts an externally ranked period list, which changes only *which*
-  periodic hypotheses are proposed — never whether one is accepted. See
-  `PHASE_L.md`.
+  periodic hypotheses are proposed — never whether one is accepted. The
+  caller's rank order is preserved (filter to range → deduplicate by first
+  occurrence → take the budgeted count → canonicalize ascending). When no list
+  is supplied, `SearchBudget::placement` decides the host surface (`Auto` by
+  default; `Scalar` is the reference). See `PHASE_L.md`.
 
 ## 8. Running it
 

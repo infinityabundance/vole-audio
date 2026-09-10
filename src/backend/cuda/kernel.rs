@@ -125,20 +125,20 @@ impl KernelWorld {
 
         // Upload the world once (no per-quantum allocation anywhere in the
         // render path).
-        let d_voices = DeviceBuffer::alloc(&cuda.fns, unsafe { pod_bytes(&flat.voices) }.len())?;
+        let d_voices = DeviceBuffer::alloc(&cuda.ctx, unsafe { pod_bytes(&flat.voices) }.len())?;
         d_voices.upload(unsafe { pod_bytes(&flat.voices) })?;
-        let d_samples = DeviceBuffer::alloc(&cuda.fns, unsafe { pod_bytes(&flat.samples) }.len())?;
+        let d_samples = DeviceBuffer::alloc(&cuda.ctx, unsafe { pod_bytes(&flat.samples) }.len())?;
         d_samples.upload(unsafe { pod_bytes(&flat.samples) })?;
         let d_partials =
-            DeviceBuffer::alloc(&cuda.fns, unsafe { pod_bytes(&flat.partials) }.len())?;
+            DeviceBuffer::alloc(&cuda.ctx, unsafe { pod_bytes(&flat.partials) }.len())?;
         d_partials.upload(unsafe { pod_bytes(&flat.partials) })?;
         let state = flat.state(0, max_frames);
         let state_arr = [state];
         let state_bytes: Vec<u8> = unsafe { pod_bytes(&state_arr) }.to_vec();
-        let d_state = DeviceBuffer::alloc(&cuda.fns, state_bytes.len())?;
+        let d_state = DeviceBuffer::alloc(&cuda.ctx, state_bytes.len())?;
         d_state.upload(&state_bytes)?;
         let out_bytes = vec![0u8; max_frames * channels * 4];
-        let d_out = DeviceBuffer::alloc(&cuda.fns, out_bytes.len())?;
+        let d_out = DeviceBuffer::alloc(&cuda.ctx, out_bytes.len())?;
 
         let stream_standard = cuda.create_stream()?;
         let stream_priority = if cuda.device.stream_priorities_supported != 0 {
@@ -189,9 +189,9 @@ impl KernelWorld {
     pub fn capture_graph(&mut self, frames: usize) -> Result<()> {
         let channels = self.flat.output_channels;
         let grid = grid_for(frames, channels);
-        let f = self.function;
+        let f = self.function.clone();
         let params = self.kernel_params();
-        let graph = GraphExec::capture(&self.cuda.fns, self.stream_standard.handle, || {
+        let graph = GraphExec::capture(&self.cuda.ctx, self.stream_standard.handle, || {
             f.launch(
                 grid,
                 (BLOCK_THREADS, 1, 1),
@@ -492,6 +492,49 @@ mod smoke_tests {
         let f = module.function(super::KERNEL_ENTRY).expect("function");
         println!("module + function OK on {}", cuda.device.name);
         let _ = f;
+    }
+
+    /// Ownership regression (Phase L review): every GPU resource retains the
+    /// context owner, so dropping the session handle must not destroy the
+    /// context while buffers/streams still exist — and the resources must
+    /// remain usable afterwards. Before the fix, `Cuda` owned the context and
+    /// its dependencies carried only a copied function table, so this
+    /// sequence freed into a destroyed context.
+    #[test]
+    #[ignore = "requires CUDA GPU"]
+    fn resources_outlive_the_session_handle() {
+        use std::sync::Arc;
+        let cuda = super::super::driver::Cuda::open(0).expect("cuda open");
+        let buf = cuda.alloc(64).expect("alloc");
+        let stream = cuda.create_stream().expect("stream");
+        let held = Arc::strong_count(cuda.ctx());
+        assert!(held >= 3, "resources must retain the context (held {held})");
+        drop(cuda); // the session handle is gone; the context must survive
+        buf.upload(&[7u8; 64]).expect("upload after session drop");
+        stream
+            .synchronize()
+            .expect("synchronize after session drop");
+        // The last owner destroys the context, after every free/destroy call.
+        drop(stream);
+        drop(buf);
+    }
+
+    /// A kernel handle must not outlive its module (structural retention).
+    #[test]
+    #[ignore = "requires CUDA GPU + built PTX artifact"]
+    fn function_outlives_the_module_handle() {
+        unsafe { std::env::set_var("CUDA_MODULE_LOADING", "EAGER") };
+        let ptx = ptx();
+        let cuda = super::super::driver::Cuda::open(0).expect("cuda open");
+        let module = cuda.load_module(&ptx).expect("module load");
+        let f = module.function(super::KERNEL_ENTRY).expect("function");
+        drop(module); // the `Function` retains the module owner
+        // The function keeps the module (and therefore the context) alive.
+        assert!(
+            std::sync::Arc::strong_count(f.ctx()) >= 2,
+            "a function must retain its module's context"
+        );
+        assert_ne!(f.handle, 0);
     }
 
     #[test]

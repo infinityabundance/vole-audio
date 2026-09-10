@@ -3,7 +3,8 @@
 //! The inverse compiler's dominant search cost is the bounded period scan: for
 //! every candidate period `p`, the exact periodic residual record count. That
 //! whole vector is embarrassingly parallel (one independent period per worker),
-//! so Phase L places it on four surfaces and requires them to agree:
+//! so Phase L places it on four possible surfaces and requires every surface
+//! that actually executes to agree:
 //!
 //! ```text
 //! scalar     sequential host scan (the reference)
@@ -11,6 +12,13 @@
 //! CUDA       vole_period_scan, one device thread per period
 //! ROCm       the same kernel from the AMDGPU code object
 //! ```
+//!
+//! The device surfaces are also the **GPU baseline**, not the endpoint of the
+//! GPU-search investigation: one device thread per period gives only
+//! `P / threads_per_block` blocks. The next GPU search experiment is a
+//! `periods x frame-tiles` mapping with a deterministic per-period reduction,
+//! which raises the independent work-item count without moving any acceptance
+//! authority onto the device.
 //!
 //! Two properties are asserted, and they are the whole point of the phase:
 //!
@@ -26,9 +34,11 @@
 //!
 //! Honest measurement: the court reports the measured wall time of each
 //! surface and the implied ratio, but makes no claim that the GPU wins. Work
-//! per period is `O(frames / p)`, so the balance depends on the period bound;
-//! the policy is "keep the faster implementation for the family", and the
-//! receipt carries the numbers either way.
+//! per period is `O(frames - p)` (a period `p` compares frames `p..frames`), so
+//! a scan of periods `1..=P` does `P*F - P*(P+1)/2` comparisons; the balance
+//! therefore depends on the period bound. The policy is "keep the faster
+//! implementation for the family", and the receipt carries the numbers either
+//! way.
 
 use crate::backend::cuda::SearchWorld;
 use crate::device::search_shared::PERIOD_NOT_CLOSEABLE;
@@ -303,30 +313,52 @@ pub fn run(receipts_root: &Path) -> crate::error::Result<Verdict> {
             );
             match artifact {
                 Ok(bytes) => {
-                    let fx = &fixtures[0];
-                    let channels = usize::from(fx.channels);
-                    let window: Vec<i32> = (0..fx.frames as usize)
-                        .map(|f| fx.samples[f * channels])
-                        .collect();
-                    let scanner = crate::backend::rocm::SearchWorldRocm::open(
-                        0,
-                        &bytes,
-                        fx.frames as u32,
-                        SEARCH_PERIODS,
-                    )?;
-                    let counts = scanner.scan(&window)?;
-                    let scan = PeriodScan { counts };
-                    let scalar =
-                        inverse::search::scan_scalar(&window, fx.frames as u32, SEARCH_PERIODS);
-                    if !inverse::search::scans_agree(&scalar, &scan) {
-                        return fail("the ROCm period scan diverged from the sequential scan");
+                    // The ROCm surface must clear the *same* battery as CUDA:
+                    // every fixture, with counts identical to the sequential
+                    // scan. A single-fixture smoke test is not enough, because
+                    // `fixtures[0]` is silence — an all-zero broken kernel would
+                    // pass it.
+                    for fx in &fixtures {
+                        let channels = usize::from(fx.channels);
+                        let frames = fx.frames as u32;
+                        let window: Vec<i32> = (0..fx.frames as usize)
+                            .map(|f| fx.samples[f * channels])
+                            .collect();
+                        let scanner = match crate::backend::rocm::SearchWorldRocm::open(
+                            0,
+                            &bytes,
+                            frames,
+                            SEARCH_PERIODS,
+                        ) {
+                            Ok(s) => s,
+                            Err(e) => {
+                                return fail(&format!(
+                                    "{}: ROCm search world failed to open: {e}",
+                                    fx.name
+                                ));
+                            }
+                        };
+                        let counts = match scanner.scan(&window) {
+                            Ok(c) => c,
+                            Err(e) => {
+                                return fail(&format!("{}: ROCm period scan failed: {e}", fx.name));
+                            }
+                        };
+                        let scan = PeriodScan { counts };
+                        let scalar = inverse::search::scan_scalar(&window, frames, SEARCH_PERIODS);
+                        if !inverse::search::scans_agree(&scalar, &scan) {
+                            return fail(&format!(
+                                "{}: the ROCm period scan diverged from the sequential scan",
+                                fx.name
+                            ));
+                        }
+                        rocm_cells.push(serde_json::json!({
+                            "fixture": fx.name,
+                            "counts_sha256": scan_hash(&scan),
+                            "surface": ScanSurface::Rocm.label(),
+                        }));
                     }
                     rocm_executed = true;
-                    rocm_cells.push(serde_json::json!({
-                        "fixture": fx.name,
-                        "counts_sha256": scan_hash(&scan),
-                        "surface": ScanSurface::Rocm.label(),
-                    }));
                 }
                 Err(e) => {
                     rocm_cells.push(serde_json::json!({
@@ -339,11 +371,25 @@ pub fn run(receipts_root: &Path) -> crate::error::Result<Verdict> {
     }
 
     let result_hex = hex(&result_hash.finalize());
+    // Truthful execution-surface count: the ROCm code object may exist as a
+    // compile-only, hardware-pending surface without having executed.
+    let executed_surfaces = 2 + usize::from(cuda_world.is_some()) + usize::from(rocm_executed);
+    let compile_only_surfaces = usize::from(!rocm_executed);
+    let surface_note = if compile_only_surfaces == 0 {
+        format!("{executed_surfaces} execution surfaces")
+    } else {
+        format!(
+            "{executed_surfaces} execution surfaces + {compile_only_surfaces} \
+             compile-only hardware-pending ROCm surface"
+        )
+    };
     let aggregate = serde_json::json!({
         "fixtures": fixtures.len(),
         "cuda_compared": cuda_compared,
         "cuda_requested": cuda_world.is_some(),
         "host_threads": threads,
+        "executed_surfaces": executed_surfaces,
+        "compile_only_surfaces": compile_only_surfaces,
         "scalar_nanos_total": scalar_ns_total,
         "parallel_nanos_total": parallel_ns_total,
         "parallel_ratio_vs_scalar": parallel_ns_total as f64 / scalar_ns_total.max(1) as f64,
@@ -381,11 +427,10 @@ pub fn run(receipts_root: &Path) -> crate::error::Result<Verdict> {
     builder
         .result(verdict)
         .result_detail(format!(
-            "period scan over {} fixtures x {} periods on {} surfaces; \
+            "period scan over {} fixtures x {} periods on {surface_note}; \
              device compared on {}; {} accepted candidates re-verified; result sha256 {result_hex}",
             fixtures.len(),
             SEARCH_PERIODS,
-            if cuda_world.is_some() { 4 } else { 3 },
             cuda_compared,
             accepted_candidates_checked,
         ))
@@ -400,6 +445,7 @@ pub fn run(receipts_root: &Path) -> crate::error::Result<Verdict> {
             serde_json::json!({
                 "max_period_scan": budget.max_period_scan,
                 "max_residual_period_candidates": budget.max_residual_period_candidates,
+                "placement": budget.placement.label(),
             }),
         )
         .extra("aggregate", aggregate)
@@ -412,8 +458,15 @@ pub fn run(receipts_root: &Path) -> crate::error::Result<Verdict> {
              representation is re-verified by the normative exact evaluator",
         )
         .limitation(
-            "no claim that the GPU wins: work per period is O(frames / p), so the balance \
-             depends on the period bound; measured ratios are reported as-is",
+            "no claim that the GPU wins: work per period is O(frames - p) (a period p \
+             compares frames p..frames), so a scan of periods 1..=P costs P*F - P*(P+1)/2 \
+             comparisons and the balance depends on the period bound; measured ratios are \
+             reported as-is",
+        )
+        .limitation(
+            "the one-thread-per-period device kernel is the GPU *baseline*, not the endpoint: \
+             a periods x frame-tiles mapping with deterministic per-period reduction is the \
+             next GPU search experiment",
         );
     let (_, path) = builder.finish_write(receipts_root)?;
     println!("court inverse-search: {verdict}");

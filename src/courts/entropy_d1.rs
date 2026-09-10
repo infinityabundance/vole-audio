@@ -253,7 +253,7 @@ fn register_ring(
 ) -> std::result::Result<HostRegistration, (Verdict, String)> {
     let bytes = region_bytes(pcm) as usize;
     // SAFETY: pcm keeps the ALSA mapping alive for the session.
-    match unsafe { attempt_register(&cuda.fns, pcm.area_base, bytes) } {
+    match unsafe { attempt_register(&cuda.ctx, pcm.area_base, bytes) } {
         RegistrationAttempt::Registered(r) => Ok(r),
         RegistrationAttempt::MissingSymbol(m) => Err((
             Verdict::UnsupportedByApi,
@@ -689,7 +689,7 @@ fn session_d0_literal(
         .cuda
         .create_stream()
         .map_err(|e| (Verdict::Inconclusive, format!("stream: {e}")))?;
-    let world = EntropyWorld::open_preloaded(&ctx.cuda.fns, ctx.decode, stream, &full)
+    let world = EntropyWorld::open_preloaded(&ctx.cuda.ctx, ctx.decode.clone(), stream, &full)
         .map_err(|e| (Verdict::Inconclusive, format!("world: {e}")))?;
     let codes = world
         .decode()
@@ -755,7 +755,7 @@ fn session_d0_residual(
         .cuda
         .create_stream()
         .map_err(|e| (Verdict::Inconclusive, format!("stream: {e}")))?;
-    let world = EntropyWorld::open_preloaded(&ctx.cuda.fns, ctx.decode, stream, &full)
+    let world = EntropyWorld::open_preloaded(&ctx.cuda.ctx, ctx.decode.clone(), stream, &full)
         .map_err(|e| (Verdict::Inconclusive, format!("world: {e}")))?;
     let codes = world
         .decode()
@@ -850,7 +850,7 @@ fn session_d1_literal(
             .cuda
             .create_stream()
             .map_err(|e| (Verdict::Inconclusive, format!("stream: {e}")))?;
-        let world = EntropyWorld::open_preloaded(&ctx.cuda.fns, ctx.decode, stream, &job)
+        let world = EntropyWorld::open_preloaded(&ctx.cuda.ctx, ctx.decode.clone(), stream, &job)
             .map_err(|e| (Verdict::Inconclusive, format!("world: {e}")))?;
         worlds.push((job, world));
     }
@@ -871,7 +871,7 @@ fn session_d1_literal(
     // first paced chunks would pay the cold-launch cost and underrun the
     // endpoint. Receipted as a limitation.
     {
-        let warm = DeviceBuffer::alloc(&ctx.cuda.fns, 1024 * 4)
+        let warm = DeviceBuffer::alloc(&ctx.cuda.ctx, 1024 * 4)
             .map_err(|e| (Verdict::Inconclusive, format!("warmup arena: {e}")))?;
         for _ in 0..10 {
             for (_, w) in &worlds {
@@ -947,7 +947,7 @@ fn session_d1_residual(
         .map_err(|e| (Verdict::Inconclusive, format!("upmix stream: {e}")))?;
     // Window-local transient decode arena (mono samples of one window =
     // two 256-frame pages), re-used across windows of the session.
-    let arena = DeviceBuffer::alloc(&ctx.cuda.fns, PERIOD_FRAMES as usize * 4)
+    let arena = DeviceBuffer::alloc(&ctx.cuda.ctx, PERIOD_FRAMES as usize * 4)
         .map_err(|e| (Verdict::Inconclusive, format!("arena: {e}")))?;
     let chunks = OBJECT_FRAMES / PERIOD_FRAMES as usize;
     let mut worlds = Vec::with_capacity(chunks);
@@ -958,13 +958,13 @@ fn session_d1_residual(
             .cuda
             .create_stream()
             .map_err(|e| (Verdict::Inconclusive, format!("stream: {e}")))?;
-        let world = EntropyWorld::open_preloaded(&ctx.cuda.fns, ctx.decode, stream, &job)
+        let world = EntropyWorld::open_preloaded(&ctx.cuda.ctx, ctx.decode.clone(), stream, &job)
             .map_err(|e| (Verdict::Inconclusive, format!("world: {e}")))?;
         worlds.push((job, world));
     }
     // Sustained-clock warm-up (see the literal session for the rationale).
     {
-        let warm = DeviceBuffer::alloc(&ctx.cuda.fns, PERIOD_FRAMES as usize * 4)
+        let warm = DeviceBuffer::alloc(&ctx.cuda.ctx, PERIOD_FRAMES as usize * 4)
             .map_err(|e| (Verdict::Inconclusive, format!("warmup arena: {e}")))?;
         for _ in 0..10 {
             for (_, w) in &worlds {
@@ -986,7 +986,7 @@ fn session_d1_residual(
         ..Default::default()
     };
     let frame_bytes = pcm.request.frame_bytes();
-    let upmix = ctx.upmix;
+    let upmix = ctx.upmix.clone();
     // Independent endpoint-region digest (see the d0-literal session).
     let mut endpoint_sha = crate::hash::sha256::Sha256::new();
     let out = run_session(&pcm, expected, |pos, offset, frames, expect| {
@@ -1065,13 +1065,13 @@ fn session_d1_noise(
             .cuda
             .create_stream()
             .map_err(|e| (Verdict::Inconclusive, format!("stream: {e}")))?;
-        let world = EntropyWorld::open_preloaded(&ctx.cuda.fns, ctx.decode, stream, &job)
+        let world = EntropyWorld::open_preloaded(&ctx.cuda.ctx, ctx.decode.clone(), stream, &job)
             .map_err(|e| (Verdict::Inconclusive, format!("world: {e}")))?;
         worlds.push((job, world));
     }
     // Sustained-clock warm-up (see the literal session for the rationale).
     {
-        let warm = DeviceBuffer::alloc(&ctx.cuda.fns, PERIOD_FRAMES as usize * 4)
+        let warm = DeviceBuffer::alloc(&ctx.cuda.ctx, PERIOD_FRAMES as usize * 4)
             .map_err(|e| (Verdict::Inconclusive, format!("warmup arena: {e}")))?;
         for _ in 0..10 {
             for (_, w) in &worlds {

@@ -61,7 +61,7 @@ use crate::object::{ObjectData, ObjectStore};
 pub use cost::{AbstractWork, CandidateCost};
 pub use frontier::Frontier;
 pub use propose::ReferenceLibrary;
-pub use search::{PeriodScan, ScanSurface};
+pub use search::{PeriodScan, ScanSurface, SearchPlacement};
 
 /// Bounded seek window for the measured seek-latency cell.
 pub const SEEK_FRAMES: u32 = 512;
@@ -81,6 +81,13 @@ pub struct SearchBudget {
     pub max_residual_period_candidates: usize,
     /// Hard ceiling on proposed candidates (must be `>= 1`).
     pub max_candidates: usize,
+    /// Where the bounded period scan runs when the caller supplies no external
+    /// ranking. A **performance** choice with no semantic content: every
+    /// surface calls the same `period_records`, and every accepted candidate is
+    /// re-verified by the exact evaluator (Phase L). `SearchPlacement::Scalar`
+    /// is the reference surface; the default `Auto` keeps the measured-faster
+    /// host surface for the workload.
+    pub placement: SearchPlacement,
 }
 
 impl Default for SearchBudget {
@@ -89,6 +96,7 @@ impl Default for SearchBudget {
             max_period_scan: 512,
             max_residual_period_candidates: 4,
             max_candidates: 64,
+            placement: SearchPlacement::Auto,
         }
     }
 }
@@ -299,7 +307,9 @@ impl SearchReport {
 }
 
 /// Run the bounded inverse search for one intrinsic window against a reference
-/// library (whose objects may be proposed as exact shared references).
+/// library (whose objects may be proposed as exact shared references). The
+/// bounded period scan runs on [`SearchBudget::placement`]; search placement is
+/// a performance choice with no acceptance semantics.
 pub fn compile(
     intrinsic: &Intrinsic,
     library: &ReferenceLibrary,
@@ -310,9 +320,11 @@ pub fn compile(
 
 /// Run the bounded inverse search with an **externally ranked** period list
 /// (Phase L): a parallel or device scan decides which periods to try, never
-/// whether a candidate is accepted. `None` uses the sequential host scan.
-/// Either way the acceptance path is identical, so a search surface can never
-/// change what is accepted — only how fast the ranking is found.
+/// whether a candidate is accepted. `None` uses the bounded scan on
+/// [`SearchBudget::placement`] (`Auto` by default, which keeps the
+/// measured-faster host surface for the workload; `Scalar` is the reference
+/// placement). Either way the acceptance path is identical, so a search surface
+/// can never change what is accepted — only how fast the ranking is found.
 pub fn compile_with(
     intrinsic: &Intrinsic,
     library: &ReferenceLibrary,
