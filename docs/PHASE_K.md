@@ -192,8 +192,13 @@ Seal run (release, `--all-features`, clean tree `7652c6b`, version 0.8.0):
 
 ### Seal 2 — review-1 closure: corrected H.2 cost adaptation (2026-09-10)
 
-Seal run (release, `--all-features`, clean tree at the corrected implementation
-commit, version 0.8.1):
+Seal run (release, `--all-features`, clean tree `e800137`, version 0.8.1):
+
+- 22 receipts, every one `source_binding: bound` and carrying
+  `seal_subject_hash =
+  8e55031be28d2d3fcd72c47760fea4f25f936528ec9443036d4d042a00bc8ce2`;
+  `seal verify` PASSes the 12-row matrix in **default mode** at the battery
+  tree and at the release head (subject unchanged — `docs/` is excluded).
 
 Re-runs the whole battery after the cost fix. The corrected economics are
 worse and more honest, and the court was **not** tuned to keep the old result:
