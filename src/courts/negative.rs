@@ -32,7 +32,7 @@ use std::path::Path;
 
 /// Frozen static-result hash (empty means "not yet frozen").
 pub const NEGATIVE_RESULT_SHA256: &str =
-    "6994a97a6be23a9d9457e95b5a21bde20d849042b5b738419c3b0ed3bee4c016";
+    "cca0f1627f8420d32d7710a5bfd84062b0e1b7dddc9a610322971fb62ba6849b";
 
 /// The frozen negative-control protocol identity.
 pub const PROTOCOL_SCHEMA: &str = "vole.audio.negative.protocol.v1";
@@ -182,6 +182,7 @@ fn static_projection(
     manifest_sha: &str,
     corpus_sha: &str,
     incompressible: &[serde_json::Value],
+    population: [u64; 7],
     integrity: usize,
     structural: usize,
     other: usize,
@@ -190,6 +191,9 @@ fn static_projection(
     for head in [PROTOCOL_SCHEMA, manifest_sha, corpus_sha] {
         out.extend_from_slice(head.as_bytes());
         out.push(0);
+    }
+    for n in population {
+        out.extend_from_slice(&n.to_le_bytes());
     }
     for obj in incompressible {
         for key in ["id", "canonical_i32_sha256"] {
@@ -229,10 +233,19 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
     let sw = Stopwatch::start();
 
     // ---- 1. incompressible controls ----
+    //
+    // Two explicit populations, because a >8-channel object is outside FLAC's
+    // format domain: `all` (B0 and VOLE for every control) and `b1_comparable`
+    // (B0, B1 and VOLE for the objects FLAC can actually encode). A B1 ratio is
+    // only ever formed inside the second.
     let mut incompressible: Vec<serde_json::Value> = Vec::new();
-    let mut b0_total = 0u64;
-    let mut b1_total = 0u64;
-    let mut vole_total = 0u64;
+    let mut all_objects = 0u64;
+    let mut all_b0 = 0u64;
+    let mut all_vole = 0u64;
+    let mut b1c_objects = 0u64;
+    let mut b1c_b0 = 0u64;
+    let mut b1c_b1 = 0u64;
+    let mut b1c_vole = 0u64;
     for o in &manifest.objects {
         if !INCOMPRESSIBLE_CLASSES.contains(&o.entropy_class.as_str()) {
             continue;
@@ -268,11 +281,16 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
             budget(),
         )?;
         let vole = obj.complete_bytes();
-        b0_total += b0;
-        if let Some((b, _)) = &b1 {
-            b1_total += b;
+        let comparable = generate::b1_comparable(o.channels);
+        all_objects += 1;
+        all_b0 += b0;
+        all_vole += vole;
+        if comparable {
+            b1c_objects += 1;
+            b1c_b0 += b0;
+            b1c_b1 += b1.as_ref().map(|(b, _)| *b).unwrap_or(0);
+            b1c_vole += vole;
         }
-        vole_total += vole;
         incompressible.push(serde_json::json!({
             "id": o.id,
             "entropy_class": o.entropy_class,
@@ -281,7 +299,7 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
             "frames": o.frames,
             "sample_rate_hz": o.sample_rate_hz,
             "canonical_i32_sha256": canonical,
-            "b1_comparable": generate::b1_comparable(o.channels),
+            "b1_comparable": comparable,
             "b0_bytes": b0,
             "b1_bytes": b1.as_ref().map(|(b, _)| *b),
             "b1_artifact_sha256": b1.as_ref().map(|(_, s)| s.clone()),
@@ -309,10 +327,20 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
     let (integrity, structural, other) = hostile_battery(&fixture.bytes)?;
 
     let total_ns = sw.elapsed_ns().max(0) as u64;
+    let population = [
+        all_objects,
+        all_b0,
+        all_vole,
+        b1c_objects,
+        b1c_b0,
+        b1c_b1,
+        b1c_vole,
+    ];
     let result_hex = hex(&Sha256::digest(&static_projection(
         &report.manifest_sha256,
         &report.corpus_sha256,
         &incompressible,
+        population,
         integrity,
         structural,
         other,
@@ -339,15 +367,17 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
     builder
         .result(verdict)
         .result_detail(format!(
-            "{} incompressible control objects: VOLE {vole_total} B vs B0 {b0_total} B \
-             (vole/B0 {:.3}) and B1 {b1_total} B (vole/B1 {:.3}); hostile archives: {integrity} \
-             integrity-hostile, {structural} resealed structural-hostile and {other} malformed/\
-             allocation-bomb candidates all rejected with a typed error, no panic; result sha256 \
-             {result_hex}",
-            incompressible.len(),
-            vole_total as f64 / b0_total as f64,
-            if b1_total > 0 {
-                vole_total as f64 / b1_total as f64
+            "{} incompressible control objects (B0/VOLE population): VOLE {all_vole} B vs B0 {all_b0} B
+             (vole/B0 {:.3}); B1-comparable population ({b1c_objects} objects): B0 {b1c_b0} B,
+             B1 {b1c_b1} B, VOLE {b1c_vole} B (vole/B0 {:.3}, vole/B1 {:.3}); hostile archives:
+             {integrity} integrity-hostile, {structural} resealed structural-hostile and {other}
+             malformed/allocation-bomb candidates all rejected with a typed error, no panic; result
+             sha256 {result_hex}",
+            all_objects,
+            all_vole as f64 / all_b0 as f64,
+            b1c_vole as f64 / b1c_b0 as f64,
+            if b1c_b1 > 0 {
+                b1c_vole as f64 / b1c_b1 as f64
             } else {
                 0.0
             },
@@ -375,12 +405,21 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
         .extra(
             "incompressible",
             serde_json::json!({
-                "objects": incompressible.len(),
-                "b0_bytes": b0_total,
-                "b1_bytes": b1_total,
-                "vole_complete_bytes": vole_total,
-                "vole_over_b0": vole_total as f64 / b0_total as f64,
-                "vole_over_b1": if b1_total > 0 { Some(vole_total as f64 / b1_total as f64) } else { None },
+                "all_population": {
+                    "objects": all_objects,
+                    "b0_bytes": all_b0,
+                    "vole_complete_bytes": all_vole,
+                    "vole_over_b0": all_vole as f64 / all_b0 as f64,
+                },
+                "b1_comparable_population": {
+                    "objects": b1c_objects,
+                    "b0_bytes": b1c_b0,
+                    "b1_bytes": b1c_b1,
+                    "vole_complete_bytes": b1c_vole,
+                    "vole_over_b0": b1c_vole as f64 / b1c_b0 as f64,
+                    "vole_over_b1": if b1c_b1 > 0 { Some(b1c_vole as f64 / b1c_b1 as f64) } else { None },
+                },
+                "excluded_from_b1": all_objects.saturating_sub(b1c_objects),
                 "per_object": incompressible,
             }),
         )
@@ -403,8 +442,16 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
     let (_, path) = builder.finish_write(receipts_root)?;
     println!("court negative: {verdict}");
     println!(
-        "  incompressible objects: {} | VOLE {vole_total} B vs B0 {b0_total} B vs B1 {b1_total} B",
-        incompressible.len()
+        "  all: {all_objects} objects | B0 {all_b0} B | VOLE {all_vole} B (vole/B0 {:.3})",
+        all_vole as f64 / all_b0 as f64
+    );
+    println!(
+        "  B1-comparable: {b1c_objects} objects | B0 {b1c_b0} B | B1 {b1c_b1} B | VOLE {b1c_vole} B (vole/B1 {:.3})",
+        if b1c_b1 > 0 {
+            b1c_vole as f64 / b1c_b1 as f64
+        } else {
+            0.0
+        }
     );
     println!(
         "  hostile rejected: {integrity} integrity + {structural} structural + {other} malformed/bomb"

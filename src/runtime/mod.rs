@@ -32,7 +32,7 @@ pub mod protocol;
 pub mod sources;
 
 pub use cache::{CacheEvidence, CacheState, proc_self_io};
-pub use energy::{PowerSource, probe_power};
+pub use energy::{EnergyCounter, PowerSource, probe_energy_counter, probe_power};
 pub use load::{LoadGuard, LoadKind};
 pub use protocol::{WindowPlan, frozen_random_trace, rotate_order};
 pub use sources::{

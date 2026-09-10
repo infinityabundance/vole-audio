@@ -14,12 +14,17 @@
 //! Conditions this host cannot actually manipulate — compositor/display load,
 //! competing GPU compute, GPU context contention, DVFS, thermal steady state and
 //! PCIe power saving — are reported `NOT_CONTROLLED`, never claimed. Energy is
-//! measured only if a real power source exists (`hwmon`); otherwise
-//! `NOT_AVAILABLE`.
+//! Energy is measured only through real instruments: cumulative joules from a
+//! powercap `energy_uj` counter when one exists, otherwise `NOT_AVAILABLE` (a
+//! hwmon instantaneous power reading, if present, is recorded as a spot reading
+//! and is not treated as workload energy).
 //!
-//! A bounded soak under the heaviest controllable load follows the matrix: it
-//! repeats the workload for a fixed wall-clock budget and reports tail drift and
-//! accumulated deadline misses (the contract's "long run"/xrun question).
+//! A bounded **CPU-contention soak** follows the matrix: it repeats the workload
+//! under `cpu_burn` for a fixed wall-clock budget and reports tail drift and
+//! accumulated deadline misses (the contract's "long run"/xrun question). It is
+//! deliberately *not* run under memory bandwidth, which this court's own matrix
+//! shows to be the more disruptive load; the soak workload is not chosen after
+//! seeing the result.
 
 use crate::baseline::{B1_LEVEL_PRIMARY, FlacArtifact, b1_flac_artifact};
 use crate::corpus;
@@ -35,7 +40,7 @@ use crate::runtime::cache::CacheState;
 use crate::runtime::load::{LoadGuard, LoadKind};
 use crate::runtime::{
     DiskPcmArtifact, DiskPcmSource, FlacPreloadSource, QUANTUM_FRAMES, ResidentPcmSource,
-    VoleBoundedSource, WindowPlan, deadline_ns, probe_power,
+    VoleBoundedSource, WindowPlan, deadline_ns, probe_energy_counter, probe_power,
 };
 use crate::status::Verdict;
 use std::collections::BTreeMap;
@@ -46,7 +51,7 @@ use super::measure::{Traversal, min_stable_depth_quanta, run_traversal, timer_ov
 
 /// Frozen static-result hash (empty means "not yet frozen").
 pub const INTERFERENCE_RESULT_SHA256: &str =
-    "9a5777bc0a998c8af794269a9338e5f450ca1fbb45566afff5c8ff42830feb33";
+    "f23c70c15016814ce3efcb7454712dbcc9517226b8e187122d39156c38fd5088";
 
 /// The frozen interference protocol identity.
 pub const PROTOCOL_SCHEMA: &str = "vole.audio.interference.protocol.v1";
@@ -108,6 +113,14 @@ struct Prepared {
     b3: DiskPcmArtifact,
     b4: Option<FlacArtifact>,
     b5: Arc<VerifiedFullObject>,
+}
+
+/// One object's deterministic traversal geometry for one (source, condition).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct ObjectCond {
+    exact: bool,
+    windows: usize,
+    deadline_ns: u64,
 }
 
 /// Accumulated per-condition, per-source evidence.
@@ -256,12 +269,24 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
         .map(|n| n.get())
         .unwrap_or(4);
     let power = probe_power();
-    let energy_probe = match &power {
+    let counter = probe_energy_counter();
+    let power_source_probe = match &power {
         Some(p) => serde_json::json!({ "status": "AVAILABLE", "source": p.describe() }),
         None => serde_json::json!({
             "status": "NOT_AVAILABLE",
-            "detail": "no hwmon power input and no NVML/AMDSMI on this host; no energy figure is \
-                       invented",
+            "detail": "no supported hwmon power source found",
+        }),
+    };
+    let energy_counter_probe = match &counter {
+        Some(c) => serde_json::json!({
+            "status": "AVAILABLE",
+            "source": c.describe(),
+            "method": "cumulative energy_uj read at each condition boundary",
+        }),
+        None => serde_json::json!({
+            "status": "NOT_AVAILABLE",
+            "detail": "no readable powercap energy_uj counter found (one may exist but be \
+                       root-only); no energy figure is invented",
         }),
     };
 
@@ -269,6 +294,13 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
     let mut all_exact = true;
     // condition -> source -> accumulated
     let mut matrix: BTreeMap<&'static str, BTreeMap<&'static str, Acc>> = BTreeMap::new();
+    // True per-object deterministic records: (object -> source -> condition).
+    // The pooled `matrix` above is measured evidence; the frozen cells are built
+    // from *these*, so each object's cell binds its own traversal geometry.
+    let mut per_object: BTreeMap<
+        String,
+        BTreeMap<&'static str, BTreeMap<&'static str, ObjectCond>>,
+    > = BTreeMap::new();
     let mut energy_samples: Vec<serde_json::Value> = Vec::new();
 
     for condition in CONDITIONS {
@@ -281,6 +313,7 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
             std::thread::sleep(std::time::Duration::from_millis(SETTLE_MS));
         }
         let watts_before = power.as_ref().and_then(|p| p.read_watts());
+        let energy_start_uj = counter.as_ref().and_then(|c| c.read_uj());
         let entry = matrix.entry(cname).or_default();
         for p in &prepared {
             let ch = usize::from(p.channels);
@@ -331,6 +364,19 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
                     other => return Err(Error::internal(format!("unknown source '{other}'"))),
                 };
                 all_exact &= t.exact;
+                per_object
+                    .entry(p.id.clone())
+                    .or_default()
+                    .entry(name)
+                    .or_default()
+                    .insert(
+                        cname,
+                        ObjectCond {
+                            exact: t.exact,
+                            windows: t.windows,
+                            deadline_ns: deadline,
+                        },
+                    );
                 if !acc.started {
                     acc.started = true;
                     acc.windows = t.windows;
@@ -349,18 +395,25 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
             }
         }
         let watts_after = power.as_ref().and_then(|p| p.read_watts());
-        if let (Some(a), Some(b)) = (watts_before, watts_after) {
+        let energy_end_uj = counter.as_ref().and_then(|c| c.read_uj());
+        if let (Some(c), Some(s), Some(e)) = (counter.as_ref(), energy_start_uj, energy_end_uj) {
             energy_samples.push(serde_json::json!({
                 "condition": cname,
-                "watts_before": a,
-                "watts_after": b,
-                "watts_mean": (a + b) / 2.0,
+                "joules": c.joules_between(s, e),
+                "source": c.id(),
+            }));
+        } else if let (Some(a), Some(b)) = (watts_before, watts_after) {
+            energy_samples.push(serde_json::json!({
+                "condition": cname,
+                "instantaneous_power_watts_before": a,
+                "instantaneous_power_watts_after": b,
+                "note": "spot power readings only; not a workload-energy measurement",
             }));
         }
         drop(guard);
     }
 
-    // ---- bounded soak under the heaviest controllable load ----
+    // ---- bounded CPU-contention soak ----
     let soak = soak(&prepared, threads, &load_dir)?;
     all_exact &= soak.exact;
 
@@ -376,18 +429,18 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
             let mut cond_json = serde_json::Map::new();
             for condition in CONDITIONS {
                 let cname = condition_name(condition);
-                let hit = matrix
-                    .get(cname)
+                let hit = per_object
+                    .get(&p.id)
                     .and_then(|m| m.get(name))
-                    .filter(|_| !(name == "B4" && p.b4.is_none()));
+                    .and_then(|m| m.get(cname));
                 cond_json.insert(
                     cname.to_string(),
                     match hit {
-                        Some(a) => serde_json::json!({
+                        Some(r) => serde_json::json!({
                             "status": "MEASURED",
-                            "exact": a.exact,
-                            "windows": a.windows,
-                            "deadline_ns": deadline_ns(QUANTUM_FRAMES, p.sample_rate_hz),
+                            "exact": r.exact,
+                            "windows": r.windows,
+                            "deadline_ns": r.deadline_ns,
                         }),
                         None => serde_json::json!({
                             "status": "NOT_APPLICABLE_BY_FORMAT_DOMAIN",
@@ -478,8 +531,8 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
         .result_detail(format!(
             "adversarial real-time load over {} frozen objects at {QUANTUM_FRAMES}-frame quanta; \
              conditions idle/cpu_burn/memory_bandwidth/storage_io on {threads} workers; every window \
-             reproduced exactly; every controllable condition measured, {SOAK_SECS}s soak under the \
-             heaviest controllable load; result sha256 {result_hex}",
+             reproduced exactly; every controllable condition measured, {SOAK_SECS}s CPU-contention \
+             soak; result sha256 {result_hex}",
             object_count,
         ))
         .params(params)
@@ -499,7 +552,8 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
                 "soak_secs": SOAK_SECS,
                 "not_controlled": NOT_CONTROLLED,
                 "latency_boundary": "harness-owned",
-                "energy": "measured only if a real hwmon power source exists; never estimated",
+                "energy": "cumulative powercap energy_uj when available; a hwmon spot reading is \
+                           evidence only, never workload energy. Never estimated",
             }),
         )
         .extra(
@@ -508,7 +562,8 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
                 "timer_overhead_ns": { "min": timer_min_ns, "median": timer_median_ns },
                 "matrix": surface,
                 "soak": soak.json,
-                "energy_probe": energy_probe,
+                "power_source_probe": power_source_probe,
+                "energy_counter_probe": energy_counter_probe,
                 "energy_samples": energy_samples,
                 "total_ns": total_ns,
             }),
@@ -521,8 +576,10 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
              those courts",
         )
         .limitation(
-            "energy is NOT_AVAILABLE without a real power source: no figure is derived from TDP or a \
-             model. The soak is bounded to a fixed wall-clock budget, not an unbounded endurance run",
+            "energy is NOT_AVAILABLE without a cumulative energy counter (powercap energy_uj): a \
+             hwmon spot power reading is recorded but not converted into a workload-energy figure, \
+             and nothing is derived from TDP or a model. The soak is a bounded CPU-contention \
+             budget, not an unbounded endurance run",
         );
     let (_, path) = builder.finish_write(receipts_root)?;
     println!("court interference: {verdict}");

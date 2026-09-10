@@ -444,9 +444,13 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
         aggs.get_mut(Slot::B3Cold.name()).unwrap().artifact_build_ns = b3_build_ns;
         aggs.get_mut(Slot::B3Warm.name()).unwrap().artifact_build_ns = b3_build_ns;
         if let Some(a) = b4.as_ref() {
-            aggs.get_mut(Slot::B4.name()).unwrap().artifact_build_ns = a.info().runtime_setup_ns;
+            // Authoring time is the FLAC *encode*; `runtime_setup_ns` is the later
+            // decode/preload and must not be duplicated into the build field.
+            let build_ns = b4_artifact.as_ref().unwrap().encoding.encode_ns;
+            aggs.get_mut(Slot::B4.name()).unwrap().artifact_build_ns = build_ns;
             aggs.get_mut(Slot::B4.name()).unwrap().artifact_sha256 =
                 Some(hex(&b4_artifact.as_ref().unwrap().sha256));
+            let _ = a;
         }
         aggs.get_mut(Slot::B5.name()).unwrap().artifact_build_ns = container_build_ns;
         aggs.get_mut(Slot::B5.name()).unwrap().artifact_sha256 = Some(hex(&container_sha));

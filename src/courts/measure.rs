@@ -147,6 +147,43 @@ pub fn min_stable_depth_quanta(latencies: &[u64], deadline_ns: u64) -> Option<u6
     None
 }
 
+/// Sustained-streaming stability for a repeated/infinite workload.
+///
+/// [`min_stable_depth_quanta`] is a *finite-object* quantity: at `k = n` the
+/// whole object has been prefetched, so it always resolves. That is an escape,
+/// not a streaming guarantee. For a repeated workload the producer keeps up iff
+/// total production time does not exceed total consumption time:
+///
+/// ```text
+/// sum(latency) <= n * deadline   =>  stable, needs `initial_depth` buffered
+/// otherwise                      =>  the buffer grows without bound
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StreamingStability {
+    /// Average production exceeds consumption: no bounded buffer keeps up.
+    UnstableStreaming,
+    /// Stable; the minimum initial buffer that absorbs the measured jitter.
+    Stable { initial_depth_quanta: u64 },
+}
+
+/// Decide sustained-streaming stability from measured per-window latencies.
+pub fn streaming_stability(latencies: &[u64], deadline_ns: u64) -> StreamingStability {
+    let n = latencies.len() as u128;
+    if n == 0 || deadline_ns == 0 {
+        return StreamingStability::UnstableStreaming;
+    }
+    let total: u128 = latencies.iter().map(|&x| x as u128).sum();
+    if total > n * deadline_ns as u128 {
+        return StreamingStability::UnstableStreaming;
+    }
+    match min_stable_depth_quanta(latencies, deadline_ns) {
+        Some(initial_depth_quanta) => StreamingStability::Stable {
+            initial_depth_quanta,
+        },
+        None => StreamingStability::UnstableStreaming,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -166,5 +203,25 @@ mod tests {
     fn degenerate_inputs_have_no_finite_depth() {
         assert_eq!(min_stable_depth_quanta(&[], 100), None);
         assert_eq!(min_stable_depth_quanta(&[1, 2], 0), None);
+    }
+
+    #[test]
+    fn streaming_stability_separates_slow_producers_from_jitter() {
+        // Every window at half its deadline: stable, one quantum of headroom.
+        assert_eq!(
+            streaming_stability(&[5, 5, 5], 10),
+            StreamingStability::Stable {
+                initial_depth_quanta: 1
+            }
+        );
+        // Average production above the deadline: no bounded buffer keeps up.
+        assert_eq!(
+            streaming_stability(&[15, 15, 15], 10),
+            StreamingStability::UnstableStreaming
+        );
+        // A finite object can still be partially prefetched even when the average
+        // is too slow, which is precisely why the two quantities are distinct.
+        assert_eq!(min_stable_depth_quanta(&[15, 15, 15], 10), Some(2));
+        assert!(streaming_stability(&[], 10) == StreamingStability::UnstableStreaming);
     }
 }

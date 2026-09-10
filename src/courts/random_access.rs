@@ -46,7 +46,7 @@ use super::measure::{Traversal, run_traversal, timer_overhead_ns};
 
 /// Frozen static-result hash (empty means "not yet frozen").
 pub const RANDOM_ACCESS_RESULT_SHA256: &str =
-    "d9259f18a4fdc731c34ac7cc1106bd612a0b993df4c7ba6ca473803ad527132f";
+    "3a76aef7b18fa981a5e5bf019acb6ac6b2f70ee1e355e191659416c2f9a09b48";
 
 /// The frozen random-access protocol identity.
 pub const PROTOCOL_SCHEMA: &str = "vole.audio.random_access.protocol.v1";
@@ -68,9 +68,16 @@ fn semantics_of(spec: &Spec) -> FullSemantics {
 const SOURCES: [&str; 5] = ["B2", "B3-warm", "B4", "B4-seek", "B5"];
 
 /// Deterministic counters plus pooled measured samples for one source.
-#[derive(Clone, Default)]
+///
+/// Constructed only through [`Acc::measured`] / [`Acc::not_applicable`] so the
+/// correctness accumulator starts `true` (a `Default` would start `false` and
+/// never recover under `&=`) and a format-domain row is never serialized as a
+/// measured one.
+#[derive(Clone)]
 struct Acc {
+    status: &'static str,
     exact: bool,
+    started: bool,
     det: Traversal,
     latencies: Vec<u64>,
     sequential: Vec<u64>,
@@ -85,8 +92,42 @@ struct Acc {
 }
 
 impl Acc {
+    fn new(status: &'static str) -> Self {
+        Acc {
+            status,
+            exact: true,
+            started: false,
+            det: Traversal::default(),
+            latencies: Vec::new(),
+            sequential: Vec::new(),
+            physical_storage_bytes_read: 0,
+            deadline_misses: 0,
+            artifact_storage_bytes: 0,
+            resident_sample_domain_bytes: 0,
+            resident_encoded_bytes: 0,
+            runtime_setup_ns: 0,
+            artifact_sha256: None,
+            setup_detail: String::new(),
+        }
+    }
+
+    fn measured() -> Self {
+        Acc::new("MEASURED")
+    }
+
+    fn not_applicable() -> Self {
+        let mut a = Acc::new("NOT_APPLICABLE_BY_FORMAT_DOMAIN");
+        a.setup_detail = "outside FLAC's format domain (>8 channels)".into();
+        a
+    }
+
+    fn is_measured(&self) -> bool {
+        self.status == "MEASURED"
+    }
+
     fn record(&mut self, t: &Traversal) {
-        if self.latencies.is_empty() {
+        if !self.started {
+            self.started = true;
             self.det = t.clone();
             self.det.latencies = Vec::new();
         }
@@ -97,9 +138,17 @@ impl Acc {
     }
 
     fn cell(&self, source: &str) -> serde_json::Value {
+        if !self.is_measured() {
+            return serde_json::json!({
+                "source": source,
+                "status": self.status,
+                "exact": serde_json::Value::Null,
+                "setup_detail": self.setup_detail,
+            });
+        }
         serde_json::json!({
             "source": source,
-            "status": "MEASURED",
+            "status": self.status,
             "exact": self.exact,
             "windows_per_traversal": self.det.windows,
             "requested_frames": self.det.requested_frames,
@@ -151,6 +200,7 @@ fn static_projection(manifest_sha: &str, corpus_sha: &str, cells: &[serde_json::
             for (name, s) in sources {
                 out.extend_from_slice(name.as_bytes());
                 out.push(0);
+                out.push(matches!(s["status"].as_str(), Some("MEASURED")) as u8);
                 out.push(s["exact"].as_bool().unwrap_or(false) as u8);
                 for key in [
                     "windows_per_traversal",
@@ -208,9 +258,12 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
 
     let mut cells: Vec<serde_json::Value> = Vec::with_capacity(manifest.objects.len());
     let mut all_exact = true;
-    let mut total_random_windows = 0u64;
     let mut pool: BTreeMap<&'static str, Acc> =
-        SOURCES.iter().map(|s| (*s, Acc::default())).collect();
+        SOURCES.iter().map(|s| (*s, Acc::new("POOLED"))).collect();
+    // Per-source random windows, summed only over the objects where the source
+    // actually exists (B4/B4-seek cover the 110 B1-domain objects, not all 115).
+    let mut pool_windows: BTreeMap<&'static str, u64> =
+        SOURCES.iter().map(|s| (*s, 0u64)).collect();
 
     for o in &manifest.objects {
         let spec = spec_by_id
@@ -229,7 +282,6 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
             frozen_random_trace(o.frames, QUANTUM_FRAMES, seed, RANDOM_WINDOWS)?,
         )?;
         let sequential = WindowPlan::build(&samples, ch)?;
-        total_random_windows += random.len() as u64;
 
         // ---- authoring ----
         let mut b2 = ResidentPcmSource::open("B2", o.channels, o.sample_rate_hz, samples.clone())?;
@@ -276,7 +328,11 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
         let mut b5 = VoleBoundedSource::open("B5", verified.clone(), false)?;
 
         let mut accs: BTreeMap<&'static str, Acc> =
-            SOURCES.iter().map(|s| (*s, Acc::default())).collect();
+            SOURCES.iter().map(|s| (*s, Acc::measured())).collect();
+        if b4.is_none() {
+            accs.insert("B4", Acc::not_applicable());
+            accs.insert("B4-seek", Acc::not_applicable());
+        }
         accs.get_mut("B2").unwrap().artifact_storage_bytes = b2.info().artifact_storage_bytes;
         accs.get_mut("B2").unwrap().resident_sample_domain_bytes =
             b2.info().resident_sample_domain_bytes;
@@ -386,23 +442,20 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
         }
 
         for (name, acc) in &accs {
-            pool.get_mut(name).unwrap().exact &= acc.exact;
-            pool.get_mut(name)
-                .unwrap()
-                .latencies
-                .extend_from_slice(&acc.latencies);
-            pool.get_mut(name)
-                .unwrap()
-                .sequential
-                .extend_from_slice(&acc.sequential);
-            pool.get_mut(name).unwrap().deadline_misses += acc.deadline_misses;
-            pool.get_mut(name).unwrap().physical_storage_bytes_read +=
-                acc.physical_storage_bytes_read;
+            if !acc.is_measured() {
+                continue;
+            }
             let p = pool.get_mut(name).unwrap();
+            p.exact &= acc.exact;
+            p.latencies.extend_from_slice(&acc.latencies);
+            p.sequential.extend_from_slice(&acc.sequential);
+            p.deadline_misses += acc.deadline_misses;
+            p.physical_storage_bytes_read += acc.physical_storage_bytes_read;
             p.artifact_storage_bytes += acc.artifact_storage_bytes;
             p.resident_sample_domain_bytes += acc.resident_sample_domain_bytes;
             p.resident_encoded_bytes += acc.resident_encoded_bytes;
             p.runtime_setup_ns += acc.runtime_setup_ns;
+            *pool_windows.get_mut(name).unwrap() += acc.det.windows as u64;
         }
 
         let _ = std::fs::remove_file(&path);
@@ -442,8 +495,12 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
     }
 
     let (timer_min_ns, timer_median_ns) = timer_overhead_ns();
-    let surface = random_surface(&pool, timer_min_ns, timer_median_ns, total_random_windows);
+    let surface = random_surface(&pool, &pool_windows, timer_min_ns, timer_median_ns);
     let object_count = cells.len();
+    let total_random_windows: u64 = cells
+        .iter()
+        .map(|c| c["random_windows"].as_u64().unwrap_or(0))
+        .sum();
     let verdict = Verdict::Supported;
     let params = CourtParams {
         universe: Some(manifest.universe.clone()),
@@ -504,8 +561,7 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
     let (_, path) = builder.finish_write(receipts_root)?;
     println!("court random-access: {verdict}");
     println!(
-        "  objects: {object_count} | random windows per traversal (object 0): {} | all exact: {all_exact}",
-        total_random_windows
+        "  objects: {object_count} | random windows total: {total_random_windows} | all exact: {all_exact}"
     );
     println!("  result sha256: {result_hex}");
     println!("  receipt: {}", path.display());
@@ -559,9 +615,9 @@ fn seed_from_hex(canonical: &str) -> u64 {
 
 fn random_surface(
     pool: &BTreeMap<&'static str, Acc>,
+    pool_windows: &BTreeMap<&'static str, u64>,
     timer_min_ns: u64,
     timer_median_ns: u64,
-    total_random_windows: u64,
 ) -> serde_json::Value {
     let mut per = serde_json::Map::new();
     for (name, acc) in pool {
@@ -575,7 +631,7 @@ fn random_surface(
             (*name).to_string(),
             serde_json::json!({
                 "exact": acc.exact,
-                "random_windows": total_random_windows,
+                "random_windows": pool_windows.get(name).copied().unwrap_or(0),
                 "random_latency": random,
                 "sequential_latency": sequential,
                 "random_over_sequential_p50": penalty,
@@ -590,8 +646,10 @@ fn random_surface(
     }
     serde_json::json!({
         "timer_overhead_ns": { "min": timer_min_ns, "median": timer_median_ns },
-        "note": "random and sequential latency are pooled over all objects per source; \
-                 random_over_sequential_p50 is the random-access penalty. Per-object detail is in cells",
+        "note": "random and sequential latency are pooled over the objects where the source exists \
+                 (B4/B4-seek cover the 110 B1-domain objects only); random_windows is that \
+                 source's own window total. random_over_sequential_p50 is the random-access \
+                 penalty. Per-object detail is in cells",
         "sources": per,
     })
 }

@@ -41,7 +41,10 @@ use std::collections::BTreeMap;
 use std::path::Path;
 use std::sync::Arc;
 
-use super::measure::{Traversal, min_stable_depth_quanta, run_traversal, timer_overhead_ns};
+use super::measure::{
+    StreamingStability, Traversal, min_stable_depth_quanta, run_traversal, streaming_stability,
+    timer_overhead_ns,
+};
 
 /// Frozen static-result hash (empty means "not yet frozen").
 pub const DEPTH_RESULT_SHA256: &str =
@@ -67,34 +70,50 @@ fn semantics_of(spec: &Spec) -> FullSemantics {
 }
 
 /// Outcome of the depth computation at one quantum.
+///
+/// Two distinct quantities, because a finite object can always be fully
+/// prefetched while a repeated stream cannot:
+///
+/// * `finite_object_min_prefill_quanta` — the smallest prefill at which this
+///   object's traversal never underruns (always finite for a non-empty trace);
+/// * `streaming` — whether a repeated workload is stable at all, and the
+///   minimum initial buffer that absorbs the measured jitter.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Depth {
-    Stable { depth_quanta: u64 },
-    Unstable,
+struct Depth {
+    finite_prefill_quanta: Option<u64>,
+    streaming: StreamingStability,
 }
 
 impl Depth {
-    fn label(&self) -> &'static str {
-        match self {
-            Depth::Stable { .. } => "STABLE",
-            Depth::Unstable => "UNSTABLE",
+    fn finite_label(&self) -> &'static str {
+        match self.finite_prefill_quanta {
+            Some(_) => "FINITE_PREFILL",
+            None => "NO_FINITE_PREFILL",
         }
     }
 
-    fn depth_quanta(&self) -> Option<u64> {
-        match self {
-            Depth::Stable { depth_quanta } => Some(*depth_quanta),
-            Depth::Unstable => None,
+    fn streaming_label(&self) -> &'static str {
+        match self.streaming {
+            StreamingStability::Stable { .. } => "STABLE_STREAMING",
+            StreamingStability::UnstableStreaming => "UNSTABLE_STREAMING",
+        }
+    }
+
+    fn initial_depth(&self) -> Option<u64> {
+        match self.streaming {
+            StreamingStability::Stable {
+                initial_depth_quanta,
+            } => Some(initial_depth_quanta),
+            StreamingStability::UnstableStreaming => None,
         }
     }
 }
 
-/// Minimum prefill depth at which a producer with these per-window latencies
-/// never underruns.
-fn min_stable_depth(latencies: &[u64], deadline: u64) -> Depth {
-    match min_stable_depth_quanta(latencies, deadline) {
-        Some(depth_quanta) => Depth::Stable { depth_quanta },
-        None => Depth::Unstable,
+/// Both depth quantities for one traversal.
+fn depth_of(latencies: &[u64], deadline: u64) -> Depth {
+    Depth {
+        finite_prefill_quanta: min_stable_depth_quanta(latencies, deadline),
+        streaming: streaming_stability(latencies, deadline),
     }
 }
 
@@ -168,6 +187,7 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
     // source -> quantum -> per-object depths
     let mut pooled: BTreeMap<&'static str, BTreeMap<u32, Vec<u64>>> = BTreeMap::new();
     let mut misses: BTreeMap<&'static str, BTreeMap<u32, u64>> = BTreeMap::new();
+    let mut unstable: BTreeMap<&'static str, BTreeMap<u32, u64>> = BTreeMap::new();
 
     for o in &manifest.objects {
         let spec = spec_by_id
@@ -260,14 +280,16 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
                 };
                 all_exact &= t.exact;
                 let deadline = deadline_ns(q, o.sample_rate_hz);
-                let depth = min_stable_depth(&t.latencies, deadline);
-                if let Some(d) = depth.depth_quanta() {
+                let depth = depth_of(&t.latencies, deadline);
+                if let Some(d) = depth.initial_depth() {
                     pooled
                         .entry(name)
                         .or_default()
                         .entry(q)
                         .or_default()
                         .push(d);
+                } else {
+                    *unstable.entry(name).or_default().entry(q).or_default() += 1;
                 }
                 *misses.entry(name).or_default().entry(q).or_default() += t.deadline_misses;
                 quanta_json.insert(
@@ -278,8 +300,10 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
                         "windows": t.windows,
                         "exact": t.exact,
                         "deadline_misses": t.deadline_misses,
-                        "min_stable_depth_quanta": depth.depth_quanta(),
-                        "stability": depth.label(),
+                        "finite_object_min_prefill_quanta": depth.finite_prefill_quanta,
+                        "finite_object_label": depth.finite_label(),
+                        "streaming_stability": depth.streaming_label(),
+                        "initial_depth_quanta": depth.initial_depth(),
                         "latency": TailSummary::summarize(&t.latencies),
                     }),
                 );
@@ -341,12 +365,20 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
                 .cloned()
                 .unwrap_or_default();
             let worst = depths.iter().copied().max();
+            let unstable_count = unstable
+                .get(name)
+                .and_then(|m| m.get(&q))
+                .copied()
+                .unwrap_or(0);
             per_q.insert(
                 q.to_string(),
                 serde_json::json!({
-                    "objects_with_finite_depth": depths.len(),
-                    "worst_min_stable_depth_quanta": worst,
-                    "median_min_stable_depth_quanta": median(&depths),
+                    "objects_with_finite_prefill": depths.len()
+                        + unstable_count as usize,
+                    "objects_streaming_stable": depths.len(),
+                    "objects_streaming_unstable": unstable_count,
+                    "worst_initial_depth_quanta": worst,
+                    "median_initial_depth_quanta": median(&depths),
                     "deadline_misses": misses.get(name).and_then(|m| m.get(&q)).copied().unwrap_or(0),
                 }),
             );
@@ -386,7 +418,13 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
             serde_json::json!({
                 "schema": PROTOCOL_SCHEMA,
                 "quanta_frames": QUANTA,
-                "method": "completion[i] - i*deadline vs completion[k-1]; smallest stable prefill k",
+                "finite_object_min_prefill": "completion[i] - i*deadline vs completion[k-1]; smallest \
+                                              prefill k for this finite traversal",
+                "sustained_streaming_stable": "sum(latency) <= n*deadline; if not, no bounded buffer \
+                                               keeps up (UNSTABLE_STREAMING)",
+                "why_both": "a finite object can always be fully prefetched (k=n resolves), so the \
+                             finite prefill is an escape, not a streaming guarantee; the two are \
+                             reported separately",
                 "stability_scope": "per object; the corpus-level depth is the worst over objects",
                 "latency_boundary": "harness-owned",
                 "outside_the_frozen_hash": "depth is derived from measured latencies and is evidence, \
