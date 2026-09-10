@@ -180,6 +180,45 @@ and the runtime chain is typed to the missing device. The positive paths
 of `rocm-d0`/`rocm-d1` execute when a D0/D1-ready ROCm stack + AMD device
 are present.)
 
+### Seal 2 — review-1 closure: runtime safety fixes (2026-09-09)
+
+Seal run (release, `--all-features`, clean tree `dd87c39`, version 0.7.1):
+
+The six review-1 findings (structural `Arc<HipApi>` ownership, exact shared
+launch grid, HIP-specific D0 gate, `hipModuleUnload` in the frozen D0
+surface, ROCm 7 / explicit-dir soname discovery, CUDA-aligned D1 verdict
+aggregation) are fixed as recorded in “Review amendment 1” above; each has
+host-only hostile tests (no device required).
+
+- 20 receipts, committed separately at `0ce17fe`; every receipt
+  `source_binding: bound` and carries `seal_subject_hash =
+  28651951d51d4dcba64b01be99664e03939eb7b438354337773009069c3e5eb9`;
+  `vole-audio seal verify` PASSes on the 10-row matrix in **default mode**
+  at the battery tree and (after rebuilding from the release head) at the
+  head itself.
+- All pre-existing courts SUPPORTED with frozen hashes unchanged (semantic
+  `1791816f4b93…`, authored `f7e103f3a97d…`).
+- `court rocm` / `rocm-d0` / `rocm-d1`: `UNSUPPORTED_BY_HARDWARE` with the
+  compile surface satisfied and bound (artifact `5092e129…` == sidecar ==
+  both determinism shas) and the typed runtime chain (no AMD compute
+  candidate on this host).
+- PTX artifact unchanged: sha256
+  `8b23325d03700847b056b29df4f4d4afd1a0c67386458512986c52f4fca7896b`.
+- Host tests: 349 total (344 passed, 5 ignored) all-features on the pinned
+  nightly (339 total, 334 passed default-features; +9 over Seal 1: the
+  Arc-lifetime graph, exact launch-grid equality for every court window,
+  HSA-only gate rejection, frozen-D0 `hipModuleUnload`, `.so.7`-only
+  discovery, and the D1 aggregation pair); clippy `-D warnings` and
+  `cargo fmt --check` clean.
+
+Procedural note (evidence hygiene): the first attempt at Seal 2 ran with an
+untracked research PDF (`vole_audio_prior_art.pdf`) present at the repo
+root, which made the worktree (and the binaries/artifacts built in it)
+dirty; the gate correctly refused the resulting receipts (they were never
+committed and were discarded). The PDF was moved under the ignored
+`research/` tree — its designated home; the seal subject is unchanged —
+and Seal 2 was re-run clean.
+
 ## Execution record (implementation summary)
 
 - HIP/runtime/kernel and both courts compile clean on the pinned nightly
