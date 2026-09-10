@@ -63,6 +63,8 @@ pub mod rocm_d0;
 #[cfg(feature = "std")]
 pub mod rocm_d1;
 #[cfg(feature = "std")]
+pub mod runtime;
+#[cfg(feature = "std")]
 pub mod semantic;
 #[cfg(feature = "std")]
 pub mod simd;
@@ -131,6 +133,12 @@ observation and hostile-container rejection over non-flagship fixtures",
         "Phase M flagship result: B1 FLAC versus current bounded VOLE inverse selection over \
 the frozen 115-object corpus (110 B1-comparable), with per-object container bytes, \
 selected representations and comparison buckets",
+    ),
+    (
+        "runtime",
+        "Phase M runtime substrate mechanism: B2 resident PCM, B3 raw PCM disk (cold/warm \
+verified), B4 the exact B1 FLAC-5 artifact preloaded, B5 bounded VOLE materialization, \
+over one frozen sequential 512-frame trace, exact on every source",
     ),
     (
         "cuda",
@@ -231,6 +239,7 @@ pub fn run(name: &str, receipts_root: &Path) -> crate::error::Result<Verdict> {
         "corpus" => corpus::run(receipts_root),
         "fullobj" => fullobj::run(receipts_root),
         "flagship" => flagship::run(receipts_root),
+        "runtime" => runtime::run(receipts_root),
         "flattening" => flattening::run(receipts_root),
         "cuda" => cuda::run(receipts_root),
         "d1" => d1::run(receipts_root),

@@ -41,6 +41,10 @@
 //! and the declared loop/one-shot identity, and observation across the root
 //! reproduces both.
 
+pub mod reader;
+
+pub use reader::{FullObjectReader, ReadStats, VerifiedFullObject};
+
 use crate::error::{Error, Result};
 use crate::hash::sha256::Sha256;
 use crate::inverse::{
@@ -581,7 +585,7 @@ pub fn decode_full_object(bytes: &[u8]) -> Result<DecodedFullObject> {
 
 /// Reconstruct the exact semantic U1 object stored by one segment: the
 /// descriptor and `ObjectData` the index's `content_id` claims.
-fn segment_object(
+pub(crate) fn segment_object(
     rep: Representation,
     payload: &[u8],
     channels: u8,
@@ -630,7 +634,7 @@ fn segment_object(
     }
 }
 
-fn data_representation(data: &ObjectData) -> Representation {
+pub(crate) fn data_representation(data: &ObjectData) -> Representation {
     match data {
         ObjectData::Literal(_) => Representation::Literal,
         ObjectData::Referenced(_) => Representation::Referenced,
@@ -649,7 +653,7 @@ fn data_representation(data: &ObjectData) -> Representation {
 /// Parse a canonical object in the subset the container stores: `Silence`,
 /// `Constant` and the cycle family. Anything else is rejected (never silently
 /// reinterpreted).
-fn parse_canonical_segment(bytes: &[u8]) -> Result<(ObjectDescriptor, ObjectData)> {
+pub(crate) fn parse_canonical_segment(bytes: &[u8]) -> Result<(ObjectDescriptor, ObjectData)> {
     let header = PROFILE_TAG_BYTES.len() + 1 + 8 + 1 + 1 + 16;
     if bytes.len() < header {
         return Err(Error::malformed("canonical segment header is truncated"));
@@ -736,6 +740,40 @@ fn parse_canonical_segment(bytes: &[u8]) -> Result<(ObjectDescriptor, ObjectData
     Ok((descriptor, data))
 }
 
+/// Borrow one segment's stored payload from a container.
+pub(crate) fn segment_payload<'a>(bytes: &'a [u8], seg: &DecodedSegment) -> Result<&'a [u8]> {
+    let lo = seg.payload_offset as usize;
+    let hi = lo + seg.payload_length as usize;
+    bytes
+        .get(lo..hi)
+        .ok_or_else(|| Error::malformed("full-object segment payload outside the container"))
+}
+
+/// Bind every segment's index `content_id` to the semantic object it stores,
+/// without retaining the reconstructed waveform.
+pub(crate) fn verify_segment_bindings(bytes: &[u8], decoded: &DecodedFullObject) -> Result<()> {
+    for seg in &decoded.segments {
+        let payload = segment_payload(bytes, seg)?;
+        let (descriptor, data) = segment_object(
+            seg.representation,
+            payload,
+            decoded.channels,
+            seg.plan.frame_count,
+        )?;
+        if data_representation(&data) != seg.representation {
+            return Err(Error::malformed(
+                "stored segment representation disagrees with the index",
+            ));
+        }
+        if crate::object::canonical_content_id(&descriptor, &data) != seg.content_id {
+            return Err(Error::malformed(
+                "full-object index content_id does not match the stored segment",
+            ));
+        }
+    }
+    Ok(())
+}
+
 /// A container that has been fully decoded and materialized: the exact samples
 /// plus the root's declared semantics.
 #[derive(Debug, Clone)]
@@ -806,34 +844,17 @@ impl MaterializedFullObject {
 /// Decode a container and materialize its exact full extent.
 pub fn materialize_full_object(bytes: &[u8]) -> Result<MaterializedFullObject> {
     let decoded = decode_full_object(bytes)?;
+    verify_segment_bindings(bytes, &decoded)?;
     let mut samples =
         Vec::with_capacity(decoded.total_frames as usize * usize::from(decoded.channels));
     for seg in &decoded.segments {
-        let lo = seg.payload_offset as usize;
-        let hi = lo + seg.payload_length as usize;
-        let payload = bytes
-            .get(lo..hi)
-            .ok_or_else(|| Error::malformed("full-object segment payload outside the container"))?;
+        let payload = segment_payload(bytes, seg)?;
         let (descriptor, data) = segment_object(
             seg.representation,
             payload,
             decoded.channels,
             seg.plan.frame_count,
         )?;
-        if data_representation(&data) != seg.representation {
-            return Err(Error::malformed(
-                "stored segment representation disagrees with the index",
-            ));
-        }
-        // The index's `content_id` is the U1 content identity of the semantic
-        // object the segment stores; it must agree with what was actually
-        // stored, not merely with the outer digest.
-        let derived = crate::object::canonical_content_id(&descriptor, &data);
-        if derived != seg.content_id {
-            return Err(Error::malformed(
-                "full-object index content_id does not match the stored segment",
-            ));
-        }
         let mut seg_samples = crate::inverse::observe::intrinsic_reconstruction(
             &descriptor,
             &data,

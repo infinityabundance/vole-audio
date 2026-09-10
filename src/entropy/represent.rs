@@ -221,6 +221,9 @@ impl RepresentedLiteral {
             let hi = lo + frames as usize * channels;
             let page_samples = &samples[lo..hi];
 
+            // Transactional shared-model pool: a page that falls back to RAW
+            // must not leave the models it would have used behind.
+            let pool_mark = pool.len();
             let streams = symbol::symbolize(symbolization, page_samples, channels)?;
             let mut blocks = Vec::with_capacity(streams.len());
             let mut rans_total: u64 = 0;
@@ -242,11 +245,11 @@ impl RepresentedLiteral {
             for s in page_samples {
                 raw.extend_from_slice(&s.to_le_bytes());
             }
-            let kind = if rans_total < raw.len() as u64 {
-                PageKind::Rans
-            } else {
-                PageKind::Raw
-            };
+            let marginal_pool = marginal_pool_bytes(&pool, pool_mark);
+            let kind = choose_page_kind(rans_total, marginal_pool, raw.len());
+            if kind == PageKind::Raw {
+                pool.truncate(pool_mark);
+            }
             pages.push(LiteralPage {
                 start_frame: start,
                 frames,
@@ -353,6 +356,21 @@ impl RepresentedLiteral {
     /// artifact size).
     pub fn serialized_bytes(&self) -> Result<u64> {
         Ok(literal_container_bytes(self)?.len() as u64)
+    }
+
+    /// Serialized payload bytes of one page: its encoded body, excluding the
+    /// page index record.
+    pub fn page_payload_bytes(&self, page: &LiteralPage) -> Result<u64> {
+        Ok(match page.kind {
+            PageKind::Raw => page.raw.len() as u64,
+            PageKind::Rans => {
+                let mut total = 0u64;
+                for b in &page.blocks {
+                    total += block::block_bytes(b)?.len() as u64;
+                }
+                total
+            }
+        })
     }
 
     /// Complete-cost breakdown of this representation.
@@ -556,6 +574,21 @@ impl RepresentedResidual {
     /// artifact size).
     pub fn serialized_bytes(&self) -> Result<u64> {
         Ok(residual_container_bytes(self)?.len() as u64)
+    }
+
+    /// Serialized payload bytes of one page: its encoded body, excluding the
+    /// page index record.
+    pub fn page_payload_bytes(&self, page: &ResidualPage) -> Result<u64> {
+        Ok(match page.kind {
+            PageKind::Raw => page.raw.len() as u64,
+            PageKind::Rans => {
+                let mut total = 0u64;
+                for b in &page.blocks {
+                    total += block::block_bytes(b)?.len() as u64;
+                }
+                total
+            }
+        })
     }
 
     /// Complete-cost breakdown of this representation.
@@ -765,6 +798,7 @@ fn encode_residual_page(
 
     // Candidate blocks: C mask streams + 4 delta lanes (each over the whole
     // zz-delta list, channel-major byte positions).
+    let pool_mark = pool.len();
     let mut blocks: Vec<Block> = Vec::with_capacity(ch + 4);
     let mut rans_total = 0u64;
     for mask in &masks {
@@ -801,11 +835,10 @@ fn encode_residual_page(
         raw.push(r.channel);
         raw.extend_from_slice(&r.delta.to_le_bytes());
     }
-    let kind = if rans_total < raw.len() as u64 {
-        PageKind::Rans
-    } else {
-        PageKind::Raw
-    };
+    let kind = choose_page_kind(rans_total, marginal_pool_bytes(pool, pool_mark), raw.len());
+    if kind == PageKind::Raw {
+        pool.truncate(pool_mark);
+    }
     Ok(ResidualPage {
         start_frame: start,
         frames,
@@ -916,6 +949,14 @@ fn semantic_model_bytes(model: &ResidualModel) -> usize {
 // Container bytes + parser (Phase-N-ready canonical records)
 // ---------------------------------------------------------------------------
 
+/// Serialized size of the shared-pool models added since `mark`.
+fn marginal_pool_bytes(pool: &[SymbolModel], mark: usize) -> u64 {
+    pool[mark..]
+        .iter()
+        .map(|m| m.canonical_bytes().len() as u64)
+        .sum()
+}
+
 /// Serialize the shared model pool.
 fn pool_bytes(pool: &[SymbolModel]) -> Vec<u8> {
     let mut out = Vec::new();
@@ -988,6 +1029,22 @@ fn block_framing_bytes(integrity: bool) -> u64 {
         } else {
             0
         }
+}
+
+/// The per-page RANS/RAW decision, with the **marginal** shared-model pool cost
+/// included.
+///
+/// A page's RANS cost is its block bytes *plus* any new models it would add to
+/// the shared pool. Choosing RANS on block bytes alone would commit pool models
+/// the page does not pay for and leave orphan entries behind when a later page
+/// falls back to RAW, so the comparison must be transactional: the caller
+/// truncates the pool back to its mark whenever the decision is `Raw`.
+fn choose_page_kind(rans_block_bytes: u64, marginal_pool_bytes: u64, raw_bytes: usize) -> PageKind {
+    if rans_block_bytes.saturating_add(marginal_pool_bytes) < raw_bytes as u64 {
+        PageKind::Rans
+    } else {
+        PageKind::Raw
+    }
 }
 
 fn container_prefix(
@@ -1755,6 +1812,112 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// The per-page decision rule must include the marginal shared-model pool
+    /// cost, not just the block bytes.
+    #[test]
+    fn page_kind_decision_includes_marginal_pool_cost() {
+        // Block bytes alone (900 < 1024) would choose RANS; with the new model
+        // bytes the page cannot beat RAW and must fall back.
+        assert_eq!(choose_page_kind(900, 1202, 1024), PageKind::Raw);
+        // The same page with no new models (all models already pooled) is RANS.
+        assert_eq!(choose_page_kind(900, 0, 1024), PageKind::Rans);
+        // Exactly break-even is RAW (never a tie win).
+        assert_eq!(choose_page_kind(1024, 0, 1024), PageKind::Raw);
+        assert_eq!(choose_page_kind(1023, 0, 1024), PageKind::Rans);
+    }
+
+    /// A page that falls back to RAW must leave the shared pool exactly as it
+    /// found it: no orphan models may survive.
+    #[test]
+    fn shared_pool_is_transactional_with_no_orphan_models() {
+        // Half tonal (compressible -> RANS) and half full-width noise
+        // (incompressible -> RAW) forces per-page fallback in shared mode.
+        let frames = 4096usize;
+        let mut samples = tone(frames / 2, 1);
+        samples.extend(noise(frames / 2, 1));
+        let d = lit_descriptor(frames as u64, Layout::Mono);
+        let mut saw_raw = false;
+        for &page in &[256u32, 512] {
+            let rl = RepresentedLiteral::encode(
+                d.clone(),
+                &samples,
+                page,
+                Symbolization::Identity,
+                ModelMode::Shared,
+                false,
+            )
+            .unwrap();
+            saw_raw |= rl.pages.iter().any(|p| p.kind == PageKind::Raw);
+            let mut referenced = std::collections::BTreeSet::new();
+            for p in &rl.pages {
+                for b in &p.blocks {
+                    if let BlockPayload::Rans {
+                        model: ModelRef::Shared(i),
+                        ..
+                    } = &b.payload
+                    {
+                        referenced.insert(*i as usize);
+                    }
+                }
+            }
+            assert_eq!(
+                referenced.len(),
+                rl.pool.len(),
+                "literal shared pool has orphan models (page {page})"
+            );
+            assert!(referenced.iter().copied().eq(0..rl.pool.len()));
+        }
+        assert!(
+            saw_raw,
+            "fixture must exercise a RAW fallback in shared mode"
+        );
+
+        // Residual: same invariant.
+        let model = ResidualModel::Constant(1000);
+        let mut intrinsic = vec![1000i32; frames];
+        let mut r = lcg(77);
+        for i in (0..frames).step_by(2) {
+            intrinsic[i] = (r() >> 32) as i32;
+        }
+        let dr = ObjectDescriptor::new(
+            crate::object::descriptor::Representation::PredictorResidual,
+            frames as u64,
+            Layout::Mono,
+            None,
+        )
+        .unwrap();
+        let records = Residual::closing_residual(&intrinsic, 1, &model).unwrap();
+        let residual = Residual::new(&dr, model, records).unwrap();
+        let mut saw_raw_residual = false;
+        for &page in &[256u32, 512] {
+            let rr =
+                RepresentedResidual::encode(dr.clone(), &residual, page, ModelMode::Shared, false)
+                    .unwrap();
+            saw_raw_residual |= rr.pages.iter().any(|p| p.kind == PageKind::Raw);
+            let mut referenced = std::collections::BTreeSet::new();
+            for p in &rr.pages {
+                for b in &p.blocks {
+                    if let BlockPayload::Rans {
+                        model: ModelRef::Shared(i),
+                        ..
+                    } = &b.payload
+                    {
+                        referenced.insert(*i as usize);
+                    }
+                }
+            }
+            assert_eq!(
+                referenced.len(),
+                rr.pool.len(),
+                "residual shared pool has orphan models (page {page})"
+            );
+        }
+        assert!(
+            saw_raw_residual,
+            "residual fixture must exercise a RAW fallback"
+        );
     }
 
     #[test]

@@ -91,6 +91,8 @@ pub mod inverse;
 #[cfg(feature = "std")]
 pub mod object;
 #[cfg(feature = "std")]
+pub mod runtime;
+#[cfg(feature = "std")]
 pub mod seal;
 #[cfg(feature = "std")]
 pub use error::{Error, Kind, Result};

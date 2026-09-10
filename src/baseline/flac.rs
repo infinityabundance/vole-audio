@@ -91,18 +91,32 @@ impl FlacEncoding {
     }
 }
 
+/// One exactly-verified B1 encoding of a window, **with its encoded bytes**.
+///
+/// B1 and the B4 runtime source both consume this exact artifact, so they can
+/// never construct subtly different FLAC files.
+#[derive(Debug, Clone)]
+pub struct FlacArtifact {
+    /// The complete `.flac` stream (marker + metadata + frames).
+    pub bytes: Vec<u8>,
+    /// The verified encoding metadata (level, times, hashes, exactness).
+    pub encoding: FlacEncoding,
+    /// SHA-256 of `bytes` (the artifact identity recorded in receipts).
+    pub sha256: [u8; 32],
+}
+
 /// Encode `samples` (exact canonical interleaved i32) at `level` and require an
-/// exact round trip.
+/// exact round trip, returning the verified bytes.
 ///
 /// Returns an error — never a silently-degraded row — when the source is
 /// outside FLAC's domain (0 or >8 channels, non-frame-aligned, empty, absurd
 /// rate) or when the decoder does not reproduce the source exactly.
-pub fn b1_flac(
+pub fn b1_flac_artifact(
     samples: &[i32],
     channels: u8,
     sample_rate: u32,
     level: u32,
-) -> Result<FlacEncoding> {
+) -> Result<FlacArtifact> {
     if channels == 0 || channels > FLAC_MAX_CHANNELS {
         return Err(Error::malformed(format!(
             "B1/FLAC supports 1..={FLAC_MAX_CHANNELS} channels (got {channels})"
@@ -133,6 +147,7 @@ pub fn b1_flac(
     let sw = Stopwatch::start();
     let encoded = encoder.encode(samples);
     let encode_ns = sw.elapsed_ns().max(0) as u64;
+    let encoded_bytes = encoded.len();
 
     let sw = Stopwatch::start();
     let decoded = libflac_rs::decode(&encoded).ok_or_else(|| {
@@ -180,21 +195,36 @@ pub fn b1_flac(
         )));
     }
 
-    Ok(FlacEncoding {
-        level,
-        channels,
-        bits_per_sample: B1_BITS_PER_SAMPLE,
-        sample_rate,
-        source_frames: (samples.len() / ch) as u64,
-        source_bytes: samples.len() as u64 * 4,
-        encoded_bytes: encoded.len() as u64,
-        encode_ns,
-        decode_ns,
-        source_sha256,
-        decoded_sha256,
-        exact_roundtrip,
-        md5_ok: decoded.md5_ok,
+    Ok(FlacArtifact {
+        sha256: crate::hash::sha256::Sha256::digest(&encoded),
+        bytes: encoded,
+        encoding: FlacEncoding {
+            level,
+            channels,
+            bits_per_sample: B1_BITS_PER_SAMPLE,
+            sample_rate,
+            source_frames: (samples.len() / ch) as u64,
+            source_bytes: samples.len() as u64 * 4,
+            encoded_bytes: encoded_bytes as u64,
+            encode_ns,
+            decode_ns,
+            source_sha256,
+            decoded_sha256,
+            exact_roundtrip,
+            md5_ok: decoded.md5_ok,
+        },
     })
+}
+
+/// Encode and verify, returning only the encoding metadata (compatibility
+/// wrapper; the artifact form is [`b1_flac_artifact`]).
+pub fn b1_flac(
+    samples: &[i32],
+    channels: u8,
+    sample_rate: u32,
+    level: u32,
+) -> Result<FlacEncoding> {
+    Ok(b1_flac_artifact(samples, channels, sample_rate, level)?.encoding)
 }
 
 #[cfg(test)]

@@ -19,7 +19,8 @@ pub mod flac;
 pub mod reference;
 
 pub use flac::{
-    B1_LEVEL_CONTROLS, B1_LEVEL_PRIMARY, FLAC_MAX_CHANNELS, FlacEncoding, b1_flac, b1_level_label,
+    B1_LEVEL_CONTROLS, B1_LEVEL_PRIMARY, FLAC_MAX_CHANNELS, FlacArtifact, FlacEncoding, b1_flac,
+    b1_flac_artifact, b1_level_label,
 };
 pub use reference::{ReferenceFlac, reference_flac};
 
