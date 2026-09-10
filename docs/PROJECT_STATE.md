@@ -1256,11 +1256,17 @@ object's native rate/channels, the same caller-owned destination, exact output.
   `a6677455…`; measured latency and storage-read traffic recorded but excluded
   from the frozen hash. No comparative headline yet — that is Seal 10.
 - Frozen hashes unchanged from Seal 8 (semantic `1791816f…`, authored
-  `f7e103f3…`, inverse `5b836006…`, inverse-search `d966d98e…`, conventional
+  `f7e103f3…`, inverse `5b836006…`, inverse-search `d34708c3…`, conventional
   `acfdaa32…`, fullobj `0969a4f4…`, flagship `8f37fab0…`, corpus `4c94b841…`,
-  manifest `f67c73cf…`, PTX `d13d22c3…`, AMDGPU `5c30a4bc…`). Seal subject
-  `1d27510c…`; **18-row** `seal verify` matrix; 426 passed / 12 ignored
-  all-features, 416 passed / 12 ignored default-features.
+  manifest `f67c73cf…`, PTX `d13d22c3…`, AMDGPU `5c30a4bc…`). All 27
+  pre-existing courts' Seal-9 receipts equal their Seal-8 predecessors
+  field-for-field. Seal subject `1d27510c…`; **18-row** `seal verify` matrix;
+  426 passed / 12 ignored all-features, 416 passed / 12 ignored
+  default-features.
+- **Documentation correction:** `court inverse-search` reports `d34708c3…` and
+  has since Seal 8 (the complete-cost oracle changed candidate pricing, which
+  the court's static result includes). Prose carrying `d966d98e…` was repeating
+  the pre-Seal-8 number; Seal 9 changed nothing.
 
 ## Next work (exact order — the implementation contract is executed in sequence)
 

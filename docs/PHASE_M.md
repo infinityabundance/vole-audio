@@ -660,9 +660,17 @@ No comparative headline is drawn here. B2/B3/B4/B5 measurement — repeated
 traversals with deterministically rotated source order, raw per-quantum
 latencies, derived distributions and the stratified crossover table — is
 **Seal 10**. Frozen hashes are unchanged from Seal 8 (semantic `1791816f…`,
-authored `f7e103f3…`, inverse `5b836006…`, inverse-search `d966d98e…`,
+authored `f7e103f3…`, inverse `5b836006…`, inverse-search `d34708c3…`,
 conventional `acfdaa32…`, fullobj `0969a4f4…`, flagship `8f37fab0…`, corpus
 `4c94b841…`, manifest `f67c73cf…`, PTX `d13d22c3…`, AMDGPU `5c30a4bc…`). Seal
 run: seal subject `1d27510c…`; the **18-row** `seal verify` matrix passes; tests
 **426 passed / 12 ignored** all-features and **416 passed / 12 ignored**
 default-features.
+
+**Documentation correction.** `court inverse-search` reports `d34708c3…`, and has
+done so since Seal 8 — the complete-cost oracle changed candidate pricing, which
+the court's static result includes. Prose that carried `d966d98e…` as the current
+value was repeating the pre-Seal-8 number (Seal 7 and earlier, where it was
+correct); Seal 9 itself changed nothing. Every Seal-9 receipt was compared
+field-for-field against its Seal-8 predecessor and all 27 pre-existing courts are
+identical.
