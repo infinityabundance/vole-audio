@@ -136,11 +136,13 @@ pub fn rocm_lib_dirs() -> Vec<std::path::PathBuf> {
     dirs
 }
 
-/// Candidate library paths for a family of sonames: the sonames themselves
-/// (ld.so cache), then every matching-version file in every explicit ROCm
-/// library directory (scanning by the family prefix discovers future
-/// versioned SONAMEs).
-pub fn lib_candidates(sonames: &[&str]) -> Vec<String> {
+/// Candidate library paths for a family of sonames, given explicit library
+/// directories: the sonames themselves (ld.so cache), then every
+/// matching-version file in each directory (scanning by the family prefix
+/// discovers future versioned SONAMEs). Pure — no process-environment
+/// access, so tests can supply their own directory without mutating global
+/// state.
+pub fn lib_candidates_in(sonames: &[&str], explicit_dirs: &[std::path::PathBuf]) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     for s in sonames {
         out.push((*s).to_string());
@@ -162,8 +164,8 @@ pub fn lib_candidates(sonames: &[&str]) -> Vec<String> {
             continue;
         }
         seen.push(prefix.clone());
-        for dir in rocm_lib_dirs() {
-            for p in scan_dir(&prefix, &dir) {
+        for dir in explicit_dirs {
+            for p in scan_dir(&prefix, dir) {
                 if !out.contains(&p) {
                     out.push(p);
                 }
@@ -171,6 +173,12 @@ pub fn lib_candidates(sonames: &[&str]) -> Vec<String> {
         }
     }
     out
+}
+
+/// Candidate library paths for a family of sonames using the production
+/// explicit directories (`ROCM_LIB_PATH` entries + `/opt/rocm*/lib{,64}`).
+pub fn lib_candidates(sonames: &[&str]) -> Vec<String> {
+    lib_candidates_in(sonames, &rocm_lib_dirs())
 }
 
 /// Load a runtime soname (via ld cache + explicit ROCm library dirs) and
@@ -227,10 +235,11 @@ mod extra_tests {
     use super::*;
 
     #[test]
-    fn versioned_soname_family_is_discovered_in_explicit_rocm_dirs() {
+    fn versioned_soname_family_is_discovered_in_explicit_dirs() {
         // ROCm 7 can ship libamdhip64.so.7 without an unversioned symlink;
-        // the candidate builder must find it inside every explicit ROCm
-        // library directory (here: ROCM_LIB_PATH), not just /opt.
+        // the candidate builder must find it inside the explicit library
+        // directories it is given (pure function: no process environment is
+        // mutated by this test).
         let dir = std::env::temp_dir().join(format!(
             "vole-rocm-cand-{}-{}",
             std::process::id(),
@@ -239,26 +248,29 @@ mod extra_tests {
         std::fs::create_dir_all(&dir).unwrap();
         let so7 = dir.join("libamdhip64.so.7");
         std::fs::write(&so7, b"").unwrap();
-        // SAFETY: test-only; single-threaded section (the value is restored
-        // immediately after the assertions).
-        unsafe {
-            std::env::set_var("ROCM_LIB_PATH", &dir);
-        }
-        let cands = lib_candidates(&[
-            "libamdhip64.so.7",
-            "libamdhip64.so.6",
-            "libamdhip64.so.5",
-            "libamdhip64.so",
-        ]);
+        // Some unrelated file must not be picked up.
+        std::fs::write(dir.join("libamdhip64_helper.txt"), b"").unwrap();
+        let dirs = vec![dir.clone()];
+        let cands = lib_candidates_in(
+            &[
+                "libamdhip64.so.7",
+                "libamdhip64.so.6",
+                "libamdhip64.so.5",
+                "libamdhip64.so",
+            ],
+            &dirs,
+        );
         // The unversioned-soname row alone also discovers the family (scan
         // by prefix), so a .so.7-only install is not mislabeled absent.
-        let cands2 = lib_candidates(&["libamdhip64.so"]);
-        unsafe {
-            std::env::remove_var("ROCM_LIB_PATH");
-        }
+        let cands2 = lib_candidates_in(&["libamdhip64.so"], &dirs);
         let path = so7.to_string_lossy().into_owned();
         assert!(cands.contains(&path), "candidates: {cands:?}");
         assert!(cands2.contains(&path), "candidates: {cands2:?}");
+        // Only files whose name starts with the family prefix are scanned.
+        let helper = dir.join("libamdhip64_helper.txt");
+        assert!(!cands.contains(&helper.to_string_lossy().into_owned()));
+        // The unversioned soname is always the first candidate (ld cache).
+        assert_eq!(cands2[0], "libamdhip64.so");
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

@@ -301,9 +301,9 @@ fn upmix_parity(artifact: &[u8]) -> Result<Vec<ParityRow>> {
         .map(|f| sat_i32(((f as i64) - 256) * 4_000 * 2))
         .collect();
     let expect: Vec<i32> = mono.iter().flat_map(|&s| [s, s]).collect();
-    let src = DeviceBuffer::alloc(&session.api, (frames as usize) * 4)?;
+    let src = DeviceBuffer::alloc(&session.device, (frames as usize) * 4)?;
     src.upload(bytemuck(&mono))?;
-    let dst = DeviceBuffer::alloc(&session.api, (frames as usize * channels as usize) * 4)?;
+    let dst = DeviceBuffer::alloc(&session.device, (frames as usize * channels as usize) * 4)?;
     upmix_mono_dup(
         &session,
         &module,

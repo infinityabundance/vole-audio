@@ -887,7 +887,7 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
             let base64 = base as u64;
             // SAFETY: the ALSA mapping is live for the whole trial (pcm
             // holds it); the registration dies before pcm in this scope.
-            let attempt = unsafe { attempt_register(&world.session().api, base64, len) };
+            let attempt = unsafe { attempt_register(&world.session().device, base64, len) };
             match attempt {
                 RegistrationAttempt::Registered(reg) => Ok(Direct {
                     registration: reg,
@@ -987,7 +987,7 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
         let mono_dev = mono_direct.registration.device_ptr.unwrap_or(0);
         // Bound mono arena (one 512-frame chunk); declared peak exposure.
         let arena = match DeviceBuffer::alloc(
-            &mono_direct.world.session().api,
+            &mono_direct.world.session().device,
             MONO_ARENA_BYTES as usize,
         ) {
             Ok(a) => a,

@@ -18,7 +18,7 @@
 use crate::backend::entropy_flat::FlatEntropyJob;
 use crate::backend::flatten::FlattenedWorld;
 use crate::backend::rocm::ffi;
-use crate::backend::rocm::runtime::{Arg, DeviceBuffer, Function, HipApi, Module, Rocm};
+use crate::backend::rocm::runtime::{Arg, DeviceBuffer, Function, HipDevice, Module, Rocm};
 use crate::device::entropy_shared::EntropyJobDesc;
 use crate::device::geom::Grid;
 use crate::device::kernel_shared::FlatState;
@@ -105,7 +105,7 @@ impl RocmWorld {
         if max_frames == 0 || max_frames > crate::limits::MAX_QUANTUM_FRAMES as usize {
             return Err(Error::limit("max_frames outside quantum domain"));
         }
-        let api = &rocm.api;
+        let api = &rocm.device;
 
         // Upload the world once (no per-quantum allocation anywhere in the
         // render path).
@@ -285,7 +285,7 @@ impl RocmWorld {
 ///
 /// The world either owns its session + module (`open`) or shares a caller
 /// session/module (`open_shared`/`build` — the fused entropy->D1 endpoint
-/// path). Lifetime is structural: every buffer retains the `Arc<HipApi>`,
+/// path). Lifetime is structural: every buffer retains the `Arc<HipDevice>`,
 /// the module stays loaded while any `Function` of it exists, and drop
 /// order of the fields is irrelevant.
 pub struct EntropyWorldRocm {
@@ -294,7 +294,7 @@ pub struct EntropyWorldRocm {
     /// Module handle (None when the caller keeps the module alive).
     module: Option<Module>,
     /// The owning API (shared by every buffer).
-    api: Arc<HipApi>,
+    device: Arc<HipDevice>,
     function: Function,
     d_pages: DeviceBuffer,
     d_streams: DeviceBuffer,
@@ -320,7 +320,7 @@ impl EntropyWorldRocm {
         let session = Rocm::open(ordinal)?;
         let module = session.load_module(artifact_bytes)?;
         let function = module.function(ENTROPY_ENTRY)?;
-        let mut world = EntropyWorldRocm::build(&session.api, function, job)?;
+        let mut world = EntropyWorldRocm::build(&session.device, function, job)?;
         world.module = Some(module);
         world.session = Some(session);
         Ok(world)
@@ -335,7 +335,7 @@ impl EntropyWorldRocm {
     ) -> Result<EntropyWorldRocm> {
         let module = session.load_module(artifact_bytes)?;
         let function = module.function(ENTROPY_ENTRY)?;
-        let mut world = EntropyWorldRocm::build(&session.api, function, job)?;
+        let mut world = EntropyWorldRocm::build(&session.device, function, job)?;
         world.module = Some(module);
         Ok(world)
     }
@@ -343,24 +343,24 @@ impl EntropyWorldRocm {
     /// Build a decode world reusing an already-loaded module + function.
     /// The module must outlive this world (its function retains it).
     pub fn build(
-        api: &Arc<HipApi>,
+        device: &Arc<HipDevice>,
         function: Function,
         job: &FlatEntropyJob,
     ) -> Result<EntropyWorldRocm> {
         let mut world = EntropyWorldRocm {
             session: None,
             module: None,
-            api: api.clone(),
+            device: device.clone(),
             function,
-            d_pages: DeviceBuffer::alloc(api, 1)?,
-            d_streams: DeviceBuffer::alloc(api, 1)?,
-            d_payload: DeviceBuffer::alloc(api, 1)?,
-            d_mvalues: DeviceBuffer::alloc(api, 2)?,
-            d_mstarts: DeviceBuffer::alloc(api, 1)?,
-            d_mfreqs: DeviceBuffer::alloc(api, 1)?,
-            d_mranges: DeviceBuffer::alloc(api, 1)?,
-            d_cycle: DeviceBuffer::alloc(api, 1)?,
-            d_desc: DeviceBuffer::alloc(api, 52)?,
+            d_pages: DeviceBuffer::alloc(device, 1)?,
+            d_streams: DeviceBuffer::alloc(device, 1)?,
+            d_payload: DeviceBuffer::alloc(device, 1)?,
+            d_mvalues: DeviceBuffer::alloc(device, 2)?,
+            d_mstarts: DeviceBuffer::alloc(device, 1)?,
+            d_mfreqs: DeviceBuffer::alloc(device, 1)?,
+            d_mranges: DeviceBuffer::alloc(device, 1)?,
+            d_cycle: DeviceBuffer::alloc(device, 1)?,
+            d_desc: DeviceBuffer::alloc(device, 52)?,
             desc: EntropyJobDesc::zeroed(),
         };
         world.upload(job)?;
@@ -370,7 +370,7 @@ impl EntropyWorldRocm {
     /// Upload a (possibly new) flat job: pages/streams/payload/models/cycle
     /// are re-uploaded and the descriptor updated.
     pub fn upload(&mut self, job: &FlatEntropyJob) -> Result<()> {
-        let api = &self.api;
+        let api = &self.device;
         let upload = |buf: &DeviceBuffer, bytes: &[u8]| -> Result<()> {
             if bytes.is_empty() {
                 return Ok(());
@@ -410,7 +410,7 @@ impl EntropyWorldRocm {
         desc.cycle_count = job.cycle.len() as u32;
         desc.statuses_len = job.pages.len() as u32;
         let desc_arr = [desc];
-        let d_desc = DeviceBuffer::alloc(api, 52)?;
+        let d_desc = DeviceBuffer::alloc(&self.device, 52)?;
         upload(&d_desc, unsafe { pod_bytes(&desc_arr) })?;
         self.d_pages = pages;
         self.d_streams = streams;
@@ -431,7 +431,7 @@ impl EntropyWorldRocm {
     /// scratch arena is per-launch (the documented H.2 limitation, mirrored
     /// from the CUDA path).
     fn launch(&self, out_dev: u64) -> Result<()> {
-        let api = &self.api;
+        let api = &self.device;
         let desc = &self.desc;
         let scratch_len = desc.page_count as usize * desc.scratch_stride as usize;
         let d_scratch = DeviceBuffer::alloc(api, scratch_len.max(1))?;
@@ -454,9 +454,10 @@ impl EntropyWorldRocm {
             Arg::U32(grid.threads_x),
         ];
         self.function.launch(grid, &args)?;
-        // SAFETY: hipDeviceSynchronize makes device writes visible.
-        ffi::check(&api.fns, "hipDeviceSynchronize", unsafe {
-            (api.fns.hipDeviceSynchronize.expect("bound"))()
+        // SAFETY: hipDeviceSynchronize makes device writes visible; the
+        // function's owning device was made current by the launch itself.
+        ffi::check(&self.device.api.fns, "hipDeviceSynchronize", unsafe {
+            (self.device.api.fns.hipDeviceSynchronize.expect("bound"))()
         })?;
         let mut status = vec![0u8; desc.page_count as usize];
         d_status.download(&mut status)?;
@@ -471,7 +472,7 @@ impl EntropyWorldRocm {
 
     /// Decode the uploaded job into a fresh device arena and download it.
     pub fn decode(&self) -> Result<Vec<i32>> {
-        let out = DeviceBuffer::alloc(&self.api, self.desc.arena_samples as usize * 4)?;
+        let out = DeviceBuffer::alloc(&self.device, self.desc.arena_samples as usize * 4)?;
         self.launch(out.device_ptr())?;
         let mut bytes = vec![0u8; self.desc.arena_samples as usize * 4];
         out.download(&mut bytes)?;
