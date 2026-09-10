@@ -300,6 +300,48 @@ Seal run (release, `--all-features`, clean tree `26a610e`, version 0.10.1):
   `vole-audio seal verify` PASSes the 13-row matrix in **default mode** at the
   battery tree and at the release head.
 
+### Seal 4 — review-3 closure: CUDA driver hygiene (2026-09-10)
+
+Three properties complete the CUDA model (see "Non-invasive context lifecycle"
+above): `Cuda::open` no longer mutates the process environment; the created
+context is popped so it is *floating* on return; `CurrentContextGuard` is
+`!Send` by construction plus a compile-time assertion. The runner sets
+`CUDA_MODULE_LOADING=EAGER` / `CUDA_CACHE_DISABLE=1` and every CUDA receipt
+records the observed `cuda_environment`.
+
+Seal run (release, `--all-features`, clean tree `27eb8d2`, version 0.10.2, with
+the runner environment above):
+
+- **The floating context immediately found a latent bug of its own** in the
+  teardown guards added by Seal 3: `let _ = self.ctx.enter();` binds nothing, so
+  the guard was released at the end of the statement and
+  `cuMemFree` / `cuModuleUnload` / `cuMemHostUnregister` ran without the owner
+  current. The D1 host registration leaked and the next registration of the
+  same mapping failed with rc 712 — `court entropy-d1` stopped being SUPPORTED
+  and caught it. Teardown guards are now bound to named locals; the bug never
+  reached a published release (the faulty revision was discarded before
+  sealing). Gated regression: `host_registration_is_released_on_drop`.
+- `court inverse-search` SUPPORTED, 3 execution surfaces + 1 compile-only
+  hardware-pending ROCm surface, frozen result `d966d98e…` unchanged; measured
+  scalar 27.00 ms, parallel 5.87 ms (**0.217×**), CUDA 7.74 ms (**0.287×**).
+- `court inverse` still reports **6 non-literal explanations** with the frozen
+  static result `217b09a7…`; no semantics or economics moved.
+- Device artifacts are byte-identical to Seals 1–3 (the change is host-side):
+  PTX `d13d22c3…`, AMDGPU `5c30a4bc…`, rebuilt from the clean `27eb8d2` tree,
+  deterministic across isolated builds.
+- Every CUDA-dependent court still SUPPORTED: `cuda`, `d1`, `inverse-search`,
+  `entropy-cuda`, `entropy-d1`.
+- All pre-existing courts SUPPORTED with frozen hashes unchanged (semantic
+  `1791816f4b93…`, authored `f7e103f3a97d…`, inverse `217b09a7…`).
+- Host tests: **391 passed, 12 ignored** all-features (381 passed, 12 ignored
+  default-features); 9 gated GPU tests pass with the runner environment set.
+  clippy `-D warnings` and `cargo fmt --check` clean.
+- 23 receipts, every one `source_binding: bound` and carrying
+  `seal_subject_hash =
+  b4a54127463c4a5fc5d007948ed1276ba5645e2a6ce5ef628bdbd2773cf2e199`;
+  `vole-audio seal verify` PASSes the 13-row matrix in **default mode** at the
+  battery tree and at the release head.
+
 ## Execution record (implementation summary)
 
 - The device surface grows by exactly one entry and no per-backend semantics:
