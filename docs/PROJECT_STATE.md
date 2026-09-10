@@ -944,10 +944,13 @@ and proves that placement is a **performance** question only:
 - `court inverse-search`: 14 fixtures × 512 periods; CUDA counts exactly equal
   the scalar counts on all 14 fixtures, 80 accepted candidates re-verified by
   the exact evaluator, and every accepted set identical between the
-  sequential scan and the externally fed ranking. Measured on this host:
-  parallel 0.198×, CUDA 0.406× the sequential scan wall time (CUDA includes
-  transfers) — reported as-is, with an explicit limitation that no claim is
-  made that the GPU wins. ROCm is a typed `UNSUPPORTED_BY_HARDWARE` row.
+  sequential scan and the externally fed ranking. Measured on the release
+  build: parallel **0.228×** and CUDA **1.779×** the sequential scan wall time
+  — the host-parallel scan wins and the CUDA scan is *slower* here (per-launch
+  and transfer overhead dominates a scan this small), so the default placement
+  stays on the host and the device path is kept as a verified-equal surface.
+  The receipt records both ratios with explicit limitations. ROCm is a typed
+  `UNSUPPORTED_BY_HARDWARE` row.
 - Artifacts change because the kernel surface grew: PTX `d13d22c3…`, AMDGPU
   `5c30a4bc…` (still byte-deterministic across isolated builds).
 

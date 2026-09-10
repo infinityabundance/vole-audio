@@ -58,22 +58,34 @@ function, so their agreement is structural rather than a coincidence — and
 The court additionally records the measured wall time of each surface and the
 implied ratio. It makes **no** claim that the GPU wins: work per period is
 `O(frames / p)`, so the balance depends on the period bound and the window
-length, and the receipt carries the numbers as they came out.
+length, and the receipt carries the numbers as they came out. On this host, in
+the release build, the sequential host scan is actually **faster** than the
+CUDA scan (see the Seal 1 ledger), so the default placement stays on the host
+and the device path is kept as a verified-equal surface.
 
 ## Seal history
 
 ### Seal 1 — Phase L implementation + clean-tree battery (2026-09-10)
 
-Seal run (release, `--all-features`, clean tree at the implementation commit,
-version 0.9.0):
+Seal run (release, `--all-features`, clean tree `3ddf66f`, version 0.9.0):
 
 - `court inverse-search` SUPPORTED: 14 fixtures × 512 candidate periods on
   scalar / 16-thread parallel / CUDA, with the CUDA counts **exactly equal**
   to the scalar counts on all 14 fixtures and 80 accepted candidates
-  re-verified by the exact evaluator. Measured on this host: parallel 0.198×
-  and CUDA 0.406× the sequential scan wall time (CUDA includes host↔device
-  transfers) — the GPU wins here, and the number is reported rather than
-  claimed as architecture.
+  re-verified by the exact evaluator, and the device-ranked period list
+  producing exactly the sequential accepted set.
+- **Measured on the release build** (this is the number that governs the
+  policy): parallel **0.228×** and CUDA **1.779×** the sequential scan wall
+  time — i.e. the 16-thread host scan is ~4.4× faster than sequential, and the
+  CUDA scan is **~1.8× slower** than the sequential host scan (the per-launch
+  and host↔device transfer overhead dominates a scan this small: ~2 M frame
+  comparisons per fixture). An earlier debug-build run showed the opposite
+  ordering; measuring on the release build is what makes the result usable.
+  Per the contract ("if GPU does not win for a search family, keep the faster
+  implementation") the default placement stays on the host (`inverse::compile`
+  is sequential; `scan_parallel` is available), and the device path is kept as
+  a verified-equal surface rather than adopted. No claim is made that the GPU
+  wins at larger period bounds — that is untested here.
 - `court rocm`: the ROCm search entry (`vole_period_scan`) is part of the
   AMDGPU compile surface and the artifact is rebuilt with four entries
   (`vole_render_d0`, `vole_entropy_decode`, `vole_upmix_mono_dup`,
@@ -87,10 +99,13 @@ version 0.9.0):
   `1791816f4b93…`, authored `f7e103f3a97d…`, inverse `217b09a7…`).
 - Host tests: **387 passed, 5 ignored** all-features (377 passed, 5 ignored
   default-features; +15 over Phase K Seal 3: the shared period-scan semantics,
-  the scalar/parallel scan equality battery, the ranking unit battery, and
-  the proposal-source invariance tests); clippy `-D warnings` and
+  the scalar/parallel scan equality battery, the ranking unit battery, and the
+  proposal-source invariance tests); clippy `-D warnings` and
   `cargo fmt --check` clean.
-- `vole-audio seal verify` PASSes the 13-row matrix in **default mode** at the
+- 23 receipts, every one `source_binding: bound` and carrying
+  `seal_subject_hash =
+  270df703f42aa049b53b8ce4ca2482a5e15ffcb6ed9493bb23c31d29ec6fedc7`;
+  `vole-audio seal verify` PASSes the 13-row matrix in **default mode** at the
   battery tree and at the release head.
 
 ## Execution record (implementation summary)
