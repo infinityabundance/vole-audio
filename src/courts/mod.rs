@@ -136,9 +136,11 @@ selected representations and comparison buckets",
     ),
     (
         "runtime",
-        "Phase M runtime substrate mechanism: B2 resident PCM, B3 raw PCM disk (cold/warm \
-verified), B4 the exact B1 FLAC-5 artifact preloaded, B5 bounded VOLE materialization, \
-over one frozen sequential 512-frame trace, exact on every source",
+        "Phase M runtime substrate and measurement: B2 resident PCM, B3 raw PCM disk \
+(cold/warm verified each repeat), B4 the exact B1 FLAC-5 artifact preloaded, B5 bounded VOLE \
+(first-play and prepared control), over the frozen sequential 512-frame trace repeated with \
+rotated source order; harness-owned latency, split storage/residency accounting, two explicit \
+populations, and a stratified crossover surface",
     ),
     (
         "cuda",
