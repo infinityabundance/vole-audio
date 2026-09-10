@@ -106,10 +106,11 @@ Stated plainly so the gap is visible (updated at Seal 6 — the corpus is frozen
 the conventional baseline is measured, the container mechanism is frozen, and
 the true B1-vs-VOLE result now exists):
 
-* B2–B4 (sampler / disk-streaming / compressed-file playback) are
-  `NOT_IMPLEMENTED`; now that a canonical full-object VOLE artifact exists, the
-  runtime ladder (B2 / B3 / B4 / B5 selected full-object VOLE scalar) becomes
-  comparable rather than fragmented;
+* B2–B4 (sampler / disk-streaming / compressed-file playback) now exist as the
+  common runtime substrate (Seal 9) beside the bounded B5 full-object VOLE
+  source; the **comparative** B2/B3/B4/B5 measurement (repeated traversals,
+  rotated source order, latency distributions, the crossover table) is the next
+  increment and has not been run;
 * `court depth`, `court random-access`, `court negative`, `court interference`,
   `court all` are not implemented;
 * energy and the adversarial real-time load matrix (§49) are not measured;
@@ -142,13 +143,15 @@ Seal run (release, `--all-features`, clean tree, version 0.11.0):
 
 ## Where this goes next
 
-1. **Seals 2–8 — the corpus is frozen, verified and review-closed; the flagship
+1. **Seals 2–9 — the corpus is frozen, verified and review-closed; the flagship
    B0/B1 conventional baseline is measured; the full-object container mechanism
    and its parser are frozen; the B1-vs-VOLE result exists with clean population
-   arithmetic; and the entropy complete-cost oracle equals the physical
-   artifact.**
-2. B2–B4 (PCM-resident / disk-streaming / compressed-file playback) beside the
-   selected full-object VOLE artifact, then the `depth` / `random-access` /
+   arithmetic; the entropy complete-cost oracle equals the physical artifact;
+   and the common runtime substrate is frozen and proven exact on every
+   source.**
+2. **Seal 10 — the B2/B3/B4/B5 runtime measurement** (repeated traversals with
+   deterministically rotated source order, raw per-quantum latencies, derived
+   distributions and the crossover table), then the `depth` / `random-access` /
    `negative` courts and the crossover surface.
 3. Adversarial real-time load (§49) and energy where measurable.
 
@@ -574,3 +577,92 @@ honest), and a handful of segments switched representation. Corpus hashes, the
 B1 conventional result, semantic behaviour and device artifacts are untouched.
 Seal run: seal subject `bb49eb48…`; tests **419 passed / 12 ignored**
 all-features and **409 passed / 12 ignored** default-features.
+
+### Seal 9 — runtime mechanism freeze (2026-09-10)
+
+This seal freezes the **runtime protocol and correctness vector** before any
+comparative timing exists. One contract, four source architectures, all fed the
+same frozen sequential trace and the same caller-owned destination:
+
+```text
+B2  PCM-resident sampler          canonical i32 held in memory
+B3  raw PCM disk streaming        canonical LE i32 on disk, cold/warm VERIFIED
+B4  compressed preload            the exact B1 FLAC-5 artifact, decoded once
+B5  bounded VOLE materialization  verified full-object container, page-bounded
+```
+
+**Shared-model pool made transactional (H.2 cleanup).** The per-page RANS/RAW
+decision in `RepresentedLiteral`/`RepresentedResidual` previously compared block
+bytes only, so a page could add shared models to the pool and then fall back to
+RAW, leaving orphan models behind that it never paid for. The decision now
+includes the **marginal** pool bytes (`choose_page_kind(rans_block_bytes,
+marginal_pool_bytes, raw_bytes)`), and a RAW fallback truncates the pool to its
+mark. Two regression tests (`page_kind_decision_includes_marginal_pool_cost`,
+`shared_pool_is_transactional_with_no_orphan_models`) require the pool to return
+exactly to its previous state. This does not affect Seal 8's result, whose
+inverse path is `ModelMode::Inline`.
+
+**One artifact for B1 and B4.** `b1_flac_artifact()` returns
+`FlacArtifact { bytes, encoding, sha256 }` after the mandatory exact-roundtrip
+and STREAMINFO MD5 checks; `b1_flac()` is now a thin compatibility wrapper
+returning `.encoding`. B1 and B4 therefore consume the **same** exactly-verified
+stream and cannot construct subtly different FLAC files. The sealed B1 stream has
+no SEEKTABLE and is never modified to gain one, so B4 is truthfully a
+*compressed-storage / decoded-resident* sampler; setup (decode) is reported
+separately from steady-state reads.
+
+**Verification outside the hot path.** `VerifiedFullObject::verify(bytes)` runs
+once — parse, outer digest, frozen layout, per-segment `content_id` binding to the
+reconstructed semantic object, and root semantics — and records `verify_ns`.
+`FullObjectReader` then services `[start, frames)` by parsing each segment once
+(lazily) and decoding only the pages the window touches through the frozen
+`RepresentedLiteral::materialize` / `RepresentedResidual::materialize_closure`
+paths; it retains encoded state only, never a decoded waveform. Windows crossing
+the 65,536-frame segment boundary concatenate seamlessly.
+
+**Cache claims are verified, not assumed.** Linux documents
+`posix_fadvise(DONTNEED)` as an attempt, so eviction is paired with a
+`mincore(2)` residency check over the page-aligned mapping; when residency cannot
+be established the state is `CACHE_STATE_NOT_CONFIRMED`, never labelled cold or
+warm. Global `drop_caches` is never used. `B3` artifacts live on a block-backed
+filesystem (`target/`) because `fadvise` cannot evict tmpfs pages — `/tmp` was
+tried first and correctly failed to reach cold. Logical (`rchar`) and physical
+(`read_bytes`) traffic come from `/proc/self/io`.
+
+**The frozen trace.** Sequential `[0,512), [512,1024), …` plus a final partial
+window, at each object's native rate and channel count, with no gain, pan, filter,
+resampling or random seek. Deadlines follow the native rate (512 frames @ 48 kHz
+= 10,666,666 ns; @ 44.1 kHz = 11,609,977 ns; @ 96 kHz = 5,333,333 ns;
+@ 192 kHz = 2,666,666 ns; asserted in a unit test). This court measures **source
+materialization**, not endpoint behaviour.
+
+`court runtime` runs all 115 frozen objects (B4 for the 110 B1-comparable
+objects and `NOT_APPLICABLE_BY_FORMAT_DOMAIN` otherwise): **23,229 trace windows
+per source, every requested window exact on every source**;
+`COLD_VERIFIED 115`, `WARM_VERIFIED 115`; frozen static result
+`a66774555f11bd9506ccfbf1f14e9e4404e6fdc8aa8478518cdee3c705d5ea84`. The hash
+covers the protocol, artifact identities, deterministic counters and the
+correctness vector; measured latency and physical storage-read traffic are
+recorded as evidence but deliberately excluded from it. Informational (not
+frozen) totals from the seal run:
+
+```text
+B2        total   1.4 ms   max   1.6 µs   storage reads 0
+B3-cold   total  55.1 ms   max   1.7 ms   storage reads 71,462,912 B (logical 71,277,600)
+B3-warm   total   5.7 ms   max  14.5 µs   storage reads 0
+B4        total   0.9 ms   max   1.3 µs   storage reads 0
+B5        total 480.7 ms   max   1.3 ms   encoded examined 60,750,412 B, parsed 31,063,791 B,
+                                           pages 12,062, segments 23,229
+deadline misses: 0 on every source
+```
+
+No comparative headline is drawn here. B2/B3/B4/B5 measurement — repeated
+traversals with deterministically rotated source order, raw per-quantum
+latencies, derived distributions and the stratified crossover table — is
+**Seal 10**. Frozen hashes are unchanged from Seal 8 (semantic `1791816f…`,
+authored `f7e103f3…`, inverse `5b836006…`, inverse-search `d966d98e…`,
+conventional `acfdaa32…`, fullobj `0969a4f4…`, flagship `8f37fab0…`, corpus
+`4c94b841…`, manifest `f67c73cf…`, PTX `d13d22c3…`, AMDGPU `5c30a4bc…`). Seal
+run: seal subject `1d27510c…`; the **18-row** `seal verify` matrix passes; tests
+**426 passed / 12 ignored** all-features and **416 passed / 12 ignored**
+default-features.

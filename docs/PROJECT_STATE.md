@@ -1226,6 +1226,42 @@ complete bytes" was not yet a physical-storage claim.
   artifacts are untouched. Seal subject `bb49eb48…`; 419 passed / 12 ignored
   all-features, 409 passed / 12 ignored default-features.
 
+### Phase M Seal 9 — runtime substrate mechanism (v0.19.0)
+
+The runtime protocol and correctness vector are frozen **before** any comparative
+timing is reported: one `RuntimeSource` contract (`info()`, `read(start, frames,
+dst)`), four architectures, the same frozen sequential 512-frame trace at each
+object's native rate/channels, the same caller-owned destination, exact output.
+
+- **B2** resident PCM, **B3** raw canonical LE PCM on disk (cold/warm verified),
+  **B4** the exact B1 FLAC-5 artifact decoded once (no seektable added), **B5**
+  bounded VOLE materialization over the verified full-object container.
+- **H.2 shared-model pool made transactional**: the per-page RANS/RAW decision
+  now includes marginal pool bytes and a RAW fallback truncates the pool, so no
+  orphan models survive. Two regression tests. Seal 8's result is unaffected
+  (its inverse path is `ModelMode::Inline`).
+- **`FlacArtifact { bytes, encoding, sha256 }`**: B1 and B4 consume the same
+  exactly-verified stream; `b1_flac()` is a compatibility wrapper.
+- **`VerifiedFullObject` / `FullObjectReader`**: verification (digest, layout,
+  per-segment `content_id` binding, root semantics) happens once outside any
+  timed path; bounded reads parse each segment lazily and decode only the pages
+  the window touches, retaining encoded state only — never a waveform.
+- **Cache claims verified**: `fadvise(DONTNEED)` paired with `mincore`; a state
+  that cannot be confirmed is `CACHE_STATE_NOT_CONFIRMED`, never assumed. B3
+  artifacts live on a block-backed filesystem because tmpfs pages cannot be
+  evicted. Logical (`rchar`) vs physical (`read_bytes`) traffic from
+  `/proc/self/io`.
+- `court runtime`: 115 objects, **23,229 trace windows per source, all exact**;
+  `COLD_VERIFIED`/`WARM_VERIFIED` 115 each; frozen static result
+  `a6677455…`; measured latency and storage-read traffic recorded but excluded
+  from the frozen hash. No comparative headline yet — that is Seal 10.
+- Frozen hashes unchanged from Seal 8 (semantic `1791816f…`, authored
+  `f7e103f3…`, inverse `5b836006…`, inverse-search `d966d98e…`, conventional
+  `acfdaa32…`, fullobj `0969a4f4…`, flagship `8f37fab0…`, corpus `4c94b841…`,
+  manifest `f67c73cf…`, PTX `d13d22c3…`, AMDGPU `5c30a4bc…`). Seal subject
+  `1d27510c…`; **18-row** `seal verify` matrix; 426 passed / 12 ignored
+  all-features, 416 passed / 12 ignored default-features.
+
 ## Next work (exact order — the implementation contract is executed in sequence)
 
 Phase H.2 is complete (entropy-native core: all ten H.2 courts SUPPORTED on
@@ -1246,10 +1282,14 @@ re-verified by the exact evaluator (`court inverse-search`), and the placement
 policy keeps the measured-faster host surface (`SearchBudget::placement`,
 `Auto`).
 
-1. Phase M — remaining increments (the B2–B4 runtime baselines beside the selected
-   full-object VOLE artifact, with a bounded `FullObjectReader` and a verified
-   `FlacArtifact`; then depth / random-access / negative / interference courts;
-   crossover surface; energy);
+1. Phase M — remaining increments. The common runtime substrate (B2 resident
+   PCM, B3 raw disk cold/warm-verified, B4 the exact B1 FLAC-5 artifact, B5
+   bounded VOLE) is frozen with a verified `FlacArtifact`, `VerifiedFullObject`
+   and a bounded `FullObjectReader`, and proven exact on every source (Seal 9).
+   Next: the **B2/B3/B4/B5 measurement** (Seal 10: repeated traversals with
+   deterministically rotated source order, raw per-quantum latencies, derived
+   distributions, stratified crossover table), then depth / random-access /
+   negative / interference courts; crossover surface; energy;
    Phase N — transport/archive
    (embeds H.2 canonical records); Phase O — learned deterministic prediction
    addendum (judged by the H.2 complete-cost API).
