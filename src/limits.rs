@@ -246,6 +246,37 @@ pub const LEARNED_WEIGHT_Q: u32 = 12;
 /// Frozen number of residual codec kinds the canonical family implements.
 pub const LEARNED_RESIDUAL_CODECS: u32 = 6;
 
+// ---------------------------------------------------------------------------
+// Exp2 addendum ceilings (the optimization profile `vole.audio.learned.exp2`).
+// ---------------------------------------------------------------------------
+
+/// Number of residual codec kinds the Exp2 family implements (6 v1 + 6 v2).
+pub const LEARNED_EXP2_RESIDUAL_CODECS: u32 = 12;
+
+/// Maximum selected lags (sparse high-order linear predictor, Exp2).
+pub const MAX_LEARNED_SPARSE_LAGS: u32 = 256;
+
+/// Maximum long-term (pitch) taps in one predictor (Exp2).
+pub const MAX_LEARNED_LTP_TAPS: u32 = 5;
+
+/// Maximum segmentation boundaries examined by the Exp2 shortest path.
+pub const MAX_LEARNED_SEGMENT_BOUNDARIES: u32 = 1 << 20;
+
+/// Maximum segments in one segmented learned object (Exp2).
+pub const MAX_LEARNED_SEGMENTS: u32 = 1 << 16;
+
+/// Maximum hierarchical residual stages (Exp2).
+pub const MAX_LEARNED_HIERARCHY_STAGES: u32 = 3;
+
+/// Maximum context-mixture experts (Exp2).
+pub const MAX_LEARNED_CONTEXT_EXPERTS: u32 = 16;
+
+/// Maximum deterministic beam width of the Exp2 optimizer.
+pub const MAX_LEARNED_BEAM_WIDTH: u32 = 16;
+
+/// Maximum backward-adaptive coefficient count (Exp2).
+pub const MAX_LEARNED_ADAPTIVE_COEFFS: u32 = 512;
+
 #[cfg(test)]
 mod tests {
     use super::*;

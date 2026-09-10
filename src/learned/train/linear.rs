@@ -182,6 +182,57 @@ pub fn fit_linear_object(
     analysis_frames: usize,
     budget: &TrainBudget,
 ) -> Result<(LearnedObject, TrainStats)> {
+    fit_linear_object_profile(
+        crate::learned::profile::LearnedProfile::Exp1,
+        source,
+        channels,
+        frames,
+        sample_rate_hz,
+        taps,
+        block_frames,
+        analysis_frames,
+        budget,
+    )
+}
+
+/// Exp2 variant: identical fitting, compiled into the Exp2 residual family.
+#[allow(clippy::too_many_arguments)]
+pub fn fit_linear_object_exp2(
+    source: &[i32],
+    channels: u8,
+    frames: u64,
+    sample_rate_hz: u32,
+    taps: u16,
+    block_frames: Option<u32>,
+    analysis_frames: usize,
+    budget: &TrainBudget,
+) -> Result<(LearnedObject, TrainStats)> {
+    fit_linear_object_profile(
+        crate::learned::profile::LearnedProfile::Exp2,
+        source,
+        channels,
+        frames,
+        sample_rate_hz,
+        taps,
+        block_frames,
+        analysis_frames,
+        budget,
+    )
+}
+
+/// Fit and compile a canonical linear object under an explicit profile.
+#[allow(clippy::too_many_arguments)]
+pub fn fit_linear_object_profile(
+    profile: crate::learned::profile::LearnedProfile,
+    source: &[i32],
+    channels: u8,
+    frames: u64,
+    sample_rate_hz: u32,
+    taps: u16,
+    block_frames: Option<u32>,
+    analysis_frames: usize,
+    budget: &TrainBudget,
+) -> Result<(LearnedObject, TrainStats)> {
     budget.validate()?;
     let sw = Stopwatch::start();
     let mut stats = TrainStats {
@@ -199,14 +250,24 @@ pub fn fit_linear_object(
     )?;
     stats.quantization_attempts += 1;
     let predictor = compile_linear(channels, taps, block_frames, &fit.weights, &fit.bias);
-    let object = LearnedObject::from_intrinsic(
-        crate::learned::model::LearnedModel::Linear(predictor),
-        channels,
-        frames,
-        sample_rate_hz,
-        Vec::new(),
-        source,
-    )?;
+    let object = match profile {
+        crate::learned::profile::LearnedProfile::Exp1 => LearnedObject::from_intrinsic(
+            crate::learned::model::LearnedModel::Linear(predictor),
+            channels,
+            frames,
+            sample_rate_hz,
+            Vec::new(),
+            source,
+        ),
+        crate::learned::profile::LearnedProfile::Exp2 => LearnedObject::from_intrinsic_exp2(
+            crate::learned::model::LearnedModel::Linear(predictor),
+            channels,
+            frames,
+            sample_rate_hz,
+            Vec::new(),
+            source,
+        ),
+    }?;
     stats.fit_ns = sw.elapsed_ns().max(0) as u64;
     Ok((object, stats))
 }

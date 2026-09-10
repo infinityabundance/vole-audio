@@ -73,6 +73,10 @@ pub(crate) mod learned_common;
 #[cfg(feature = "std")]
 pub mod learned_determinism;
 #[cfg(feature = "std")]
+pub mod learned_exp2_baseline;
+#[cfg(feature = "std")]
+pub mod learned_exp2_mechanisms;
+#[cfg(feature = "std")]
 pub mod learned_gpu;
 #[cfg(feature = "std")]
 pub mod learned_intrinsic;
@@ -88,6 +92,8 @@ pub mod learned_random_access;
 pub mod learned_residual;
 #[cfg(feature = "std")]
 pub mod learned_residual_codec;
+#[cfg(feature = "std")]
+pub mod learned_residual_codec2;
 #[cfg(feature = "std")]
 pub mod learned_shared;
 #[cfg(feature = "std")]
@@ -250,6 +256,23 @@ family",
         "learned-residual-codec",
         "Phase O exact residual codec family: SparseDelta / DenseI32 / ZigZagVarint / BlockRice / \
 PredictiveRice / LiteralResidual over representative and corpus residuals",
+    ),
+    (
+        "learned-exp2-baseline",
+        "Exp2 Seal A baseline import: the frozen Exp1 identity is verified and every Exp1 candidate \
+remains available inside Exp2 with exp2 bytes <= exp1 bytes",
+    ),
+    (
+        "learned-exp2-mechanisms",
+        "Exp2 mechanism portfolio: residual codec v2 + adaptive segmentation + sparse high-order \
+linear prediction + long-term prediction + optimizer v2 over the frozen intrinsic corpus, with \
+the structural portfolio no-regression gates",
+    ),
+    (
+        "learned-residual-codec2",
+        "Exp2 Seal B residual codec family: PartitionRice / CoreTailRice / RunLengthRice / \
+ZeroMaskRice / BytePlane / ContextRans beside the frozen Exp1 codecs, with the structural gate \
+best_v2 <= best_v1 on every residual",
     ),
     (
         "learned-linear",
@@ -418,7 +441,10 @@ pub fn run(name: &str, receipts_root: &Path) -> crate::error::Result<Verdict> {
         "depth" => depth::run(receipts_root),
         "interference" => interference::run(receipts_root),
         "learned-determinism" => learned_determinism::run(receipts_root),
+        "learned-exp2-baseline" => learned_exp2_baseline::run(receipts_root),
+        "learned-exp2-mechanisms" => learned_exp2_mechanisms::run(receipts_root),
         "learned-residual-codec" => learned_residual_codec::run(receipts_root),
+        "learned-residual-codec2" => learned_residual_codec2::run(receipts_root),
         "learned-linear" => learned_linear::run(receipts_root),
         "learned-intrinsic" => learned_intrinsic::run(receipts_root),
         "learned-transfer" => learned_transfer::run(receipts_root),

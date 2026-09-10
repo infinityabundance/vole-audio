@@ -100,3 +100,12 @@ See [LEARNED_NON_CLAIMS.md](LEARNED_NON_CLAIMS.md). In short: no claim that
 learned representation is smaller, faster, more general, perceptually better,
 or closer to a "true source process"; no claim that tensor cores are normative;
 no change to VOLE's exactness model.
+
+## Exp2 addendum
+
+The optimization addendum `vole.audio.learned.exp2` is described in
+[PHASE_O_EXP2.md](PHASE_O_EXP2.md). It freezes Exp1 permanently and adds new
+mechanisms beside it (residual codec v2, adaptive segmentation, sparse
+high-order linear prediction, stronger external baselines), so that under the
+same complete-physical-byte objective the Exp2 portfolio can never be worse
+than the Exp1 portfolio.

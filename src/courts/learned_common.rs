@@ -260,6 +260,30 @@ pub fn try_fit_linear(
     .map(|(o, _)| o)
 }
 
+/// A resilient linear fit compiled into the **Exp2** residual family.
+#[allow(dead_code)]
+pub fn try_fit_linear_exp2(
+    samples: &[i32],
+    channels: u8,
+    frames: u64,
+    rate: u32,
+    taps: u16,
+    block_frames: Option<u32>,
+) -> Option<LearnedObject> {
+    crate::learned::train::linear::fit_linear_object_exp2(
+        samples,
+        channels,
+        frames,
+        rate,
+        taps,
+        block_frames,
+        frames as usize,
+        &train_budget(),
+    )
+    .ok()
+    .map(|(o, _)| o)
+}
+
 /// A resilient quantization-aware fit.
 pub fn try_fit_qat(
     samples: &[i32],
@@ -622,6 +646,52 @@ pub fn finish(
     detail: String,
     extras: Vec<(&str, serde_json::Value)>,
 ) -> Result<crate::status::Verdict> {
+    finish_with_profile(
+        court,
+        crate::learned::profile::LearnedProfile::Exp1,
+        receipts_root,
+        frozen,
+        projection,
+        verdict,
+        detail,
+        extras,
+    )
+}
+
+/// Freeze-or-write an **Exp2** learned court's receipt.
+#[allow(clippy::too_many_arguments)]
+pub fn finish_exp2(
+    court: &str,
+    receipts_root: &std::path::Path,
+    frozen: &str,
+    projection: &[u8],
+    verdict: crate::status::Verdict,
+    detail: String,
+    extras: Vec<(&str, serde_json::Value)>,
+) -> Result<crate::status::Verdict> {
+    finish_with_profile(
+        court,
+        crate::learned::profile::LearnedProfile::Exp2,
+        receipts_root,
+        frozen,
+        projection,
+        verdict,
+        detail,
+        extras,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn finish_with_profile(
+    court: &str,
+    profile: crate::learned::profile::LearnedProfile,
+    receipts_root: &std::path::Path,
+    frozen: &str,
+    projection: &[u8],
+    verdict: crate::status::Verdict,
+    detail: String,
+    extras: Vec<(&str, serde_json::Value)>,
+) -> Result<crate::status::Verdict> {
     use crate::evidence::receipt::{CourtParams, Provenance, ReceiptBuilder};
     let observed = projection_hash(projection);
     if !frozen.is_empty() && observed != frozen {
@@ -638,13 +708,21 @@ pub fn finish(
     if frozen.is_empty() {
         eprintln!("court {court}: frozen result hash is unset; observed {observed}");
     }
+    let schema = match profile {
+        crate::learned::profile::LearnedProfile::Exp1 => {
+            crate::learned::profile::LEARNED_EVIDENCE_SCHEMA
+        }
+        crate::learned::profile::LearnedProfile::Exp2 => {
+            crate::learned::profile::LEARNED_EXP2_EVIDENCE_SCHEMA
+        }
+    };
     let mut builder = ReceiptBuilder::new(court);
     builder
         .result(verdict)
         .result_detail(format!("{detail}; result sha256 {observed}"))
         .params(CourtParams {
             universe: Some(crate::learned::profile::LEARNED_UNIVERSE.into()),
-            profile: Some(crate::learned::profile::LEARNED_PROFILE.into()),
+            profile: Some(profile.name().into()),
             backend: Some("scalar canonical learned evaluator".into()),
             content_kind: Some("Phase O learned deterministic prediction".into()),
             ..Default::default()
@@ -656,9 +734,10 @@ pub fn finish(
         .extra(
             "protocol",
             serde_json::json!({
-                "schema": LEARNED_PROTOCOL,
-                "profile": crate::learned::profile::LEARNED_PROFILE,
-                "version": crate::learned::profile::LEARNED_PROFILE_VERSION,
+                "protocol_schema": LEARNED_PROTOCOL,
+                "schema": schema,
+                "profile": profile.name(),
+                "version": profile.version(),
                 "semantic_authority": "none: a learned hypothesis is a candidate family, \
                                        never truth; scalar exact closure decides acceptance",
             }),

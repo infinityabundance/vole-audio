@@ -11,9 +11,12 @@
 
 pub mod finite_field;
 pub mod linear;
+pub mod ltp;
 pub mod objective;
 pub mod optimizer;
+pub mod optimizer2;
 pub mod quant_aware;
+pub mod sparse;
 
 /// Training cost, kept separate from playback cost but never hidden (`O.41`).
 #[derive(Debug, Clone, Default, PartialEq)]

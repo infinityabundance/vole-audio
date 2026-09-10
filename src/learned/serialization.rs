@@ -30,8 +30,8 @@ use crate::error::{Error, Kind, Result};
 use crate::hash::sha256::Sha256;
 use crate::learned::model::LearnedModel;
 use crate::learned::object::LearnedObject;
-use crate::learned::profile::{LEARNED_FORMAT_VERSION, LEARNED_MAGIC, LEARNED_PROFILE_TAG};
-use crate::learned::residual_codec::ResidualCodec;
+use crate::learned::profile::{LEARNED_FORMAT_VERSION, LEARNED_MAGIC, LearnedProfile};
+use crate::learned::residual_codec2::ResidualCodecV2;
 use crate::object::id::ContentId;
 
 /// A checked little-endian reader over a byte slice.
@@ -110,7 +110,7 @@ pub fn encode(o: &LearnedObject) -> Vec<u8> {
         LEARNED_MAGIC.len()
             + 1
             + 1
-            + LEARNED_PROFILE_TAG.len()
+            + o.profile.tag().len()
             + 1
             + 8
             + 4
@@ -125,8 +125,9 @@ pub fn encode(o: &LearnedObject) -> Vec<u8> {
     );
     out.extend_from_slice(LEARNED_MAGIC);
     out.push(LEARNED_FORMAT_VERSION);
-    out.push(LEARNED_PROFILE_TAG.len() as u8);
-    out.extend_from_slice(LEARNED_PROFILE_TAG);
+    let tag = o.profile.tag();
+    out.push(tag.len() as u8);
+    out.extend_from_slice(tag);
     out.push(o.channels);
     put_u64(&mut out, o.frames);
     out.extend_from_slice(&o.sample_rate_hz.to_le_bytes());
@@ -163,10 +164,9 @@ pub fn decode(bytes: &[u8]) -> Result<LearnedObject> {
         ));
     }
     let profile_len = r.u8()? as usize;
-    let profile = r.take(profile_len)?;
-    if profile != LEARNED_PROFILE_TAG {
-        return Err(Error::malformed("learned object profile tag mismatch"));
-    }
+    let profile_bytes = r.take(profile_len)?.to_vec();
+    let profile = LearnedProfile::from_tag(&profile_bytes)
+        .ok_or_else(|| Error::malformed("learned object profile tag mismatch"))?;
     let channels = r.u8()?;
     if channels == 0 || channels > crate::limits::MAX_CHANNELS as u8 {
         return Err(Error::malformed(
@@ -190,7 +190,7 @@ pub fn decode(bytes: &[u8]) -> Result<LearnedObject> {
     let model_bytes = r.take(model_len_usize)?;
     let model = LearnedModel::from_canonical_bytes(model_bytes)?;
     let codec_id = r.u8()?;
-    let codec = ResidualCodec::from_id(codec_id).ok_or_else(|| {
+    let codec = ResidualCodecV2::from_id(codec_id).ok_or_else(|| {
         Error::new(
             Kind::Unsupported,
             format!("unknown residual codec {codec_id}"),
@@ -227,6 +227,7 @@ pub fn decode(bytes: &[u8]) -> Result<LearnedObject> {
         ));
     }
     let o = LearnedObject {
+        profile,
         channels,
         frames,
         sample_rate_hz,

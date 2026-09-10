@@ -17,6 +17,7 @@
 
 pub mod flac;
 pub mod reference;
+pub mod wavpack;
 
 pub use flac::{
     B1_LEVEL_CONTROLS, B1_LEVEL_PRIMARY, FLAC_MAX_CHANNELS, FlacArtifact, FlacEncoding, b1_flac,

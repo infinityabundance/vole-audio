@@ -13,18 +13,23 @@
 use crate::error::{Error, Kind, Result};
 use crate::hash::sha256::Sha256;
 use crate::learned::model::LearnedModel;
-use crate::learned::residual_codec::{decode_encoding, encode_best};
+use crate::learned::profile::LearnedProfile;
+use crate::learned::residual_codec2::{
+    ResidualCodecV2, ResidualEncodingV2, decode_encoding_v2, encode_best_v1, encode_best_v2,
+};
 use crate::learned::serialization;
 use crate::object::id::ContentId;
 
 /// A complete learned representation of one intrinsic object.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LearnedObject {
+    /// The experimental profile this object belongs to (`exp1` is frozen).
+    pub profile: LearnedProfile,
     pub channels: u8,
     pub frames: u64,
     pub sample_rate_hz: u32,
     pub model: LearnedModel,
-    pub residual_codec: crate::learned::residual_codec::ResidualCodec,
+    pub residual_codec: ResidualCodecV2,
     /// Residual payload only (no codec id byte).
     pub residual_bytes: Vec<u8>,
     /// Transitive dependency content ids (models, sources, shared tables).
@@ -140,6 +145,30 @@ impl LearnedObject {
         source: &[i32],
     ) -> Result<LearnedObject> {
         Self::build(
+            LearnedProfile::Exp1,
+            model,
+            channels,
+            frames,
+            sample_rate_hz,
+            dependencies,
+            source,
+            source,
+        )
+    }
+
+    /// Build the canonical **Exp2** learned object that closes `source` exactly
+    /// under `model`. Exp2 imports every Exp1 candidate and adds the v2 residual
+    /// codec family; the Exp1 constructor above is byte-for-byte unchanged.
+    pub fn from_intrinsic_exp2(
+        model: LearnedModel,
+        channels: u8,
+        frames: u64,
+        sample_rate_hz: u32,
+        dependencies: Vec<ContentId>,
+        source: &[i32],
+    ) -> Result<LearnedObject> {
+        Self::build(
+            LearnedProfile::Exp2,
             model,
             channels,
             frames,
@@ -168,6 +197,35 @@ impl LearnedObject {
             ));
         }
         Self::build(
+            LearnedProfile::Exp1,
+            model,
+            channels,
+            frames,
+            sample_rate_hz,
+            dependencies,
+            source,
+            target,
+        )
+    }
+
+    /// Exp2 transfer construction (v2 residual family).
+    #[allow(clippy::too_many_arguments)]
+    pub fn from_transfer_operator_exp2(
+        model: LearnedModel,
+        channels: u8,
+        frames: u64,
+        sample_rate_hz: u32,
+        dependencies: Vec<ContentId>,
+        source: &[i32],
+        target: &[i32],
+    ) -> Result<LearnedObject> {
+        if !model.requires_source() {
+            return Err(Error::malformed(
+                "transfer construction requires a source-dependent model",
+            ));
+        }
+        Self::build(
+            LearnedProfile::Exp2,
             model,
             channels,
             frames,
@@ -180,6 +238,7 @@ impl LearnedObject {
 
     #[allow(clippy::too_many_arguments)]
     fn build(
+        profile: LearnedProfile,
         model: LearnedModel,
         channels: u8,
         frames: u64,
@@ -215,8 +274,12 @@ impl LearnedObject {
             }
             residual[i] = d as i32;
         }
-        let enc = encode_best(&residual);
+        let enc = match profile {
+            LearnedProfile::Exp1 => encode_best_v1(&residual),
+            LearnedProfile::Exp2 => encode_best_v2(&residual),
+        };
         let object = LearnedObject {
+            profile,
             channels,
             frames,
             sample_rate_hz,
@@ -269,10 +332,10 @@ impl LearnedObject {
     }
 
     /// Decode one residual encoding candidate for accounting/courts.
-    pub fn residual_encoding(&self) -> Result<crate::learned::residual_codec::ResidualEncoding> {
+    pub fn residual_encoding(&self) -> Result<ResidualEncodingV2> {
         let mut bytes = Vec::with_capacity(self.residual_bytes.len() + 1);
         bytes.push(self.residual_codec.id());
         bytes.extend_from_slice(&self.residual_bytes);
-        decode_encoding(&bytes, self.residual_len()?)
+        decode_encoding_v2(&bytes, self.residual_len()?)
     }
 }

@@ -28,6 +28,12 @@ pub enum LearnedModel {
     Stateful(crate::learned::stateful::StatefulPredictor),
     /// A learned operator relating a source object to a target object.
     Transfer(crate::learned::transfer::TransferOperator),
+    /// An independently-materializable sequence of segments (Exp2).
+    Segmented(crate::learned::segmented::SegmentedModel),
+    /// A sparse selected-lag linear predictor (Exp2).
+    SparseLinear(crate::learned::sparse::SparseLinearPredictor),
+    /// A short-term predictor plus a long-term (pitch) stage (Exp2).
+    LongTerm(crate::learned::ltp::LongTermPredictor),
 }
 
 impl LearnedModel {
@@ -38,6 +44,9 @@ impl LearnedModel {
             LearnedModel::Nonlinear(_) => 1,
             LearnedModel::Stateful(_) => 2,
             LearnedModel::Transfer(_) => 3,
+            LearnedModel::Segmented(_) => 4,
+            LearnedModel::SparseLinear(_) => 5,
+            LearnedModel::LongTerm(_) => 6,
         }
     }
 
@@ -48,6 +57,9 @@ impl LearnedModel {
             LearnedModel::Nonlinear(_) => "nonlinear_finite_field",
             LearnedModel::Stateful(_) => "stateful",
             LearnedModel::Transfer(_) => "transfer_operator",
+            LearnedModel::Segmented(_) => "segmented",
+            LearnedModel::SparseLinear(_) => "sparse_linear",
+            LearnedModel::LongTerm(_) => "long_term",
         }
     }
 
@@ -58,6 +70,9 @@ impl LearnedModel {
             LearnedModel::Nonlinear(g) => g.validate(),
             LearnedModel::Stateful(s) => s.validate(),
             LearnedModel::Transfer(t) => t.validate(),
+            LearnedModel::Segmented(s) => s.validate(),
+            LearnedModel::SparseLinear(p) => p.validate(),
+            LearnedModel::LongTerm(p) => p.validate(),
         }
     }
 
@@ -68,6 +83,9 @@ impl LearnedModel {
             LearnedModel::Nonlinear(g) => g.channels,
             LearnedModel::Stateful(s) => s.channels,
             LearnedModel::Transfer(t) => t.channels,
+            LearnedModel::Segmented(s) => s.channels,
+            LearnedModel::SparseLinear(p) => p.channels,
+            LearnedModel::LongTerm(p) => p.channels,
         }
     }
 
@@ -78,6 +96,9 @@ impl LearnedModel {
             LearnedModel::Nonlinear(g) => g.receptive_field(),
             LearnedModel::Stateful(s) => s.receptive_field(),
             LearnedModel::Transfer(t) => t.receptive_field(),
+            LearnedModel::Segmented(s) => s.receptive_field(),
+            LearnedModel::SparseLinear(p) => p.receptive_field(),
+            LearnedModel::LongTerm(p) => p.receptive_field(),
         }
     }
 
@@ -88,6 +109,9 @@ impl LearnedModel {
             LearnedModel::Nonlinear(g) => g.ops_per_sample(),
             LearnedModel::Stateful(s) => s.ops_per_sample(),
             LearnedModel::Transfer(t) => t.ops_per_sample(),
+            LearnedModel::Segmented(s) => s.ops_per_sample(),
+            LearnedModel::SparseLinear(p) => p.ops_per_sample(),
+            LearnedModel::LongTerm(p) => p.ops_per_sample(),
         }
     }
 
@@ -98,6 +122,9 @@ impl LearnedModel {
             LearnedModel::Nonlinear(g) => g.state_bytes(),
             LearnedModel::Stateful(s) => s.state_bytes(),
             LearnedModel::Transfer(t) => t.state_bytes(),
+            LearnedModel::Segmented(s) => s.state_bytes(),
+            LearnedModel::SparseLinear(p) => p.state_bytes(),
+            LearnedModel::LongTerm(p) => p.state_bytes(),
         }
     }
 
@@ -108,6 +135,9 @@ impl LearnedModel {
             LearnedModel::Nonlinear(g) => g.checkpoint_count(),
             LearnedModel::Stateful(s) => s.checkpoint_count(),
             LearnedModel::Transfer(t) => t.checkpoint_count(),
+            LearnedModel::Segmented(s) => s.checkpoint_count(),
+            LearnedModel::SparseLinear(p) => p.checkpoint_count(),
+            LearnedModel::LongTerm(p) => p.checkpoint_count(),
         }
     }
 
@@ -118,6 +148,9 @@ impl LearnedModel {
             LearnedModel::Nonlinear(g) => g.canonical_bytes(),
             LearnedModel::Stateful(s) => s.canonical_bytes(),
             LearnedModel::Transfer(t) => t.canonical_bytes(),
+            LearnedModel::Segmented(s) => s.canonical_bytes(),
+            LearnedModel::SparseLinear(p) => p.canonical_bytes(),
+            LearnedModel::LongTerm(p) => p.canonical_bytes(),
         }
     }
 
@@ -136,6 +169,15 @@ impl LearnedModel {
             ),
             3 => LearnedModel::Transfer(
                 crate::learned::transfer::TransferOperator::from_canonical_bytes(bytes)?,
+            ),
+            4 => LearnedModel::Segmented(
+                crate::learned::segmented::SegmentedModel::from_canonical_bytes(bytes)?,
+            ),
+            5 => LearnedModel::SparseLinear(
+                crate::learned::sparse::SparseLinearPredictor::from_canonical_bytes(bytes)?,
+            ),
+            6 => LearnedModel::LongTerm(
+                crate::learned::ltp::LongTermPredictor::from_canonical_bytes(bytes)?,
             ),
             other => {
                 return Err(Error::new(
@@ -157,6 +199,9 @@ impl LearnedModel {
             LearnedModel::Nonlinear(g) => g.hypothesis_all_from_source(source, frames),
             LearnedModel::Stateful(s) => s.hypothesis_all_from_source(source, frames),
             LearnedModel::Transfer(t) => t.hypothesis_from_source(source, frames),
+            LearnedModel::Segmented(s) => s.hypothesis_from_source(source, frames),
+            LearnedModel::SparseLinear(p) => p.hypothesis_all_from_source(source, frames),
+            LearnedModel::LongTerm(p) => p.hypothesis_all_from_source(source, frames),
         }
     }
 
@@ -173,6 +218,9 @@ impl LearnedModel {
             LearnedModel::Nonlinear(g) => g.evaluate_range(residual, frames, start, len),
             LearnedModel::Stateful(s) => s.evaluate_range(residual, frames, start, len),
             LearnedModel::Transfer(t) => t.evaluate_range(residual, frames, start, len),
+            LearnedModel::Segmented(s) => s.evaluate_range(residual, frames, start, len),
+            LearnedModel::SparseLinear(p) => p.evaluate_range(residual, frames, start, len),
+            LearnedModel::LongTerm(p) => p.evaluate_range(residual, frames, start, len),
         }
     }
 
@@ -183,6 +231,9 @@ impl LearnedModel {
             LearnedModel::Nonlinear(g) => g.replay_frames(start),
             LearnedModel::Stateful(s) => s.replay_frames(start),
             LearnedModel::Transfer(t) => t.replay_frames(start),
+            LearnedModel::Segmented(s) => s.replay_frames(start),
+            LearnedModel::SparseLinear(p) => p.replay_frames(start),
+            LearnedModel::LongTerm(p) => p.replay_frames(start),
         }
     }
 

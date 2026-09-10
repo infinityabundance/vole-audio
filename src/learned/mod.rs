@@ -16,12 +16,17 @@ pub mod arithmetic;
 pub mod corpus;
 pub mod finite_field;
 pub mod graph;
+pub mod ltp;
 pub mod model;
 pub mod object;
 pub mod profile;
 pub mod quantize;
 pub mod residual_codec;
+pub mod residual_codec2;
+pub mod segmentation;
+pub mod segmented;
 pub mod serialization;
+pub mod sparse;
 pub mod stateful;
 pub mod train;
 pub mod transfer;
@@ -31,4 +36,8 @@ pub use arithmetic::{
 };
 pub use residual_codec::{
     ResidualCodec, ResidualEncoding, decode_encoding, encode_all, encode_best,
+};
+pub use residual_codec2::{
+    ResidualCodecV2, ResidualEncodingV2, decode_encoding_v2, encode_all_v2, encode_best_v1,
+    encode_best_v2,
 };

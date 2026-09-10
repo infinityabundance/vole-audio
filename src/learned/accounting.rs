@@ -21,6 +21,82 @@ use crate::error::Result;
 use crate::learned::model::LearnedModel;
 use crate::learned::object::LearnedObject;
 
+/// Named model sub-components `(weights, biases, activations, checkpoints,
+/// tensor_dims, state_def)`. Every family's components sum to at most its
+/// canonical model length; the remainder is graph/header metadata.
+fn model_components(m: &LearnedModel) -> (u64, u64, u64, u64, u64, u64) {
+    match m {
+        LearnedModel::Linear(p) => (
+            (p.weights.len() as u64) * 2,
+            (p.bias.len() as u64) * 4,
+            0,
+            0,
+            0,
+            0,
+        ),
+        LearnedModel::Nonlinear(g) => {
+            let w: u64 = g.layers.iter().map(|l| (l.weights.len() as u64) * 2).sum();
+            let b: u64 = g.layers.iter().map(|l| (l.bias.len() as u64) * 4).sum();
+            let a: u64 = g.layers.iter().map(|l| l.activation.canonical_len()).sum();
+            let t: u64 = (g.layers.len() as u64) * 8 + 4;
+            (w, b, a, 0, t, 0)
+        }
+        LearnedModel::Stateful(s) => {
+            let w = ((s.out_w.len() + s.rec_w.len() + s.in_w.len()) as u64) * 2;
+            let b = ((s.out_b.len() + s.rec_b.len()) as u64) * 4;
+            let a = s.activation.canonical_len();
+            let cp = s.checkpoint_bytes();
+            let t = 6;
+            (w, b, a, cp, t, 0)
+        }
+        LearnedModel::Transfer(t) => (
+            (t.weights.len() as u64) * 2,
+            (t.bias.len() as u64) * 4,
+            0,
+            0,
+            0,
+            0,
+        ),
+        LearnedModel::SparseLinear(p) => {
+            // Canonical coefficient/bias payloads, capped so the named
+            // components never exceed the model length; the remainder is graph
+            // metadata (lag deltas and framing).
+            let len = p.canonical_bytes().len() as u64;
+            let weights = ((p.weights.len() as u64) * 2).min(len);
+            let bias = 4u64.min(len - weights);
+            (weights, bias, 0, 0, 0, 0)
+        }
+        LearnedModel::LongTerm(p) => {
+            let len = p.canonical_bytes().len() as u64;
+            let (sw, sb, _, _, _, _) =
+                model_components(&LearnedModel::SparseLinear(p.short.clone()));
+            let weights = (sw + (p.gains.len() as u64) * 2).min(len);
+            let bias = sb.min(len - weights);
+            (weights, bias, 0, 0, 0, 0)
+        }
+        LearnedModel::Segmented(s) => {
+            let mut w = 0u64;
+            let mut b = 0u64;
+            let mut a = 0u64;
+            let mut cp = 0u64;
+            let mut td = 0u64;
+            let mut st = 0u64;
+            for seg in &s.segments {
+                let (sw, sb, sa, scp, std, sst) = model_components(&seg.model);
+                w += sw;
+                b += sb;
+                a += sa;
+                cp += scp;
+                td += std;
+                st += sst;
+            }
+            // Segment framing: seg_count(4) + per-segment frames(4) + model_len(8).
+            td += 4 + (s.segments.len() as u64) * 12;
+            (w, b, a, cp, td, st)
+        }
+    }
+}
+
 /// The complete storage cost of one learned representation.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct LearnedCost {
@@ -78,56 +154,15 @@ impl LearnedCost {
         let mut c = LearnedCost::default();
         // Framing: fixed fields plus the profile tag. The residual codec id
         // byte is counted in `residual_bytes`, not here.
-        c.metadata_bytes = (12
-            + 1
-            + 1
-            + crate::learned::profile::LEARNED_PROFILE_TAG.len()
-            + 1
-            + 8
-            + 4
-            + 8
-            + 8
-            + 4) as u64;
+        c.metadata_bytes = (12 + 1 + 1 + o.profile.tag().len() + 1 + 8 + 4 + 8 + 8 + 4) as u64;
         c.residual_bytes = 1 + o.residual_bytes.len() as u64;
         c.dependency_bytes = (o.dependencies.len() as u64) * 32;
         c.integrity_bytes = 32;
 
         // Model components. Named components are computed directly; the
         // remainder is graph/dimension metadata, so the sum is exact.
-        let (weights, biases, activations, checkpoints, tensor_dims, state_def) = match &o.model {
-            LearnedModel::Linear(p) => (
-                (p.weights.len() as u64) * 2,
-                (p.bias.len() as u64) * 4,
-                0u64,
-                0u64,
-                0u64,
-                0u64,
-            ),
-            LearnedModel::Nonlinear(g) => {
-                let w: u64 = g.layers.iter().map(|l| (l.weights.len() as u64) * 2).sum();
-                let b: u64 = g.layers.iter().map(|l| (l.bias.len() as u64) * 4).sum();
-                let a: u64 = g.layers.iter().map(|l| l.activation.canonical_len()).sum();
-                let t: u64 = (g.layers.len() as u64) * 8 + 4;
-                (w, b, a, 0, t, 0)
-            }
-            LearnedModel::Stateful(s) => {
-                let w = ((s.out_w.len() + s.rec_w.len() + s.in_w.len()) as u64) * 2;
-                let b = ((s.out_b.len() + s.rec_b.len()) as u64) * 4;
-                let a = s.activation.canonical_len();
-                let cp = s.checkpoint_bytes();
-                // Declared state dimension and checkpoint count framing.
-                let t = 6;
-                (w, b, a, cp, t, 0)
-            }
-            LearnedModel::Transfer(t) => (
-                (t.weights.len() as u64) * 2,
-                (t.bias.len() as u64) * 4,
-                0u64,
-                0u64,
-                0u64,
-                0u64,
-            ),
-        };
+        let (weights, biases, activations, checkpoints, tensor_dims, state_def) =
+            model_components(&o.model);
         let named = weights + biases + activations + checkpoints + tensor_dims + state_def;
         if named > model_len {
             return Err(crate::error::Error::internal(
