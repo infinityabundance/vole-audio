@@ -397,11 +397,21 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
         let watts_after = power.as_ref().and_then(|p| p.read_watts());
         let energy_end_uj = counter.as_ref().and_then(|c| c.read_uj());
         if let (Some(c), Some(s), Some(e)) = (counter.as_ref(), energy_start_uj, energy_end_uj) {
-            energy_samples.push(serde_json::json!({
-                "condition": cname,
-                "joules": c.joules_between(s, e),
-                "source": c.id(),
-            }));
+            // A determinable interval is evidence; an undeterminable one (wrapped
+            // counter with no declared range) is reported, never zeroed.
+            match c.joules_between(s, e) {
+                Some(joules) => energy_samples.push(serde_json::json!({
+                    "condition": cname,
+                    "joules": joules,
+                    "source": c.id(),
+                })),
+                None => energy_samples.push(serde_json::json!({
+                    "condition": cname,
+                    "joules": serde_json::Value::Null,
+                    "source": c.id(),
+                    "detail": "counter wrapped with no declared range; interval unavailable",
+                })),
+            }
         } else if let (Some(a), Some(b)) = (watts_before, watts_after) {
             energy_samples.push(serde_json::json!({
                 "condition": cname,

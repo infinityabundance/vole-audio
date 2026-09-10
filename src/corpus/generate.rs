@@ -268,6 +268,42 @@ impl Spec {
 }
 
 // ---------------------------------------------------------------------------
+// Hostile-control classification (single definition, shared by the corpus
+// tests and `court negative`)
+// ---------------------------------------------------------------------------
+
+/// Is this object a **hostile incompressible** control?
+///
+/// The definition is deliberately strict: full-width occupancy, random or
+/// scrambled character, and genuinely independent channels.
+///
+/// * a temporally random but cross-channel structured object (for example
+///   anticorrelated stereo, where `R = -L`) is a valuable control but is
+///   **not** incompressible;
+/// * a reduced-amplitude object carries real compressible structure in its
+///   unused high bits.
+///
+/// Both are excluded, so no court can call them "incompressible" and quietly
+/// flatter (or penalise) a codec with them.
+pub fn is_hostile_incompressible(spec: &Spec) -> bool {
+    matches!(spec.entropy, Entropy::FullWidthRandom | Entropy::Scrambled)
+        && spec.amplitude == Amplitude::Full
+        && matches!(
+            spec.channel_structure,
+            ChannelStructure::Mono
+                | ChannelStructure::IndependentStereo
+                | ChannelStructure::Multichannel
+        )
+}
+
+/// The complement within the random-character stratum: temporally random
+/// material whose amplitude or channel structure still admits compression.
+pub fn is_structured_random_control(spec: &Spec) -> bool {
+    matches!(spec.entropy, Entropy::FullWidthRandom | Entropy::Scrambled)
+        && !is_hostile_incompressible(spec)
+}
+
+// ---------------------------------------------------------------------------
 // Deterministic primitives
 // ---------------------------------------------------------------------------
 

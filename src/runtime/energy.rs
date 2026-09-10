@@ -59,17 +59,21 @@ impl EnergyCounter {
 
     /// Joules consumed between two readings of this counter, handling wraparound
     /// against the declared range when one is available.
-    pub fn joules_between(&self, start_uj: u64, end_uj: u64) -> f64 {
+    ///
+    /// `None` means the interval cannot be determined (a wrapped counter with no
+    /// declared range) — never a fabricated `0.0`, which would be
+    /// indistinguishable from a genuine zero-energy interval.
+    pub fn joules_between(&self, start_uj: u64, end_uj: u64) -> Option<f64> {
         let delta_uj = if end_uj >= start_uj {
             end_uj - start_uj
         } else {
             match self.max_range_uj {
                 Some(max) if max > start_uj => (max - start_uj) + end_uj,
-                // Unknown range and a wrapped counter: refuse to invent a value.
-                _ => return 0.0,
+                // Unknown range and a wrapped counter: report unavailable.
+                _ => return None,
             }
         };
-        delta_uj as f64 * 1e-6
+        Some(delta_uj as f64 * 1e-6)
     }
 
     pub fn id(&self) -> &str {
@@ -127,9 +131,11 @@ pub fn probe_energy_counter() -> Option<EnergyCounter> {
         if !path.is_file() {
             continue;
         }
-        let start = std::fs::read_to_string(&path).ok()?;
-        if start.trim().parse::<u64>().is_err() {
-            continue;
+        // Must be readable to be a usable source: skip an unreadable candidate
+        // and keep looking, rather than abandoning the whole probe.
+        match std::fs::read_to_string(&path) {
+            Ok(text) if text.trim().parse::<u64>().is_ok() => {}
+            _ => continue,
         }
         let max_range_uj = std::fs::read_to_string(base.join("max_energy_range_uj"))
             .ok()
@@ -171,15 +177,17 @@ mod tests {
             max_range_uj: Some(1_000_000),
             id: "test".into(),
         };
-        assert!((counter.joules_between(250_000, 750_000) - 0.5).abs() < 1e-12);
+        assert!((counter.joules_between(250_000, 750_000).unwrap() - 0.5).abs() < 1e-12);
         // Wrapped: 900k -> 100k over a 1M range is a 200k uJ (0.2 J) interval.
-        assert!((counter.joules_between(900_000, 100_000) - 0.2).abs() < 1e-12);
+        assert!((counter.joules_between(900_000, 100_000).unwrap() - 0.2).abs() < 1e-12);
+        // A genuine zero interval is Some(0.0), distinct from an unknown one.
+        assert_eq!(counter.joules_between(5, 5), Some(0.0));
         let unknown = EnergyCounter {
             path: PathBuf::from("/nonexistent"),
             max_range_uj: None,
             id: "test".into(),
         };
-        // A wrapped counter with no declared range refuses to invent a value.
-        assert_eq!(unknown.joules_between(900_000, 100_000), 0.0);
+        // A wrapped counter with no declared range reports unavailable, not zero.
+        assert_eq!(unknown.joules_between(900_000, 100_000), None);
     }
 }

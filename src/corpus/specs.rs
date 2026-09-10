@@ -1488,21 +1488,14 @@ mod tests {
     /// The hostile incompressible stratum: full-width occupancy, random or
     /// scrambled character, and **genuinely independent channels**.
     ///
-    /// An object that is temporally random but cross-channel structured (for
-    /// example anticorrelated stereo, where `R = -L`) is a valuable control but
-    /// is not *incompressible*, so it is deliberately excluded here.
+    /// The classification lives in [`is_hostile_incompressible`] so the corpus
+    /// tests and `court negative` cannot drift apart. An object that is
+    /// temporally random but cross-channel structured (for example anticorrelated
+    /// stereo, where `R = -L`) is a valuable control but is not *incompressible*,
+    /// so it is deliberately excluded.
     fn hostile_controls(s: &[Spec]) -> Vec<&Spec> {
         s.iter()
-            .filter(|x| {
-                matches!(x.entropy, Entropy::FullWidthRandom | Entropy::Scrambled)
-                    && x.amplitude == Amplitude::Full
-                    && matches!(
-                        x.channel_structure,
-                        ChannelStructure::Mono
-                            | ChannelStructure::IndependentStereo
-                            | ChannelStructure::Multichannel
-                    )
-            })
+            .filter(|x| crate::corpus::generate::is_hostile_incompressible(x))
             .collect()
     }
 

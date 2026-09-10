@@ -32,13 +32,32 @@ use std::path::Path;
 
 /// Frozen static-result hash (empty means "not yet frozen").
 pub const NEGATIVE_RESULT_SHA256: &str =
-    "cca0f1627f8420d32d7710a5bfd84062b0e1b7dddc9a610322971fb62ba6849b";
+    "8e6e1a34cecc880953b54d967d30380d1082c0caed48b1b77203e041aca0266c";
 
 /// The frozen negative-control protocol identity.
 pub const PROTOCOL_SCHEMA: &str = "vole.audio.negative.protocol.v1";
 
-/// Entropy classes treated as incompressible controls.
-const INCOMPRESSIBLE_CLASSES: [&str; 2] = ["full_width_random", "scrambled"];
+/// Entropy classes with random character (the hostile *and* structured-random
+/// strata both live here; [`generate::is_hostile_incompressible`] separates them).
+const RANDOM_CHARACTER_CLASSES: [&str; 2] = ["full_width_random", "scrambled"];
+
+/// Accumulated bytes for one population.
+#[derive(Debug, Clone, Copy, Default)]
+struct Pop {
+    objects: u64,
+    b0: u64,
+    b1: u64,
+    vole: u64,
+}
+
+impl Pop {
+    fn add(&mut self, b0: u64, b1: Option<u64>, vole: u64) {
+        self.objects += 1;
+        self.b0 += b0;
+        self.b1 += b1.unwrap_or(0);
+        self.vole += vole;
+    }
+}
 
 fn budget() -> SearchBudget {
     SearchBudget::default()
@@ -178,33 +197,43 @@ fn hostile_battery(valid: &[u8]) -> Result<(usize, usize, usize)> {
     Ok((integrity, structural, other))
 }
 
-fn static_projection(
-    manifest_sha: &str,
-    corpus_sha: &str,
-    incompressible: &[serde_json::Value],
-    population: [u64; 7],
+/// Everything the negative court's static projection binds.
+struct Projection<'a> {
+    manifest_sha: &'a str,
+    corpus_sha: &'a str,
+    hostile: &'a [serde_json::Value],
+    structured: &'a [serde_json::Value],
+    /// `[hostile: objects, b0, b1, vole, b1_domain: objects, b0, b1, vole]`.
+    population: [u64; 8],
     integrity: usize,
     structural: usize,
     other: usize,
-) -> Vec<u8> {
+}
+
+fn static_projection(p: Projection<'_>) -> Vec<u8> {
     let mut out = Vec::new();
-    for head in [PROTOCOL_SCHEMA, manifest_sha, corpus_sha] {
+    for head in [PROTOCOL_SCHEMA, p.manifest_sha, p.corpus_sha] {
         out.extend_from_slice(head.as_bytes());
         out.push(0);
     }
-    for n in population {
+    for n in p.population {
         out.extend_from_slice(&n.to_le_bytes());
     }
-    for obj in incompressible {
-        for key in ["id", "canonical_i32_sha256"] {
-            out.extend_from_slice(obj[key].as_str().unwrap_or("").as_bytes());
-            out.push(0);
-        }
-        for key in ["b0_bytes", "b1_bytes", "vole_complete_bytes"] {
-            out.extend_from_slice(&obj[key].as_u64().unwrap_or(0).to_le_bytes());
+    // Hostile controls first (the claim under test), structured-random controls
+    // second (reported, but explicitly not incompressible).
+    for (tag, group) in [(1u8, p.hostile), (2u8, p.structured)] {
+        out.push(tag);
+        for obj in group {
+            for key in ["id", "canonical_i32_sha256"] {
+                out.extend_from_slice(obj[key].as_str().unwrap_or("").as_bytes());
+                out.push(0);
+            }
+            for key in ["b0_bytes", "b1_bytes", "vole_complete_bytes"] {
+                out.extend_from_slice(&obj[key].as_u64().unwrap_or(0).to_le_bytes());
+            }
         }
     }
-    for n in [integrity, structural, other] {
+    for n in [p.integrity, p.structural, p.other] {
         out.extend_from_slice(&(n as u64).to_le_bytes());
     }
     out
@@ -232,27 +261,39 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
 
     let sw = Stopwatch::start();
 
-    // ---- 1. incompressible controls ----
+    // ---- 1. hostile incompressible controls ----
+    //
+    // A control is *incompressible* only if it is full-width, random in
+    // character **and** genuinely independent across channels — the same
+    // predicate the corpus membership tests use (`is_hostile_incompressible`),
+    // so the two cannot drift. Objects that are temporally random but carry
+    // exploitable structure (anticorrelated stereo, reduced amplitude occupancy)
+    // are reported separately as *structured-random controls*.
     //
     // Two explicit populations, because a >8-channel object is outside FLAC's
-    // format domain: `all` (B0 and VOLE for every control) and `b1_comparable`
-    // (B0, B1 and VOLE for the objects FLAC can actually encode). A B1 ratio is
-    // only ever formed inside the second.
-    let mut incompressible: Vec<serde_json::Value> = Vec::new();
-    let mut all_objects = 0u64;
-    let mut all_b0 = 0u64;
-    let mut all_vole = 0u64;
-    let mut b1c_objects = 0u64;
-    let mut b1c_b0 = 0u64;
-    let mut b1c_b1 = 0u64;
-    let mut b1c_vole = 0u64;
+    // format domain: `all` (B0 and VOLE for every hostile control) and
+    // `b1_comparable` (B0, B1 and VOLE for those FLAC can encode). A B1 ratio is
+    // formed only inside the second.
+    let mut hostile: Vec<serde_json::Value> = Vec::new();
+    let mut structured: Vec<serde_json::Value> = Vec::new();
+    let mut h_all = Pop::default();
+    let mut h_b1 = Pop::default();
     for o in &manifest.objects {
-        if !INCOMPRESSIBLE_CLASSES.contains(&o.entropy_class.as_str()) {
-            continue;
-        }
         let spec = spec_by_id
             .get(o.id.as_str())
             .ok_or_else(|| Error::internal(format!("{}: not in the frozen membership", o.id)))?;
+        let is_random_character = RANDOM_CHARACTER_CLASSES.contains(&o.entropy_class.as_str());
+        if !is_random_character {
+            continue;
+        }
+        // The string class filter and the typed predicate must agree.
+        debug_assert_eq!(
+            is_random_character,
+            generate::is_hostile_incompressible(spec)
+                || generate::is_structured_random_control(spec),
+            "{}: manifest entropy class disagrees with the typed predicate",
+            o.id
+        );
         let samples = generate::generate(spec)?;
         let canonical = hex(&generate::canonical_sha256(&samples));
         if canonical != o.canonical_i32_sha256 {
@@ -282,18 +323,12 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
         )?;
         let vole = obj.complete_bytes();
         let comparable = generate::b1_comparable(o.channels);
-        all_objects += 1;
-        all_b0 += b0;
-        all_vole += vole;
-        if comparable {
-            b1c_objects += 1;
-            b1c_b0 += b0;
-            b1c_b1 += b1.as_ref().map(|(b, _)| *b).unwrap_or(0);
-            b1c_vole += vole;
-        }
-        incompressible.push(serde_json::json!({
+        let b1_bytes = b1.as_ref().map(|(b, _)| *b);
+        let entry = serde_json::json!({
             "id": o.id,
             "entropy_class": o.entropy_class,
+            "amplitude_class": o.amplitude_class,
+            "channel_structure": o.channel_structure,
             "source_structure_class": o.source_structure_class,
             "channels": o.channels,
             "frames": o.frames,
@@ -301,16 +336,25 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
             "canonical_i32_sha256": canonical,
             "b1_comparable": comparable,
             "b0_bytes": b0,
-            "b1_bytes": b1.as_ref().map(|(b, _)| *b),
+            "b1_bytes": b1_bytes,
             "b1_artifact_sha256": b1.as_ref().map(|(_, s)| s.clone()),
             "vole_complete_bytes": vole,
-            "b1_over_b0": b1.as_ref().map(|(b, _)| *b as f64 / b0 as f64),
+            "b1_over_b0": b1_bytes.map(|b| b as f64 / b0 as f64),
             "vole_over_b0": vole as f64 / b0 as f64,
-            "vole_over_b1": b1.as_ref().map(|(b, _)| vole as f64 / *b as f64),
-        }));
+            "vole_over_b1": b1_bytes.map(|b| vole as f64 / b as f64),
+        });
+        if generate::is_hostile_incompressible(spec) {
+            h_all.add(b0, b1_bytes, vole);
+            if comparable {
+                h_b1.add(b0, b1_bytes, vole);
+            }
+            hostile.push(entry);
+        } else {
+            structured.push(entry);
+        }
     }
-    if incompressible.is_empty() {
-        return fail("the frozen corpus has no incompressible control objects");
+    if hostile.is_empty() {
+        return fail("the frozen corpus has no hostile incompressible controls");
     }
 
     // ---- 2. hostile archives ----
@@ -328,23 +372,25 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
 
     let total_ns = sw.elapsed_ns().max(0) as u64;
     let population = [
-        all_objects,
-        all_b0,
-        all_vole,
-        b1c_objects,
-        b1c_b0,
-        b1c_b1,
-        b1c_vole,
+        h_all.objects,
+        h_all.b0,
+        h_all.b1,
+        h_all.vole,
+        h_b1.objects,
+        h_b1.b0,
+        h_b1.b1,
+        h_b1.vole,
     ];
-    let result_hex = hex(&Sha256::digest(&static_projection(
-        &report.manifest_sha256,
-        &report.corpus_sha256,
-        &incompressible,
+    let result_hex = hex(&Sha256::digest(&static_projection(Projection {
+        manifest_sha: &report.manifest_sha256,
+        corpus_sha: &report.corpus_sha256,
+        hostile: &hostile,
+        structured: &structured,
         population,
         integrity,
         structural,
         other,
-    )));
+    })));
     if NEGATIVE_RESULT_SHA256.is_empty() {
         eprintln!("court negative: frozen result hash is unset; observed {result_hex}");
     } else if result_hex != NEGATIVE_RESULT_SHA256 {
@@ -367,20 +413,23 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
     builder
         .result(verdict)
         .result_detail(format!(
-            "{} incompressible control objects (B0/VOLE population): VOLE {all_vole} B vs B0 {all_b0} B
-             (vole/B0 {:.3}); B1-comparable population ({b1c_objects} objects): B0 {b1c_b0} B,
-             B1 {b1c_b1} B, VOLE {b1c_vole} B (vole/B0 {:.3}, vole/B1 {:.3}); hostile archives:
+            "{} hostile incompressible controls (B0/VOLE population): VOLE {} B vs B0 {} B (VOLE/B0
+             {:.5}); B1-comparable hostile population ({} objects): B0 {} B, B1 {} B, VOLE {} B (B1/B0
+             {:.5}, VOLE/B1 {:.5}); {} structured-random controls reported separately; hostile archives:
              {integrity} integrity-hostile, {structural} resealed structural-hostile and {other}
              malformed/allocation-bomb candidates all rejected with a typed error, no panic; result
              sha256 {result_hex}",
-            all_objects,
-            all_vole as f64 / all_b0 as f64,
-            b1c_vole as f64 / b1c_b0 as f64,
-            if b1c_b1 > 0 {
-                b1c_vole as f64 / b1c_b1 as f64
-            } else {
-                0.0
-            },
+            h_all.objects,
+            h_all.vole,
+            h_all.b0,
+            h_all.vole as f64 / h_all.b0 as f64,
+            h_b1.objects,
+            h_b1.b0,
+            h_b1.b1,
+            h_b1.vole,
+            h_b1.b1 as f64 / h_b1.b0 as f64,
+            h_b1.vole as f64 / h_b1.b1 as f64,
+            structured.len(),
         ))
         .params(params)
         .provenance(Provenance {
@@ -392,35 +441,52 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
             "protocol",
             serde_json::json!({
                 "schema": PROTOCOL_SCHEMA,
-                "incompressible_classes": INCOMPRESSIBLE_CLASSES,
+                "hostile_predicate": "is_hostile_incompressible: entropy in {full_width_random, scrambled}
+                                      AND amplitude full AND channel structure in {mono,
+                                      independent_stereo, multichannel}. Shared with the corpus
+                                      membership tests",
+                "structured_random": "temporally random but compressible (cross-channel relation or
+                                      reduced amplitude occupancy); reported separately and never
+                                      counted as incompressible",
                 "b1": "level 5, 32-bit, exact canonical i32, pinned libflac-rs",
                 "vole": "selected full-object container (Seal 5 segmentation, exact segments)",
-                "hostile": "truncation, bit flip, resealed structural mutation, allocation bomb, \
-                            garbage; each must be rejected with a typed error and no panic",
-                "claim_boundary": "on incompressible material both codecs are expected to lose to raw \
-                                   framing once framing is included; this court prints that rather \
+                "hostile_archives": "truncation, bit flip, resealed structural mutation, allocation bomb,
+                                     garbage; each must be rejected with a typed error and no panic",
+                "claim_boundary": "on genuinely incompressible material both codecs are expected to land
+                                   near raw plus their framing overhead; this court prints that rather
                                    than hiding it",
             }),
         )
         .extra(
-            "incompressible",
+            "hostile_populations",
             serde_json::json!({
                 "all_population": {
-                    "objects": all_objects,
-                    "b0_bytes": all_b0,
-                    "vole_complete_bytes": all_vole,
-                    "vole_over_b0": all_vole as f64 / all_b0 as f64,
+                    "objects": h_all.objects,
+                    "b0_bytes": h_all.b0,
+                    "vole_complete_bytes": h_all.vole,
+                    "vole_over_b0": h_all.vole as f64 / h_all.b0 as f64,
                 },
                 "b1_comparable_population": {
-                    "objects": b1c_objects,
-                    "b0_bytes": b1c_b0,
-                    "b1_bytes": b1c_b1,
-                    "vole_complete_bytes": b1c_vole,
-                    "vole_over_b0": b1c_vole as f64 / b1c_b0 as f64,
-                    "vole_over_b1": if b1c_b1 > 0 { Some(b1c_vole as f64 / b1c_b1 as f64) } else { None },
+                    "objects": h_b1.objects,
+                    "b0_bytes": h_b1.b0,
+                    "b1_bytes": h_b1.b1,
+                    "vole_complete_bytes": h_b1.vole,
+                    "b1_over_b0": h_b1.b1 as f64 / h_b1.b0 as f64,
+                    "vole_over_b0": h_b1.vole as f64 / h_b1.b0 as f64,
+                    "vole_over_b1": h_b1.vole as f64 / h_b1.b1 as f64,
                 },
-                "excluded_from_b1": all_objects.saturating_sub(b1c_objects),
-                "per_object": incompressible,
+                "excluded_from_b1": h_all.objects.saturating_sub(h_b1.objects),
+                "hostile_per_object": hostile,
+            }),
+        )
+        .extra(
+            "structured_random_controls",
+            serde_json::json!({
+                "objects": structured.len(),
+                "note": "temporal randomness is not incompressibility: these controls compress because of
+                         cross-channel structure or limited amplitude occupancy, so they are excluded
+                         from the hostile aggregate and shown here",
+                "per_object": structured,
             }),
         )
         .extra(
@@ -435,23 +501,32 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
             }),
         )
         .limitation(
-            "this court is a negative control, not a scoreboard: it reports that incompressible \
-             material is not compressed by either codec and that hostile archives are rejected. It \
-             does not assert a predetermined winner",
+            "this court is a negative control, not a scoreboard: it reports that genuinely incompressible
+             material is not compressed by either codec and that hostile archives are rejected.
+             Structured-random controls are reported separately because temporal randomness alone is
+             not incompressibility. No predetermined winner is asserted",
         );
     let (_, path) = builder.finish_write(receipts_root)?;
     println!("court negative: {verdict}");
     println!(
-        "  all: {all_objects} objects | B0 {all_b0} B | VOLE {all_vole} B (vole/B0 {:.3})",
-        all_vole as f64 / all_b0 as f64
+        "  hostile all: {} objects | B0 {} B | VOLE {} B (VOLE/B0 {:.5})",
+        h_all.objects,
+        h_all.b0,
+        h_all.vole,
+        h_all.vole as f64 / h_all.b0 as f64
     );
     println!(
-        "  B1-comparable: {b1c_objects} objects | B0 {b1c_b0} B | B1 {b1c_b1} B | VOLE {b1c_vole} B (vole/B1 {:.3})",
-        if b1c_b1 > 0 {
-            b1c_vole as f64 / b1c_b1 as f64
-        } else {
-            0.0
-        }
+        "  hostile B1-domain: {} objects | B0 {} B | B1 {} B | VOLE {} B (B1/B0 {:.5}, VOLE/B1 {:.5})",
+        h_b1.objects,
+        h_b1.b0,
+        h_b1.b1,
+        h_b1.vole,
+        h_b1.b1 as f64 / h_b1.b0 as f64,
+        h_b1.vole as f64 / h_b1.b1 as f64
+    );
+    println!(
+        "  structured-random controls reported separately: {}",
+        structured.len()
     );
     println!(
         "  hostile rejected: {integrity} integrity + {structural} structural + {other} malformed/bomb"
