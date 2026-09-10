@@ -120,6 +120,10 @@ impl PointerEvidence {
     /// `cuMemHostGetDevicePointer`. Best effort per query: each row records
     /// rc + driver string + value.
     pub fn query(ctx: &Arc<CudaContext>, host_ptr: usize, dev_ptr: CUdeviceptr) -> PointerEvidence {
+        // Best effort: make the owning context current so the attribute
+        // queries target it. A failure surfaces as per-query rc rows, never a
+        // panic.
+        let _guard = ctx.enter().ok();
         let fns = &ctx.fns;
         let mut ev = PointerEvidence::default();
         let attribute_name = |a: c_int| -> &'static str {
@@ -251,6 +255,18 @@ pub unsafe fn attempt_register(
     base: usize,
     len: usize,
 ) -> RegistrationAttempt {
+    // The registration targets the calling thread's *current* context, so make
+    // the owning context current for the duration (rc 201 if the driver
+    // refuses, which `classify` reports as a context-binding defect).
+    let _guard = match ctx.enter() {
+        Ok(g) => g,
+        Err(e) => {
+            return RegistrationAttempt::Failed {
+                rc: CUDA_ERROR_INVALID_CONTEXT,
+                message: format!("cuCtxPushCurrent: {e}"),
+            };
+        }
+    };
     let fns = &ctx.fns;
     if !fns.d1_surface_complete() {
         let missing = [
@@ -363,7 +379,9 @@ impl Drop for HostRegistration {
     fn drop(&mut self) {
         if !self.host_ptr.is_null() {
             // SAFETY: unregister exactly what was registered; the caller
-            // guarantees the mapping outlives this drop.
+            // guarantees the mapping outlives this drop. Enter the owning
+            // context so the unregister targets it.
+            let _ = self.ctx.enter();
             unsafe { (self.ctx.fns.cuMemHostUnregister.expect("bound"))(self.host_ptr) };
         }
     }

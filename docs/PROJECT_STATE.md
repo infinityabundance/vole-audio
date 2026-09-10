@@ -973,6 +973,15 @@ possible surfaces and proves that placement is a **performance** question only:
   `Function` retains its module. Gated ownership regressions pass on the RTX
   4080. `SearchBudget::placement` (`Auto`) drives production placement; external
   period rankings preserve the caller's rank order.
+- Seal 3 (review-2 closure, v0.10.1): CUDA resource identity is now **lifetime
+  *and* current-context affinity**. Every context-dependent operation enters
+  its owner (`cuCtxSetCurrent`, previous value restored on drop; entering is a
+  single `cuCtxGetCurrent` when the owner is already current), and stream-taking
+  APIs take `&Stream` with an `Arc::ptr_eq` context check instead of a raw
+  handle. `cuCtxPushCurrent` is deliberately not used: a context created by
+  `cuCtxCreate` is already on the calling thread's stack and pushing it again
+  returns rc 201 (reproduced on driver 610.57.04). Gated regressions: two-context
+  isolation with restore, foreign-thread use, cross-context rejection.
 
 ## Next work (exact order — the implementation contract is executed in sequence)
 

@@ -125,12 +125,8 @@ impl SearchWorld {
             self.d_counts.device_ptr(),
         ];
         let blocks = self.period_limit.div_ceil(BLOCK_THREADS).max(1);
-        self.function.launch(
-            (blocks, 1, 1),
-            (BLOCK_THREADS, 1, 1),
-            self.stream.handle,
-            &params,
-        )?;
+        self.function
+            .launch((blocks, 1, 1), (BLOCK_THREADS, 1, 1), &self.stream, &params)?;
         self.stream.synchronize()?;
         let mut out = vec![0u8; self.period_limit as usize * 4];
         self.d_counts.download_prefix(&mut out)?;

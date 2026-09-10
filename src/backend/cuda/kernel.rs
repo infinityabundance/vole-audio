@@ -191,13 +191,8 @@ impl KernelWorld {
         let grid = grid_for(frames, channels);
         let f = self.function.clone();
         let params = self.kernel_params();
-        let graph = GraphExec::capture(&self.cuda.ctx, self.stream_standard.handle, || {
-            f.launch(
-                grid,
-                (BLOCK_THREADS, 1, 1),
-                self.stream_standard.handle,
-                &params,
-            )
+        let graph = GraphExec::capture(&self.cuda.ctx, &self.stream_standard, || {
+            f.launch(grid, (BLOCK_THREADS, 1, 1), &self.stream_standard, &params)
         })?;
         self.graph = Some(graph);
         Ok(())
@@ -269,7 +264,7 @@ impl KernelWorld {
                 self.function.launch(
                     grid,
                     (BLOCK_THREADS, 1, 1),
-                    self.stream_standard.handle,
+                    &self.stream_standard,
                     &params,
                 )?;
                 self.stream_standard.synchronize()?;
@@ -280,7 +275,7 @@ impl KernelWorld {
                     Error::new(crate::error::Kind::Unavailable, "no priority stream")
                 })?;
                 self.function
-                    .launch(grid, (BLOCK_THREADS, 1, 1), stream.handle, &params)?;
+                    .launch(grid, (BLOCK_THREADS, 1, 1), stream, &params)?;
                 stream.synchronize()?;
                 self.counters.kernel_launches += 1;
             }
@@ -288,7 +283,7 @@ impl KernelWorld {
                 let graph = self.graph.as_ref().ok_or_else(|| {
                     Error::new(crate::error::Kind::Unavailable, "graph not captured")
                 })?;
-                graph.launch(self.stream_standard.handle)?;
+                graph.launch(&self.stream_standard)?;
                 self.stream_standard.synchronize()?;
                 self.counters.kernel_launches += 1;
             }
@@ -332,12 +327,8 @@ impl KernelWorld {
         let channels = self.flat.output_channels;
         let grid = grid_for(frames, channels);
         let params = self.kernel_params();
-        self.function.launch(
-            grid,
-            (BLOCK_THREADS, 1, 1),
-            self.stream_standard.handle,
-            &params,
-        )?;
+        self.function
+            .launch(grid, (BLOCK_THREADS, 1, 1), &self.stream_standard, &params)?;
         self.stream_standard.synchronize()?;
         self.counters.kernel_launches += 1;
         let want = out.len() * 4;
@@ -381,12 +372,8 @@ impl KernelWorld {
         let channels = self.flat.output_channels;
         let grid = grid_for(frames, channels);
         let params = self.kernel_params_to(out_dev);
-        self.function.launch(
-            grid,
-            (BLOCK_THREADS, 1, 1),
-            self.stream_standard.handle,
-            &params,
-        )?;
+        self.function
+            .launch(grid, (BLOCK_THREADS, 1, 1), &self.stream_standard, &params)?;
         self.stream_standard.synchronize()?;
         self.counters.kernel_launches += 1;
         self.counters.quanta_submitted += 1;
@@ -407,34 +394,34 @@ impl KernelWorld {
         let e1 = self.cuda.create_event(false)?;
         let r = match s {
             Strategy::Standard => {
-                e0.record(self.stream_standard.handle)?;
+                e0.record(&self.stream_standard)?;
                 let r = self.function.launch(
                     grid,
                     (BLOCK_THREADS, 1, 1),
-                    self.stream_standard.handle,
+                    &self.stream_standard,
                     &params,
                 );
-                e1.record(self.stream_standard.handle)?;
+                e1.record(&self.stream_standard)?;
                 r
             }
             Strategy::HighPriority => {
                 let stream = self.stream_priority.as_ref().ok_or_else(|| {
                     Error::new(crate::error::Kind::Unavailable, "no priority stream")
                 })?;
-                e0.record(stream.handle)?;
+                e0.record(stream)?;
                 let r = self
                     .function
-                    .launch(grid, (BLOCK_THREADS, 1, 1), stream.handle, &params);
-                e1.record(stream.handle)?;
+                    .launch(grid, (BLOCK_THREADS, 1, 1), stream, &params);
+                e1.record(stream)?;
                 r
             }
             Strategy::Graph => {
                 let graph = self.graph.as_ref().ok_or_else(|| {
                     Error::new(crate::error::Kind::Unavailable, "graph not captured")
                 })?;
-                e0.record(self.stream_standard.handle)?;
-                let r = graph.launch(self.stream_standard.handle);
-                e1.record(self.stream_standard.handle)?;
+                e0.record(&self.stream_standard)?;
+                let r = graph.launch(&self.stream_standard);
+                e1.record(&self.stream_standard)?;
                 r
             }
         };
@@ -535,6 +522,87 @@ mod smoke_tests {
             "a function must retain its module's context"
         );
         assert_ne!(f.handle, 0);
+    }
+
+    /// Affinity regression (Phase L review): a resource from context A must be
+    /// usable while context B is current on this thread, and using it must
+    /// restore B's currency afterwards. Lifetime safety alone (the Arc graph)
+    /// does not give this: the driver operates on the calling thread's
+    /// *current* context.
+    #[test]
+    #[ignore = "requires CUDA GPU"]
+    fn affinity_is_restored_across_two_contexts() {
+        use super::super::driver::Cuda;
+        let a = Cuda::open(0).expect("context A");
+        let buf_a = a.alloc(128).expect("alloc A");
+        buf_a.upload(&[3u8; 128]).expect("upload A");
+
+        let b = Cuda::open(0).expect("context B");
+        // Make B explicitly current (whether `cuCtxCreate` leaves its context
+        // current is driver detail; the guard establishes it either way).
+        let guard = b.ctx().enter().expect("enter B");
+        assert!(b.ctx().is_current(), "B must be current");
+        assert!(!a.ctx().is_current(), "A must not be current");
+
+        // A resource owned by A, used while B is current.
+        let mut back = [0u8; 128];
+        buf_a
+            .download(&mut back)
+            .expect("download A while B is current");
+        assert!(back.iter().all(|&x| x == 3), "A's data must round-trip");
+        assert!(
+            b.ctx().is_current(),
+            "using A must restore B as the current context"
+        );
+        assert!(!a.ctx().is_current());
+        drop(guard);
+    }
+
+    /// Affinity regression (Phase L review): a foreign thread that never
+    /// entered the context must still be able to use a resource owned by it,
+    /// because every operation enters the owner.
+    #[test]
+    #[ignore = "requires CUDA GPU"]
+    fn cross_thread_use_establishes_its_context() {
+        let cuda = super::super::driver::Cuda::open(0).expect("cuda open");
+        let buf = cuda.alloc(256).expect("alloc");
+        buf.upload(&[1u8; 256])
+            .expect("upload on the owning thread");
+        let handle = std::thread::spawn(move || {
+            // This thread never opened or entered the context.
+            buf.upload(&[9u8; 256]).expect("upload on a foreign thread");
+            let mut back = [0u8; 256];
+            buf.download(&mut back)
+                .expect("download on a foreign thread");
+            assert!(back.iter().all(|&b| b == 9));
+            // `buf` drops here: `cuMemFree` also enters the owning context.
+        });
+        handle.join().expect("foreign thread panicked");
+    }
+
+    /// Affinity regression (Phase L review): pairing resources from different
+    /// contexts is rejected by the safe API rather than silently executed
+    /// against whichever context happens to be current.
+    /// Affinity regression (Phase L review): pairing resources from different
+    /// contexts is rejected by the safe API rather than silently executed
+    /// against whichever context happens to be current.
+    #[test]
+    #[ignore = "requires CUDA GPU"]
+    fn cross_context_pairing_is_rejected() {
+        use super::super::driver::Cuda;
+        let a = Cuda::open(0).expect("context A");
+        let b = Cuda::open(0).expect("context B");
+        let buf_a = a.alloc(64).expect("alloc A");
+        let stream_b = b.create_stream().expect("stream B");
+        let err = buf_a
+            .upload_async(&[0u8; 64], &stream_b)
+            .expect_err("cross-context async upload must fail");
+        assert!(err.to_string().contains("different CUDA contexts"), "{err}");
+        let event_a = a.create_event(true).expect("event A");
+        let err = event_a
+            .record(&stream_b)
+            .expect_err("cross-context event record must fail");
+        assert!(err.to_string().contains("different CUDA contexts"), "{err}");
     }
 
     #[test]

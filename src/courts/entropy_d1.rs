@@ -1008,7 +1008,7 @@ fn session_d1_residual(
         let params = [arena.device_ptr(), target, frames, u64::from(CHANNELS)];
         let blocks = u32::try_from(frames.div_ceil(128)).unwrap_or(1).max(1);
         upmix
-            .launch((blocks, 1, 1), (128, 1, 1), up_stream.handle, &params)
+            .launch((blocks, 1, 1), (128, 1, 1), &up_stream, &params)
             .map_err(|e| format!("upmix launch: {e}"))?;
         up_stream
             .synchronize()

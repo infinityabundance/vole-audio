@@ -206,7 +206,7 @@ impl EntropyWorld {
         self.function.launch(
             (grid_blocks, 1, 1),
             (BLOCK_THREADS, 1, 1),
-            self.stream.handle,
+            &self.stream,
             &params,
         )?;
         self.stream.synchronize()?;

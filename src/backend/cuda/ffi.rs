@@ -182,6 +182,18 @@ type FnCtxSynchronize = unsafe extern "C" fn() -> CUresult;
 /// cuCtxGetStreamPriorityRange(int* least, int* greatest) — the only
 /// documented way to obtain the meaningful priority range (cuda.h 7176).
 type FnCtxGetStreamPriorityRange = unsafe extern "C" fn(*mut c_int, *mut c_int) -> CUresult;
+/// cuCtxGetCurrent(CUcontext*) — the calling thread's current context (NULL
+/// when the thread has none).
+type FnCtxGetCurrent = unsafe extern "C" fn(*mut CUcontext) -> CUresult;
+/// cuCtxSetCurrent(CUcontext) — set the calling thread's current context.
+///
+/// This is the primitive the affinity guard uses rather than
+/// `cuCtxPushCurrent`: a context created by `cuCtxCreate` is already on the
+/// calling thread's context stack, and pushing it again returns
+/// `CUDA_ERROR_INVALID_CONTEXT` (rc 201, verified on driver 610.57.04).
+/// `cuCtxSetCurrent` switches without touching the stack, so saving the
+/// previous value and setting it back restores the exact prior state.
+type FnCtxSetCurrent = unsafe extern "C" fn(CUcontext) -> CUresult;
 type FnModuleLoadData = unsafe extern "C" fn(*mut CUmodule, *const c_void) -> CUresult;
 type FnModuleLoadDataEx = unsafe extern "C" fn(
     *mut CUmodule,
@@ -261,6 +273,8 @@ fns! {
     cuCtxDestroy: FnCtxDestroy,
     cuCtxSynchronize: FnCtxSynchronize,
     cuCtxGetStreamPriorityRange: FnCtxGetStreamPriorityRange,
+    cuCtxGetCurrent: FnCtxGetCurrent,
+    cuCtxSetCurrent: FnCtxSetCurrent,
     cuModuleLoadData: FnModuleLoadData,
     cuModuleLoadDataEx: FnModuleLoadDataEx,
     cuModuleUnload: FnModuleUnload,
@@ -345,6 +359,7 @@ impl Fns {
             cuInit, cuDriverGetVersion, cuDeviceGetCount, cuDeviceGet,
             cuDeviceGetName, cuDeviceComputeCapability, cuDeviceGetAttribute,
             cuCtxCreate, cuCtxDestroy, cuCtxSynchronize, cuCtxGetStreamPriorityRange,
+            cuCtxGetCurrent, cuCtxSetCurrent,
             cuModuleLoadDataEx, cuModuleUnload, cuModuleGetFunction, cuMemAlloc, cuMemFree,
             cuMemcpyHtoD, cuMemcpyDtoH, cuLaunchKernel, cuStreamCreate,
             cuStreamCreateWithPriority, cuStreamDestroy, cuStreamSynchronize,

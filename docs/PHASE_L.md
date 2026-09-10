@@ -59,6 +59,48 @@ available as the reference placement, and the device surfaces are explicit
 court surfaces — never selected implicitly — because they lost the measured
 family on this host.
 
+## CUDA resource identity: lifetime **and** affinity
+
+Phase J gave HIP a structural resource graph (every resource retains its
+owning API handle). Phase L's review showed the CUDA port had only half of the
+same property, and that the second half is a *different* axis:
+
+```text
+owning/session handle dropped while a buffer lives   →  lifetime (fixed)
+buffer used while another context is current        →  affinity  (this fix)
+buffer used on a thread that never entered it       →  affinity  (this fix)
+```
+
+CUDA's driver API operates on the calling thread's **current** context, so
+lifetime alone is not enough. `CudaContext` now owns
+
+```text
+Enter  = cuCtxGetCurrent  → (no-op if already current | cuCtxSetCurrent)
+Guard  = current value saved, restored on drop
+```
+
+and every context-dependent operation — allocation, copies, launches,
+stream/event/graph work, module load and function lookup, synchronize, D1 host
+registration — begins with that guard. Resource identity is therefore
+`driver lifetime + context identity + current-thread affinity`.
+
+Two details are deliberate, and both are empirical rather than assumed:
+
+* the guard uses `cuCtxSetCurrent` and restores the saved value, **not**
+  `cuCtxPushCurrent`/`cuCtxPopCurrent`. A context created by `cuCtxCreate` is
+  already on the calling thread's context stack, and pushing it again returns
+  `CUDA_ERROR_INVALID_CONTEXT` (rc 201, reproduced on driver 610.57.04 against a
+  minimal C driver-API program) — so push/pop would fail for exactly the
+  contexts this program creates;
+* every API that used to take a raw `CUstream` now takes a `&Stream` whose
+  context identity is checked (`Arc::ptr_eq`), so a stream from context B
+  cannot be handed to a resource owned by context A. The raw handle is private
+  to the driver module.
+
+Entering costs one `cuCtxGetCurrent` in the single-context single-thread case
+(the whole forward/entropy/D0/D1 path), which is why the ordinary courts are
+unaffected — their counts and frozen hashes are unchanged.
+
 ## The two invariants the court asserts
 
 1. **Placement has no semantics.** Every surface must produce identical
@@ -197,3 +239,13 @@ Seal run (release, `--all-features`, clean tree `3cb4a6d`, version 0.10.0):
   hardware is present the ROCm row runs the **same 14-fixture battery** as CUDA
   (a single-fixture smoke test would let an all-zero kernel pass, because the
   first fixture is silence).
+- **CUDA resource identity is now lifetime *and* affinity.** Every GPU
+  resource retains an `Arc<CudaContext>` (driver + context + device) so a
+  context cannot be destroyed under a live resource, and every context-
+  dependent operation makes its owner the calling thread's current context
+  (`cuCtxSetCurrent`, restoring the previous value) so a resource cannot be
+  used while another context is current or from a thread that never entered it.
+  Stream-taking APIs take `&Stream` and check context identity instead of a raw
+  stream handle. Gated regressions on the RTX 4080 prove: a buffer from A is
+  usable while B is current and B is restored afterwards; a foreign thread can
+  use a buffer it did not open; cross-context pairings are rejected.
