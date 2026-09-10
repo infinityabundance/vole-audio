@@ -148,19 +148,22 @@ Seal run (release, `--all-features`, clean tree, version 0.11.0):
 
 ## Where this goes next
 
-1. **Seals 2–11 — the corpus is frozen, verified and review-closed; the flagship
+1. **Seals 2–12 — the corpus is frozen, verified and review-closed; the flagship
    B0/B1 conventional baseline is measured; the full-object container mechanism
    and its parser are frozen; the B1-vs-VOLE result exists with clean population
    arithmetic; the entropy complete-cost oracle equals the physical artifact;
    the runtime substrate is measured under a frozen protocol with a stratified
-   crossover surface; and the negative, random-access, depth and interference
-   courts exist with a Phase-M aggregate.**
+   crossover surface; the negative, random-access, depth and interference courts
+   exist with a Phase-M aggregate; and the Seal-11 evidence defects are closed.**
 2. **What remains in Phase M** is not another court: the license-clean
    real-recording stratum (currently vacant), energy on a host that exposes a
-   power source, an unbounded soak rather than the bounded one, and the
-   conditions this host cannot control. Then Phase N — transport/archive;
+   readable cumulative counter, an unbounded soak rather than the bounded one,
+   and the conditions this host cannot control. Then Phase N — transport/archive;
    Phase O — learned deterministic prediction addendum.
-3. Adversarial real-time load (§49) and energy where measurable.
+3. **Release status.** 0.19.0 and 0.20.0 are published; 0.21.0 was deliberately
+   left unpublished (it carries the Seal-11 evidence defects). 0.22.0 is
+   committed and pushed; publish it once the crates.io 24-hour version quota
+   permits, then begin Phase N.
 
 ### Seal 2 — flagship corpus freeze (2026-09-10)
 
@@ -844,3 +847,81 @@ Every pre-existing court's receipt is field-for-field identical to Seal 10.
 Seal run: seal subject `6b000562…`; the **23-row** `seal verify` matrix passes;
 tests **437 passed / 12 ignored** all-features and **427 passed / 12 ignored**
 default-features.
+
+*Superseded by Seal 12 for the affected evidence (Git history and receipts are
+preserved unchanged): the `court negative` aggregate above mixes the 20-object
+B0/VOLE population with the 19-object B1 population, so “VOLE … vs B1 …” is not
+an apples-to-apples ratio; `court interference`'s frozen cells repeat a
+corpus-level accumulator rather than per-object geometry; the soak is a
+CPU-contention soak; and `court random-access`'s frozen vector records
+`exact: false` and zero-window “MEASURED” rows for the five >8-channel objects.*
+
+### Seal 12 — evidence-contract closure (2026-09-10)
+
+A narrow closure. No data path changed; six evidence-contract defects are fixed.
+
+**`court random-access`.** `Acc` derived `Default`, so `exact` started `false`
+and `&= t.exact` could never recover it: the independent court-level gate still
+passed, but every cell recorded `"exact": false` and the frozen hash bound that
+false value. It is now constructed only through `Acc::measured()` /
+`Acc::not_applicable()` with `exact: true` (and a `started` flag for the first
+record). The five `>8`-channel objects now serialize B4/B4-seek as
+`NOT_APPLICABLE_BY_FORMAT_DOMAIN` (`exact: null`) instead of zero-window
+“MEASURED”, and the pooled surface reports each source's own window total
+(B2/B3-warm/B5 7806; B4/B4-seek 7471). Resealed: `3a76aef7…`. B4-seek's random
+p50 is **1.45 ms** — the honest cost of stateless seeking on a no-SEEKTABLE
+stream, against 131 ns for B4's resident path.
+
+**`court negative`.** The 12-channel `noise-stress` full-width-random object is
+outside FLAC's domain, so B0/VOLE covered 20 objects while B1 covered 19 and the
+reported `vole/B1` mixed populations. Two explicit populations are now formed:
+
+```text
+all (20 objects)          B0 11,348,400 B   VOLE 11,248,166 B   (VOLE/B0 0.991)
+b1_comparable (19)        B0 10,772,400 B   B1 10,046,098 B      VOLE 10,671,752 B
+                          VOLE/B0 0.991     VOLE/B1 1.062
+```
+
+The honest figure is **VOLE/B1 1.062**, not the mixed 1.12. Every B1 ratio is now
+formed only inside the comparable population. Resealed: `cca0f162…`.
+
+**`court interference`.** The frozen cells were built from one corpus-level
+accumulator per (condition, source) copied into all 115 object cells, so they
+repeated aggregate state (the first object's window count) rather than binding
+each object's own traversal geometry. Per-object deterministic records
+(`ObjectCond { exact, windows, deadline_ns }`) are now captured during
+measurement and the static projection is built from them; the pooled latency
+matrix remains the measured evidence. Resealed: `f23c70c1…`. The bounded soak is
+now described as what it is — a **CPU-contention soak** — rather than “the
+heaviest controllable load”, which this court's own matrix contradicts (memory
+bandwidth is more disruptive); the soak workload was not changed after seeing
+the result.
+
+**`court depth`.** The finite prefill search always resolves at `k = n` (the
+whole object is prefetched), so an `UNSTABLE` state was unreachable for a
+non-empty trace and a producer slower than real-time could still read
+“stable, depth=n”. Two quantities are now reported: the
+`finite_object_min_prefill_quanta` (the escape it is) and `streaming_stability`,
+which marks `UNSTABLE_STREAMING` when average production exceeds the deadline
+(`sum(latency) > n * deadline`). The measured result is unaffected — depth 1
+everywhere, with B5's 64-frame quantum still the first to miss individual
+deadlines. Frozen result unchanged (`3e616cde…`) because the projection holds
+request geometry and exactness only; depth is evidence.
+
+**Energy.** The probe claimed to have searched NVML/AMDSMI and never did; it is
+now described as what it probes (a hwmon instantaneous power source) and a
+present-but-unreadable powercap counter is not reported as available. Cumulative
+`energy_uj` (powercap) is the supported instrument for joules over an interval,
+with wraparound handled against `max_energy_range_uj`; a hwmon spot reading is
+recorded as evidence and never converted into workload energy. On this host
+`energy_uj` exists but is root-only, so energy is truthfully `NOT_AVAILABLE`.
+
+**`court runtime`.** B4's `artifact_build_ns` was set from `runtime_setup_ns`
+(the decode/preload) rather than the B1 encode; it now reports the FLAC
+`encode_ns`. Frozen result unchanged (`d7d11681…`) — the field is measured
+evidence, not part of the static projection.
+
+Seal run: seal subject `2a9ce87e…`; the **23-row** `seal verify` matrix passes;
+tests **439 passed / 12 ignored** all-features and **429 passed / 12 ignored**
+default-features. Random-access, negative and interference are resealed; every
+other court's receipt is field-for-field identical to Seal 11.

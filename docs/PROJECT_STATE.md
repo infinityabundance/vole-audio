@@ -1332,6 +1332,42 @@ The last Phase-M courts land, all built on one shared measurement boundary
 - Every pre-existing court is field-for-field identical to Seal 10. Seal subject
   `6b000562…`; **23-row** `seal verify` matrix; 437 passed / 12 ignored
   all-features, 427 passed / 12 ignored default-features.
+- *Superseded by Seal 12 for the affected evidence:* the `court negative`
+  aggregate above mixes the 20-object B0/VOLE population with the 19-object B1
+  population; `court interference`'s frozen cells repeat a corpus-level
+  accumulator rather than per-object geometry; `court random-access`'s frozen
+  vector records `exact: false` and zero-window “MEASURED” rows for the five
+  >8-channel objects. Git history and receipts are preserved unchanged.
+
+### Phase M Seal 12 — evidence-contract closure (v0.22.0)
+
+Narrow evidence corrections; no data path changed.
+
+- **`court random-access`** resealed `3a76aef7…`: the accumulator starts
+  `exact: true` (a `Default` started it false and `&=` could never recover it),
+  B4/B4-seek are `NOT_APPLICABLE_BY_FORMAT_DOMAIN` on the 5 >8-channel objects,
+  and pooled window totals are per source (B2/B3-warm/B5 7806, B4/B4-seek 7471).
+  B4-seek's honest stateless-seek p50 is 1.45 ms vs B4's resident 131 ns.
+- **`court negative`** resealed `cca0f162…`: `all` (20 objects) B0 11,348,400 B /
+  VOLE 11,248,166 B (0.991×); `b1_comparable` (19 objects) B0 10,772,400 B /
+  B1 10,046,098 B / VOLE 10,671,752 B → **VOLE/B1 1.062**, not the mixed 1.12.
+  Every B1 ratio is formed only inside the comparable population.
+- **`court interference`** resealed `f23c70c1…`: frozen cells are true per-object
+  records built from `ObjectCond` captured during measurement; the pooled matrix
+  is unchanged measured evidence. The soak is named the **CPU-contention soak**.
+- **`court depth`** unchanged (`3e616cde…`): the unreachable `UNSTABLE` state is
+  replaced by an explicit `finite_object_min_prefill_quanta` plus
+  `streaming_stability` (`UNSTABLE_STREAMING` when `sum(latency) > n*deadline`);
+  depth is evidence, so the projection is unchanged.
+- **Energy** probe wording is truthful (hwmon instantaneous only), a
+  present-but-unreadable powercap counter is not “available”, and cumulative
+  `energy_uj` is the defined contract; energy stays `NOT_AVAILABLE` here.
+- **`court runtime`** unchanged (`d7d11681…`): B4 `artifact_build_ns` now
+  reports the FLAC encode, not the later decode/preload.
+- Seal subject `2a9ce87e…`; **23-row** `seal verify` matrix; 439 passed / 12
+  ignored all-features, 429 passed / 12 ignored default-features. 0.21.0 is left
+  unpublished (it carries the Seal-11 defects); 0.22.0 awaits the crates.io
+  quota.
 
 ## Next work (exact order — the implementation contract is executed in sequence)
 
@@ -1353,14 +1389,14 @@ re-verified by the exact evaluator (`court inverse-search`), and the placement
 policy keeps the measured-faster host surface (`SearchBudget::placement`,
 `Auto`).
 
-1. Phase M — **the court set is complete**. The common runtime substrate is
-   measured under a frozen protocol (Seal 10); the negative, random-access,
-   depth, interference and aggregate courts exist (Seal 11). What remains in
-   Phase M is not another court: the license-clean real-recording stratum
-   (currently vacant), energy on a host that exposes a power source, an
-   unbounded soak in place of the bounded one, and the load conditions this host
-   cannot control (compositor/display, competing GPU compute, GPU context
-   contention, DVFS, thermal steady state, PCIe power saving). Then
-   Phase N — transport/archive
-   (embeds H.2 canonical records); Phase O — learned deterministic prediction
-   addendum (judged by the H.2 complete-cost API).
+1. Phase M — **the court set is complete and its evidence is review-closed**.
+   The runtime substrate is measured under a frozen protocol (Seal 10); the
+   negative, random-access, depth, interference and aggregate courts exist
+   (Seal 11); and the Seal-11 evidence-contract defects are fixed (Seal 12).
+   What remains in Phase M is not another court: the license-clean real-recording
+   stratum (currently vacant), energy on a host that exposes a readable cumulative
+   counter, an unbounded soak in place of the bounded one, and the load
+   conditions this host cannot control. Release: 0.19.0/0.20.0 published, 0.21.0
+   deliberately unpublished, 0.22.0 committed and awaiting the crates.io quota.
+   Then Phase N — transport/archive; Phase O — learned deterministic prediction
+   addendum.
