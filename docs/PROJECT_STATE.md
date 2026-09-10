@@ -919,6 +919,11 @@ authority.
 - None for Phases F/G/H/H.2/K/L. ROCm hardware absent (evidence row only). The
   D1 result is per-device/per-driver: another host's endpoint may register,
   refuse registration, or lack mmap — the court records whichever happens.
+- Phase L measurement caveat: GPU-side period-scan timing on this host is
+  clock-state-dependent (≈0.21×–1.78× the sequential scan across release runs).
+  The placement policy does not depend on it — the host-parallel surface is
+  consistently faster — and the receipt reports the observed ratios with an
+  explicit "no stable device comparison" limitation.
 
 ### Phase L — GPU inverse search (complete)
 
@@ -947,18 +952,27 @@ possible surfaces and proves that placement is a **performance** question only:
 - `court inverse-search`: 14 fixtures × 512 periods; CUDA counts exactly equal
   the scalar counts on all 14 fixtures, 80 accepted candidates re-verified by
   the exact evaluator, and every accepted set identical between the
-  sequential scan and the externally fed ranking. Measured on the release
-  build: parallel **0.228×** and CUDA **1.779×** the sequential scan wall time
-  — the host-parallel scan wins and the CUDA scan is *slower* here (per-launch
-  and transfer overhead dominates a scan this small), so the default placement
-  keeps the host surface and the device path is kept as a verified-equal
-  surface. Work per period is `O(frames - p)`, so a scan of periods `1..=P`
-  costs `P*F - P*(P+1)/2` comparisons. The receipt states the executed-surface
-  count explicitly and records both ratios with explicit limitations. ROCm is a
-  typed `UNSUPPORTED_BY_HARDWARE` row; when AMD hardware is present the ROCm row
-  runs the same 14-fixture battery as CUDA.
-- Artifacts change because the kernel surface grew: PTX `d13d22c3…`, AMDGPU
-  `5c30a4bc…` (still byte-deterministic across isolated builds).
+  sequential scan and the externally fed ranking. Work per period is
+  `O(frames - p)`, so a scan of periods `1..=P` costs `P*F - P*(P+1)/2`
+  comparisons. The host-parallel surface is consistently faster than
+  sequential (≈0.22–0.25×); the CUDA ratio is **not stable** on this host
+  (≈0.21×–1.78× across release runs, dominated by GPU clock state), so no
+  stable GPU comparison is claimed. The default placement keeps the host
+  surface and the device path is kept as a verified-equal surface. The receipt
+  states the executed-surface count explicitly
+  ("3 execution surfaces + 1 compile-only hardware-pending ROCm surface") and
+  records the ratios with explicit limitations. ROCm is a typed
+  `UNSUPPORTED_BY_HARDWARE` row; when AMD hardware is present the ROCm row runs
+  the same 14-fixture battery as CUDA.
+- Artifacts are unchanged from Seal 1 (the closure was host-side): PTX
+  `d13d22c3…`, AMDGPU `5c30a4bc…` (still byte-deterministic across isolated
+  builds).
+- Seal 2 (review-1 closure, v0.10.0): CUDA resources now retain a shared
+  `Arc<CudaContext>` (driver + context + device) so a context can never be
+  destroyed under a live resource — the HIP model, applied to CUDA;
+  `Function` retains its module. Gated ownership regressions pass on the RTX
+  4080. `SearchBudget::placement` (`Auto`) drives production placement; external
+  period rankings preserve the caller's rank order.
 
 ## Next work (exact order — the implementation contract is executed in sequence)
 
@@ -975,8 +989,10 @@ proposals, exact acceptance through two independent reconstructions, complete
 H.2-priced dependency accounting, and a deterministic Pareto frontier, sealed
 by `court inverse` + `court flattening`. Phase L (GPU inverse search) is
 complete: the bounded period scan runs on scalar / host-parallel / CUDA /
-ROCm surfaces with identical counts, and the device-ranked proposals are
-re-verified by the exact evaluator (`court inverse-search`). Next:
+ROCm surfaces with identical counts, the device-ranked proposals are
+re-verified by the exact evaluator (`court inverse-search`), and the placement
+policy keeps the measured-faster host surface (`SearchBudget::placement`,
+`Auto`). Next:
 
 1. Phase M — production depth/courts/corpus; Phase N — transport/archive
    (embeds H.2 canonical records); Phase O — learned deterministic prediction

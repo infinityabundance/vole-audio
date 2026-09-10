@@ -74,15 +74,24 @@ The court additionally records the measured wall time of each surface and the
 implied ratio. It makes **no** claim that the GPU wins: work per period is
 `O(frames - p)` (a period `p` compares frames `p..frames`), so a scan of periods
 `1..=P` does `P*F - P*(P+1)/2` comparisons; the balance therefore depends on the
-period bound and the window length, and the receipt carries the numbers as they
-came out. On this host, in the release build, the sequential host scan is
-actually **slower** than the 16-thread parallel host scan and **faster** than
-the CUDA scan (see the Seal 1/2 ledger), so the default placement selects the
-host surface and the device path is kept as a verified-equal surface.
+period bound and the window length. The host-parallel surface is **consistently
+faster** than the sequential reference (measured ~0.22–0.25× across the sealed
+runs). The CUDA ratio is **not stable on this host**: across release runs it
+ranged from ≈0.21× to ≈1.78×, dominated by GPU clock state (the device idles at
+~720 MHz of a 3105 MHz ceiling while a scan is only ~2 M comparisons per
+fixture), so the court claims no stable device comparison. The default placement
+therefore selects the host surface and the device path is kept as a
+verified-equal surface.
 
 ## Seal history
 
 ### Seal 1 — Phase L implementation + clean-tree battery (2026-09-10)
+
+> **Superseded in part by Seal 2.** The complexity explanation below
+> (`O(frames / p)`) is wrong and is corrected to `O(frames - p)`; the GPU/CUDA
+> ratio recorded here is one clock-state-dependent sample of a noisy
+> measurement (Seal 2 reports the observed range). The Seal 1 numbers are kept
+> as the measurement record, not as a current claim.
 
 Seal run (release, `--all-features`, clean tree `3ddf66f`, version 0.9.0):
 
@@ -122,6 +131,52 @@ Seal run (release, `--all-features`, clean tree `3ddf66f`, version 0.9.0):
 - 23 receipts, every one `source_binding: bound` and carrying
   `seal_subject_hash =
   270df703f42aa049b53b8ce4ca2482a5e15ffcb6ed9493bb23c31d29ec6fedc7`;
+  `vole-audio seal verify` PASSes the 13-row matrix in **default mode** at the
+  battery tree and at the release head.
+
+### Seal 2 — review-1 closure (2026-09-10)
+
+Review-1 findings closed in implementation (no redesign): CUDA structural
+ownership, the `O(frames - p)` complexity model, the full-corpus ROCm battery,
+rank-preserving external period lists, a placement policy that actually uses the
+faster host surface, and truthful executed-surface wording. See the Phase-L
+commit for the detail.
+
+Seal run (release, `--all-features`, clean tree `3cb4a6d`, version 0.10.0):
+
+- `court inverse-search` SUPPORTED: 14 fixtures × 512 candidate periods on
+  **3 execution surfaces** (scalar, 16-thread parallel, CUDA) **+ 1 compile-only
+  hardware-pending ROCm surface**, with the CUDA counts exactly equal to the
+  scalar counts on all 14 fixtures, 80 accepted candidates re-verified by the
+  exact evaluator, and the device-ranked period list producing exactly the
+  sequential accepted set. The receipt reports the executed-surface count from
+  actual execution and the frozen `d966d98e…` result hash is unchanged.
+- **Measured ratios are honest but noisy.** In this sealed run: scalar 27.24 ms,
+  parallel 5.99 ms (**0.220×**), CUDA 8.51 ms (**0.312×**). The host-parallel
+  surface is consistently faster than sequential; the CUDA ratio is not stable
+  — four consecutive release runs measured 0.90×, 0.41×, 0.30×, 0.31× (and Seal
+  1 measured 1.78×), dominated by GPU clock state (720 MHz idle of 3105 MHz max
+  for a ~2 M-comparison scan). No stable GPU comparison is claimed, and the
+  default placement keeps the host surface.
+- `court inverse` still reports **6 non-literal explanations** with the frozen
+  static result `217b09a7…`; the accepted set is unchanged by the placement
+  policy (verified).
+- Device artifacts are **byte-identical to Seal 1** (the change was host-side
+  only): PTX `d13d22c3…`, AMDGPU `5c30a4bc…`, both rebuilt from the clean
+  `3cb4a6d` tree and still byte-deterministic across isolated builds
+  (`source_tree_sha = ea614998…`, `source_dirty = false`).
+- ROCm rows remain typed `UNSUPPORTED_BY_HARDWARE` (no AMD compute candidate on
+  this host); `court rocm` compile surface satisfied, runtime a typed negative.
+- All pre-existing courts SUPPORTED with frozen hashes unchanged (semantic
+  `1791816f4b93…`, authored `f7e103f3a97d…`, inverse `217b09a7…`).
+- Host tests: **391 passed, 7 ignored** all-features (381 passed, 7 ignored
+  default-features; +4 over Seal 1: the rank-order normalization test, the
+  closed-form comparison-count test, the Auto placement-policy test, and the
+  every-placement-agrees test; +2 ignored CUDA ownership regressions gated on a
+  device); clippy `-D warnings` and `cargo fmt --check` clean.
+- 23 receipts, every one `source_binding: bound` and carrying
+  `seal_subject_hash =
+  02c8157e41e0be6381c9a4a04bdf6c61bea8d23c73889c02b2fabf65da7811a4`;
   `vole-audio seal verify` PASSes the 13-row matrix in **default mode** at the
   battery tree and at the release head.
 
