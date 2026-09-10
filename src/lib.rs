@@ -71,6 +71,8 @@ pub mod audio;
 #[cfg(feature = "std")]
 pub mod backend;
 #[cfg(feature = "std")]
+pub mod baseline;
+#[cfg(feature = "std")]
 pub mod courts;
 #[cfg(feature = "std")]
 pub mod error;

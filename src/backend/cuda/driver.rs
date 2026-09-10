@@ -253,6 +253,40 @@ impl Drop for CurrentContextGuard<'_> {
     }
 }
 
+/// Owns a freshly created context for the window in which `Cuda::open` has not
+/// yet built its RAII owner.
+///
+/// `cuCtxCreate` pushes the new context onto the calling thread's stack, and the
+/// two setup queries that follow it are fallible. Without this guard an error
+/// (or a panic) between creation and the `Arc<CudaContext>` would return from a
+/// safe function having leaked a context and left the caller's context stack
+/// altered. Disarmed once the real owner exists.
+struct ProvisionalContext {
+    fns: Fns,
+    context: CUcontext,
+    armed: bool,
+}
+
+impl Drop for ProvisionalContext {
+    fn drop(&mut self) {
+        if !self.armed || self.context == 0 {
+            return;
+        }
+        // Detach it first when it is still current on this thread, then destroy.
+        let mut current: CUcontext = 0;
+        // SAFETY: out-param; a failure leaves `current` at zero and we simply
+        // destroy below.
+        let rc = unsafe { (self.fns.cuCtxGetCurrent.expect("bound"))(&mut current) };
+        if rc == 0 && current == self.context {
+            let mut popped: CUcontext = 0;
+            // SAFETY: pops the context created for this guard.
+            unsafe { (self.fns.cuCtxPopCurrent.expect("bound"))(&mut popped) };
+        }
+        // SAFETY: destroys the context this guard owns.
+        unsafe { (self.fns.cuCtxDestroy.expect("bound"))(self.context) };
+    }
+}
+
 // Compile-time assertion: the affinity guard must not be Send (identity of the
 // current context is per-thread). If a future refactor made it Send, this
 // instantiation becomes ambiguous and fails to compile.
@@ -381,6 +415,14 @@ impl Cuda {
             (fns.cuCtxCreate.expect("bound"))(&mut context, std::ptr::null_mut(), 0, ordinal)
         };
         check(&fns, "cuCtxCreate", rc)?;
+        // From here until the RAII owner exists, the created context must be
+        // destroyed on any early return (and the caller's context stack left as
+        // it was). `ProvisionalContext` owns it until disarmed below.
+        let mut provisional = ProvisionalContext {
+            fns,
+            context,
+            armed: true,
+        };
         // Stream priority range: context query, the only documented source,
         // performed while the new context is still current.
         let (mut least, mut greatest) = (0, 0);
@@ -409,6 +451,10 @@ impl Cuda {
                 ),
             ));
         }
+        // The context is now floating and fully set up: hand ownership to the
+        // RAII context, disarming the provisional guard (nothing below can fail).
+        let fns = provisional.fns;
+        provisional.armed = false;
         Ok(Cuda {
             ctx: Arc::new(CudaContext {
                 fns,

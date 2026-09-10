@@ -288,6 +288,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3eaf3ede3fee6db1a4c2ee091bf8a8b4dccdc6d17f656fb07896ee72867612f2"
 
 [[package]]
+name = "libflac-rs"
+version = "0.143.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "103950d4bbd33a11347d4442989989dd5b89a36248267690feb9cef4b3a51ab3"
+
+[[package]]
 name = "libm"
 version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -554,11 +560,12 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 
 [[package]]
 name = "vole-audio"
-version = "0.10.2"
+version = "0.11.0"
 dependencies = [
  "dsfb",
  "entropyfs",
  "libc",
+ "libflac-rs",
  "ryg-rans-rs",
  "serde",
  "serde_json",

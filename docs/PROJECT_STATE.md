@@ -991,6 +991,39 @@ possible surfaces and proves that placement is a **performance** question only:
   by construction plus a compile-time assertion. Gated regression:
   `context_is_floating_after_open_and_safe_to_drop_elsewhere`.
 
+### Phase M — production depth / courts (in progress)
+
+Charter + seal ledger: `docs/PHASE_M.md`. Increment 1 (Seal 1) delivers the
+conventional baseline ladder's foundation:
+
+- `src/baseline/flac.rs`: **B1**, an in-process conventional lossless baseline
+  over the **exact canonical interleaved i32 domain** at **32 bits/sample**,
+  `libflac-rs = "=0.143.1"` pinned exactly, level 5 primary with levels 0/8 as
+  secondary controls, and `decode(encode(x)) == x` enforced sample-for-sample
+  (an inexact row is `FAILED_CORRECTNESS`, never a smaller number). No `>> 8`,
+  no dither, no normalisation, no resampling. Zero VOLE semantic authority.
+- `src/baseline/reference.rs`: a **non-authoritative** reference oracle that
+  runs the system `flac` on the same exact domain at identical settings when
+  installed (absent = `NOT_AVAILABLE`), outside the frozen result vector. It
+  records a real divergence: `libflac-rs` ports libFLAC 1.4.3, which does not
+  select the CONSTANT subframe at ≥28 bits/sample, so all-zero 32-bit blocks cost
+  ~1 bit/sample there (B1 2,178 B vs reference 160 B on `silence`), while the
+  rest of the corpus agrees within ~2% (aggregate reference/B1 0.973).
+- `court conventional`: B0 raw PCM + B1 (primary + controls) per fixture, the
+  full B0–B9 ladder manifest with every row's status, and a frozen static result
+  `11f8683f…`. Measured over the frozen H.2 entropy corpus: B0 1,179,648 B, B1(5)
+  288,791 B (0.245× raw), B1(0) 385,114 B, B1(8) 283,660 B, u1 literal
+  1,180,404 B; 42 exact round trips verified.
+- CUDA construction hygiene (the deferred Phase-L review item): `Cuda::open`
+  owns a freshly created context with `ProvisionalContext` so a fallible setup
+  step (or panic) between `cuCtxCreate` and the RAII owner destroys the context
+  and leaves the caller's context stack unchanged.
+
+Not yet in Phase M: the flagship corpus freeze (this increment measures the H.2
+entropy corpus, whose negative controls are not all incompressible at 32
+bits/sample), B2–B4, `court depth|random-access|negative|interference|all`, the
+crossover surface, energy, and the adversarial real-time load matrix.
+
 ## Next work (exact order — the implementation contract is executed in sequence)
 
 Phase H.2 is complete (entropy-native core: all ten H.2 courts SUPPORTED on
@@ -1009,8 +1042,10 @@ complete: the bounded period scan runs on scalar / host-parallel / CUDA /
 ROCm surfaces with identical counts, the device-ranked proposals are
 re-verified by the exact evaluator (`court inverse-search`), and the placement
 policy keeps the measured-faster host surface (`SearchBudget::placement`,
-`Auto`). Next:
+`Auto`).
 
-1. Phase M — production depth/courts/corpus; Phase N — transport/archive
+1. Phase M — remaining increments (flagship corpus freeze; B2–B4; depth /
+   random-access / negative / interference courts; crossover surface; energy);
+   Phase N — transport/archive
    (embeds H.2 canonical records); Phase O — learned deterministic prediction
    addendum (judged by the H.2 complete-cost API).

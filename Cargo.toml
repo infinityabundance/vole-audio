@@ -1,6 +1,6 @@
 [package]
 name = "vole-audio"
-version = "0.10.2"
+version = "0.11.0"
 edition = "2024"
 # Verified MSRV: the full host test suite (all-features; 280+ tests incl.
 # the AVX-512 kernels, which need `stdarch_x86_avx512` stabilized in 1.89)
@@ -47,7 +47,7 @@ default = ["std"]
 # amdgcn-amd-amdhsa) compile this same package with --no-default-features
 # and never see the std-only modules (backend, audio, format archive
 # readers, evidence serialization, courts, CLI).
-std = ["dep:libc", "dep:serde", "dep:serde_json"]
+std = ["dep:libc", "dep:serde", "dep:serde_json", "dep:libflac-rs"]
 # Optional persistence adapter (H.2.21-H.2.25): the real published EntropyFS
 # engine behind StoreBackend. Default-off; encoder/store governance only —
 # never in the decoder or playback path (owner: docs/ENTROPYFS.md).
@@ -78,6 +78,14 @@ serde_json = { version = "1.0", features = ["float_roundtrip", "preserve_order"]
 entropyfs = { version = "=0.7.17", default-features = false, optional = true }
 # Real published DSFB drift-slew-fusion observer (feature `dsfb`, default-off).
 dsfb = { version = "=0.1.2", optional = true }
+
+# B1 conventional lossless codec baseline (Phase M, contract §47): a pure-Rust,
+# `forbid(unsafe_code)`, zero-runtime-dependency, byte-exact port of libFLAC
+# 1.4.3. Pinned EXACTLY: B1 is a frozen comparison target, so the encoder that
+# produces its bytes must never drift underneath a sealed receipt. Supports
+# 32 bits/sample, which is what makes a like-for-like comparison with the
+# canonical i32 observation domain possible (no s24 conversion).
+libflac-rs = { version = "=0.143.1", optional = true }
 
 [dev-dependencies]
 serde_json = { version = "1.0", features = ["float_roundtrip", "preserve_order"] }
