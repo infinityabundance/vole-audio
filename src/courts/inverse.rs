@@ -57,7 +57,7 @@ pub const INVERSE_RATE_HZ: u32 = 48_000;
 /// Frozen static-result hash: the court fails if a change silently alters the
 /// inverse results. Re-freeze only with a documented reason.
 pub const INVERSE_RESULT_SHA256: &str =
-    "217b09a79c0561448605706c79e87f53d5ce014f5128cbf735212e914c9155ca";
+    "5b83600646c7e013e74767ff41e4dcad3fdc36199a264b360a1a35a5448354af";
 
 /// Build the bounded inverse fixture set from the frozen corpus.
 pub fn fixtures() -> crate::error::Result<Vec<Intrinsic>> {

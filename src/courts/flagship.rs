@@ -38,7 +38,7 @@ use std::path::Path;
 /// flagship comparison. Empty means "not yet frozen" (the observed value is
 /// printed); re-freeze only with a documented reason.
 pub const FLAGSHIP_RESULT_SHA256: &str =
-    "76fe5dcff1dec0a173ed67dc69effcc6befc093e340519c81ec2b32ea3b1a17b";
+    "8f37fab06e5fd088369f0ff6199ad3660a2b6ccb918da3060af65a4e68cd2419";
 
 /// The frozen FLAC level-5 total over the 110 B1-comparable objects, as sealed
 /// by `court conventional` (Seal 4). The flagship court recomputes B1

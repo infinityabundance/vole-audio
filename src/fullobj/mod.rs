@@ -295,6 +295,18 @@ pub fn compile_full_object(
                 "selected representation serialized to zero bytes",
             ));
         }
+        // The selection objective must be the physical artifact size, or
+        // "minimum complete bytes" is not a storage claim. This is the
+        // full-object form of the entropy cost invariant.
+        if selected.objective_bytes != selected.stored_bytes() {
+            return Err(Error::internal(format!(
+                "segment {}: selection objective {} != stored bytes {} (the storage oracle \
+                 must equal the physical artifact)",
+                seg.start_frame,
+                selected.objective_bytes,
+                selected.stored_bytes()
+            )));
+        }
         segments.push(SegmentSelection {
             plan: *seg,
             kind: selected.kind,
@@ -924,6 +936,14 @@ mod tests {
                     obj.complete_bytes(),
                     obj.header_bytes + obj.index_bytes + obj.payload_bytes + obj.integrity_bytes
                 );
+                // "Minimum complete bytes" must be a physical-storage claim.
+                for s in &obj.segments {
+                    assert_eq!(
+                        s.objective_bytes, s.stored_bytes,
+                        "{channels}ch/{total}f segment @{}: objective != stored",
+                        s.plan.start_frame
+                    );
+                }
                 let mat = materialize_full_object(&obj.bytes)
                     .unwrap_or_else(|e| panic!("{channels}ch/{total}f decode: {e}"));
                 assert_eq!(

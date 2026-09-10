@@ -38,7 +38,7 @@ use std::path::Path;
 /// container mechanism. Empty means "not yet frozen" (the observed value is
 /// printed); re-freeze only with a documented reason.
 pub const FULLOBJ_RESULT_SHA256: &str =
-    "4b517ea0d564662d0b5c004434d1cea5b7358c5e1e563df5f6628a4665993a87";
+    "0969a4f4b52b690a301c4e696c4960080893316f647a23d02ee318eb63580c8a";
 
 /// Nominal rate recorded in the receipt (content classes are rate-independent).
 pub const FULLOBJ_RATE_HZ: u32 = 48_000;
@@ -480,6 +480,14 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
         )?;
         if obj.complete_bytes() != obj.bytes.len() as u64 {
             return fail("container complete_bytes is not its serialized length");
+        }
+        for s in &obj.segments {
+            if s.objective_bytes != s.stored_bytes {
+                return fail(&format!(
+                    "{}: segment @{} selection objective {} != stored bytes {}",
+                    fx.name, s.plan.start_frame, s.objective_bytes, s.stored_bytes
+                ));
+            }
         }
         let mat = fullobj::materialize_full_object(&obj.bytes)?;
         if mat.samples() != &fx.samples[..] {

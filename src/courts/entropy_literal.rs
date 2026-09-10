@@ -91,6 +91,19 @@ pub fn run(receipts_root: &Path) -> crate::error::Result<Verdict> {
                 }
                 exact_reconstructions += 1;
                 let c = rl.cost(canonical_u1).unwrap();
+                // The complete cost must equal the physical artifact size: no
+                // serialized byte (block headers, integrity flags, pool/page
+                // counts) may be missing from the accounting.
+                let serialized = match rl.serialized_bytes() {
+                    Ok(n) => n,
+                    Err(e) => return fail(&format!("{} serialize: {e}", fx.name)),
+                };
+                if c.complete_bytes != serialized {
+                    return fail(&format!(
+                        "{}: complete cost {} != serialized bytes {serialized}",
+                        fx.name, c.complete_bytes
+                    ));
+                }
                 let raw_pages = rl.pages.iter().filter(|p| p.kind == PageKind::Raw).count();
                 let fallback_fraction = if rl.pages.is_empty() {
                     1.0
@@ -112,6 +125,7 @@ pub fn run(receipts_root: &Path) -> crate::error::Result<Verdict> {
                     "page_frames": page_frames,
                     "raw_sample_bytes": raw_sample_bytes,
                     "canonical_u1_bytes": canonical_u1,
+                    "serialized_bytes": serialized,
                     "metadata_bytes": c.metadata_bytes,
                     "model_bytes": c.model_bytes,
                     "payload_bytes": c.payload_bytes,

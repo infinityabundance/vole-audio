@@ -143,6 +143,13 @@ pub fn run(receipts_root: &Path) -> crate::error::Result<Verdict> {
             }
             let container_bytes = represent::residual_container_bytes(&rr)?.len() as u64;
             let cost = rr.cost(canonical_u1_literal_bytes(frames, channels))?;
+            // The complete cost must equal the physical artifact size.
+            if cost.complete_bytes != container_bytes {
+                return fail(&format!(
+                    "{}: complete cost {} != container bytes {container_bytes}",
+                    fx.name, cost.complete_bytes
+                ));
+            }
             let raw_pages = rr.pages.iter().filter(|p| p.kind == PageKind::Raw).count();
             let fallback_fraction = if rr.pages.is_empty() {
                 1.0

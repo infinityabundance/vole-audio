@@ -349,53 +349,69 @@ impl RepresentedLiteral {
             .collect()
     }
 
+    /// Exact canonical serialized length of this representation (the physical
+    /// artifact size).
+    pub fn serialized_bytes(&self) -> Result<u64> {
+        Ok(literal_container_bytes(self)?.len() as u64)
+    }
+
     /// Complete-cost breakdown of this representation.
+    ///
+    /// **Invariant:** the eight components sum to exactly the canonical
+    /// serialized length, so `complete_bytes == self.serialized_bytes()`. Every
+    /// physical byte has a home: the container prefix, the shared-model pool
+    /// count and model bytes, each block's fixed header and integrity
+    /// flag/digest (framing), the encoded bodies (payload), the page-count field
+    /// and page index records (index). A cost that omitted block framing would
+    /// underprice an entropy representation against a canonical object and
+    /// change which candidate the inverse compiler selects.
     pub fn cost(&self, canonical_literal_bytes: u64) -> Result<CompleteCost> {
         let mut model_bytes = 0u64;
         let mut payload_bytes = 0u64;
-        let mut integrity_bytes = 0u64;
+        let mut framing_bytes = 0u64;
         for page in &self.pages {
             match page.kind {
                 PageKind::Rans => {
                     for b in &page.blocks {
+                        framing_bytes += block_framing_bytes(b.integrity.is_some());
                         match &b.payload {
                             BlockPayload::Rans { model, bytes, .. } => {
                                 payload_bytes += bytes.len() as u64;
-                                if let ModelRef::Inline(m) = model {
-                                    model_bytes += m.canonical_bytes().len() as u64;
-                                }
+                                model_bytes += match model {
+                                    ModelRef::Inline(m) => m.canonical_bytes().len() as u64,
+                                    ModelRef::Shared(_) => SHARED_MODEL_REF_BYTES,
+                                };
                             }
                             BlockPayload::Raw { bytes } => payload_bytes += bytes.len() as u64,
-                        }
-                        if b.integrity.is_some() {
-                            integrity_bytes += 33;
                         }
                     }
                 }
                 PageKind::Raw => payload_bytes += page.raw.len() as u64,
             }
         }
-        if self.model_mode == ModelMode::Shared {
-            for m in &self.pool {
-                model_bytes += m.canonical_bytes().len() as u64;
-            }
+        for m in &self.pool {
+            model_bytes += m.canonical_bytes().len() as u64;
         }
         let raw = self.descriptor.extent_frames * u64::from(self.descriptor.layout.count()) * 4;
         let mut c = CompleteCost {
-            metadata_bytes: (15 + 1 + 1 + 1 + 1 + 1 + 4 + 1 + 46) as u64,
+            metadata_bytes: CONTAINER_PREFIX_BYTES + POOL_COUNT_BYTES,
             hypothesis_bytes: 0,
             model_bytes,
             payload_bytes,
-            index_bytes: PAGE_INDEX_RECORD_BYTES * self.pages.len() as u64,
+            index_bytes: PAGE_COUNT_BYTES + PAGE_INDEX_RECORD_BYTES * self.pages.len() as u64,
             checkpoint_bytes: 0,
             dependency_bytes: 0,
-            integrity_bytes,
+            integrity_bytes: framing_bytes,
             complete_bytes: 0,
             raw_sample_bytes: raw,
             canonical_literal_bytes,
             source_wav_bytes: 0,
         };
         c.compute();
+        debug_assert_eq!(
+            c.complete_bytes,
+            self.serialized_bytes().unwrap_or(u64::MAX)
+        );
         Ok(c)
     }
 }
@@ -536,53 +552,67 @@ impl RepresentedResidual {
             .collect()
     }
 
+    /// Exact canonical serialized length of this representation (the physical
+    /// artifact size).
+    pub fn serialized_bytes(&self) -> Result<u64> {
+        Ok(residual_container_bytes(self)?.len() as u64)
+    }
+
     /// Complete-cost breakdown of this representation.
+    ///
+    /// **Invariant:** the eight components sum to exactly the canonical
+    /// serialized length, so `complete_bytes == self.serialized_bytes()`. The
+    /// semantic hypothesis is `hypothesis_bytes`; the container's model-length
+    /// field, pool count field and page-count field are fixed framing
+    /// (`metadata_bytes`/`index_bytes`); each block contributes its fixed header
+    /// and integrity flag/digest.
     pub fn cost(&self, canonical_literal_bytes: u64) -> Result<CompleteCost> {
         let mut model_bytes = 0u64;
         let mut payload_bytes = 0u64;
-        let mut integrity_bytes = 0u64;
+        let mut framing_bytes = 0u64;
         for page in &self.pages {
             match page.kind {
                 PageKind::Rans => {
                     for b in &page.blocks {
+                        framing_bytes += block_framing_bytes(b.integrity.is_some());
                         match &b.payload {
                             BlockPayload::Rans { model, bytes, .. } => {
                                 payload_bytes += bytes.len() as u64;
-                                if let ModelRef::Inline(m) = model {
-                                    model_bytes += m.canonical_bytes().len() as u64;
-                                }
+                                model_bytes += match model {
+                                    ModelRef::Inline(m) => m.canonical_bytes().len() as u64,
+                                    ModelRef::Shared(_) => SHARED_MODEL_REF_BYTES,
+                                };
                             }
                             BlockPayload::Raw { bytes } => payload_bytes += bytes.len() as u64,
-                        }
-                        if b.integrity.is_some() {
-                            integrity_bytes += 33;
                         }
                     }
                 }
                 PageKind::Raw => payload_bytes += page.raw.len() as u64,
             }
         }
-        if self.model_mode == ModelMode::Shared {
-            for m in &self.pool {
-                model_bytes += m.canonical_bytes().len() as u64;
-            }
+        for m in &self.pool {
+            model_bytes += m.canonical_bytes().len() as u64;
         }
         let raw = self.descriptor.extent_frames * u64::from(self.descriptor.layout.count()) * 4;
         let mut c = CompleteCost {
-            metadata_bytes: (15 + 1 + 1 + 1 + 1 + 1 + 4 + 1 + 46) as u64,
+            metadata_bytes: CONTAINER_PREFIX_BYTES + MODEL_LENGTH_FIELD_BYTES + POOL_COUNT_BYTES,
             hypothesis_bytes: semantic_model_bytes(&self.model) as u64,
             model_bytes,
             payload_bytes,
-            index_bytes: PAGE_INDEX_RECORD_BYTES * self.pages.len() as u64,
+            index_bytes: PAGE_COUNT_BYTES + PAGE_INDEX_RECORD_BYTES * self.pages.len() as u64,
             checkpoint_bytes: 0,
             dependency_bytes: 0,
-            integrity_bytes,
+            integrity_bytes: framing_bytes,
             complete_bytes: 0,
             raw_sample_bytes: raw,
             canonical_literal_bytes,
             source_wav_bytes: 0,
         };
         c.compute();
+        debug_assert_eq!(
+            c.complete_bytes,
+            self.serialized_bytes().unwrap_or(u64::MAX)
+        );
         Ok(c)
     }
 }
@@ -930,6 +960,35 @@ fn parse_pool(bytes: &[u8], mut pos: usize) -> Result<(Vec<SymbolModel>, usize)>
 /// Semantic header region: profile tag (19) + representation + extent + ...
 /// `canonical_header_bytes` is a fixed 46-byte region.
 const SEMANTIC_HEADER_LEN: usize = 46;
+
+/// Fixed container prefix length:
+/// `tag ∥ version ∥ kind ∥ model mode ∥ reserved ∥ page frames ∥ symbolization
+/// ∥ semantic header`.
+const CONTAINER_PREFIX_BYTES: u64 =
+    FORMAT_TAG.len() as u64 + 1 + 1 + 1 + 1 + 4 + 1 + SEMANTIC_HEADER_LEN as u64;
+
+/// The 4-byte shared-model pool count that every container carries (zero when
+/// the pool is empty).
+const POOL_COUNT_BYTES: u64 = 4;
+/// The 4-byte page-count field that every container carries.
+const PAGE_COUNT_BYTES: u64 = 4;
+/// The 4-byte semantic-model length field of a residual container.
+const MODEL_LENGTH_FIELD_BYTES: u64 = 4;
+/// A shared-model reference inside a block (`u32` pool index).
+const SHARED_MODEL_REF_BYTES: u64 = 4;
+
+/// Framing bytes of one serialized block: its fixed header, its integrity flag,
+/// and its digest when integrity is requested. These are physical bytes of the
+/// artifact and must appear in the complete cost.
+fn block_framing_bytes(integrity: bool) -> u64 {
+    crate::entropy::block::HEADER_BYTES as u64
+        + crate::entropy::block::INTEGRITY_FLAG_BYTES as u64
+        + if integrity {
+            crate::entropy::block::INTEGRITY_DIGEST_BYTES as u64
+        } else {
+            0
+        }
+}
 
 fn container_prefix(
     kind: u8,
@@ -1602,6 +1661,102 @@ mod tests {
         assert!(parse_raw_records(&bad).is_err());
     }
 
+    /// The invariant that makes "minimum complete bytes" a physical-storage
+    /// claim: the cost decomposition must sum to exactly the canonical
+    /// serialized length, with no serialized byte missing and no estimated byte
+    /// present.
+    ///
+    /// Regression: an all-RANS literal previously under-reported by exactly
+    /// `7 + 33 * rans_blocks` (container prefix/pool-count/page-count shortfall
+    /// plus one 32-byte block header and one integrity flag per block), which
+    /// let an entropy `Literal` win a Phase-K selection on a discounted price
+    /// and then store its much larger physical artifact.
+    #[test]
+    fn complete_cost_equals_serialized_bytes_across_the_encoding_universe() {
+        let symbolizations = [
+            Symbolization::Identity,
+            Symbolization::Lane4Plain,
+            Symbolization::Lane4ZigZag,
+            Symbolization::DeltaLane4,
+        ];
+        for &channels in &[1u8, 2] {
+            let frames = 1024usize;
+            let ch = usize::from(channels);
+            let layout = Layout::checked(channels).unwrap();
+            let d = lit_descriptor(frames as u64, layout);
+            let samples = tone(frames, ch);
+            let canonical = 46 + 8 + (frames * ch * 4) as u64;
+            for sym in symbolizations {
+                for &page in &[256u32, 512, 1024] {
+                    for mode in [ModelMode::Inline, ModelMode::Shared] {
+                        for integrity in [false, true] {
+                            let rl = RepresentedLiteral::encode(
+                                d.clone(),
+                                &samples,
+                                page,
+                                sym,
+                                mode,
+                                integrity,
+                            )
+                            .unwrap();
+                            let c = rl.cost(canonical).unwrap();
+                            assert_eq!(
+                                c.complete_bytes,
+                                rl.serialized_bytes().unwrap(),
+                                "literal cost != serialized bytes ({channels}ch {sym:?} page {page} {mode:?} i{integrity})"
+                            );
+                            // Block framing is counted explicitly, not implied.
+                            let rans_blocks: u64 = rl
+                                .pages
+                                .iter()
+                                .filter(|p| p.kind == PageKind::Rans)
+                                .map(|p| p.blocks.len() as u64)
+                                .sum();
+                            assert!(
+                                c.integrity_bytes
+                                    >= rans_blocks * crate::entropy::block::HEADER_BYTES as u64,
+                                "literal block framing uncounted"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
+        // Residual: the same invariant, with the semantic hypothesis counted.
+        let frames = 2048usize;
+        let d = ObjectDescriptor::new(
+            crate::object::descriptor::Representation::PredictorResidual,
+            frames as u64,
+            Layout::Mono,
+            None,
+        )
+        .unwrap();
+        let model = ResidualModel::Periodic {
+            cycle: (0..64).map(|i| i << 20).collect(),
+        };
+        let intrinsic: Vec<i32> = (0..frames).map(|f| model.model_sample(f as u64)).collect();
+        let records = Residual::closing_residual(&intrinsic, 1, &model).unwrap();
+        let residual = Residual::new(&d, model, records).unwrap();
+        let canonical = 46 + 8 + (frames * 4) as u64;
+        for &page in &[256u32, 512, 1024] {
+            for mode in [ModelMode::Inline, ModelMode::Shared] {
+                for integrity in [false, true] {
+                    let rr =
+                        RepresentedResidual::encode(d.clone(), &residual, page, mode, integrity)
+                            .unwrap();
+                    let c = rr.cost(canonical).unwrap();
+                    assert_eq!(
+                        c.complete_bytes,
+                        rr.serialized_bytes().unwrap(),
+                        "residual cost != serialized bytes (page {page} {mode:?} i{integrity})"
+                    );
+                    assert!(c.hypothesis_bytes > 0, "residual hypothesis is counted");
+                }
+            }
+        }
+    }
+
     #[test]
     fn cost_ledger_counts_models_and_payloads() {
         let frames = 2048usize;
@@ -1629,12 +1784,22 @@ mod tests {
                 "tonal content must compress ({mode:?})"
             );
             assert!(c.model_bytes > 0, "model bytes are always counted");
+            let rans_blocks: u64 = rl
+                .pages
+                .iter()
+                .filter(|p| p.kind == PageKind::Rans)
+                .map(|p| p.blocks.len() as u64)
+                .sum();
+            let refs = rans_blocks * SHARED_MODEL_REF_BYTES;
             if mode == ModelMode::Inline {
+                // Inline mode carries the models in full, with no pool refs.
                 inline_cost = Some(c.model_bytes);
             } else {
-                // Shared models across pages cost no more than inline models.
+                // The shared model *pool* costs no more than the per-page inline
+                // models; the per-block refs are separate framing bytes.
+                assert!(c.model_bytes >= refs, "shared refs must be counted");
                 assert!(
-                    c.model_bytes <= inline_cost.unwrap(),
+                    c.model_bytes - refs <= inline_cost.unwrap(),
                     "shared pool must not exceed per-page inline models"
                 );
             }

@@ -120,6 +120,16 @@ impl BlockPayload {
 /// Fixed header length before the model/payload region.
 const HEADER_LEN: usize = 15 + 1 + 1 + 1 + 1 + 1 + 8 + 4;
 
+/// Public fixed block header length. The complete-cost oracle must count every
+/// serialized byte, so the block framing length is part of the public contract.
+pub const HEADER_BYTES: usize = HEADER_LEN;
+
+/// The one-byte integrity flag every serialized block carries.
+pub const INTEGRITY_FLAG_BYTES: usize = 1;
+
+/// The integrity digest appended when a block requests integrity.
+pub const INTEGRITY_DIGEST_BYTES: usize = 32;
+
 /// Build the fixed header of a block.
 fn header_bytes(
     payload_kind: PayloadKind,
