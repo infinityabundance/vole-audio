@@ -86,9 +86,17 @@ candidate vocabulary, accounting rules and frontier semantics is
 
 ### Seal 1 — Phase K implementation + clean-tree battery (2026-09-10)
 
-Seal run (release, `--all-features`, clean tree at the implementation commit,
-version 0.8.0):
+Seal run (release, `--all-features`, clean tree `7652c6b`, version 0.8.0):
 
+- 22 receipts (eleven standalone courts — semantic, authored, simd, facts,
+  inverse, flattening, cuda, d1, rocm, rocm-d0, rocm-d1 — plus `court h2`
+  with its ten sub-courts), every receipt `source_binding: bound` and
+  carrying `seal_subject_hash =
+  1e1cd8e11766fd3268d1d2d638d158a08e4b40ef0f66b99dde646f72c2efaf08`;
+  `vole-audio seal verify` PASSes the 12-row matrix in **default mode** at
+  the battery tree and (after rebuilding from the release head) at the head
+  itself; every receipt also verifies individually with `receipt show` (all
+  348 archived receipts do — see work item 10).
 - `court inverse` SUPPORTED: 14 fixtures (the frozen H.2 corpus truncated to a
   4096-frame inverse window), every fixture's `Literal` fallback accepted,
   **11/14** fixtures explained more cheaply by a non-literal candidate

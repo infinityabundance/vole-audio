@@ -893,6 +893,15 @@ authority.
   partial/harmonic hypotheses require a residual-model vocabulary extension
   beyond the frozen u1 v1 models, so they are a universe amendment, not a
   Phase-K implementation detail.
+- Evidence integrity (found while sealing K, because `court inverse` is the
+  first float-bearing receipt in the seal matrix): receipt self-hashing is now
+  stable under (a) `serde_json` float parsing — the `float_roundtrip` feature
+  is required, or a shortest-decimal `f64` re-parses 1 ULP off and the
+  receipt cannot reproduce its own hash — and (b) **additive schema growth**:
+  the hash covers the receipt body exactly as the file carries it
+  (`preserve_order`), so a receipt written before a new field existed still
+  re-hashes its own field set. Previously 180 of 348 archived receipts failed
+  `receipt show`; now all 348 verify.
 
 ## Known blockers
 
