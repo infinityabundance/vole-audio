@@ -103,20 +103,25 @@ the context and leaves the caller's context stack exactly as it was.
 
 ## What is *not* in this increment
 
-Stated plainly so the gap is visible (updated at Seal 6 — the corpus is frozen,
-the conventional baseline is measured, the container mechanism is frozen, and
-the true B1-vs-VOLE result now exists):
+Stated plainly so the gap is visible (updated at Seal 11 — the corpus is frozen,
+the conventional and runtime baselines are measured, the full-object container
+is frozen and hostile-tested, the negative controls and the observation-depth,
+random-access and interference courts exist):
 
-* B2–B5 now exist as a measured common runtime substrate (Seals 9–10) with
-  harness-owned latency, split storage/residency accounting and a stratified
-  crossover surface; the *remaining* Phase-M courts below are still absent;
-* `court depth`, `court random-access`, `court negative`, `court interference`,
-  `court all` are not implemented;
-* the **long run** (soak stability) is not run;
-* energy and the adversarial real-time load matrix (§49) are not measured;
 * the **license-clean real-recording stratum is declared and vacant** (see
   `corpus/README.md`); no production claim rests on real recordings yet, and
-  `court corpus` records that rather than staying silent.
+  `court corpus` records that rather than staying silent;
+* **energy is not measurable on this host** (no hwmon power input, no
+  NVML/AMDSMI): `court interference` reports `NOT_AVAILABLE` rather than
+  inventing a figure, and the probe works on hosts that do expose a source;
+* the adversarial load matrix covers only conditions this host can create
+  (CPU, memory bandwidth, storage); compositor/display load, competing GPU
+  compute, GPU context contention, DVFS, thermal steady state and PCIe power
+  saving are `NOT_CONTROLLED`;
+* the **long run is a bounded soak** (10 s under CPU contention), not an
+  unbounded endurance run;
+* `court d2` remains unimplemented (D2 is future conceptual), as do the
+  `inspect`/`verify`/`encode`/`observe`/`play`/`bench` CLI surfaces.
 
 ## Seal history
 
@@ -143,16 +148,18 @@ Seal run (release, `--all-features`, clean tree, version 0.11.0):
 
 ## Where this goes next
 
-1. **Seals 2–10 — the corpus is frozen, verified and review-closed; the flagship
+1. **Seals 2–11 — the corpus is frozen, verified and review-closed; the flagship
    B0/B1 conventional baseline is measured; the full-object container mechanism
    and its parser are frozen; the B1-vs-VOLE result exists with clean population
    arithmetic; the entropy complete-cost oracle equals the physical artifact;
-   and the runtime substrate is measured under a frozen protocol with a
-   stratified crossover surface.**
-2. **The remaining Phase-M courts** — `depth` (depth sweep), `random-access`,
-   `negative`, `interference`, `all` — then the **long run** soak, energy where
-   measurable and the adversarial real-time load matrix (§49); and the
-   license-clean real-recording stratum.
+   the runtime substrate is measured under a frozen protocol with a stratified
+   crossover surface; and the negative, random-access, depth and interference
+   courts exist with a Phase-M aggregate.**
+2. **What remains in Phase M** is not another court: the license-clean
+   real-recording stratum (currently vacant), energy on a host that exposes a
+   power source, an unbounded soak rather than the bounded one, and the
+   conditions this host cannot control. Then Phase N — transport/archive;
+   Phase O — learned deterministic prediction addendum.
 3. Adversarial real-time load (§49) and energy where measurable.
 
 ### Seal 2 — flagship corpus freeze (2026-09-10)
@@ -769,3 +776,71 @@ all-features and **420 passed / 12 ignored** default-features.
 
 **Real-time load, depth, random-access, interference, long run and energy are
 not measured here** — see “What is *not* in this increment”.
+
+### Seal 11 — remaining Phase-M courts (2026-09-10)
+
+With the runtime substrate measured, the rest of the Phase-M court set lands.
+
+**`court random-access`.** The runtime court measures the sequential trace; this
+measures the other half. Deterministic per-object random windows (seeded from
+the canonical hash, never from measurement) always include the first frame, the
+last frame, a window straddling the 65,536-frame container boundary and a final
+full quantum, then pseudo-random windows of 1/64/256/512 frames, repeated with
+rotated source order and compared against a sequential pass. Five rows: B2
+resident PCM, B3-warm, B4 decoded-resident, **B4-seek** (the same artifact via
+stateless `decode_seek` — the sealed stream has no SEEKTABLE, so each seek
+decodes forward from the first frame) and B5 bounded VOLE. New
+`runtime::FlacSeekSource`. Frozen static result
+`d9259f18a4fdc731c34ac7cc1106bd612a0b993df4c7ba6ca473803ad527132f`.
+
+**`court negative`.** The incompressible controls (entropy classes
+`full_width_random` and `scrambled`) measured against B0/B1/VOLE with every
+ratio recomputed from the stored bytes — **VOLE 11,248,166 B vs B0 11,348,400 B
+vs B1 10,046,098 B** over 20 objects, i.e. neither codec compresses
+incompressible material and VOLE does not lose to raw framing there (0.991×) but
+does lose to FLAC (1.12×). Plus a hostile-archive battery (truncation, bit flip,
+**resealed** structural mutation, allocation bomb, garbage) run under
+`catch_unwind`: **21 candidates rejected with a typed error, 0 panics**. Frozen
+result `6994a97a…`.
+
+**`court depth`.** Minimum stable observation depth from measured per-window
+latencies at quanta 64/128/256/512/1024: the smallest buffered lookahead `k`
+with `completion[k-1] >= max_i(completion[i] - i*deadline)`. On this idle host
+the worst depth over all 115 objects is **1 quantum** at every quantum and for
+every source — production is far faster than realtime — with the first
+non-trivial sign at B5's 64-frame quantum (1.33 ms deadline), where **3 windows
+miss their individual deadline** without yet forcing a deeper prefill. Frozen
+result `3e616cde…`.
+
+**`court interference`** (contract §49). The frozen workload under idle,
+`cpu_burn` (one spinner per logical CPU), `memory_bandwidth` and `storage_io`,
+with idle-relative tails and per-condition depth:
+
+```text
+condition          B2      B3-warm   B4      B5      (p50 ns / idle ratio)
+idle               40      150       40      911
+cpu_burn           50 1.25 200 1.33  50 1.25 1723 1.89
+memory_bandwidth   822 20.6 2385 15.9 762 19.1 2915 3.20
+storage_io         40 1.00 150 1.00  40 1.00 911 1.00
+```
+
+Memory bandwidth is the dominant interference (B2/B4 ~19–21×, B3-warm ~16×, B5
+~3.2× — B5 is already materialization-bound); CPU contention ~1.3–1.9×; storage
+pressure does not move the warm-cache sources. One B3-warm window misses its
+deadline under memory pressure. A **bounded soak** under CPU contention runs
+121 passes with **0 deadline misses** and drift 1.0. `energy` is
+`NOT_AVAILABLE` (no hwmon power input, no NVML/AMDSMI — no figure is invented),
+and seven contract conditions this host cannot manipulate are reported
+`NOT_CONTROLLED`. New `runtime::load` and `runtime::energy`. Frozen result
+`9a5777bc…`.
+
+**`court all`.** The Phase-M aggregate runs conventional, corpus, fullobj,
+flagship, runtime, random-access, negative, depth and interference in sequence
+and is `SUPPORTED` when all nine are (they are). Frozen result `c3d4a47c…`.
+
+Shared `courts::measure` now owns the traversal runner, the timer calibration
+and the depth computation, so every measurement court uses one latency boundary.
+Every pre-existing court's receipt is field-for-field identical to Seal 10.
+Seal run: seal subject `6b000562…`; the **23-row** `seal verify` matrix passes;
+tests **437 passed / 12 ignored** all-features and **427 passed / 12 ignored**
+default-features.

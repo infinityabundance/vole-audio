@@ -1303,6 +1303,36 @@ comparable**. Four corrections, then the first official runtime measurement.
   matrix; 430 passed / 12 ignored all-features, 420 passed / 12 ignored
   default-features.
 
+### Phase M Seal 11 — remaining Phase-M courts (v0.21.0)
+
+The last Phase-M courts land, all built on one shared measurement boundary
+(`courts::measure`).
+
+- **`court random-access`** (`d9259f18…`): deterministic per-object random
+  windows (seeded from the canonical hash, with first/last/65,536-boundary
+  edges) over B2 / B3-warm / B4 / **B4-seek** (stateless `decode_seek` on the
+  no-SEEKTABLE sealed stream) / B5, against a sequential reference. New
+  `runtime::FlacSeekSource`.
+- **`court negative`** (`6994a97a…`): 20 incompressible objects, VOLE
+  11,248,166 B vs B0 11,348,400 B vs B1 10,046,098 B (ratios recomputed from
+  stored bytes); hostile battery of 21 candidates (truncation, bit flip,
+  resealed structural mutation, allocation bomb, garbage) all rejected under
+  `catch_unwind`, 0 panics.
+- **`court depth`** (`3e616cde…`): minimum stable observation depth at quanta
+  64/128/256/512/1024; worst depth 1 quantum everywhere on this idle host;
+  B5's 64-frame quantum is the first to miss individual deadlines (3 windows).
+- **`court interference`** (`9a5777bc…`), contract §49: idle / cpu_burn /
+  memory_bandwidth / storage_io on all logical CPUs. Memory bandwidth dominates
+  (B2/B4 ~19–21×, B3-warm ~16×, B5 ~3.2× idle p50); CPU ~1.3–1.9×; storage
+  pressure does not move warm-cache sources; one B3-warm miss under memory
+  pressure; bounded soak 121 passes / 0 misses / drift 1.0; energy
+  `NOT_AVAILABLE` (no hwmon/NVML, no figure invented); 7 contract conditions
+  `NOT_CONTROLLED`. New `runtime::load`, `runtime::energy`.
+- **`court all`** (`c3d4a47c…`): Phase-M aggregate, 9/9 sub-courts SUPPORTED.
+- Every pre-existing court is field-for-field identical to Seal 10. Seal subject
+  `6b000562…`; **23-row** `seal verify` matrix; 437 passed / 12 ignored
+  all-features, 427 passed / 12 ignored default-features.
+
 ## Next work (exact order — the implementation contract is executed in sequence)
 
 Phase H.2 is complete (entropy-native core: all ten H.2 courts SUPPORTED on
@@ -1323,13 +1353,14 @@ re-verified by the exact evaluator (`court inverse-search`), and the placement
 policy keeps the measured-faster host surface (`SearchBudget::placement`,
 `Auto`).
 
-1. Phase M — remaining increments. The common runtime substrate is **measured**
-   under a frozen protocol (Seal 10): harness-owned latency, split
-   storage/residency, two explicit populations, rotated repeats and a stratified
-   crossover surface. Remaining: `court depth` (depth sweep), `court
-   random-access`, `court negative`, `court interference`, `court all`; the long
-   run soak; energy where measurable; the adversarial real-time load matrix
-   (§49); and the license-clean real-recording stratum. Then
+1. Phase M — **the court set is complete**. The common runtime substrate is
+   measured under a frozen protocol (Seal 10); the negative, random-access,
+   depth, interference and aggregate courts exist (Seal 11). What remains in
+   Phase M is not another court: the license-clean real-recording stratum
+   (currently vacant), energy on a host that exposes a power source, an
+   unbounded soak in place of the bounded one, and the load conditions this host
+   cannot control (compositor/display, competing GPU compute, GPU context
+   contention, DVFS, thermal steady state, PCIe power saving). Then
    Phase N — transport/archive
    (embeds H.2 canonical records); Phase O — learned deterministic prediction
    addendum (judged by the H.2 complete-cost API).
