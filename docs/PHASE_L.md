@@ -90,8 +90,10 @@ verified-equal surface.
 > **Superseded in part by Seal 2.** The complexity explanation below
 > (`O(frames / p)`) is wrong and is corrected to `O(frames - p)`; the GPU/CUDA
 > ratio recorded here is one clock-state-dependent sample of a noisy
-> measurement (Seal 2 reports the observed range). The Seal 1 numbers are kept
-> as the measurement record, not as a current claim.
+> measurement (Seal 2 reports the observed range); and the default placement is
+> no longer fixed at `Scalar` but `Auto` (still the host surface, chosen by
+> measurement). The Seal 1 numbers are kept as the measurement record, not as a
+> current claim.
 
 Seal run (release, `--all-features`, clean tree `3ddf66f`, version 0.9.0):
 
