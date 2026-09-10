@@ -845,6 +845,15 @@ chain) — no kernel execution is pretended.
   policy, per-session traffic/exposure cells incl. the 2048-byte bounded
   mono intermediate); D1 readiness split is preserved — a D0-ready stack
   without host registration is `UNSUPPORTED_BY_API`, never "unavailable".
+- Review closures (Seal 2, version 0.7.1; Seal 3, version 0.7.2): resource
+  identity is **API lifetime AND device affinity** — `HipDevice { api,
+  ordinal }` is retained by every resource, and every current-device-
+  dependent operation re-selects its owner ordinal first (`make_current()`,
+  no ABI expansion). This closes the thread-local-device hole
+  (launch/alloc/copy/register/synchronize could otherwise follow whichever
+  device a later `Rocm::open` left current). Registration failure to
+  re-select the owner is reported with the veol-side sentinel rc, never a
+  fabricated HIP code.
 
 ## Known blockers
 

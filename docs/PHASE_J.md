@@ -144,6 +144,64 @@ correctness defects (not provenance polish); all are fixed here:
 
 Seal 2 re-runs the clean-tree battery with these fixes.
 
+## Review amendment 2 (device affinity, before Seal 3)
+
+The second external review found one remaining abstraction defect in the
+Phase-J host runtime: **API lifetime was structural, device affinity was
+not.** HIP device selection is thread-local (`hipSetDevice` selects the
+device used by subsequent calls on that host thread), so an `Arc<HipApi>`
+alone did not identify which device a resource belonged to. A later
+`Rocm::open(1)` could leave ordinal 1 current and silently redirect a
+current-device-dependent operation (`hipMalloc`, `hipMemcpy`,
+`hipModuleLaunchKernel`, `hipHostRegister`, `hipDeviceSynchronize`) away
+from the owner — most visibly in `attempt_register`, which took no device
+identity at all.
+
+Resource identity is now **API lifetime AND device affinity**:
+
+```text
+                    HipApi ──> Lib (dlopen) + Fns
+                       │
+                HipDevice { api, ordinal }
+       ┌─────────────┼─────────────┐
+       ↓             ↓             ↓
+    Module      DeviceBuffer   HostRegistration
+       ↓
+    Function
+```
+
+1. **`Arc<HipDevice>` in the ownership graph.** `ModuleInner`,
+   `DeviceBuffer`, and `HostRegistration` retain `Arc<HipDevice>` (which
+   owns the `Arc<HipApi>` plus the ordinal); `Function` retains its
+   `ModuleInner`. Every current-device-dependent operation calls
+   `make_current()` (→ `hipSetDevice`, already part of the frozen D0
+   surface — **no ABI expansion**) before touching the device; `Drop`
+   paths use the best-effort variant so a stale current device can never
+   turn a free/unregister into a call on the wrong device. A resource can
+   no longer silently act on whichever device a later `Rocm::open` left
+   current.
+2. **Registration targets the owner ordinal.** `attempt_register()` now
+   takes `&Arc<HipDevice>` and re-selects the owner device before
+   `hipHostRegister` (registration maps into the *current* device's address
+   space). A failure of that pre-call step returns the explicit veol-side
+   sentinel rc `PRE_CALL_FAILURE_RC = -1` — never a fabricated HIP code —
+   makes no HIP call, and classifies as `INCONCLUSIVE`
+   (`HostRegistration::classify` gained the sentinel arm).
+3. **No environment mutation in tests.** `lib_candidates_in(sonames,
+   explicit_dirs)` is pure; the production `lib_candidates()` reads
+   `ROCM_LIB_PATH` + `/opt/rocm*` directories and passes them in. The
+   `.so.7` hostile test supplies a temp directory directly and no longer
+   calls `std::env::set_var` (Rust 2024 makes it `unsafe` precisely
+   because it races other threads).
+4. **Hostile affinity tests.** A fake HIP table proves, through the real
+   resource types, that launch, buffer alloc/upload/download/free,
+   register/get-devptr/unregister, synchronize, and module unload each
+   restore the owner ordinal after another device was made current, and
+   that a failed device re-selection reports the pre-call sentinel without
+   issuing a HIP call.
+
+Seal 3 re-runs the clean-tree battery with these fixes.
+
 ## Seal history
 
 ### Seal 1 — Phase J implementation + clean-tree battery (2026-09-09)
@@ -218,6 +276,41 @@ dirty; the gate correctly refused the resulting receipts (they were never
 committed and were discarded). The PDF was moved under the ignored
 `research/` tree — its designated home; the seal subject is unchanged —
 and Seal 2 was re-run clean.
+
+### Seal 3 — review-2 closure: structural device affinity (2026-09-10)
+
+Seal run (release, `--all-features`, clean tree `207e82f`, version 0.7.2):
+
+The single review-2 finding — HIP device selection is thread-local, so
+API lifetime alone did not bind a resource to its ordinal — is fixed as
+recorded in “Review amendment 2” above; the affinity battery is
+host-only (a fake HIP table drives the real resource types), so it needs
+no device.
+
+- 20 receipts, committed separately; every receipt `source_binding: bound`
+  and carries `seal_subject_hash =
+  67fdd5b0d3ccce35e06b123d393eaedb111a46daefd9b60da57cd00d92892d49`;
+  `vole-audio seal verify` PASSes on the 10-row matrix in **default mode**
+  at the battery tree and (after rebuilding from the release head) at the
+  head itself.
+- All pre-existing courts SUPPORTED with frozen hashes unchanged (semantic
+  `1791816f4b93…`, authored `f7e103f3a97d…`); CUDA/D1/H.2 evidence
+  unperturbed by this host-only change.
+- `court rocm` / `rocm-d0` / `rocm-d1`: `UNSUPPORTED_BY_HARDWARE` with the
+  compile surface satisfied and bound (artifact `5092e129…` == sidecar ==
+  both determinism shas) and the typed runtime chain (no AMD compute
+  candidate on this host).
+- PTX artifact unchanged: sha256
+  `8b23325d03700847b056b29df4f4d4afd1a0c67386458512986c52f4fca7896b`.
+- Host tests: 351 total (346 passed, 5 ignored) all-features on the pinned
+  nightly (341 total, 336 passed default-features; +2 over Seal 2: the
+  device-affinity battery — owner-device restoration for every operation
+  through the real resource types, and the pre-call sentinel
+  classification); clippy `-D warnings` and `cargo fmt --check` clean.
+
+With this seal the host-side Phase-J work is frozen: no further ROCm
+review cycles are planned without new empirical input (a real AMD
+device + ROCm userspace).
 
 ## Execution record (implementation summary)
 
