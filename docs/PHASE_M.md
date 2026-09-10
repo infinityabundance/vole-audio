@@ -102,16 +102,14 @@ the context and leaves the caller's context stack exactly as it was.
 
 ## What is *not* in this increment
 
-Stated plainly so the gap is visible (updated at Seal 5 — the corpus is frozen,
-the flagship conventional baseline is measured, and the full-object container
-mechanism is frozen; the true B1-vs-VOLE result is not):
+Stated plainly so the gap is visible (updated at Seal 6 — the corpus is frozen,
+the conventional baseline is measured, the container mechanism is frozen, and
+the true B1-vs-VOLE result now exists):
 
-* the **B1-vs-selected-VOLE comparison has not been run**. Seal 4 measures the
-  conventional baselines; Seal 5 freezes the container mechanism. Seal 6 opens
-  the second box: the 115 frozen objects through the container, priced against
-  the frozen FLAC-5 bytes;
 * B2–B4 (sampler / disk-streaming / compressed-file playback) are
-  `NOT_IMPLEMENTED`;
+  `NOT_IMPLEMENTED`; now that a canonical full-object VOLE artifact exists, the
+  runtime ladder (B2 / B3 / B4 / B5 selected full-object VOLE scalar) becomes
+  comparable rather than fragmented;
 * `court depth`, `court random-access`, `court negative`, `court interference`,
   `court all` are not implemented;
 * energy and the adversarial real-time load matrix (§49) are not measured;
@@ -144,12 +142,12 @@ Seal run (release, `--all-features`, clean tree, version 0.11.0):
 
 ## Where this goes next
 
-1. **Seals 2–5 — the corpus is frozen, verified and review-closed; the flagship
-   B0/B1 conventional baseline is measured; and the full-object container
-   mechanism is frozen.**
-2. Seal 6 — the true flagship **B1-vs-current-VOLE** result; then B2–B4
-   (PCM-resident / disk-streaming / compressed-file playback), the `depth` /
-   `random-access` / `negative` courts and the crossover surface.
+1. **Seals 2–6 — the corpus is frozen, verified and review-closed; the flagship
+   B0/B1 conventional baseline is measured; the full-object container mechanism
+   is frozen; and the true B1-vs-VOLE result exists.**
+2. B2–B4 (PCM-resident / disk-streaming / compressed-file playback) beside the
+   selected full-object VOLE artifact, then the `depth` / `random-access` /
+   `negative` courts and the crossover surface.
 3. Adversarial real-time load (§49) and energy where measurable.
 
 ### Seal 2 — flagship corpus freeze (2026-09-10)
@@ -381,3 +379,63 @@ frozen result           4b517ea0d564662d0b5c004434d1cea5b7358c5e1e563df5f6628a46
 Seal run: seal subject `837653dc…`; tests **417 passed / 12 ignored**
 all-features and **407 passed / 12 ignored** default-features. No flagship
 performance claim exists yet; Seal 6 opens the second box.
+
+### Seal 6 — B1 FLAC versus current bounded VOLE inverse selection (2026-09-10)
+
+The second box is open. Every frozen object is compiled through the Seal-5
+container and the 110 B1-comparable objects are priced against their FLAC
+level-5 bytes.
+
+**Claim boundary.** This is *B1 FLAC versus the current bounded VOLE inverse
+selection* — not "optimal VOLE". The inverse compiler's proposal vocabulary is
+deliberately limited (literal, silence, constant, exact-repeat, residual
+zero/constant/periodic, shared reference), so a source frozen as `oscillator`
+may legitimately compile to `exact_repeat`. Every segment is priced standalone
+(empty reference library), exactly as B1 is priced standalone per file.
+
+Binding: the court verifies the frozen manifest before measuring, recomputes B1
+in-process, and requires the total to equal the sealed `court conventional`
+total (`25,577,431 B`), so the two courts cannot drift. Frozen search budget:
+the default bounded search (`max_period_scan` 512, `max_residual_period_candidates`
+4, `max_candidates` 64, `Auto` placement).
+
+```text
+objects                  115   (110 B1-comparable, 5 format-domain excluded)
+segments                 255
+B0 raw PCM               71,277,600 B
+u1 literal equivalent    71,283,810 B
+B1 FLAC level 5          25,577,431 B
+VOLE (container)         31,118,702 B
+B1 / VOLE                    0.822     VOLE = 1.217x B1 in aggregate
+VOLE cheaper / equal / larger than B1      55 / 0 / 55   (within 1%: 15)
+objects all-literal / all-procedural / mixed   61 / 49 / 5
+selected kinds           literal 133, exact_repeat 103, constant 10,
+                         silence 4, residual_zero 3, residual_constant 2
+every extent             reconstructed sample-for-sample; semantics preserved
+frozen result           76fe5dcff1dec0a173ed67dc69effcc6befc093e340519c81ec2b32ea3b1a17b
+```
+
+The aggregate hides the shape, which is the point of reporting the buckets and
+the axes. Under a *common* exact test the current compiler wins decisively where
+its vocabulary fits and loses where it does not:
+
+```text
+B1 / VOLE                 B1 / VOLE                 B1 / VOLE
+source literal    51.55   ch identical st.   8.97   entropy globally per.  3.05
+source exact_rep   7.08   amp full_i32       1.09   entropy highly pred.   1.64
+source wavetable   2.70   amp s16_like       0.71   entropy scrambled      1.00
+source oscillator  1.53   ch mono            0.96   entropy full-width rnd 0.91
+source residual    0.56   ch correlated      0.46   entropy sparse resid.  0.58
+source compound    0.48   ch independent     0.92   entropy locally pred.  0.59
+source noise       0.88   ch multichannel    0.76   entropy spectrally st. 0.74
+```
+
+(`B1 / VOLE` > 1 means VOLE stores fewer bytes.) VOLE wins on 55 of 110
+comparable objects and loses on 55; the aggregate loss is driven by classes the
+current vocabulary cannot yet model — compound material, residual-governed
+content the periodic model does not capture, independent multichannel, and
+full-width random content where both systems pay framing on noise.
+
+Seal run: seal subject `ef8a57d1…`; 26 fresh receipts; the 16-row `seal verify`
+matrix passes; tests **417 passed / 12 ignored** all-features and **407 passed /
+12 ignored** default-features.

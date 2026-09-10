@@ -1141,6 +1141,34 @@ Measured: frozen result
 subject `837653dc…`; 417 passed / 12 ignored all-features, 407 passed / 12
 ignored default-features. The true B1-vs-VOLE result is Seal 6.
 
+### Phase M Seal 6 — B1 FLAC versus current bounded VOLE inverse selection (v0.16.0)
+
+The second box is open. `src/courts/flagship.rs` compiles every frozen object
+through the Seal-5 container and prices the 110 B1-comparable objects against
+their FLAC level-5 bytes. It is named for the compiler that exists today, not
+"optimal VOLE": the proposal vocabulary is bounded and deterministic, and every
+segment is priced standalone (empty reference library).
+
+- Bound to the frozen population (manifest/corpus sha256, object order, canonical
+  hashes); B1 is recomputed in-process and required to equal the sealed
+  `court conventional` total (25,577,431 B), so the courts cannot drift.
+- Measured (default bounded search; 115 objects, 255 segments): B0 71,277,600 B,
+  B1 25,577,431 B, VOLE 31,118,702 B (**VOLE 1.217x B1 in aggregate**; B1/VOLE
+  0.822). VOLE is cheaper on **55**, equal on 0, larger on **55** of the 110
+  comparable objects (within 1% on 15). Objects all-literal 61, all-procedural
+  49, mixed 5; segments selected literal 133, exact_repeat 103, constant 10,
+  silence 4, residual_zero 3, residual_constant 2.
+- The aggregate hides the shape. VOLE wins where the vocabulary fits
+  (`literal` 51.5x, `exact_repetition` 7.1x, `identical_stereo` 9.0x,
+  `globally_periodic` 3.05x, `wavetable` 2.70x, `oscillator` 1.53x) and loses
+  where it does not (`compound` 2.10x larger, `residual` 1.79x,
+  `sparse_residual` 1.74x, `independent_stereo` 1.09x, `noise` 1.13x),
+  with full-width random and scrambled near parity.
+- Frozen result
+`76fe5dcff1dec0a173ed67dc69effcc6befc093e340519c81ec2b32ea3b1a17b`; seal
+subject `ef8a57d1…`; 417 passed / 12 ignored all-features, 407 passed / 12
+ignored default-features.
+
 ## Next work (exact order — the implementation contract is executed in sequence)
 
 Phase H.2 is complete (entropy-native core: all ten H.2 courts SUPPORTED on
@@ -1161,9 +1189,9 @@ re-verified by the exact evaluator (`court inverse-search`), and the placement
 policy keeps the measured-faster host surface (`SearchBudget::placement`,
 `Auto`).
 
-1. Phase M — remaining increments (Seal 6: the true flagship B1-vs-current-VOLE
-   result via the frozen full-object container; B2–B4; depth /
-   random-access / negative / interference courts; crossover surface; energy);
+1. Phase M — remaining increments (B2–B4 beside the selected full-object VOLE
+   artifact; depth / random-access / negative / interference courts; crossover
+   surface; energy);
    Phase N — transport/archive
    (embeds H.2 canonical records); Phase O — learned deterministic prediction
    addendum (judged by the H.2 complete-cost API).
