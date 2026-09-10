@@ -142,9 +142,10 @@ Seal run (release, `--all-features`, clean tree, version 0.11.0):
 
 ## Where this goes next
 
-1. **Seal 2 — the flagship corpus is frozen and verified.**
-2. Switch the conventional/baseline courts onto the flagship corpus (population
-   rule in force) and implement B2–B4, then the `depth` / `random-access` /
+1. **Seals 2–3 — the flagship corpus is frozen, verified and review-closed**, all
+   before any flagship measurement exists.
+2. Open the box: run the flagship B1 comparison over the frozen corpus under the
+   population rule, then implement B2–B4, the `depth` / `random-access` /
    `negative` courts and the crossover surface.
 3. Adversarial real-time load (§49) and energy where measurable.
 
