@@ -1,0 +1,1259 @@
+{
+  "schema": "vole.audio.evidence.v1",
+  "schema_version": 1,
+  "receipt": {
+    "schema": "vole.audio.evidence.v1",
+    "schema_version": 1,
+    "run_id": "inverse-search-659440634-2de148",
+    "court": "inverse-search",
+    "created_unix_ms": 659440634,
+    "result": "SUPPORTED",
+    "result_detail": "period scan over 14 fixtures x 512 periods on 3 execution surfaces + 1 compile-only hardware-pending ROCm surface; device compared on 14; 80 accepted candidates re-verified; result sha256 d966d98e936e4b1f77c675fdebe85ceb186ef4b0a71a536af30591109cd12bf4",
+    "environment": {
+      "os": {
+        "sysname": "Linux",
+        "release": "7.2.2-1-cachyos",
+        "version": "#1 SMP PREEMPT_DYNAMIC Fri, 28 Aug 2026 08:05:11 +0000",
+        "machine": "x86_64",
+        "nodename": "vanir",
+        "os_pretty_name": "CachyOS"
+      },
+      "cpu": {
+        "model": "AMD Ryzen 7 9800X3D 8-Core Processor",
+        "flags": [
+          "3dnowprefetch",
+          "abm",
+          "adx",
+          "aes",
+          "amd_lbr_pmc_freeze",
+          "amd_lbr_v2",
+          "aperfmperf",
+          "apic",
+          "arat",
+          "avic",
+          "avx",
+          "avx2",
+          "avx512_bf16",
+          "avx512_bitalg",
+          "avx512_vbmi2",
+          "avx512_vnni",
+          "avx512_vp2intersect",
+          "avx512_vpopcntdq",
+          "avx512bw",
+          "avx512cd",
+          "avx512dq",
+          "avx512f",
+          "avx512ifma",
+          "avx512vbmi",
+          "avx512vl",
+          "avx_vnni",
+          "bmi1",
+          "bmi2",
+          "bpext",
+          "bus_lock_detect",
+          "cat_l3",
+          "cdp_l3",
+          "clflush",
+          "clflushopt",
+          "clwb",
+          "clzero",
+          "cmov",
+          "cmp_legacy",
+          "constant_tsc",
+          "cpb",
+          "cppc",
+          "cpuid",
+          "cpuid_fault",
+          "cqm",
+          "cqm_llc",
+          "cqm_mbm_local",
+          "cqm_mbm_total",
+          "cqm_occup_llc",
+          "cr8_legacy",
+          "cx16",
+          "cx8",
+          "de",
+          "decodeassists",
+          "erms",
+          "extapic",
+          "extd_apicid",
+          "f16c",
+          "flush_l1d",
+          "flushbyasid",
+          "fma",
+          "fpu",
+          "fsgsbase",
+          "fsrm",
+          "fxsr",
+          "fxsr_opt",
+          "gfni",
+          "ht",
+          "hw_pstate",
+          "ibpb",
+          "ibrs",
+          "ibrs_enhanced",
+          "ibs",
+          "invpcid",
+          "irperf",
+          "lahf_lm",
+          "lbrv",
+          "lm",
+          "mba",
+          "mca",
+          "mce",
+          "misalignsse",
+          "mmx",
+          "mmxext",
+          "monitor",
+          "movbe",
+          "movdir64b",
+          "movdiri",
+          "msr",
+          "mtrr",
+          "mwaitx",
+          "nonstop_tsc",
+          "nopl",
+          "npt",
+          "nrip_save",
+          "nx",
+          "ospke",
+          "osvw",
+          "overflow_recov",
+          "pae",
+          "pat",
+          "pausefilter",
+          "pclmulqdq",
+          "pdpe1gb",
+          "perfctr_core",
+          "perfctr_llc",
+          "perfctr_nb",
+          "perfmon_v2",
+          "pfthreshold",
+          "pge",
+          "pku",
+          "pni",
+          "popcnt",
+          "pse",
+          "pse36",
+          "rapl",
+          "rdpid",
+          "rdpru",
+          "rdrand",
+          "rdseed",
+          "rdt_a",
+          "rdtscp",
+          "rep_good",
+          "sep",
+          "sha_ni",
+          "skinit",
+          "smap",
+          "smca",
+          "smep",
+          "ssbd",
+          "sse",
+          "sse2",
+          "sse4_1",
+          "sse4_2",
+          "sse4a",
+          "ssse3",
+          "stibp",
+          "succor",
+          "svm",
+          "svm_lock",
+          "syscall",
+          "tce",
+          "topoext",
+          "tsc",
+          "tsc_adjust",
+          "tsc_scale",
+          "umip",
+          "user_shstk",
+          "v_spec_ctrl",
+          "v_vmsave_vmload",
+          "vaes",
+          "vgif",
+          "vmcb_clean",
+          "vme",
+          "vmmcall",
+          "vnmi",
+          "vpclmulqdq",
+          "wbnoinvd",
+          "wdt",
+          "x2avic",
+          "xgetbv1",
+          "xsave",
+          "xsavec",
+          "xsaveerptr",
+          "xsaveopt",
+          "xsaves",
+          "xtopology"
+        ],
+        "has_avx2": true,
+        "has_avx512": true,
+        "has_neon": false
+      },
+      "memory": {
+        "total_bytes": 134689935360
+      },
+      "git_commit": "26a610e19264eaf4e9bfc192791304230fb0d521",
+      "git_dirty": false,
+      "git_branch": "main",
+      "rustc_version": "rustc 1.99.0-nightly (89c61a754 2026-07-23)",
+      "crate_version": "0.10.1",
+      "target_arch": "x86_64",
+      "target_os": "linux",
+      "cpu_governor": "performance",
+      "bios_version": "1402",
+      "git_tree_sha": "59acd844172b30467cd7e72bb456e73541ac8b1d",
+      "build_git_commit": "26a610e19264eaf4e9bfc192791304230fb0d521",
+      "build_tree_sha": "59acd844172b30467cd7e72bb456e73541ac8b1d",
+      "build_dirty": false,
+      "build_rustc": "rustc 1.99.0-nightly (89c61a754 2026-07-23)",
+      "build_profile": "release",
+      "build_target": "x86_64-unknown-linux-gnu",
+      "source_binding": "bound",
+      "seal_subject_hash": "acbcc2b2162b309e174592ecdad147a7509029821e8720508872d5963585d837"
+    },
+    "hardware": {
+      "pci_devices": [
+        {
+          "bdf": "0000:00:00.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14d8",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": null
+        },
+        {
+          "bdf": "0000:00:00.2",
+          "class": "0x080600",
+          "vendor": "0x1022",
+          "device": "0x14d9",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": null
+        },
+        {
+          "bdf": "0000:00:01.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "0"
+        },
+        {
+          "bdf": "0000:00:01.1",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14db",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "1"
+        },
+        {
+          "bdf": "0000:00:01.2",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14db",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "2"
+        },
+        {
+          "bdf": "0000:00:02.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "3"
+        },
+        {
+          "bdf": "0000:00:02.1",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14db",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "4"
+        },
+        {
+          "bdf": "0000:00:02.2",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14db",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "5"
+        },
+        {
+          "bdf": "0000:00:03.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "6"
+        },
+        {
+          "bdf": "0000:00:04.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "7"
+        },
+        {
+          "bdf": "0000:00:08.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "8"
+        },
+        {
+          "bdf": "0000:00:08.1",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14dd",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "9"
+        },
+        {
+          "bdf": "0000:00:08.3",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14dd",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "10"
+        },
+        {
+          "bdf": "0000:00:14.0",
+          "class": "0x0c0500",
+          "vendor": "0x1022",
+          "device": "0x790b",
+          "driver": "piix4_smbus",
+          "numa_node": -1,
+          "iommu_group": "11"
+        },
+        {
+          "bdf": "0000:00:14.3",
+          "class": "0x060100",
+          "vendor": "0x1022",
+          "device": "0x790e",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "11"
+        },
+        {
+          "bdf": "0000:00:18.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e0",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.1",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e1",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.2",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e2",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.3",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e3",
+          "driver": "k10temp",
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.4",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e4",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.5",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e5",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.6",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e6",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.7",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e7",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:01:00.0",
+          "class": "0x030000",
+          "vendor": "0x10de",
+          "device": "0x2702",
+          "driver": "nvidia",
+          "numa_node": -1,
+          "iommu_group": "13"
+        },
+        {
+          "bdf": "0000:01:00.1",
+          "class": "0x040300",
+          "vendor": "0x10de",
+          "device": "0x22bb",
+          "driver": "snd_hda_intel",
+          "numa_node": -1,
+          "iommu_group": "13"
+        },
+        {
+          "bdf": "0000:02:00.0",
+          "class": "0x010802",
+          "vendor": "0xc0a9",
+          "device": "0x542b",
+          "driver": "nvme",
+          "numa_node": -1,
+          "iommu_group": "14"
+        },
+        {
+          "bdf": "0000:03:00.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f4",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "15"
+        },
+        {
+          "bdf": "0000:04:00.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "16"
+        },
+        {
+          "bdf": "0000:04:04.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "17"
+        },
+        {
+          "bdf": "0000:04:05.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "18"
+        },
+        {
+          "bdf": "0000:04:08.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "19"
+        },
+        {
+          "bdf": "0000:04:0c.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "20"
+        },
+        {
+          "bdf": "0000:04:0d.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "21"
+        },
+        {
+          "bdf": "0000:05:00.0",
+          "class": "0x010802",
+          "vendor": "0x2646",
+          "device": "0x5019",
+          "driver": "nvme",
+          "numa_node": -1,
+          "iommu_group": "16"
+        },
+        {
+          "bdf": "0000:06:00.0",
+          "class": "0x020000",
+          "vendor": "0x10ec",
+          "device": "0x8125",
+          "driver": "r8169",
+          "numa_node": -1,
+          "iommu_group": "17"
+        },
+        {
+          "bdf": "0000:09:00.0",
+          "class": "0x0c0330",
+          "vendor": "0x1022",
+          "device": "0x43fc",
+          "driver": "xhci-pci-prom21",
+          "numa_node": -1,
+          "iommu_group": "20"
+        },
+        {
+          "bdf": "0000:0a:00.0",
+          "class": "0x010601",
+          "vendor": "0x1022",
+          "device": "0x43f6",
+          "driver": "ahci",
+          "numa_node": -1,
+          "iommu_group": "21"
+        },
+        {
+          "bdf": "0000:0b:00.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2421",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "22"
+        },
+        {
+          "bdf": "0000:0c:00.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2423",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "23"
+        },
+        {
+          "bdf": "0000:0c:01.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2423",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "24"
+        },
+        {
+          "bdf": "0000:0c:02.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2423",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "25"
+        },
+        {
+          "bdf": "0000:0c:03.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2423",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "26"
+        },
+        {
+          "bdf": "0000:71:00.0",
+          "class": "0x0c0330",
+          "vendor": "0x1b21",
+          "device": "0x2426",
+          "driver": "xhci_hcd",
+          "numa_node": -1,
+          "iommu_group": "25"
+        },
+        {
+          "bdf": "0000:72:00.0",
+          "class": "0x0c0340",
+          "vendor": "0x1b21",
+          "device": "0x2425",
+          "driver": "thunderbolt",
+          "numa_node": -1,
+          "iommu_group": "26"
+        },
+        {
+          "bdf": "0000:73:00.0",
+          "class": "0x130000",
+          "vendor": "0x1022",
+          "device": "0x14de",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "27"
+        },
+        {
+          "bdf": "0000:73:00.2",
+          "class": "0x108000",
+          "vendor": "0x1022",
+          "device": "0x1649",
+          "driver": "ccp",
+          "numa_node": -1,
+          "iommu_group": "28"
+        },
+        {
+          "bdf": "0000:73:00.3",
+          "class": "0x0c0330",
+          "vendor": "0x1022",
+          "device": "0x15b6",
+          "driver": "xhci_hcd",
+          "numa_node": -1,
+          "iommu_group": "29"
+        },
+        {
+          "bdf": "0000:73:00.4",
+          "class": "0x0c0330",
+          "vendor": "0x1022",
+          "device": "0x15b7",
+          "driver": "xhci_hcd",
+          "numa_node": -1,
+          "iommu_group": "30"
+        },
+        {
+          "bdf": "0000:73:00.6",
+          "class": "0x040300",
+          "vendor": "0x1022",
+          "device": "0x15e3",
+          "driver": "snd_hda_intel",
+          "numa_node": -1,
+          "iommu_group": "31"
+        },
+        {
+          "bdf": "0000:74:00.0",
+          "class": "0x0c0330",
+          "vendor": "0x1022",
+          "device": "0x15b8",
+          "driver": "xhci_hcd",
+          "numa_node": -1,
+          "iommu_group": "32"
+        }
+      ],
+      "gpu": {
+        "vendor": null,
+        "name": null,
+        "bdf": null,
+        "compute_capability": null,
+        "memory_bytes": null,
+        "driver_version": null,
+        "runtime_version": null
+      },
+      "audio": {
+        "card": null,
+        "device": null,
+        "name": null,
+        "subdevice": null
+      }
+    },
+    "params": {
+      "universe": "vole.audio.u1",
+      "profile": "u1/v1 + vole.inverse.k1 + vole.inverse.l1",
+      "backend": "scalar|parallel|cuda|rocm",
+      "sample_rate_hz": 48000,
+      "channels": null,
+      "voices": null,
+      "quantum_frames": 512,
+      "duration_secs": null,
+      "content_kind": "entropy-corpus-v1 (mono channel-0 search windows"
+    },
+    "counters": {
+      "host_pcm_staging_bytes": 0,
+      "host_pcm_copy_bytes": 0,
+      "gpu_to_host_pcm_bytes": 0,
+      "endpoint_observation_bytes": 0,
+      "device_sample_block_bytes": 0,
+      "transient_compute_words": 0,
+      "host_pcm_resident_peak_bytes": 0,
+      "host_pcm_resident_integral": 0.0,
+      "endpoint_depth_frames": 0,
+      "endpoint_depth_min_frames": 18446744073709551615,
+      "endpoint_depth_max_frames": 0,
+      "quanta_submitted": 0,
+      "events_consumed": 0,
+      "xruns": 0,
+      "kernel_launches": 0,
+      "missed_deadlines": 0
+    },
+    "timing": {
+      "total_ns": null,
+      "deadline_ns": null,
+      "warmup_runs": null,
+      "run_count": null,
+      "observation_count": null,
+      "tail": null
+    },
+    "provenance": {
+      "reference_hash": "d966d98e936e4b1f77c675fdebe85ceb186ef4b0a71a536af30591109cd12bf4",
+      "backend_hash": null,
+      "endpoint_hash": null,
+      "gpu_artifact_hash": null,
+      "source_hash": null,
+      "corpus_hash": null,
+      "table_hashes": [],
+      "benchmark_order": [],
+      "exact_equality": true
+    },
+    "endpoint": {
+      "directness": null,
+      "topology": null,
+      "registered_range": null,
+      "registration_result": null,
+      "device_pointer": null,
+      "synchronization_mechanism": null,
+      "fence_sync_evidence": null,
+      "coherency_assumptions": null,
+      "hidden_staging_investigation": null,
+      "endpoint_clock": null
+    },
+    "energy": null,
+    "trace": null,
+    "limitations": [
+      "period-scan placement only: the scan ranks candidate periods; every accepted representation is re-verified by the normative exact evaluator",
+      "no claim that the GPU wins: work per period is O(frames - p) (a period p compares frames p..frames), so a scan of periods 1..=P costs P*F - P*(P+1)/2 comparisons and the balance depends on the period bound; measured ratios are reported as-is",
+      "the one-thread-per-period device kernel is the GPU *baseline*, not the endpoint: a periods x frame-tiles mapping with deterministic per-period reduction is the next GPU search experiment"
+    ],
+    "extras": {
+      "aggregate": {
+        "fixtures": 14,
+        "cuda_compared": 14,
+        "cuda_requested": true,
+        "host_threads": 16,
+        "executed_surfaces": 3,
+        "compile_only_surfaces": 1,
+        "scalar_nanos_total": 27205087,
+        "parallel_nanos_total": 6314311,
+        "parallel_ratio_vs_scalar": 0.23210037887399515,
+        "cuda_nanos_total": 7508383,
+        "cuda_ratio_vs_scalar": 0.2759918760781761,
+        "accepted_candidates_checked": 80,
+        "rocm_executed": false
+      },
+      "budget": {
+        "max_period_scan": 512,
+        "max_residual_period_candidates": 4,
+        "placement": "auto"
+      },
+      "cells": [
+        {
+          "fixture": "silence",
+          "channels": 1,
+          "frames": 4096,
+          "scan_bound": 512,
+          "counts_sha256": "e5a00aa9991ac8a5ee3109844d84a55583bd20572ad3ffcd42792f3c36b183ad",
+          "ranked": [
+            {
+              "period": 1,
+              "records": 0
+            },
+            {
+              "period": 2,
+              "records": 0
+            },
+            {
+              "period": 3,
+              "records": 0
+            },
+            {
+              "period": 4,
+              "records": 0
+            }
+          ],
+          "periodic_candidates_proposed": 4,
+          "accepted": 10,
+          "frontier": 1,
+          "scalar_nanos": 2448109,
+          "parallel_nanos": 702771,
+          "parallel_ratio_vs_scalar": 0.2870668748817965,
+          "cuda": {
+            "ran": true,
+            "counts_sha256": "e5a00aa9991ac8a5ee3109844d84a55583bd20572ad3ffcd42792f3c36b183ad",
+            "nanos": 632478,
+            "ratio_vs_scalar": 0.2583536925847664
+          }
+        },
+        {
+          "fixture": "dc",
+          "channels": 1,
+          "frames": 4096,
+          "scan_bound": 512,
+          "counts_sha256": "e5a00aa9991ac8a5ee3109844d84a55583bd20572ad3ffcd42792f3c36b183ad",
+          "ranked": [
+            {
+              "period": 1,
+              "records": 0
+            },
+            {
+              "period": 2,
+              "records": 0
+            },
+            {
+              "period": 3,
+              "records": 0
+            },
+            {
+              "period": 4,
+              "records": 0
+            }
+          ],
+          "periodic_candidates_proposed": 4,
+          "accepted": 9,
+          "frontier": 1,
+          "scalar_nanos": 2526436,
+          "parallel_nanos": 573177,
+          "parallel_ratio_vs_scalar": 0.22687176718507812,
+          "cuda": {
+            "ran": true,
+            "counts_sha256": "e5a00aa9991ac8a5ee3109844d84a55583bd20572ad3ffcd42792f3c36b183ad",
+            "nanos": 659999,
+            "ratio_vs_scalar": 0.26123717363115473
+          }
+        },
+        {
+          "fixture": "dc-negative",
+          "channels": 1,
+          "frames": 4096,
+          "scan_bound": 512,
+          "counts_sha256": "e5a00aa9991ac8a5ee3109844d84a55583bd20572ad3ffcd42792f3c36b183ad",
+          "ranked": [
+            {
+              "period": 1,
+              "records": 0
+            },
+            {
+              "period": 2,
+              "records": 0
+            },
+            {
+              "period": 3,
+              "records": 0
+            },
+            {
+              "period": 4,
+              "records": 0
+            }
+          ],
+          "periodic_candidates_proposed": 4,
+          "accepted": 9,
+          "frontier": 1,
+          "scalar_nanos": 2471162,
+          "parallel_nanos": 523463,
+          "parallel_ratio_vs_scalar": 0.21182868626176674,
+          "cuda": {
+            "ran": true,
+            "counts_sha256": "e5a00aa9991ac8a5ee3109844d84a55583bd20572ad3ffcd42792f3c36b183ad",
+            "nanos": 660280,
+            "ratio_vs_scalar": 0.2671941378185647
+          }
+        },
+        {
+          "fixture": "single-sine",
+          "channels": 2,
+          "frames": 4096,
+          "scan_bound": 512,
+          "counts_sha256": "d728a5ea1db1176904825c736f32551c7f0ca193fe12975485850e346592d8c4",
+          "ranked": [
+            {
+              "period": 64,
+              "records": 0
+            },
+            {
+              "period": 128,
+              "records": 0
+            },
+            {
+              "period": 192,
+              "records": 0
+            },
+            {
+              "period": 256,
+              "records": 0
+            }
+          ],
+          "periodic_candidates_proposed": 0,
+          "accepted": 4,
+          "frontier": 1,
+          "scalar_nanos": 2462696,
+          "parallel_nanos": 545615,
+          "parallel_ratio_vs_scalar": 0.2215519089648093,
+          "cuda": {
+            "ran": true,
+            "counts_sha256": "d728a5ea1db1176904825c736f32551c7f0ca193fe12975485850e346592d8c4",
+            "nanos": 658587,
+            "ratio_vs_scalar": 0.2674252120440363
+          }
+        },
+        {
+          "fixture": "harmonic-tone",
+          "channels": 2,
+          "frames": 4096,
+          "scan_bound": 512,
+          "counts_sha256": "b346097bf837c97b030dd11ad7f4ba359745b927c531da4c7dbb301016775d57",
+          "ranked": [
+            {
+              "period": 509,
+              "records": 3586
+            },
+            {
+              "period": 510,
+              "records": 3584
+            },
+            {
+              "period": 511,
+              "records": 3585
+            },
+            {
+              "period": 512,
+              "records": 3582
+            }
+          ],
+          "periodic_candidates_proposed": 0,
+          "accepted": 3,
+          "frontier": 1,
+          "scalar_nanos": 2445835,
+          "parallel_nanos": 497264,
+          "parallel_ratio_vs_scalar": 0.203310525853134,
+          "cuda": {
+            "ran": true,
+            "counts_sha256": "b346097bf837c97b030dd11ad7f4ba359745b927c531da4c7dbb301016775d57",
+            "nanos": 665200,
+            "ratio_vs_scalar": 0.2719725574292624
+          }
+        },
+        {
+          "fixture": "quasi-periodic",
+          "channels": 1,
+          "frames": 4096,
+          "scan_bound": 512,
+          "counts_sha256": "d32abff67581424032ebdffdc2d84b36b3bd4757148a58587afb2c30b2245567",
+          "ranked": [
+            {
+              "period": 256,
+              "records": 3328
+            },
+            {
+              "period": 384,
+              "records": 3429
+            },
+            {
+              "period": 448,
+              "records": 3369
+            },
+            {
+              "period": 512,
+              "records": 2816
+            }
+          ],
+          "periodic_candidates_proposed": 4,
+          "accepted": 7,
+          "frontier": 2,
+          "scalar_nanos": 2449502,
+          "parallel_nanos": 525297,
+          "parallel_ratio_vs_scalar": 0.21445052912796153,
+          "cuda": {
+            "ran": true,
+            "counts_sha256": "d32abff67581424032ebdffdc2d84b36b3bd4757148a58587afb2c30b2245567",
+            "nanos": 665230,
+            "ratio_vs_scalar": 0.2715776512940181
+          }
+        },
+        {
+          "fixture": "impulse-train",
+          "channels": 1,
+          "frames": 4096,
+          "scan_bound": 512,
+          "counts_sha256": "2b0cff3a0e2500c1d869d77b96658fc23fff2bdb61bffd4d829e39270b36073a",
+          "ranked": [
+            {
+              "period": 256,
+              "records": 8
+            },
+            {
+              "period": 384,
+              "records": 13
+            },
+            {
+              "period": 448,
+              "records": 14
+            },
+            {
+              "period": 512,
+              "records": 0
+            }
+          ],
+          "periodic_candidates_proposed": 4,
+          "accepted": 8,
+          "frontier": 1,
+          "scalar_nanos": 2449061,
+          "parallel_nanos": 518684,
+          "parallel_ratio_vs_scalar": 0.21178892644976993,
+          "cuda": {
+            "ran": true,
+            "counts_sha256": "2b0cff3a0e2500c1d869d77b96658fc23fff2bdb61bffd4d829e39270b36073a",
+            "nanos": 666682,
+            "ratio_vs_scalar": 0.27221943430563794
+          }
+        },
+        {
+          "fixture": "transient-heavy",
+          "channels": 1,
+          "frames": 4096,
+          "scan_bound": 512,
+          "counts_sha256": "80f2c6ff4859c451b93e4ea75ecb95b76ce5bd0f63b1107254caf19d6c018179",
+          "ranked": [
+            {
+              "period": 509,
+              "records": 696
+            },
+            {
+              "period": 510,
+              "records": 688
+            },
+            {
+              "period": 511,
+              "records": 680
+            },
+            {
+              "period": 512,
+              "records": 672
+            }
+          ],
+          "periodic_candidates_proposed": 4,
+          "accepted": 7,
+          "frontier": 1,
+          "scalar_nanos": 2453188,
+          "parallel_nanos": 492415,
+          "parallel_ratio_vs_scalar": 0.2007245266159789,
+          "cuda": {
+            "ran": true,
+            "counts_sha256": "80f2c6ff4859c451b93e4ea75ecb95b76ce5bd0f63b1107254caf19d6c018179",
+            "nanos": 597863,
+            "ratio_vs_scalar": 0.2437085946939248
+          }
+        },
+        {
+          "fixture": "am-signal",
+          "channels": 1,
+          "frames": 4096,
+          "scan_bound": 512,
+          "counts_sha256": "20ebc538546dfa835af36c94eef09c8c639c8a29a91412a3604a35815101607d",
+          "ranked": [
+            {
+              "period": 128,
+              "records": 1312
+            },
+            {
+              "period": 256,
+              "records": 1312
+            },
+            {
+              "period": 384,
+              "records": 1312
+            },
+            {
+              "period": 512,
+              "records": 1312
+            }
+          ],
+          "periodic_candidates_proposed": 4,
+          "accepted": 7,
+          "frontier": 2,
+          "scalar_nanos": 2511819,
+          "parallel_nanos": 527260,
+          "parallel_ratio_vs_scalar": 0.20991162181669937,
+          "cuda": {
+            "ran": true,
+            "counts_sha256": "20ebc538546dfa835af36c94eef09c8c639c8a29a91412a3604a35815101607d",
+            "nanos": 663536,
+            "ratio_vs_scalar": 0.2641655310354767
+          }
+        },
+        {
+          "fixture": "fm-signal",
+          "channels": 1,
+          "frames": 4096,
+          "scan_bound": 512,
+          "counts_sha256": "f92bac716d49afd94ec8a43bb9e2419fb124ca81f66744905a79d02d15f0af55",
+          "ranked": [
+            {
+              "period": 509,
+              "records": 3585
+            },
+            {
+              "period": 510,
+              "records": 3585
+            },
+            {
+              "period": 511,
+              "records": 3585
+            },
+            {
+              "period": 512,
+              "records": 3584
+            }
+          ],
+          "periodic_candidates_proposed": 4,
+          "accepted": 7,
+          "frontier": 1,
+          "scalar_nanos": 2523922,
+          "parallel_nanos": 491914,
+          "parallel_ratio_vs_scalar": 0.1949006348056715,
+          "cuda": {
+            "ran": true,
+            "counts_sha256": "f92bac716d49afd94ec8a43bb9e2419fb124ca81f66744905a79d02d15f0af55",
+            "nanos": 656654,
+            "ratio_vs_scalar": 0.26017206553926786
+          }
+        },
+        {
+          "fixture": "stereo-correlated",
+          "channels": 2,
+          "frames": 4096,
+          "scan_bound": 512,
+          "counts_sha256": "43e7661e410ba9e29196d7403ae6080d8389db35e08e61c84df30920dfed96cf",
+          "ranked": [
+            {
+              "period": 500,
+              "records": 3581
+            },
+            {
+              "period": 510,
+              "records": 3584
+            },
+            {
+              "period": 511,
+              "records": 3580
+            },
+            {
+              "period": 512,
+              "records": 3582
+            }
+          ],
+          "periodic_candidates_proposed": 0,
+          "accepted": 3,
+          "frontier": 1,
+          "scalar_nanos": 2444873,
+          "parallel_nanos": 491994,
+          "parallel_ratio_vs_scalar": 0.20123499257425642,
+          "cuda": {
+            "ran": true,
+            "counts_sha256": "43e7661e410ba9e29196d7403ae6080d8389db35e08e61c84df30920dfed96cf",
+            "nanos": 655200,
+            "ratio_vs_scalar": 0.2679893802254759
+          }
+        },
+        {
+          "fixture": "white-noise",
+          "channels": 1,
+          "frames": 4096,
+          "scan_bound": 512,
+          "counts_sha256": "d0ff1b294b5288d1ae1421eadf5b2d38a8752b76d472ff30bed9028e25b1c5b8",
+          "ranked": [],
+          "periodic_candidates_proposed": 0,
+          "accepted": 2,
+          "frontier": 1,
+          "scalar_nanos": 5921,
+          "parallel_nanos": 145042,
+          "parallel_ratio_vs_scalar": 24.496199966221923,
+          "cuda": {
+            "ran": true,
+            "counts_sha256": "d0ff1b294b5288d1ae1421eadf5b2d38a8752b76d472ff30bed9028e25b1c5b8",
+            "nanos": 107172,
+            "ratio_vs_scalar": 18.10032089174126
+          }
+        },
+        {
+          "fixture": "random-control",
+          "channels": 2,
+          "frames": 4096,
+          "scan_bound": 512,
+          "counts_sha256": "d0ff1b294b5288d1ae1421eadf5b2d38a8752b76d472ff30bed9028e25b1c5b8",
+          "ranked": [],
+          "periodic_candidates_proposed": 0,
+          "accepted": 2,
+          "frontier": 1,
+          "scalar_nanos": 6632,
+          "parallel_nanos": 144822,
+          "parallel_ratio_vs_scalar": 21.836851628468033,
+          "cuda": {
+            "ran": true,
+            "counts_sha256": "d0ff1b294b5288d1ae1421eadf5b2d38a8752b76d472ff30bed9028e25b1c5b8",
+            "nanos": 113864,
+            "ratio_vs_scalar": 17.16887816646562
+          }
+        },
+        {
+          "fixture": "scrambled-control",
+          "channels": 1,
+          "frames": 4096,
+          "scan_bound": 512,
+          "counts_sha256": "d0ff1b294b5288d1ae1421eadf5b2d38a8752b76d472ff30bed9028e25b1c5b8",
+          "ranked": [],
+          "periodic_candidates_proposed": 0,
+          "accepted": 2,
+          "frontier": 1,
+          "scalar_nanos": 5931,
+          "parallel_nanos": 134593,
+          "parallel_ratio_vs_scalar": 22.693137750800876,
+          "cuda": {
+            "ran": true,
+            "counts_sha256": "d0ff1b294b5288d1ae1421eadf5b2d38a8752b76d472ff30bed9028e25b1c5b8",
+            "nanos": 105638,
+            "ratio_vs_scalar": 17.81116169280054
+          }
+        }
+      ],
+      "cuda": {
+        "available": true,
+        "artifact_sha256": "d13d22c373dd78c09cd926bb71f318b167e1bf2ebb3385048a833697bd4c66d9",
+        "entry": "vole_period_scan",
+        "threads_per_block": 128
+      },
+      "rocm": {
+        "gate": "UNSUPPORTED_BY_HARDWARE",
+        "reason": "no AMD compute candidate in the sysfs PCI walk — the scalar == ROCm battery cannot execute on this host",
+        "entry": "vole_period_scan",
+        "artifact": 95184
+      },
+      "rocm_cells": []
+    }
+  },
+  "receipt_sha256": "665b58be5826aa761cb264e0a238cc3d0dd7361c5ced0f563248fed26749588b"
+}
