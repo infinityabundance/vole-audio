@@ -448,6 +448,99 @@ impl RuntimeSource for VoleBoundedSource {
     }
 }
 
+/// B4-seek — conventional compressed random access: `decode_seek` on the exact
+/// B1 artifact, which has **no SEEKTABLE**, so every seek decodes forward from
+/// the first frame. This is the honest cost of stateless compressed seeking and
+/// is deliberately a separate row from the decoded-resident [`FlacPreloadSource`].
+pub struct FlacSeekSource {
+    info: SourceInfo,
+    bytes: Vec<u8>,
+    artifact_sha256: [u8; 32],
+}
+
+impl FlacSeekSource {
+    pub fn open(
+        name: &'static str,
+        channels: u8,
+        sample_rate_hz: u32,
+        artifact: &FlacArtifact,
+    ) -> Result<FlacSeekSource> {
+        let sw = Stopwatch::start();
+        // Validate decodability once (setup); the read path is what is measured.
+        let decoded = libflac_rs::decode(&artifact.bytes)
+            .ok_or_else(|| Error::internal("B4-seek: artifact is not decodable"))?;
+        if decoded.channels != u32::from(channels)
+            || decoded.sample_rate != sample_rate_hz
+            || decoded.bits_per_sample != 32
+        {
+            return Err(Error::internal(
+                "B4-seek: artifact stream format disagrees with the object",
+            ));
+        }
+        let ch = usize::from(channels.max(1));
+        let total_frames = (decoded.interleaved.len() / ch) as u64;
+        let runtime_setup_ns = sw.elapsed_ns().max(0) as u64;
+        Ok(FlacSeekSource {
+            info: SourceInfo {
+                name,
+                channels,
+                total_frames,
+                sample_rate_hz,
+                artifact_storage_bytes: artifact.bytes.len() as u64,
+                resident_sample_domain_bytes: 0,
+                resident_encoded_bytes: artifact.bytes.len() as u64,
+                runtime_setup_ns,
+                setup_detail: "exact B1 FLAC-5 artifact held compressed; stateless decode_seek \
+                               (no SEEKTABLE: decodes forward from the first frame)"
+                    .into(),
+            },
+            bytes: artifact.bytes.clone(),
+            artifact_sha256: artifact.sha256,
+        })
+    }
+
+    pub fn artifact_sha256(&self) -> [u8; 32] {
+        self.artifact_sha256
+    }
+}
+
+impl RuntimeSource for FlacSeekSource {
+    fn info(&self) -> SourceInfo {
+        self.info.clone()
+    }
+
+    fn read(&mut self, start_frame: u64, frames: u32, dst: &mut [i32]) -> Result<ReadEvidence> {
+        check_request(&self.info, start_frame, frames, dst)?;
+        let ch = usize::from(self.info.channels);
+        let seek = libflac_rs::decode_seek(&self.bytes, start_frame)
+            .ok_or_else(|| Error::internal("B4-seek: decode_seek failed"))?;
+        if seek.first_sample != start_frame || seek.channels as usize != ch {
+            return Err(Error::internal(
+                "B4-seek: decode_seek returned an unexpected origin/geometry",
+            ));
+        }
+        let n = frames as usize * ch;
+        if seek.interleaved.len() < n {
+            return Err(Error::internal(
+                "B4-seek: decode_seek returned too few samples",
+            ));
+        }
+        dst.copy_from_slice(&seek.interleaved[..n]);
+        Ok(ReadEvidence {
+            requested_frames: frames,
+            returned_frames: frames,
+            output_bytes: n as u64 * 4,
+            // No seektable: the decoder reads the whole compressed stream.
+            logical_source_bytes_read: self.bytes.len() as u64,
+            sample_domain_bytes_materialized: seek.interleaved.len() as u64 * 4,
+            resident_encoded_bytes: self.info.resident_encoded_bytes,
+            resident_sample_domain_bytes: self.info.resident_sample_domain_bytes,
+            scratch_peak_bytes: seek.interleaved.len() as u64 * 4,
+            ..Default::default()
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -44,12 +44,14 @@ use crate::inverse::SearchBudget;
 use crate::runtime::cache::CacheState;
 use crate::runtime::{
     DiskPcmArtifact, DiskPcmSource, FlacPreloadSource, QUANTUM_FRAMES, REPEATS, ResidentPcmSource,
-    RuntimeSource, VoleBoundedSource, WindowPlan, deadline_ns, proc_self_io, rotate_order,
+    RuntimeSource, VoleBoundedSource, WindowPlan, rotate_order,
 };
 use crate::status::Verdict;
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::sync::Arc;
+
+use super::measure::{Traversal, run_traversal, timer_overhead_ns};
 
 /// Frozen static-result hash: the court fails if a change silently alters the
 /// runtime protocol, artifact identities, counters or correctness vector.
@@ -99,86 +101,7 @@ impl Slot {
 }
 
 /// Deterministic counters and measured samples from one traversal.
-#[derive(Clone, Default)]
-struct Traversal {
-    exact: bool,
-    windows: usize,
-    requested_frames: u64,
-    returned_frames: u64,
-    output_bytes: u64,
-    logical_source_bytes_read: u64,
-    physical_storage_bytes_read: u64,
-    encoded_bytes_examined: u64,
-    encoded_bytes_parsed: u64,
-    sample_domain_bytes_materialized: u64,
-    segments_touched: u64,
-    pages_touched: u64,
-    working_state_bytes: u64,
-    scratch_peak_bytes: u64,
-    deadline_misses: u64,
-    worst_deadline_margin_ns: i64,
-    latencies: Vec<u64>,
-}
-
-/// Run the frozen trace once over one source, timing the whole `read` and
-/// checking each window against its precomputed digest.
-fn run_traversal(
-    source: &mut dyn RuntimeSource,
-    plan: &WindowPlan,
-    channels: usize,
-    sample_rate_hz: u32,
-    dst: &mut [i32],
-    scratch: &mut Vec<u8>,
-) -> Result<Traversal> {
-    let mut t = Traversal {
-        exact: true,
-        windows: plan.len(),
-        worst_deadline_margin_ns: i64::MAX,
-        ..Default::default()
-    };
-    let io_before = proc_self_io();
-    for (i, &(start, frames)) in plan.spans().iter().enumerate() {
-        let n = frames as usize * channels;
-        let sw = Stopwatch::start();
-        let e = source.read(start, frames, &mut dst[..n])?;
-        let latency_ns = sw.elapsed_ns().max(0) as u64;
-
-        if plan.window_matches(i, &dst[..n], scratch) != Some(true) {
-            t.exact = false;
-        }
-        let deadline = deadline_ns(frames, sample_rate_hz);
-        if latency_ns > deadline {
-            t.deadline_misses += 1;
-        }
-        t.worst_deadline_margin_ns = t
-            .worst_deadline_margin_ns
-            .min(deadline as i64 - latency_ns as i64);
-        t.latencies.push(latency_ns);
-
-        t.requested_frames += u64::from(e.requested_frames);
-        t.returned_frames += u64::from(e.returned_frames);
-        t.output_bytes += e.output_bytes;
-        t.logical_source_bytes_read += e.logical_source_bytes_read;
-        t.encoded_bytes_examined += e.encoded_bytes_examined;
-        t.encoded_bytes_parsed += e.encoded_bytes_parsed;
-        t.sample_domain_bytes_materialized += e.sample_domain_bytes_materialized;
-        t.segments_touched += u64::from(e.segments_touched);
-        t.pages_touched += u64::from(e.pages_touched);
-        t.working_state_bytes = t.working_state_bytes.max(e.working_state_bytes);
-        t.scratch_peak_bytes = t.scratch_peak_bytes.max(e.scratch_peak_bytes);
-    }
-    let io_after = proc_self_io();
-    t.physical_storage_bytes_read = match (io_before, io_after) {
-        (Some((_, a)), Some((_, b))) => b.saturating_sub(a),
-        _ => 0,
-    };
-    if t.windows == 0 {
-        t.worst_deadline_margin_ns = 0;
-    }
-    Ok(t)
-}
-
-/// Accumulated evidence for one source over one object.
+// (shared: `super::measure::Traversal`)
 #[derive(Clone)]
 struct SourceAgg {
     status: &'static str,
@@ -912,21 +835,7 @@ fn write_trace(
     Ok(())
 }
 
-/// Cost of the measurement apparatus itself: two clock reads per window.
-///
-/// Sub-100 ns latencies are near this floor and must be read that way rather
-/// than as a precise copy time.
-fn timer_overhead_ns() -> (u64, u64) {
-    let mut v: Vec<u64> = Vec::with_capacity(10_001);
-    for _ in 0..10_001 {
-        let sw = Stopwatch::start();
-        v.push(sw.elapsed_ns().max(0) as u64);
-    }
-    v.sort_unstable();
-    (v[0], v[v.len() / 2])
-}
-
-/// Pooled evidence over a set of objects (a population or one stratum).
+/// Accumulated evidence for one source over one object.
 #[derive(Default)]
 struct Pool {
     latencies: BTreeMap<String, Vec<u64>>,

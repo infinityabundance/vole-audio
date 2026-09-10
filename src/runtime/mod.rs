@@ -26,13 +26,18 @@
 //! filters or random seeks.
 
 pub mod cache;
+pub mod energy;
+pub mod load;
 pub mod protocol;
 pub mod sources;
 
 pub use cache::{CacheEvidence, CacheState, proc_self_io};
-pub use protocol::{WindowPlan, rotate_order};
+pub use energy::{PowerSource, probe_power};
+pub use load::{LoadGuard, LoadKind};
+pub use protocol::{WindowPlan, frozen_random_trace, rotate_order};
 pub use sources::{
-    DiskPcmArtifact, DiskPcmSource, FlacPreloadSource, ResidentPcmSource, VoleBoundedSource,
+    DiskPcmArtifact, DiskPcmSource, FlacPreloadSource, FlacSeekSource, ResidentPcmSource,
+    VoleBoundedSource,
 };
 
 use crate::error::{Error, Result};

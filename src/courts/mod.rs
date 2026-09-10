@@ -12,6 +12,8 @@
 //! all.
 
 #[cfg(feature = "std")]
+pub mod all;
+#[cfg(feature = "std")]
 pub mod authored;
 #[cfg(feature = "std")]
 pub mod conventional;
@@ -21,6 +23,8 @@ pub mod corpus;
 pub mod cuda;
 #[cfg(feature = "std")]
 pub mod d1;
+#[cfg(feature = "std")]
+pub mod depth;
 #[cfg(feature = "std")]
 pub mod dsfb_entropy;
 #[cfg(feature = "std")]
@@ -53,9 +57,17 @@ pub mod fullobj;
 #[cfg(feature = "std")]
 pub mod h2;
 #[cfg(feature = "std")]
+pub mod interference;
+#[cfg(feature = "std")]
 pub mod inverse;
 #[cfg(feature = "std")]
 pub mod inverse_search;
+#[cfg(feature = "std")]
+pub(crate) mod measure;
+#[cfg(feature = "std")]
+pub mod negative;
+#[cfg(feature = "std")]
+pub mod random_access;
 #[cfg(feature = "std")]
 pub mod rocm;
 #[cfg(feature = "std")]
@@ -141,6 +153,38 @@ selected representations and comparison buckets",
 (first-play and prepared control), over the frozen sequential 512-frame trace repeated with \
 rotated source order; harness-owned latency, split storage/residency accounting, two explicit \
 populations, and a stratified crossover surface",
+    ),
+    (
+        "random-access",
+        "Phase M bounded random access: deterministic per-object random windows (seeded from the \
+canonical hash, with boundary/first/last edges) over B2 resident PCM, B3-warm disk PCM, B4 the \
+decoded-resident FLAC artifact, B4-seek the same artifact via stateless decode_seek (no \
+SEEKTABLE) and B5 bounded VOLE, measured against a sequential pass for the random-access penalty",
+    ),
+    (
+        "negative",
+        "Phase M negative controls: the incompressible corpus objects (full-width random, \
+scrambled) measured against B0/B1/VOLE with no fake wins, plus a hostile-archive battery \
+(truncation, bit flip, resealed structural mutation, allocation bomb, garbage) where every \
+candidate must be rejected with a typed error and none may panic",
+    ),
+    (
+        "depth",
+        "Phase M observation-depth sweep: the minimum buffered lookahead (in quanta) at which \
+B2/B3-warm/B4/B5 never underrun, computed from measured per-window latencies at quanta \
+64/128/256/512/1024 frames over the frozen corpus",
+    ),
+    (
+        "interference",
+        "Phase M adversarial real-time load (contract §49): the frozen workload under idle, \
+CPU-burn, memory-bandwidth and storage-IO pressure on all logical CPUs, with a bounded soak \
+under CPU contention; uncontrolled conditions and unavailable energy are reported honestly",
+    ),
+    (
+        "all",
+        "Phase-M aggregate: runs every Phase-M court (conventional, corpus, fullobj, flagship, \
+runtime, random-access, negative, depth, interference) in sequence and is SUPPORTED only when \
+all of them are",
     ),
     (
         "cuda",
@@ -242,6 +286,11 @@ pub fn run(name: &str, receipts_root: &Path) -> crate::error::Result<Verdict> {
         "fullobj" => fullobj::run(receipts_root),
         "flagship" => flagship::run(receipts_root),
         "runtime" => runtime::run(receipts_root),
+        "random-access" => random_access::run(receipts_root),
+        "negative" => negative::run(receipts_root),
+        "depth" => depth::run(receipts_root),
+        "interference" => interference::run(receipts_root),
+        "all" => all::run(receipts_root),
         "flattening" => flattening::run(receipts_root),
         "cuda" => cuda::run(receipts_root),
         "d1" => d1::run(receipts_root),

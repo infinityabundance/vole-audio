@@ -19,7 +19,8 @@ COMMANDS (current build):
     probe                 Capture environment + hardware evidence summary
     court <name>          Run an executable court (semantic, authored, simd, facts,
                           inverse, inverse-search, conventional, corpus, fullobj,
-                          flagship, runtime, flattening,
+                          flagship, runtime, random-access, negative, depth,
+                          interference, all, flattening,
                           cuda, d1, rocm,
                           rocm-d0, rocm-d1, entropy-rans, entropy-literal,
                           entropy-residual, entropy-pages, entropy-partial,
@@ -56,8 +57,7 @@ COMMANDS (current build):
     help                  Show this help
 
 Planned commands arrive with their phases (inspect/verify/encode/observe/play,
-bench, court d2|depth|random-access|negative|interference, and probe
-cuda|rocm|alsa|d1|d2). Until implemented they exit with
+bench, court d2, and probe cuda|rocm|alsa|d1|d2). Until implemented they exit with
 NOT_IMPLEMENTED (3); the CLI never implies support that is absent.
 
 example:
@@ -346,6 +346,8 @@ fn cmd_seal_verify(args: &[String]) -> Result<u8> {
                        facts=SUPPORTED,inverse=SUPPORTED,flattening=SUPPORTED,\
                        inverse-search=SUPPORTED,conventional=SUPPORTED,corpus=SUPPORTED,\
                        fullobj=SUPPORTED,flagship=SUPPORTED,runtime=SUPPORTED,\
+                       random-access=SUPPORTED,negative=SUPPORTED,depth=SUPPORTED,\
+                       interference=SUPPORTED,all=SUPPORTED,\
                        cuda=SUPPORTED,d1=SUPPORTED,h2=SUPPORTED,\
                        rocm=UNSUPPORTED_BY_HARDWARE|UNSUPPORTED_BY_API|INCONCLUSIVE,\
                        rocm-d0=UNSUPPORTED_BY_HARDWARE|UNSUPPORTED_BY_API|INCONCLUSIVE,\
