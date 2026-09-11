@@ -248,14 +248,43 @@ shape the report anticipated for a coefficient-geometry change: at Q14 the
 lattice does not beat the direct-form predictor's quantisation on these blocks.
 The family stays in the portfolio as a non-regressing candidate.
 
+### Seal S8 — pole-zero (ARMA) exact residual closure
+
+New family `learned::polezero` (model kind `15`): an exact causal pole-zero
+predictor using only decoder-visible history — already reconstructed samples and
+already decoded exact residuals — over the bounded `(p,q)` ladder
+`{(4,1),(6,1),(8,1),(6,2),(8,2)}`. The AR part comes from Levinson; the MA part
+is a Levinson fit of the AR residual, and the MA history is the true decoded
+residual, so closure stays exact.
+
+Measured (court `learned-speech`, result `83c3e06e…`): effectiveness
+129 652 → **129 612 B** against FLAC-5 130 331 and FLAC-8 129 713; Mode C
+unchanged at 141 704 against FLAC-5 144 145 and FLAC-8 142 714. A small but real
+positive on effectiveness.
+
+### Speech campaign result (S0–S8)
+
+| split | VOLE | FLAC-5 | FLAC-8 | wins vs FLAC-5 |
+| ----- | ---- | ------ | ------ | -------------- |
+| effectiveness (dev-clean) | **129 612 B** | 130 331 B | 129 713 B | 5/8 |
+| Mode C held-out (test-clean) | **141 704 B** | 144 145 B | 142 714 B | 7/8 |
+
+The wired three-family Exp2 portfolio started ~4.6 % behind FLAC-5 on
+effectiveness; the campaign now places VOLE **ahead of FLAC-5 on both splits and
+ahead of FLAC-8 in aggregate**, with every candidate exact and every byte
+accounted. Progression (share of the original FLAC-5 effectiveness gap closed):
+S2 ≈ 0.5 %, S3 ≈ 1.9 %, S4 ≈ 2.8 %, S5 ≈ 2.9 %, S6 ≈ 3.1 %, S7 ≈ 3.1 %,
+S8 ≈ 3.1 %.
+
 ## Status
 
 Implemented and pushed: Track A, Track B (including the entropy decode table),
 and the Report 3 Seal S0 diagnostic courts (`learned-speech-trace`,
 `learned-real-corpus-u1`), Seal S1 fixed differences, Seal S2 dense local LPC,
 Seal S3 precision/shift/error-feedback, Seal S4 general Golomb residual
-coding, Seal S5 estimator diversity, Seal S6 higher dense-LPC orders and Seal
-S7 lattice/PARCOR realisation (court `learned-speech`).
+coding, Seal S5 estimator diversity, Seal S6 higher dense-LPC orders, Seal S7
+lattice/PARCOR realisation and Seal S8 pole-zero/ARMA closure (court
+`learned-speech`). The campaign places VOLE ahead of FLAC-5 on both splits.
 The remaining tracks from the two whole-repository
 optimization reports
 (CPU frame-tile multicore + PartialBank vectorization, GPU work decomposition,

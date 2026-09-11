@@ -654,6 +654,108 @@ pub fn fit_lpc_object(
     Ok((o, stats))
 }
 
+/// Fit a per-block pole-zero (ARMA) object over the frozen `(p, q)` ladder.
+pub fn fit_pz_object(
+    source: &[i32],
+    frames: u64,
+    sample_rate_hz: u32,
+    block_frames: u32,
+    budget: &TrainBudget,
+) -> Result<(LearnedObject, TrainStats)> {
+    budget.validate()?;
+    if source.len() != frames as usize {
+        return Err(Error::malformed(
+            "pole-zero fit is mono-only and expects one sample per frame",
+        ));
+    }
+    if block_frames == 0 {
+        return Err(Error::malformed("pole-zero block size must be positive"));
+    }
+    let shift = crate::learned::polezero::PZ_SHIFT;
+    let sw = Stopwatch::start();
+    let mut stats = TrainStats::default();
+    let ranges = block_ranges(frames as usize, block_frames as usize);
+    let mut segments = Vec::with_capacity(ranges.len());
+    for (from, to) in ranges {
+        stats.candidates += 1;
+        let block = &source[from..to];
+        let max_p = 8usize;
+        let lev = analyse_block(block, max_p);
+        let mut best: Option<(crate::learned::polezero::PoleZeroPredictor, u64)> = None;
+        for &(p, q) in &crate::learned::polezero::PZ_LADDER {
+            let p = usize::from(p);
+            let q = usize::from(q);
+            let Some(ar_real) = lev.get(p - 1) else {
+                continue;
+            };
+            let ar = quantize(ar_real, shift, 16, Quantizer::ErrorFeedback);
+            // AR residual (the intermediate signal the MA stage predicts).
+            let mut e = vec![0i32; block.len()];
+            for t in p..block.len() {
+                let mut acc = 0i64;
+                for (i, &c) in ar.iter().enumerate() {
+                    acc += i64::from(c) * i64::from(block[t - 1 - i]);
+                }
+                e[t] = block[t].wrapping_sub((acc >> shift) as i32);
+            }
+            let ma_real = levinson_durbin(&autocorrelation(&e[p..], q, 0.5), q);
+            let ma = match ma_real.last() {
+                Some(c) => quantize(c, shift, 16, Quantizer::ErrorFeedback),
+                None => vec![0i32; q],
+            };
+            let m = crate::learned::polezero::PoleZeroPredictor {
+                channels: 1,
+                order_ar: p as u16,
+                order_ma: q as u16,
+                shift,
+                ar: ar.clone(),
+                ma,
+                block_frames: None,
+            };
+            if m.validate().is_err() {
+                continue;
+            }
+            let Ok(h) = m.hypothesis_all_from_source(block, block.len()) else {
+                continue;
+            };
+            let residual: Vec<i32> = block
+                .iter()
+                .zip(&h)
+                .map(|(&x, &hh)| x.wrapping_sub(hh))
+                .collect();
+            let cost = ((p + q) as u64) * 16 + 32 + rice_cost_bits(&residual);
+            if best.as_ref().is_none_or(|(_, c)| cost < *c) {
+                best = Some((m, cost));
+            }
+        }
+        let (m, _) = best.unwrap_or_else(|| {
+            (
+                crate::learned::polezero::PoleZeroPredictor {
+                    channels: 1,
+                    order_ar: 1,
+                    order_ma: 1,
+                    shift,
+                    ar: vec![0],
+                    ma: vec![0],
+                    block_frames: None,
+                },
+                u64::MAX,
+            )
+        });
+        m.validate()?;
+        segments.push(Segment {
+            frames: (to - from) as u32,
+            model: Box::new(LearnedModel::PoleZero(m)),
+        });
+    }
+    let o = build_segmented(source, frames, sample_rate_hz, segments)?;
+    if !o.verify(source) {
+        return Err(Error::internal("pole-zero candidate did not close exactly"));
+    }
+    stats.fit_ns = sw.elapsed_ns().max(0) as u64;
+    Ok((o, stats))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

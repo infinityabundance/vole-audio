@@ -28,6 +28,7 @@ pub mod ltp;
 pub mod model;
 pub mod multichannel;
 pub mod object;
+pub mod polezero;
 pub mod profile;
 pub mod quantize;
 pub mod residual_codec;

@@ -26,14 +26,14 @@ use crate::learned::train::TrainBudget;
 use crate::learned::train::fixed::fit_fixed_diff_sweep;
 use crate::learned::train::hierarchy::fit_hierarchy_object;
 use crate::learned::train::linear::fit_linear_object_exp2;
-use crate::learned::train::lpc::{fit_lattice_object, fit_lpc_object};
+use crate::learned::train::lpc::{fit_lattice_object, fit_lpc_object, fit_pz_object};
 use crate::learned::train::sparse::fit_sparse_object;
 use crate::status::Verdict;
 use std::path::Path;
 
 /// Frozen static-result hash (empty means "not yet frozen").
 pub const LEARNED_SPEECH_SHA256: &str =
-    "d155764d7fec74d1693d7dbf2fddc10c2ad9046767a7167b4b09163dde06215f";
+    "83c3e06e86dd25fa6b39ab448d40e9e24ee6e9161c675f20616bac3b8aec3c25";
 
 const CLIPS_PER_SPLIT: usize = 8;
 
@@ -45,6 +45,7 @@ pub const ACTIVE_FAMILIES: &[&str] = &[
     "fixed_diff",
     "lpc",
     "lattice",
+    "polezero",
 ];
 
 fn bytes(o: &LearnedObject) -> Option<u64> {
@@ -111,6 +112,21 @@ fn portfolio(case: &RealCase, budget: &TrainBudget) -> Result<Vec<(&'static str,
     }
     if let Some(o) = best_lat {
         raw.push(("lattice", o));
+    }
+    // Seal S8: pole-zero (ARMA) closure over a frozen (p, q) ladder.
+    let mut best_pz: Option<LearnedObject> = None;
+    let mut best_pz_bytes = u64::MAX;
+    for block in [4096u32, 2048] {
+        if let Ok((o, _)) = fit_pz_object(&case.samples, frames, rate, block, budget)
+            && let Some(b) = bytes(&o)
+            && b < best_pz_bytes
+        {
+            best_pz_bytes = b;
+            best_pz = Some(o);
+        }
+    }
+    if let Some(o) = best_pz {
+        raw.push(("polezero", o));
     }
     // Re-encode every Exp2 candidate under Exp3 so the Seal S4 residual codecs
     // (general Golomb, centered Golomb) are selectable.

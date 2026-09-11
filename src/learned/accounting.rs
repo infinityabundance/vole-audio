@@ -155,6 +155,11 @@ fn model_components(m: &LearnedModel) -> (u64, u64, u64, u64, u64, u64) {
             let weights = ((p.reflection.len() as u64) * 2).min(len);
             (weights, 0, 0, 0, 0, 0)
         }
+        LearnedModel::PoleZero(p) => {
+            let len = p.canonical_bytes().len() as u64;
+            let weights = (((p.ar.len() + p.ma.len()) as u64) * 2).min(len);
+            (weights, 0, 0, 0, 0, 0)
+        }
         LearnedModel::Segmented(s) => {
             let mut w = 0u64;
             let mut b = 0u64;
