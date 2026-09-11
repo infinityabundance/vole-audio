@@ -112,6 +112,8 @@ pub mod learned_training_cost;
 #[cfg(feature = "std")]
 pub mod learned_transfer;
 #[cfg(feature = "std")]
+pub mod learned_u1_wasted;
+#[cfg(feature = "std")]
 pub(crate) mod measure;
 #[cfg(feature = "std")]
 pub mod negative;
@@ -307,6 +309,10 @@ hierarchy + fixed finite differences, then LPC …) over the real + Mode-C corpu
 FLAC-5 with per-family attribution",
     ),
     (
+        "learned-u1-wasted",
+        "U1-domain common-factor fix: the Wasted model wrapper (kind 16) plus the FactorShift residual codec (id 14) against the S0 U1 baseline portfolio and FLAC-5",
+    ),
+    (
         "learned-speech-trace",
         "Seal S0 diagnostic: bit-for-bit trace of the frozen B1 FLAC-5 artifact (subframe kinds, orders, precision, shift, partition order, residual payload) beside the wired three-family Exp2 VOLE byte waterfall, on the real + Mode-C corpus",
     ),
@@ -489,6 +495,7 @@ pub fn run(name: &str, receipts_root: &Path) -> crate::error::Result<Verdict> {
         "learned-speech-trace" => learned_speech_trace::run(receipts_root),
         "learned-speech" => learned_speech::run(receipts_root),
         "learned-real-corpus-u1" => learned_real_corpus_u1::run(receipts_root),
+        "learned-u1-wasted" => learned_u1_wasted::run(receipts_root),
         "learned-exp2-transfer" => learned_exp2_transfer::run(receipts_root),
         "learned-residual-codec" => learned_residual_codec::run(receipts_root),
         "learned-residual-codec2" => learned_residual_codec2::run(receipts_root),

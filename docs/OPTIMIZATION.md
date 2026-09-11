@@ -276,6 +276,27 @@ accounted. Progression (share of the original FLAC-5 effectiveness gap closed):
 S2 ≈ 0.5 %, S3 ≈ 1.9 %, S4 ≈ 2.8 %, S5 ≈ 2.9 %, S6 ≈ 3.1 %, S7 ≈ 3.1 %,
 S8 ≈ 3.1 %.
 
+### Mechanism 14 — exact common-factor / wasted-bits exploitation
+
+Seal S0's U1 replay showed VOLE losing ~3× to FLAC under the frozen U1 s16
+ingest because FLAC strips the 16 low zero bits through wasted bits while the
+learned model did not. Two pieces fix it, both exact:
+
+* a **`Wasted` model wrapper** (kind `16`, Exp3) models the quotients `X >> 16`
+  with any inner hypothesis and scales the prediction back — a pure integer
+transform;
+* a **`FactorShift` residual codec** (id `14`) stores the common power-of-two
+  factor of the exact residual and encodes the quotients with the v2 family.
+
+The wrapper is only accepted when the scaled prediction does not saturate, so
+closure stays exact.
+
+Measured (court `learned-u1-wasted`, result `8f58639a…`): over the 8 U1-mapped
+effectiveness clips the S0 baseline portfolio is **397 283 B** and the
+wasted-wrapped LPC portfolio is **133 400 B** — a **2.98×** reduction, winning
+8/8 clips, against FLAC-5's 130 006 B. `factor_shift` is selected on every clip.
+The U1-domain 3× gap is closed to ~2.6 %.
+
 ## Status
 
 Implemented and pushed: Track A, Track B (including the entropy decode table),
@@ -284,7 +305,9 @@ and the Report 3 Seal S0 diagnostic courts (`learned-speech-trace`,
 Seal S3 precision/shift/error-feedback, Seal S4 general Golomb residual
 coding, Seal S5 estimator diversity, Seal S6 higher dense-LPC orders, Seal S7
 lattice/PARCOR realisation and Seal S8 pole-zero/ARMA closure (court
-`learned-speech`). The campaign places VOLE ahead of FLAC-5 on both splits.
+`learned-speech`). The campaign places VOLE ahead of FLAC-5 on both splits,
+and the U1 common-factor fix (`learned-u1-wasted`) closes the S0 U1-domain 3×
+gap to ~2.6 %.
 The remaining tracks from the two whole-repository
 optimization reports
 (CPU frame-tile multicore + PartialBank vectorization, GPU work decomposition,

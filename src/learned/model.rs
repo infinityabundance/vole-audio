@@ -52,6 +52,8 @@ pub enum LearnedModel {
     Lattice(crate::learned::lattice::LatticePredictor),
     /// A pole-zero (ARMA) predictor with exact residual closure (Exp3, Seal S8).
     PoleZero(crate::learned::polezero::PoleZeroPredictor),
+    /// A wasted-bits / common-factor wrapper (Exp3, mechanism 14).
+    Wasted(crate::learned::wasted::WastedPredictor),
 }
 
 impl LearnedModel {
@@ -74,6 +76,7 @@ impl LearnedModel {
             LearnedModel::Fixed(_) => 13,
             LearnedModel::Lattice(_) => 14,
             LearnedModel::PoleZero(_) => 15,
+            LearnedModel::Wasted(_) => 16,
         }
     }
 
@@ -96,6 +99,7 @@ impl LearnedModel {
             LearnedModel::Fixed(_) => "fixed_difference",
             LearnedModel::Lattice(_) => "lattice",
             LearnedModel::PoleZero(_) => "pole_zero",
+            LearnedModel::Wasted(_) => "wasted",
         }
     }
 
@@ -118,6 +122,7 @@ impl LearnedModel {
             LearnedModel::Fixed(p) => p.validate(),
             LearnedModel::Lattice(p) => p.validate(),
             LearnedModel::PoleZero(p) => p.validate(),
+            LearnedModel::Wasted(p) => p.validate(),
         }
     }
 
@@ -140,6 +145,7 @@ impl LearnedModel {
             LearnedModel::Fixed(p) => p.channels,
             LearnedModel::Lattice(p) => p.channels,
             LearnedModel::PoleZero(p) => p.channels,
+            LearnedModel::Wasted(p) => p.channels,
         }
     }
 
@@ -162,6 +168,7 @@ impl LearnedModel {
             LearnedModel::Fixed(p) => p.receptive_field(),
             LearnedModel::Lattice(p) => p.receptive_field(),
             LearnedModel::PoleZero(p) => p.receptive_field(),
+            LearnedModel::Wasted(p) => p.receptive_field(),
         }
     }
 
@@ -184,6 +191,7 @@ impl LearnedModel {
             LearnedModel::Fixed(p) => p.ops_per_sample(),
             LearnedModel::Lattice(p) => p.ops_per_sample(),
             LearnedModel::PoleZero(p) => p.ops_per_sample(),
+            LearnedModel::Wasted(p) => p.ops_per_sample(),
         }
     }
 
@@ -206,6 +214,7 @@ impl LearnedModel {
             LearnedModel::Fixed(p) => p.state_bytes(),
             LearnedModel::Lattice(p) => p.state_bytes(),
             LearnedModel::PoleZero(p) => p.state_bytes(),
+            LearnedModel::Wasted(p) => p.state_bytes(),
         }
     }
 
@@ -228,6 +237,7 @@ impl LearnedModel {
             LearnedModel::Fixed(p) => p.checkpoint_count(),
             LearnedModel::Lattice(p) => p.checkpoint_count(),
             LearnedModel::PoleZero(p) => p.checkpoint_count(),
+            LearnedModel::Wasted(p) => p.checkpoint_count(),
         }
     }
 
@@ -250,6 +260,7 @@ impl LearnedModel {
             LearnedModel::Fixed(p) => p.canonical_bytes(),
             LearnedModel::Lattice(p) => p.canonical_bytes(),
             LearnedModel::PoleZero(p) => p.canonical_bytes(),
+            LearnedModel::Wasted(p) => p.canonical_bytes(),
         }
     }
 
@@ -307,6 +318,9 @@ impl LearnedModel {
             15 => LearnedModel::PoleZero(
                 crate::learned::polezero::PoleZeroPredictor::from_canonical_bytes(bytes)?,
             ),
+            16 => LearnedModel::Wasted(
+                crate::learned::wasted::WastedPredictor::from_canonical_bytes(bytes)?,
+            ),
             other => {
                 return Err(Error::new(
                     crate::error::Kind::Unsupported,
@@ -339,6 +353,7 @@ impl LearnedModel {
             LearnedModel::Fixed(p) => p.hypothesis_all_from_source(source, frames),
             LearnedModel::Lattice(p) => p.hypothesis_all_from_source(source, frames),
             LearnedModel::PoleZero(p) => p.hypothesis_all_from_source(source, frames),
+            LearnedModel::Wasted(p) => p.hypothesis_all_from_source(source, frames),
         }
     }
 
@@ -369,6 +384,7 @@ impl LearnedModel {
             LearnedModel::Fixed(p) => p.evaluate_range(residual, frames, start, len),
             LearnedModel::Lattice(p) => p.evaluate_range(residual, frames, start, len),
             LearnedModel::PoleZero(p) => p.evaluate_range(residual, frames, start, len),
+            LearnedModel::Wasted(p) => p.evaluate_range(residual, frames, start, len),
         }
     }
 
@@ -391,6 +407,7 @@ impl LearnedModel {
             LearnedModel::Fixed(p) => p.replay_frames(start),
             LearnedModel::Lattice(p) => p.replay_frames(start),
             LearnedModel::PoleZero(p) => p.replay_frames(start),
+            LearnedModel::Wasted(p) => p.replay_frames(start),
         }
     }
 

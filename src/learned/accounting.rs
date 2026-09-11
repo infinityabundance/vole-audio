@@ -160,6 +160,14 @@ fn model_components(m: &LearnedModel) -> (u64, u64, u64, u64, u64, u64) {
             let weights = (((p.ar.len() + p.ma.len()) as u64) * 2).min(len);
             (weights, 0, 0, 0, 0, 0)
         }
+        LearnedModel::Wasted(p) => {
+            // Name the inner model's components (capped so the sum never exceeds
+            // the wrapper's canonical length); the rest is wrapper metadata.
+            let len = p.canonical_bytes().len() as u64;
+            let (w, b, a, cp, td, st) = model_components(&p.inner);
+            let named = (w + b + a + cp + td + st).min(len);
+            (named, 0, 0, 0, 0, 0)
+        }
         LearnedModel::Segmented(s) => {
             let mut w = 0u64;
             let mut b = 0u64;

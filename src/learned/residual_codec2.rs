@@ -85,6 +85,8 @@ pub enum ResidualCodecV2 {
     Golomb = 12,
     /// Centered partitioned general Golomb (a stored residual center).
     CenteredGolomb = 13,
+    /// Strip a common power-of-two factor, then encode the quotients.
+    FactorShift = 14,
 }
 
 impl ResidualCodecV2 {
@@ -125,7 +127,7 @@ impl ResidualCodecV2 {
     ];
 
     /// The Exp3 additions (Seal S4), in canonical tie order.
-    pub const ALL_V3: [ResidualCodecV2; 14] = [
+    pub const ALL_V3: [ResidualCodecV2; 15] = [
         ResidualCodecV2::DenseI32,
         ResidualCodecV2::SparseDelta,
         ResidualCodecV2::ZigZagVarint,
@@ -140,6 +142,7 @@ impl ResidualCodecV2 {
         ResidualCodecV2::ContextRans,
         ResidualCodecV2::Golomb,
         ResidualCodecV2::CenteredGolomb,
+        ResidualCodecV2::FactorShift,
     ];
 
     /// Canonical codec identifier byte.
@@ -164,6 +167,7 @@ impl ResidualCodecV2 {
             ResidualCodecV2::ContextRans => "context_rans",
             ResidualCodecV2::Golomb => "golomb",
             ResidualCodecV2::CenteredGolomb => "centered_golomb",
+            ResidualCodecV2::FactorShift => "factor_shift",
         }
     }
 
@@ -184,6 +188,7 @@ impl ResidualCodecV2 {
             11 => Some(ResidualCodecV2::ContextRans),
             12 => Some(ResidualCodecV2::Golomb),
             13 => Some(ResidualCodecV2::CenteredGolomb),
+            14 => Some(ResidualCodecV2::FactorShift),
             _ => None,
         }
     }
@@ -235,6 +240,7 @@ impl ResidualCodecV2 {
             ResidualCodecV2::ContextRans => encode_context_rans(residual),
             ResidualCodecV2::Golomb => encode_golomb(residual),
             ResidualCodecV2::CenteredGolomb => encode_centered_golomb(residual),
+            ResidualCodecV2::FactorShift => encode_factor_shift(residual),
         }
     }
 
@@ -260,6 +266,7 @@ impl ResidualCodecV2 {
             ResidualCodecV2::ContextRans => decode_context_rans(bytes, len),
             ResidualCodecV2::Golomb => decode_golomb(bytes, len),
             ResidualCodecV2::CenteredGolomb => decode_centered_golomb(bytes, len),
+            ResidualCodecV2::FactorShift => decode_factor_shift(bytes, len),
         }
     }
 }
@@ -1955,6 +1962,56 @@ fn median_i32(values: &[i32]) -> i32 {
     let mut v: Vec<i32> = values.to_vec();
     v.sort_unstable();
     v[v.len() / 2]
+}
+
+// ---------------------------------------------------------------------------
+// id 14: FactorShift (strip a common power-of-two factor)
+// ---------------------------------------------------------------------------
+
+/// Encode the residual quotients after dividing out their common power-of-two
+/// factor. The factor is stored as a shift count.
+fn encode_factor_shift(residual: &[i32]) -> Vec<u8> {
+    let n = residual.len();
+    let mut out = Vec::new();
+    out.extend_from_slice(&(n as u64).to_le_bytes());
+    if n == 0 {
+        out.push(0);
+        return out;
+    }
+    let mut t = 32u32;
+    for &v in residual {
+        if v != 0 {
+            t = t.min(v.trailing_zeros());
+        }
+    }
+    if t == 32 {
+        t = 0; // all zero
+    }
+    t = t.min(31);
+    out.push(t as u8);
+    let q: Vec<i32> = residual.iter().map(|&v| v >> t).collect();
+    let inner = encode_best_v2(&q);
+    out.extend_from_slice(&inner.bytes);
+    out
+}
+
+fn decode_factor_shift(bytes: &[u8], len: usize) -> Result<Vec<i32>> {
+    let mut r = Reader::new(bytes);
+    let total = r.u64le()? as usize;
+    if total != len {
+        return Err(Error::malformed("factor-shift length mismatch"));
+    }
+    if len == 0 {
+        return Ok(Vec::new());
+    }
+    let t = r.u8()? as u32;
+    if t > 31 {
+        return Err(Error::malformed("factor-shift factor out of range"));
+    }
+    let rest = r.rest();
+    let inner = decode_encoding_v2(rest, len)?;
+    let q = inner.decode(len)?;
+    Ok(q.into_iter().map(|v| v << t).collect())
 }
 
 #[cfg(test)]

@@ -40,6 +40,7 @@ pub mod sparse;
 pub mod stateful;
 pub mod train;
 pub mod transfer;
+pub mod wasted;
 
 pub use arithmetic::{
     Acc, Activation, Bias, Weight, accumulator_is_safe, round_shift_half_away, sat_i16, sat_i32,

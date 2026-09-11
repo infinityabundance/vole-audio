@@ -365,6 +365,7 @@ fn cmd_seal_verify(args: &[String]) -> Result<u8> {
                        learned-exp2-mechanisms=SUPPORTED,learned-exp2-transfer=SUPPORTED,\
                        learned-exp2-real-corpus=SUPPORTED,\
                        learned-speech-trace=SUPPORTED,learned-real-corpus-u1=SUPPORTED,\
+                       learned-u1-wasted=SUPPORTED,\
                        learned-speech=SUPPORTED,\
                        compound=SUPPORTED,\
                        cuda=SUPPORTED,d1=SUPPORTED,h2=SUPPORTED,\
