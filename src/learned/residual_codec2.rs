@@ -101,6 +101,8 @@ pub enum ResidualCodecV2 {
     SignedFsmRcm = 20,
     /// BGMC-style high/coarse arithmetic coding with a raw low remainder (Seal C0).
     Bgmc = 21,
+    /// Bounded-depth Context Tree Weighting entropy ceiling (Seal C1).
+    Ctw = 22,
 }
 
 impl ResidualCodecV2 {
@@ -140,8 +142,8 @@ impl ResidualCodecV2 {
         ResidualCodecV2::ContextRans,
     ];
 
-    /// The Exp3 additions (Seal S4, E1..E5, C0), in canonical tie order.
-    pub const ALL_V3: [ResidualCodecV2; 22] = [
+    /// The Exp3 additions (Seal S4, E1..E5, C0, C1), in canonical tie order.
+    pub const ALL_V3: [ResidualCodecV2; 23] = [
         ResidualCodecV2::DenseI32,
         ResidualCodecV2::SparseDelta,
         ResidualCodecV2::ZigZagVarint,
@@ -164,6 +166,7 @@ impl ResidualCodecV2 {
         ResidualCodecV2::SignedFsmMix,
         ResidualCodecV2::SignedFsmRcm,
         ResidualCodecV2::Bgmc,
+        ResidualCodecV2::Ctw,
     ];
 
     /// Canonical codec identifier byte.
@@ -196,6 +199,7 @@ impl ResidualCodecV2 {
             ResidualCodecV2::SignedFsmMix => "signed_fsm_mix",
             ResidualCodecV2::SignedFsmRcm => "signed_fsm_rcm",
             ResidualCodecV2::Bgmc => "bgmc",
+            ResidualCodecV2::Ctw => "ctw",
         }
     }
 
@@ -224,6 +228,7 @@ impl ResidualCodecV2 {
             19 => Some(ResidualCodecV2::SignedFsmMix),
             20 => Some(ResidualCodecV2::SignedFsmRcm),
             21 => Some(ResidualCodecV2::Bgmc),
+            22 => Some(ResidualCodecV2::Ctw),
             _ => None,
         }
     }
@@ -283,6 +288,7 @@ impl ResidualCodecV2 {
             ResidualCodecV2::SignedFsmMix => encode_signed_fsm_mix(residual),
             ResidualCodecV2::SignedFsmRcm => encode_signed_fsm_rcm(residual),
             ResidualCodecV2::Bgmc => encode_bgmc(residual),
+            ResidualCodecV2::Ctw => encode_ctw(residual),
         }
     }
 
@@ -316,6 +322,7 @@ impl ResidualCodecV2 {
             ResidualCodecV2::SignedFsmMix => decode_signed_fsm_mix(bytes, len),
             ResidualCodecV2::SignedFsmRcm => decode_signed_fsm_rcm(bytes, len),
             ResidualCodecV2::Bgmc => decode_bgmc(bytes, len),
+            ResidualCodecV2::Ctw => decode_ctw(bytes, len),
         }
     }
 }
@@ -3286,6 +3293,271 @@ fn decode_bgmc(bytes: &[u8], len: usize) -> Result<Vec<i32>> {
     Ok(out)
 }
 
+// ---------------------------------------------------------------------------
+// Context Tree Weighting ceiling (fourth-pass Seal C1)
+//
+// A bounded-depth binary CTW coder over the canonical residual bitstream. Each
+// node keeps Krichevsky-Trofimov counts and a log2 weighted probability; the
+// root's weighted probability mixes every bounded-memory context-tree model, so
+// the coder does not have to guess a single residual context order. The
+// conditional probability of the next bit is the exact CTW ratio
+// `P_w(root + b) / P_w(root)`, computed in fixed-point log2 (Q8) with integer
+// log-add tables, so the bitstream is portable. Depth is bounded and the tree is
+// reset per residual. This is a **ceiling**: it asks how much conditional
+// redundancy the residual still contains when no context order is chosen by hand.
+// ---------------------------------------------------------------------------
+
+/// `round(256 * log2(1 + idx/256))` for `idx in 0..=255`.
+const CTW_LOG2M: [u16; 256] = [
+    0, 1, 3, 4, 6, 7, 9, 10, 11, 13, 14, 16, 17, 18, 20, 21, 22, 24, 25, 26, 28, 29, 30, 32, 33,
+    34, 36, 37, 38, 40, 41, 42, 44, 45, 46, 47, 49, 50, 51, 52, 54, 55, 56, 57, 59, 60, 61, 62, 63,
+    65, 66, 67, 68, 69, 71, 72, 73, 74, 75, 77, 78, 79, 80, 81, 82, 84, 85, 86, 87, 88, 89, 90, 92,
+    93, 94, 95, 96, 97, 98, 99, 100, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113,
+    114, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133,
+    134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152,
+    153, 154, 155, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 169,
+    170, 171, 172, 173, 174, 175, 176, 177, 178, 178, 179, 180, 181, 182, 183, 184, 185, 185, 186,
+    187, 188, 189, 190, 191, 192, 192, 193, 194, 195, 196, 197, 198, 198, 199, 200, 201, 202, 203,
+    203, 204, 205, 206, 207, 208, 208, 209, 210, 211, 212, 212, 213, 214, 215, 216, 216, 217, 218,
+    219, 220, 220, 221, 222, 223, 224, 224, 225, 226, 227, 228, 228, 229, 230, 231, 231, 232, 233,
+    234, 234, 235, 236, 237, 238, 238, 239, 240, 241, 241, 242, 243, 244, 244, 245, 246, 247, 247,
+    248, 249, 249, 250, 251, 252, 252, 253, 254, 255, 255,
+];
+
+/// `round(256 * log2(1 + 2^{-(idx*8)/256}))` for `idx in 0..=255` (step 8 in Q8).
+const CTW_LOGADD: [u16; 256] = [
+    256, 252, 248, 244, 240, 237, 233, 229, 225, 222, 218, 215, 211, 208, 204, 201, 198, 194, 191,
+    188, 185, 181, 178, 175, 172, 169, 166, 164, 161, 158, 155, 152, 150, 147, 144, 142, 139, 137,
+    134, 132, 130, 127, 125, 123, 120, 118, 116, 114, 112, 110, 108, 106, 104, 102, 100, 98, 96,
+    94, 93, 91, 89, 87, 86, 84, 82, 81, 79, 78, 76, 75, 73, 72, 70, 69, 68, 66, 65, 64, 63, 61, 60,
+    59, 58, 57, 55, 54, 53, 52, 51, 50, 49, 48, 47, 46, 45, 44, 44, 43, 42, 41, 40, 39, 38, 38, 37,
+    36, 35, 35, 34, 33, 33, 32, 31, 31, 30, 29, 29, 28, 28, 27, 26, 26, 25, 25, 24, 24, 23, 23, 22,
+    22, 21, 21, 21, 20, 20, 19, 19, 19, 18, 18, 17, 17, 17, 16, 16, 16, 15, 15, 15, 14, 14, 14, 13,
+    13, 13, 13, 12, 12, 12, 12, 11, 11, 11, 11, 10, 10, 10, 10, 10, 9, 9, 9, 9, 9, 8, 8, 8, 8, 8,
+    8, 7, 7, 7, 7, 7, 7, 7, 6, 6, 6, 6, 6, 6, 6, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 4, 4, 4, 4, 4, 4, 4,
+    4, 4, 4, 4, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+    2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1,
+];
+
+/// `log2(v)` in Q8 for `v >= 1`.
+fn ctw_log2_q8(v: u64) -> i64 {
+    let b = 63 - v.leading_zeros() as i64;
+    let idx = if b == 0 {
+        0
+    } else {
+        (((v - (1u64 << b)) << 8) >> b).min(255) as usize
+    };
+    b * 256 + i64::from(CTW_LOG2M[idx])
+}
+
+/// `log2(2^a + 2^b)` in Q8 for `a >= b`.
+#[inline]
+fn ctw_logadd(a: i64, b: i64) -> i64 {
+    let d = ((a - b) >> 3).clamp(0, 255) as usize;
+    a + i64::from(CTW_LOGADD[d])
+}
+
+/// Increment of `log2 pk` when a bit is appended, in Q8.
+#[inline]
+fn ctw_delta(n0: u32, n1: u32, bit: u32) -> i64 {
+    let a = if bit == 0 { n0 } else { n1 };
+    let n = n0 + n1;
+    ctw_log2_q8(u64::from(2 * a) + 1) - 256 - ctw_log2_q8(u64::from(n) + 1)
+}
+
+struct Ctw {
+    depth: usize,
+    n0: Vec<u32>,
+    n1: Vec<u32>,
+    logpk: Vec<i64>,
+    logpw: Vec<i64>,
+    path: Vec<usize>,
+    npk: Vec<i64>,
+    npw: Vec<i64>,
+    ctx: u32,
+    mask: u32,
+}
+
+impl Ctw {
+    fn new(depth: usize) -> Self {
+        let nodes = (1usize << (depth + 1)) - 1;
+        Ctw {
+            depth,
+            n0: vec![0; nodes],
+            n1: vec![0; nodes],
+            logpk: vec![0; nodes],
+            logpw: vec![0; nodes],
+            path: vec![0; depth + 1],
+            npk: vec![0; depth + 1],
+            npw: vec![0; depth + 1],
+            ctx: 0,
+            mask: ((1u32 << depth) - 1).max(1),
+        }
+    }
+
+    #[inline]
+    fn build_path(&mut self) {
+        let mut node = 0usize;
+        self.path[0] = 0;
+        for d in 0..self.depth {
+            let bit = (self.ctx >> d) & 1;
+            node = 2 * node + 1 + bit as usize;
+            self.path[d + 1] = node;
+        }
+    }
+
+    /// Root `logpw` after tentatively appending `bit`.
+    fn compute(&mut self, bit: u32) -> i64 {
+        let d = self.depth;
+        for dd in 0..=d {
+            let node = self.path[dd];
+            self.npk[dd] = self.logpk[node] + ctw_delta(self.n0[node], self.n1[node], bit);
+        }
+        self.npw[d] = self.npk[d];
+        for dd in (0..d).rev() {
+            let node = self.path[dd];
+            let onpath = self.path[dd + 1];
+            let off = if onpath == 2 * node + 1 {
+                2 * node + 2
+            } else {
+                2 * node + 1
+            };
+            let prod = self.npw[dd + 1] + self.logpw[off];
+            self.npw[dd] = ctw_logadd(self.npk[dd] - 256, prod - 256);
+        }
+        self.npw[0]
+    }
+
+    /// CTW predictive probability of a zero bit (12-bit).
+    fn predict_zero(&mut self) -> u16 {
+        let old = self.logpw[0];
+        let r1 = self.compute(1);
+        let r0 = self.compute(0);
+        let logit = (((r0 - old) - (r1 - old)) * 177) >> 8;
+        squash(logit.clamp(-2047, 2047) as i32).clamp(1, 4095) as u16
+    }
+
+    /// Persist the observed bit and advance the context.
+    fn observe(&mut self, bit: u32) {
+        let d = self.depth;
+        for dd in 0..=d {
+            let node = self.path[dd];
+            self.logpk[node] += ctw_delta(self.n0[node], self.n1[node], bit);
+            if bit == 0 {
+                self.n0[node] += 1;
+            } else {
+                self.n1[node] += 1;
+            }
+            self.npk[dd] = self.logpk[node];
+        }
+        self.npw[d] = self.npk[d];
+        for dd in (0..=d).rev() {
+            let node = self.path[dd];
+            if dd == d {
+                self.npw[dd] = self.npk[dd];
+            } else {
+                let onpath = self.path[dd + 1];
+                let off = if onpath == 2 * node + 1 {
+                    2 * node + 2
+                } else {
+                    2 * node + 1
+                };
+                let prod = self.npw[dd + 1] + self.logpw[off];
+                self.npw[dd] = ctw_logadd(self.npk[dd] - 256, prod - 256);
+            }
+            self.logpw[node] = self.npw[dd];
+        }
+        self.ctx = ((self.ctx << 1) | bit) & self.mask;
+    }
+}
+
+#[inline]
+fn ctw_code_enc(enc: &mut RangeEncoder, ctw: &mut Ctw, bit: u32) {
+    ctw.build_path();
+    let p0 = ctw.predict_zero();
+    enc.encode_bit(p0, bit);
+    ctw.observe(bit);
+}
+
+#[inline]
+fn ctw_code_dec(dec: &mut RangeDecoder<'_>, ctw: &mut Ctw) -> Result<u32> {
+    ctw.build_path();
+    let p0 = ctw.predict_zero();
+    let bit = dec.decode_bit(p0)?;
+    ctw.observe(bit);
+    Ok(bit)
+}
+
+fn encode_ctw_with_depth(residual: &[i32], depth: usize) -> Vec<u8> {
+    let mut enc = RangeEncoder::new();
+    let mut ctw = Ctw::new(depth);
+    for &r in residual {
+        let neg = u32::from(r < 0);
+        ctw_code_enc(&mut enc, &mut ctw, neg);
+        let m = u64::from(r.unsigned_abs());
+        let v = m + 1;
+        let n = (64 - v.leading_zeros()) as usize;
+        for i in 0..n {
+            ctw_code_enc(&mut enc, &mut ctw, u32::from(i + 1 == n));
+        }
+        for j in 0..n - 1 {
+            ctw_code_enc(&mut enc, &mut ctw, ((v >> (n - 2 - j)) & 1) as u32);
+        }
+    }
+    let mut out = Vec::with_capacity(1);
+    out.push(depth as u8);
+    out.extend_from_slice(&enc.finish());
+    out
+}
+
+fn encode_ctw(residual: &[i32]) -> Vec<u8> {
+    let mut best: Option<Vec<u8>> = None;
+    for depth in [12usize, 16] {
+        let candidate = encode_ctw_with_depth(residual, depth);
+        if best.as_ref().is_none_or(|b| candidate.len() < b.len()) {
+            best = Some(candidate);
+        }
+    }
+    best.expect("ctw always produces a candidate")
+}
+
+fn decode_ctw(bytes: &[u8], len: usize) -> Result<Vec<i32>> {
+    let (&depth_byte, rest) = bytes
+        .split_first()
+        .ok_or_else(|| Error::malformed("ctw stream has no depth header"))?;
+    let depth = usize::from(depth_byte);
+    if depth == 0 || depth > 16 {
+        return Err(Error::malformed("ctw depth out of range"));
+    }
+    let mut dec = RangeDecoder::new(rest)?;
+    let mut ctw = Ctw::new(depth);
+    let mut out = Vec::with_capacity(len);
+    for _ in 0..len {
+        let neg = ctw_code_dec(&mut dec, &mut ctw)? != 0;
+        let mut z = 0usize;
+        loop {
+            if ctw_code_dec(&mut dec, &mut ctw)? == 1 {
+                break;
+            }
+            z += 1;
+            if z > 32 {
+                return Err(Error::malformed("ctw unary length out of range"));
+            }
+        }
+        let mut v: u64 = 1;
+        for _ in 0..z {
+            let bit = ctw_code_dec(&mut dec, &mut ctw)?;
+            v = (v << 1) | u64::from(bit);
+        }
+        let m = v - 1;
+        if m > (1u64 << 31) {
+            return Err(Error::malformed("ctw magnitude exceeds i32 range"));
+        }
+        out.push(if neg { -(m as i64) as i32 } else { m as i32 });
+    }
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3483,6 +3755,23 @@ mod tests {
             let back = c
                 .decode(&payload, residual.len())
                 .unwrap_or_else(|e| panic!("bgmc: {e}"));
+            assert_eq!(back, residual);
+        }
+        let extreme = vec![i32::MIN, i32::MAX, -1, 0, 1, 2, -2, 1 << 30, -(1 << 30)];
+        let payload = c.encode(&extreme);
+        assert_eq!(c.decode(&payload, extreme.len()).unwrap(), extreme);
+    }
+
+    #[test]
+    fn ctw_round_trips_exactly() {
+        let c = ResidualCodecV2::Ctw;
+        assert_eq!(c.name(), "ctw");
+        assert_eq!(ResidualCodecV2::from_id(22), Some(c));
+        for residual in sample_residuals() {
+            let payload = c.encode(&residual);
+            let back = c
+                .decode(&payload, residual.len())
+                .unwrap_or_else(|e| panic!("ctw: {e}"));
             assert_eq!(back, residual);
         }
         let extreme = vec![i32::MIN, i32::MAX, -1, 0, 1, 2, -2, 1 << 30, -(1 << 30)];
