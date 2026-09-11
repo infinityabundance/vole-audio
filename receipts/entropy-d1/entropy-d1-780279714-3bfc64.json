@@ -1,0 +1,1360 @@
+{
+  "schema": "vole.audio.evidence.v1",
+  "schema_version": 1,
+  "receipt": {
+    "schema": "vole.audio.evidence.v1",
+    "schema_version": 1,
+    "run_id": "entropy-d1-780279714-3bfc64",
+    "court": "entropy-d1",
+    "created_unix_ms": 780279714,
+    "result": "SUPPORTED",
+    "result_detail": "entropy D1 on hw:2,0: per-window bounded page decode wrote exact final S32 codes directly into the registered ALSA ring for literal (16 pages), procedural mono+residual (16 pages, 256 corrections, device mono->stereo expansion) and high-entropy control (16 pages); scalar == CUDA == endpoint ring codes; D0 equal-work baseline on the same object/frames/endpoint",
+    "environment": {
+      "os": {
+        "sysname": "Linux",
+        "release": "7.2.2-1-cachyos",
+        "version": "#1 SMP PREEMPT_DYNAMIC Fri, 28 Aug 2026 08:05:11 +0000",
+        "machine": "x86_64",
+        "nodename": "vanir",
+        "os_pretty_name": "CachyOS"
+      },
+      "cpu": {
+        "model": "AMD Ryzen 7 9800X3D 8-Core Processor",
+        "flags": [
+          "3dnowprefetch",
+          "abm",
+          "adx",
+          "aes",
+          "amd_lbr_pmc_freeze",
+          "amd_lbr_v2",
+          "aperfmperf",
+          "apic",
+          "arat",
+          "avic",
+          "avx",
+          "avx2",
+          "avx512_bf16",
+          "avx512_bitalg",
+          "avx512_vbmi2",
+          "avx512_vnni",
+          "avx512_vp2intersect",
+          "avx512_vpopcntdq",
+          "avx512bw",
+          "avx512cd",
+          "avx512dq",
+          "avx512f",
+          "avx512ifma",
+          "avx512vbmi",
+          "avx512vl",
+          "avx_vnni",
+          "bmi1",
+          "bmi2",
+          "bpext",
+          "bus_lock_detect",
+          "cat_l3",
+          "cdp_l3",
+          "clflush",
+          "clflushopt",
+          "clwb",
+          "clzero",
+          "cmov",
+          "cmp_legacy",
+          "constant_tsc",
+          "cpb",
+          "cppc",
+          "cpuid",
+          "cpuid_fault",
+          "cqm",
+          "cqm_llc",
+          "cqm_mbm_local",
+          "cqm_mbm_total",
+          "cqm_occup_llc",
+          "cr8_legacy",
+          "cx16",
+          "cx8",
+          "de",
+          "decodeassists",
+          "erms",
+          "extapic",
+          "extd_apicid",
+          "f16c",
+          "flush_l1d",
+          "flushbyasid",
+          "fma",
+          "fpu",
+          "fsgsbase",
+          "fsrm",
+          "fxsr",
+          "fxsr_opt",
+          "gfni",
+          "ht",
+          "hw_pstate",
+          "ibpb",
+          "ibrs",
+          "ibrs_enhanced",
+          "ibs",
+          "invpcid",
+          "irperf",
+          "lahf_lm",
+          "lbrv",
+          "lm",
+          "mba",
+          "mca",
+          "mce",
+          "misalignsse",
+          "mmx",
+          "mmxext",
+          "monitor",
+          "movbe",
+          "movdir64b",
+          "movdiri",
+          "msr",
+          "mtrr",
+          "mwaitx",
+          "nonstop_tsc",
+          "nopl",
+          "npt",
+          "nrip_save",
+          "nx",
+          "ospke",
+          "osvw",
+          "overflow_recov",
+          "pae",
+          "pat",
+          "pausefilter",
+          "pclmulqdq",
+          "pdpe1gb",
+          "perfctr_core",
+          "perfctr_llc",
+          "perfctr_nb",
+          "perfmon_v2",
+          "pfthreshold",
+          "pge",
+          "pku",
+          "pni",
+          "popcnt",
+          "pse",
+          "pse36",
+          "rapl",
+          "rdpid",
+          "rdpru",
+          "rdrand",
+          "rdseed",
+          "rdt_a",
+          "rdtscp",
+          "rep_good",
+          "sep",
+          "sha_ni",
+          "skinit",
+          "smap",
+          "smca",
+          "smep",
+          "ssbd",
+          "sse",
+          "sse2",
+          "sse4_1",
+          "sse4_2",
+          "sse4a",
+          "ssse3",
+          "stibp",
+          "succor",
+          "svm",
+          "svm_lock",
+          "syscall",
+          "tce",
+          "topoext",
+          "tsc",
+          "tsc_adjust",
+          "tsc_scale",
+          "umip",
+          "user_shstk",
+          "v_spec_ctrl",
+          "v_vmsave_vmload",
+          "vaes",
+          "vgif",
+          "vmcb_clean",
+          "vme",
+          "vmmcall",
+          "vnmi",
+          "vpclmulqdq",
+          "wbnoinvd",
+          "wdt",
+          "x2avic",
+          "xgetbv1",
+          "xsave",
+          "xsavec",
+          "xsaveerptr",
+          "xsaveopt",
+          "xsaves",
+          "xtopology"
+        ],
+        "has_avx2": true,
+        "has_avx512": true,
+        "has_neon": false
+      },
+      "memory": {
+        "total_bytes": 134689935360
+      },
+      "git_commit": "94c5af13e383a94d6b422db27683d83e7f9c9797",
+      "git_dirty": false,
+      "git_branch": "main",
+      "rustc_version": "rustc 1.99.0-nightly (89c61a754 2026-07-23)",
+      "crate_version": "0.43.0",
+      "target_arch": "x86_64",
+      "target_os": "linux",
+      "cpu_governor": "performance",
+      "bios_version": "1402",
+      "git_tree_sha": "f98185699ea0a8b270443e364e35a79788ae5d62",
+      "build_git_commit": "94c5af13e383a94d6b422db27683d83e7f9c9797",
+      "build_tree_sha": "f98185699ea0a8b270443e364e35a79788ae5d62",
+      "build_dirty": false,
+      "build_rustc": "rustc 1.99.0-nightly (89c61a754 2026-07-23)",
+      "build_profile": "release",
+      "build_target": "x86_64-unknown-linux-gnu",
+      "source_binding": "bound",
+      "seal_subject_hash": "dbbd25569b17970abee223570ce3e305e91047ea3e346ff7fb9b7434d773f183"
+    },
+    "hardware": {
+      "pci_devices": [
+        {
+          "bdf": "0000:00:00.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14d8",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": null
+        },
+        {
+          "bdf": "0000:00:00.2",
+          "class": "0x080600",
+          "vendor": "0x1022",
+          "device": "0x14d9",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": null
+        },
+        {
+          "bdf": "0000:00:01.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "0"
+        },
+        {
+          "bdf": "0000:00:01.1",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14db",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "1"
+        },
+        {
+          "bdf": "0000:00:01.2",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14db",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "2"
+        },
+        {
+          "bdf": "0000:00:02.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "3"
+        },
+        {
+          "bdf": "0000:00:02.1",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14db",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "4"
+        },
+        {
+          "bdf": "0000:00:02.2",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14db",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "5"
+        },
+        {
+          "bdf": "0000:00:03.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "6"
+        },
+        {
+          "bdf": "0000:00:04.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "7"
+        },
+        {
+          "bdf": "0000:00:08.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "8"
+        },
+        {
+          "bdf": "0000:00:08.1",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14dd",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "9"
+        },
+        {
+          "bdf": "0000:00:08.3",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14dd",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "10"
+        },
+        {
+          "bdf": "0000:00:14.0",
+          "class": "0x0c0500",
+          "vendor": "0x1022",
+          "device": "0x790b",
+          "driver": "piix4_smbus",
+          "numa_node": -1,
+          "iommu_group": "11"
+        },
+        {
+          "bdf": "0000:00:14.3",
+          "class": "0x060100",
+          "vendor": "0x1022",
+          "device": "0x790e",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "11"
+        },
+        {
+          "bdf": "0000:00:18.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e0",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.1",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e1",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.2",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e2",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.3",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e3",
+          "driver": "k10temp",
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.4",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e4",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.5",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e5",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.6",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e6",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.7",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e7",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:01:00.0",
+          "class": "0x030000",
+          "vendor": "0x10de",
+          "device": "0x2702",
+          "driver": "nvidia",
+          "numa_node": -1,
+          "iommu_group": "13"
+        },
+        {
+          "bdf": "0000:01:00.1",
+          "class": "0x040300",
+          "vendor": "0x10de",
+          "device": "0x22bb",
+          "driver": "snd_hda_intel",
+          "numa_node": -1,
+          "iommu_group": "13"
+        },
+        {
+          "bdf": "0000:02:00.0",
+          "class": "0x010802",
+          "vendor": "0xc0a9",
+          "device": "0x542b",
+          "driver": "nvme",
+          "numa_node": -1,
+          "iommu_group": "14"
+        },
+        {
+          "bdf": "0000:03:00.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f4",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "15"
+        },
+        {
+          "bdf": "0000:04:00.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "16"
+        },
+        {
+          "bdf": "0000:04:04.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "17"
+        },
+        {
+          "bdf": "0000:04:05.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "18"
+        },
+        {
+          "bdf": "0000:04:08.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "19"
+        },
+        {
+          "bdf": "0000:04:0c.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "20"
+        },
+        {
+          "bdf": "0000:04:0d.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "21"
+        },
+        {
+          "bdf": "0000:05:00.0",
+          "class": "0x010802",
+          "vendor": "0x2646",
+          "device": "0x5019",
+          "driver": "nvme",
+          "numa_node": -1,
+          "iommu_group": "16"
+        },
+        {
+          "bdf": "0000:06:00.0",
+          "class": "0x020000",
+          "vendor": "0x10ec",
+          "device": "0x8125",
+          "driver": "r8169",
+          "numa_node": -1,
+          "iommu_group": "17"
+        },
+        {
+          "bdf": "0000:09:00.0",
+          "class": "0x0c0330",
+          "vendor": "0x1022",
+          "device": "0x43fc",
+          "driver": "xhci-pci-prom21",
+          "numa_node": -1,
+          "iommu_group": "20"
+        },
+        {
+          "bdf": "0000:0a:00.0",
+          "class": "0x010601",
+          "vendor": "0x1022",
+          "device": "0x43f6",
+          "driver": "ahci",
+          "numa_node": -1,
+          "iommu_group": "21"
+        },
+        {
+          "bdf": "0000:0b:00.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2421",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "22"
+        },
+        {
+          "bdf": "0000:0c:00.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2423",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "23"
+        },
+        {
+          "bdf": "0000:0c:01.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2423",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "24"
+        },
+        {
+          "bdf": "0000:0c:02.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2423",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "25"
+        },
+        {
+          "bdf": "0000:0c:03.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2423",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "26"
+        },
+        {
+          "bdf": "0000:71:00.0",
+          "class": "0x0c0330",
+          "vendor": "0x1b21",
+          "device": "0x2426",
+          "driver": "xhci_hcd",
+          "numa_node": -1,
+          "iommu_group": "25"
+        },
+        {
+          "bdf": "0000:72:00.0",
+          "class": "0x0c0340",
+          "vendor": "0x1b21",
+          "device": "0x2425",
+          "driver": "thunderbolt",
+          "numa_node": -1,
+          "iommu_group": "26"
+        },
+        {
+          "bdf": "0000:73:00.0",
+          "class": "0x130000",
+          "vendor": "0x1022",
+          "device": "0x14de",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "27"
+        },
+        {
+          "bdf": "0000:73:00.2",
+          "class": "0x108000",
+          "vendor": "0x1022",
+          "device": "0x1649",
+          "driver": "ccp",
+          "numa_node": -1,
+          "iommu_group": "28"
+        },
+        {
+          "bdf": "0000:73:00.3",
+          "class": "0x0c0330",
+          "vendor": "0x1022",
+          "device": "0x15b6",
+          "driver": "xhci_hcd",
+          "numa_node": -1,
+          "iommu_group": "29"
+        },
+        {
+          "bdf": "0000:73:00.4",
+          "class": "0x0c0330",
+          "vendor": "0x1022",
+          "device": "0x15b7",
+          "driver": "xhci_hcd",
+          "numa_node": -1,
+          "iommu_group": "30"
+        },
+        {
+          "bdf": "0000:73:00.6",
+          "class": "0x040300",
+          "vendor": "0x1022",
+          "device": "0x15e3",
+          "driver": "snd_hda_intel",
+          "numa_node": -1,
+          "iommu_group": "31"
+        },
+        {
+          "bdf": "0000:74:00.0",
+          "class": "0x0c0330",
+          "vendor": "0x1022",
+          "device": "0x15b8",
+          "driver": "xhci_hcd",
+          "numa_node": -1,
+          "iommu_group": "32"
+        }
+      ],
+      "gpu": {
+        "vendor": null,
+        "name": null,
+        "bdf": null,
+        "compute_capability": null,
+        "memory_bytes": null,
+        "driver_version": null,
+        "runtime_version": null
+      },
+      "audio": {
+        "card": null,
+        "device": null,
+        "name": null,
+        "subdevice": null
+      }
+    },
+    "params": {
+      "universe": "vole.audio.u1",
+      "profile": "u1/v1 + vole.entropy.p1/p1/v1",
+      "backend": "cuda",
+      "sample_rate_hz": 48000,
+      "channels": 2,
+      "voices": null,
+      "quantum_frames": 512,
+      "duration_secs": 0.08533333333333333,
+      "content_kind": "entropy-corpus-v1 d1"
+    },
+    "counters": {
+      "host_pcm_staging_bytes": 0,
+      "host_pcm_copy_bytes": 0,
+      "gpu_to_host_pcm_bytes": 0,
+      "endpoint_observation_bytes": 32768,
+      "device_sample_block_bytes": 0,
+      "transient_compute_words": 0,
+      "host_pcm_resident_peak_bytes": 0,
+      "host_pcm_resident_integral": 0.0,
+      "endpoint_depth_frames": 4096,
+      "endpoint_depth_min_frames": 512,
+      "endpoint_depth_max_frames": 4096,
+      "quanta_submitted": 8,
+      "events_consumed": 0,
+      "xruns": 0,
+      "kernel_launches": 8,
+      "missed_deadlines": 0
+    },
+    "timing": {
+      "total_ns": null,
+      "deadline_ns": null,
+      "warmup_runs": null,
+      "run_count": null,
+      "observation_count": null,
+      "tail": null
+    },
+    "provenance": {
+      "reference_hash": "82fc9c9f5c4914a90595a2a836de0c63f3124c8e8cb11c9e2fa38e7c92d1224b",
+      "backend_hash": "82fc9c9f5c4914a90595a2a836de0c63f3124c8e8cb11c9e2fa38e7c92d1224b",
+      "endpoint_hash": "82fc9c9f5c4914a90595a2a836de0c63f3124c8e8cb11c9e2fa38e7c92d1224b",
+      "gpu_artifact_hash": "d13d22c373dd78c09cd926bb71f318b167e1bf2ebb3385048a833697bd4c66d9",
+      "source_hash": null,
+      "corpus_hash": null,
+      "table_hashes": [],
+      "benchmark_order": [
+        "d0-literal",
+        "d1-literal",
+        "d0-residual",
+        "d1-residual",
+        "d1-noise"
+      ],
+      "exact_equality": true
+    },
+    "endpoint": {
+      "directness": "D1_ENDPOINT_MAPPED",
+      "topology": null,
+      "registered_range": "0x7ff72da7a000+32768",
+      "registration_result": "cuMemHostRegister(DEVICEMAP) succeeded — captured from the verdict-bearing d1-literal session's own HostRegistration",
+      "device_pointer": "present (registered host memory, DEVICEMAP)",
+      "synchronization_mechanism": null,
+      "fence_sync_evidence": null,
+      "coherency_assumptions": null,
+      "hidden_staging_investigation": null,
+      "endpoint_clock": null
+    },
+    "energy": null,
+    "trace": null,
+    "limitations": [
+      "silence-safe content (quiet fixture amplitudes); endpoint consumption is proven by commit/avail/drain evidence, not by listening",
+      "D1 residual session uses a window-local transient device arena (the mono samples of one 512-frame window = two 256-frame pages, 2048 bytes) for the on-device mono->stereo expansion; it is bounded transient decode scratch, not a full-object waveform, and is receipted as gpu_global_sample_intermediate_peak_bytes (2048) per session",
+      "EntropyWorld::launch allocates the per-decode device scratch/status buffers, the parameter vector, and the host status buffer on every decode invocation; the D1 court is therefore not yet an allocation-free production real-time path — zero xruns here is court evidence, not the final RT architecture (Phase M owns the preallocated persistent-resource path)",
+      "the single-thread serial rANS decode is latency-chain bound on idle GPU clocks: each D1 session first runs back-to-back warm-up decode launches into scratch arenas (80 launches/session) so the paced chunk decodes run at sustained clocks (wall regimes: ~20 ms idle-first-launch, ~2-3 ms court-warmup, ~0.4-0.5 ms aggregate-hot — see PERFORMANCE.md); the warm-up decodes nothing used by the session — every window is decoded at its own chunk boundary directly into the registered ring",
+      "high-entropy control: the full-range 32-bit RAW-fallback negative control is audible-only (quiet mode truncates low-order bits to keep peak <= 2^20); RAW fallback on full-range noise is separately sealed by court entropy-cuda and the entropy-literal corpus cells"
+    ],
+    "extras": {
+      "artifact": {
+        "path": "scripts/out/vole_audio.ptx",
+        "present": true,
+        "bytes": 194145,
+        "sha256": "d13d22c373dd78c09cd926bb71f318b167e1bf2ebb3385048a833697bd4c66d9",
+        "sidecar_present": true,
+        "build_source_tree": "f98185699ea0a8b270443e364e35a79788ae5d62",
+        "build_dirty": false,
+        "build_toolchain": "rustc 1.99.0-nightly",
+        "target_cpu": "sm_70 (baseline; driver JIT for installed GPU)",
+        "entries": [
+          "vole_render_d0",
+          "vole_entropy_decode",
+          "vole_upmix_mono_dup",
+          "vole_period_scan"
+        ],
+        "sidecar": {
+          "artifact": "vole_audio.ptx",
+          "sha256": "d13d22c373dd78c09cd926bb71f318b167e1bf2ebb3385048a833697bd4c66d9",
+          "entry": "vole_render_d0",
+          "entries": [
+            "vole_render_d0",
+            "vole_entropy_decode",
+            "vole_upmix_mono_dup",
+            "vole_period_scan"
+          ],
+          "rustc": "rustc 1.99.0-nightly",
+          "llvm": "22.1.8",
+          "target": "nvptx64-nvidia-cuda",
+          "target_cpu": "sm_70 (baseline; driver JIT for installed GPU)",
+          "profile": "release-equivalent: panic=abort opt-level=3 codegen-units=1",
+          "source_tree_sha": "f98185699ea0a8b270443e364e35a79788ae5d62",
+          "source_dirty": false,
+          "created_unix_ms": 1789131366891
+        }
+      },
+      "bytes_d1_removes": {
+        "literal": {
+          "gpu_to_host": 32768,
+          "host_copies": 32768
+        },
+        "residual": {
+          "gpu_to_host": 16384,
+          "host_copies": 32768
+        }
+      },
+      "cuda_environment": {
+        "module_loading": "EAGER",
+        "cache_disable": "1",
+        "observation": "read from the process environment (CUDA_MODULE_LOADING / CUDA_CACHE_DISABLE); the library never calls set_var"
+      },
+      "endpoint_region_sha256": {
+        "d1_literal_window": "82fc9c9f5c4914a90595a2a836de0c63f3124c8e8cb11c9e2fa38e7c92d1224b",
+        "d1_literal_endpoint": "82fc9c9f5c4914a90595a2a836de0c63f3124c8e8cb11c9e2fa38e7c92d1224b",
+        "d1_residual_endpoint": "f03fab3447f048cb63af73a893ae95740edf5fd01876ae15d06b18f2e0331177",
+        "d1_noise_endpoint": "ff5db7e9f0034ec84dec4e06a76f8f5f71c89bfc6a68661bba824477d55c80c5",
+        "derivation": "reference_hash is the scalar-expected window digest; backend_hash and endpoint_hash are independently accumulated from the actual mapped-region bytes read during per-chunk in-place verification (pre-commit, before the DMA consumes the region at drain). The digests are measured through separate byte streams and agree exactly because every committed chunk matched the scalar oracle (per-session window_sha256 / endpoint_sha256 in each row)"
+      },
+      "endpoint_registration_provenance": {
+        "source": "the d1-literal session's own HostRegistration (cuMemHostRegister over the ALSA mmap mapping the verdict-bearing GPU writes went through); captured at session setup, not from a post-hoc re-open",
+        "registered_range": "0x7ff72da7a000+32768",
+        "device_ptr_present": true,
+        "pcm_name": "hw:2,0",
+        "area_layout": "ch0 first=0 step=64; ch1 first=32 step=64",
+        "chain": "scalar expected bytes -> reference_hash; the verdict-bearing ALSA mmap region (registered by the d1-literal session) <- actual CUDA device pointer <- GPU writes -> per-chunk in-place mmap readback -> endpoint_hash == backend_hash == reference_hash",
+        "post_session_reprobe": "the trial-row snapshot re-opens the endpoint for endpoint state only (labeled post_session_reprobe); it is never registered and never supplies registered_range / device_pointer evidence"
+      },
+      "kernel_launch_accounting": {
+        "definition": "counters.kernel_launches and each session's kernel_launches count verdict-bearing measurement launches only (consistent with every earlier seal); warm-up launches are reported separately as warmup_kernel_launches per session and in methodology.sustained_clock_warmup_launches_per_d1_session",
+        "top_level_counters_kernel_launches": 8,
+        "top_level_includes_warmup": false
+      },
+      "methodology": {
+        "buffer_frames": 4096,
+        "period_frames": 512,
+        "page_frames": 256,
+        "windows_per_session": 8,
+        "pages_per_window": 2,
+        "sustained_clock_warmup_launches_per_d1_session": 80,
+        "warmup_target": "device scratch arenas; no window is pre-decoded for the session"
+      },
+      "object": {
+        "frames": 4096,
+        "channels": 2,
+        "page_frames": 256,
+        "pages_per_object": 16,
+        "literal": {
+          "pages": 16,
+          "rans": 16,
+          "raw": 0
+        },
+        "noise": {
+          "pages": 16,
+          "rans": 0,
+          "raw": 16
+        },
+        "residual": {
+          "pages": 16,
+          "rans": 0,
+          "raw": 16,
+          "corrections": 256,
+          "mono_to_stereo": "duplicate (L=R) at the sampler boundary"
+        }
+      },
+      "trials": [
+        {
+          "device": "hw:2,0",
+          "driver": "snd_hda_intel",
+          "stage": "session",
+          "result": "SUPPORTED",
+          "snapshot": {
+            "post_session_reprobe": true,
+            "pcm_name": "hw:2,0",
+            "access": "MMAP_INTERLEAVED",
+            "format": "S32_LE",
+            "rate_hz": 48000,
+            "channels": 2,
+            "period_frames": 512,
+            "buffer_frames": 4096,
+            "area_layout": "ch0 first=0 step=64; ch1 first=32 step=64",
+            "area_layout_validated": true,
+            "state": "PREPARED"
+          },
+          "sessions": [
+            {
+              "label": "d0-literal",
+              "verdict": "SUPPORTED",
+              "frames_committed": 4096,
+              "chunks": 8,
+              "xruns": 0,
+              "completed": true,
+              "shadow_exact": true,
+              "wall_ms": {
+                "mean": 0.01171175,
+                "median": 0.011592,
+                "max": 0.012673
+              },
+              "depth_frames": {
+                "min": 512,
+                "max": 4096
+              },
+              "materialization_gpu_to_host_bytes": 32768,
+              "materialization_host_copy_bytes": 32768,
+              "materialization_host_resident_peak_bytes": 32768,
+              "endpoint_observation_bytes": 32768,
+              "kernel_launches": 1,
+              "kernel_launches_total": 1,
+              "warmup_kernel_launches": 0,
+              "entropy_pages_decoded": 16,
+              "gpu_global_sample_intermediate_peak_bytes": 32768,
+              "verification_host_read_bytes": 32768,
+              "verification_shadow_copy_bytes": 0,
+              "window_sha256": "82fc9c9f5c4914a90595a2a836de0c63f3124c8e8cb11c9e2fa38e7c92d1224b",
+              "endpoint_sha256": "82fc9c9f5c4914a90595a2a836de0c63f3124c8e8cb11c9e2fa38e7c92d1224b",
+              "registered_range": null,
+              "registered_device_ptr_present": null,
+              "drain_state": "SETUP",
+              "detail": null
+            },
+            {
+              "label": "d1-literal",
+              "verdict": "SUPPORTED",
+              "frames_committed": 4096,
+              "chunks": 8,
+              "xruns": 0,
+              "completed": true,
+              "shadow_exact": true,
+              "wall_ms": {
+                "mean": 0.452089125,
+                "median": 0.451752,
+                "max": 0.467101
+              },
+              "depth_frames": {
+                "min": 512,
+                "max": 4096
+              },
+              "materialization_gpu_to_host_bytes": 0,
+              "materialization_host_copy_bytes": 0,
+              "materialization_host_resident_peak_bytes": 0,
+              "endpoint_observation_bytes": 32768,
+              "kernel_launches": 8,
+              "kernel_launches_total": 88,
+              "warmup_kernel_launches": 80,
+              "entropy_pages_decoded": 16,
+              "gpu_global_sample_intermediate_peak_bytes": 0,
+              "verification_host_read_bytes": 32768,
+              "verification_shadow_copy_bytes": 0,
+              "window_sha256": "82fc9c9f5c4914a90595a2a836de0c63f3124c8e8cb11c9e2fa38e7c92d1224b",
+              "endpoint_sha256": "82fc9c9f5c4914a90595a2a836de0c63f3124c8e8cb11c9e2fa38e7c92d1224b",
+              "registered_range": "0x7ff72da7a000+32768",
+              "registered_device_ptr_present": true,
+              "drain_state": "SETUP",
+              "detail": null
+            },
+            {
+              "label": "d0-residual",
+              "verdict": "SUPPORTED",
+              "frames_committed": 4096,
+              "chunks": 8,
+              "xruns": 0,
+              "completed": true,
+              "shadow_exact": true,
+              "wall_ms": {
+                "mean": 0.012335374999999999,
+                "median": 0.012293,
+                "max": 0.012774
+              },
+              "depth_frames": {
+                "min": 512,
+                "max": 4096
+              },
+              "materialization_gpu_to_host_bytes": 16384,
+              "materialization_host_copy_bytes": 32768,
+              "materialization_host_resident_peak_bytes": 16384,
+              "endpoint_observation_bytes": 32768,
+              "kernel_launches": 1,
+              "kernel_launches_total": 1,
+              "warmup_kernel_launches": 0,
+              "entropy_pages_decoded": 16,
+              "gpu_global_sample_intermediate_peak_bytes": 16384,
+              "verification_host_read_bytes": 32768,
+              "verification_shadow_copy_bytes": 0,
+              "window_sha256": "f03fab3447f048cb63af73a893ae95740edf5fd01876ae15d06b18f2e0331177",
+              "endpoint_sha256": "f03fab3447f048cb63af73a893ae95740edf5fd01876ae15d06b18f2e0331177",
+              "registered_range": null,
+              "registered_device_ptr_present": null,
+              "drain_state": "SETUP",
+              "detail": null
+            },
+            {
+              "label": "d1-residual",
+              "verdict": "SUPPORTED",
+              "frames_committed": 4096,
+              "chunks": 8,
+              "xruns": 0,
+              "completed": true,
+              "shadow_exact": true,
+              "wall_ms": {
+                "mean": 0.12353025000000001,
+                "median": 0.122608,
+                "max": 0.130924
+              },
+              "depth_frames": {
+                "min": 512,
+                "max": 4096
+              },
+              "materialization_gpu_to_host_bytes": 0,
+              "materialization_host_copy_bytes": 0,
+              "materialization_host_resident_peak_bytes": 0,
+              "endpoint_observation_bytes": 32768,
+              "kernel_launches": 16,
+              "kernel_launches_total": 96,
+              "warmup_kernel_launches": 80,
+              "entropy_pages_decoded": 16,
+              "gpu_global_sample_intermediate_peak_bytes": 2048,
+              "verification_host_read_bytes": 32768,
+              "verification_shadow_copy_bytes": 0,
+              "window_sha256": "f03fab3447f048cb63af73a893ae95740edf5fd01876ae15d06b18f2e0331177",
+              "endpoint_sha256": "f03fab3447f048cb63af73a893ae95740edf5fd01876ae15d06b18f2e0331177",
+              "registered_range": "0x7ff72da7a000+32768",
+              "registered_device_ptr_present": true,
+              "drain_state": "SETUP",
+              "detail": null
+            },
+            {
+              "label": "d1-noise",
+              "verdict": "SUPPORTED",
+              "frames_committed": 4096,
+              "chunks": 8,
+              "xruns": 0,
+              "completed": true,
+              "shadow_exact": true,
+              "wall_ms": {
+                "mean": 0.071687125,
+                "median": 0.071794,
+                "max": 0.072254
+              },
+              "depth_frames": {
+                "min": 512,
+                "max": 4096
+              },
+              "materialization_gpu_to_host_bytes": 0,
+              "materialization_host_copy_bytes": 0,
+              "materialization_host_resident_peak_bytes": 0,
+              "endpoint_observation_bytes": 32768,
+              "kernel_launches": 8,
+              "kernel_launches_total": 88,
+              "warmup_kernel_launches": 80,
+              "entropy_pages_decoded": 16,
+              "gpu_global_sample_intermediate_peak_bytes": 0,
+              "verification_host_read_bytes": 32768,
+              "verification_shadow_copy_bytes": 0,
+              "window_sha256": "ff5db7e9f0034ec84dec4e06a76f8f5f71c89bfc6a68661bba824477d55c80c5",
+              "endpoint_sha256": "ff5db7e9f0034ec84dec4e06a76f8f5f71c89bfc6a68661bba824477d55c80c5",
+              "registered_range": "0x7ff72da7a000+32768",
+              "registered_device_ptr_present": true,
+              "drain_state": "SETUP",
+              "detail": null
+            }
+          ],
+          "session_verdicts": [
+            {
+              "label": "d0-literal",
+              "verdict": "SUPPORTED",
+              "detail": "entropy decoded on GPU; sample block transferred to host and copied into the ALSA ring; endpoint codes matched scalar oracle; committed without discontinuity"
+            },
+            {
+              "label": "d1-literal",
+              "verdict": "SUPPORTED",
+              "detail": "entropy decoded on GPU; final sample codes written directly into the registered ALSA ring; endpoint codes matched scalar oracle; committed without discontinuity"
+            },
+            {
+              "label": "d0-residual",
+              "verdict": "SUPPORTED",
+              "detail": "entropy decoded on GPU; sample block transferred to host and copied into the ALSA ring; endpoint codes matched scalar oracle; committed without discontinuity"
+            },
+            {
+              "label": "d1-residual",
+              "verdict": "SUPPORTED",
+              "detail": "entropy decoded on GPU; final sample codes written directly into the registered ALSA ring; endpoint codes matched scalar oracle; committed without discontinuity"
+            },
+            {
+              "label": "d1-noise",
+              "verdict": "SUPPORTED",
+              "detail": "entropy decoded on GPU; final sample codes written directly into the registered ALSA ring; endpoint codes matched scalar oracle; committed without discontinuity"
+            }
+          ]
+        },
+        {
+          "device": "hw:1,3",
+          "driver": "snd_hda_intel",
+          "stage": "session",
+          "result": "NOT_ATTEMPTED_AFTER_SUCCESS",
+          "detail": "a prior candidate (hw:2,0) completed a successful entropy-D1 session set"
+        },
+        {
+          "device": "hw:1,7",
+          "driver": "snd_hda_intel",
+          "stage": "session",
+          "result": "NOT_ATTEMPTED_AFTER_SUCCESS",
+          "detail": "a prior candidate (hw:2,0) completed a successful entropy-D1 session set"
+        },
+        {
+          "device": "hw:1,8",
+          "driver": "snd_hda_intel",
+          "stage": "session",
+          "result": "NOT_ATTEMPTED_AFTER_SUCCESS",
+          "detail": "a prior candidate (hw:2,0) completed a successful entropy-D1 session set"
+        },
+        {
+          "device": "hw:1,9",
+          "driver": "snd_hda_intel",
+          "stage": "session",
+          "result": "NOT_ATTEMPTED_AFTER_SUCCESS",
+          "detail": "a prior candidate (hw:2,0) completed a successful entropy-D1 session set"
+        },
+        {
+          "device": "hw:2,1",
+          "driver": "snd_hda_intel",
+          "stage": "session",
+          "result": "NOT_ATTEMPTED_AFTER_SUCCESS",
+          "detail": "a prior candidate (hw:2,0) completed a successful entropy-D1 session set"
+        },
+        {
+          "device": "hw:0,0",
+          "driver": "snd-usb-audio",
+          "stage": "session",
+          "result": "NOT_ATTEMPTED_AFTER_SUCCESS",
+          "detail": "a prior candidate (hw:2,0) completed a successful entropy-D1 session set"
+        }
+      ],
+      "verification_accounting": "verification reads the committed ring in place; it is separate from materialization counters (never conflated)",
+      "winning_trial": {
+        "device": "hw:2,0",
+        "driver": "snd_hda_intel",
+        "stage": "session",
+        "result": "SUPPORTED",
+        "snapshot": {
+          "post_session_reprobe": true,
+          "pcm_name": "hw:2,0",
+          "access": "MMAP_INTERLEAVED",
+          "format": "S32_LE",
+          "rate_hz": 48000,
+          "channels": 2,
+          "period_frames": 512,
+          "buffer_frames": 4096,
+          "area_layout": "ch0 first=0 step=64; ch1 first=32 step=64",
+          "area_layout_validated": true,
+          "state": "PREPARED"
+        },
+        "sessions": [
+          {
+            "label": "d0-literal",
+            "verdict": "SUPPORTED",
+            "frames_committed": 4096,
+            "chunks": 8,
+            "xruns": 0,
+            "completed": true,
+            "shadow_exact": true,
+            "wall_ms": {
+              "mean": 0.01171175,
+              "median": 0.011592,
+              "max": 0.012673
+            },
+            "depth_frames": {
+              "min": 512,
+              "max": 4096
+            },
+            "materialization_gpu_to_host_bytes": 32768,
+            "materialization_host_copy_bytes": 32768,
+            "materialization_host_resident_peak_bytes": 32768,
+            "endpoint_observation_bytes": 32768,
+            "kernel_launches": 1,
+            "kernel_launches_total": 1,
+            "warmup_kernel_launches": 0,
+            "entropy_pages_decoded": 16,
+            "gpu_global_sample_intermediate_peak_bytes": 32768,
+            "verification_host_read_bytes": 32768,
+            "verification_shadow_copy_bytes": 0,
+            "window_sha256": "82fc9c9f5c4914a90595a2a836de0c63f3124c8e8cb11c9e2fa38e7c92d1224b",
+            "endpoint_sha256": "82fc9c9f5c4914a90595a2a836de0c63f3124c8e8cb11c9e2fa38e7c92d1224b",
+            "registered_range": null,
+            "registered_device_ptr_present": null,
+            "drain_state": "SETUP",
+            "detail": null
+          },
+          {
+            "label": "d1-literal",
+            "verdict": "SUPPORTED",
+            "frames_committed": 4096,
+            "chunks": 8,
+            "xruns": 0,
+            "completed": true,
+            "shadow_exact": true,
+            "wall_ms": {
+              "mean": 0.452089125,
+              "median": 0.451752,
+              "max": 0.467101
+            },
+            "depth_frames": {
+              "min": 512,
+              "max": 4096
+            },
+            "materialization_gpu_to_host_bytes": 0,
+            "materialization_host_copy_bytes": 0,
+            "materialization_host_resident_peak_bytes": 0,
+            "endpoint_observation_bytes": 32768,
+            "kernel_launches": 8,
+            "kernel_launches_total": 88,
+            "warmup_kernel_launches": 80,
+            "entropy_pages_decoded": 16,
+            "gpu_global_sample_intermediate_peak_bytes": 0,
+            "verification_host_read_bytes": 32768,
+            "verification_shadow_copy_bytes": 0,
+            "window_sha256": "82fc9c9f5c4914a90595a2a836de0c63f3124c8e8cb11c9e2fa38e7c92d1224b",
+            "endpoint_sha256": "82fc9c9f5c4914a90595a2a836de0c63f3124c8e8cb11c9e2fa38e7c92d1224b",
+            "registered_range": "0x7ff72da7a000+32768",
+            "registered_device_ptr_present": true,
+            "drain_state": "SETUP",
+            "detail": null
+          },
+          {
+            "label": "d0-residual",
+            "verdict": "SUPPORTED",
+            "frames_committed": 4096,
+            "chunks": 8,
+            "xruns": 0,
+            "completed": true,
+            "shadow_exact": true,
+            "wall_ms": {
+              "mean": 0.012335374999999999,
+              "median": 0.012293,
+              "max": 0.012774
+            },
+            "depth_frames": {
+              "min": 512,
+              "max": 4096
+            },
+            "materialization_gpu_to_host_bytes": 16384,
+            "materialization_host_copy_bytes": 32768,
+            "materialization_host_resident_peak_bytes": 16384,
+            "endpoint_observation_bytes": 32768,
+            "kernel_launches": 1,
+            "kernel_launches_total": 1,
+            "warmup_kernel_launches": 0,
+            "entropy_pages_decoded": 16,
+            "gpu_global_sample_intermediate_peak_bytes": 16384,
+            "verification_host_read_bytes": 32768,
+            "verification_shadow_copy_bytes": 0,
+            "window_sha256": "f03fab3447f048cb63af73a893ae95740edf5fd01876ae15d06b18f2e0331177",
+            "endpoint_sha256": "f03fab3447f048cb63af73a893ae95740edf5fd01876ae15d06b18f2e0331177",
+            "registered_range": null,
+            "registered_device_ptr_present": null,
+            "drain_state": "SETUP",
+            "detail": null
+          },
+          {
+            "label": "d1-residual",
+            "verdict": "SUPPORTED",
+            "frames_committed": 4096,
+            "chunks": 8,
+            "xruns": 0,
+            "completed": true,
+            "shadow_exact": true,
+            "wall_ms": {
+              "mean": 0.12353025000000001,
+              "median": 0.122608,
+              "max": 0.130924
+            },
+            "depth_frames": {
+              "min": 512,
+              "max": 4096
+            },
+            "materialization_gpu_to_host_bytes": 0,
+            "materialization_host_copy_bytes": 0,
+            "materialization_host_resident_peak_bytes": 0,
+            "endpoint_observation_bytes": 32768,
+            "kernel_launches": 16,
+            "kernel_launches_total": 96,
+            "warmup_kernel_launches": 80,
+            "entropy_pages_decoded": 16,
+            "gpu_global_sample_intermediate_peak_bytes": 2048,
+            "verification_host_read_bytes": 32768,
+            "verification_shadow_copy_bytes": 0,
+            "window_sha256": "f03fab3447f048cb63af73a893ae95740edf5fd01876ae15d06b18f2e0331177",
+            "endpoint_sha256": "f03fab3447f048cb63af73a893ae95740edf5fd01876ae15d06b18f2e0331177",
+            "registered_range": "0x7ff72da7a000+32768",
+            "registered_device_ptr_present": true,
+            "drain_state": "SETUP",
+            "detail": null
+          },
+          {
+            "label": "d1-noise",
+            "verdict": "SUPPORTED",
+            "frames_committed": 4096,
+            "chunks": 8,
+            "xruns": 0,
+            "completed": true,
+            "shadow_exact": true,
+            "wall_ms": {
+              "mean": 0.071687125,
+              "median": 0.071794,
+              "max": 0.072254
+            },
+            "depth_frames": {
+              "min": 512,
+              "max": 4096
+            },
+            "materialization_gpu_to_host_bytes": 0,
+            "materialization_host_copy_bytes": 0,
+            "materialization_host_resident_peak_bytes": 0,
+            "endpoint_observation_bytes": 32768,
+            "kernel_launches": 8,
+            "kernel_launches_total": 88,
+            "warmup_kernel_launches": 80,
+            "entropy_pages_decoded": 16,
+            "gpu_global_sample_intermediate_peak_bytes": 0,
+            "verification_host_read_bytes": 32768,
+            "verification_shadow_copy_bytes": 0,
+            "window_sha256": "ff5db7e9f0034ec84dec4e06a76f8f5f71c89bfc6a68661bba824477d55c80c5",
+            "endpoint_sha256": "ff5db7e9f0034ec84dec4e06a76f8f5f71c89bfc6a68661bba824477d55c80c5",
+            "registered_range": "0x7ff72da7a000+32768",
+            "registered_device_ptr_present": true,
+            "drain_state": "SETUP",
+            "detail": null
+          }
+        ],
+        "session_verdicts": [
+          {
+            "label": "d0-literal",
+            "verdict": "SUPPORTED",
+            "detail": "entropy decoded on GPU; sample block transferred to host and copied into the ALSA ring; endpoint codes matched scalar oracle; committed without discontinuity"
+          },
+          {
+            "label": "d1-literal",
+            "verdict": "SUPPORTED",
+            "detail": "entropy decoded on GPU; final sample codes written directly into the registered ALSA ring; endpoint codes matched scalar oracle; committed without discontinuity"
+          },
+          {
+            "label": "d0-residual",
+            "verdict": "SUPPORTED",
+            "detail": "entropy decoded on GPU; sample block transferred to host and copied into the ALSA ring; endpoint codes matched scalar oracle; committed without discontinuity"
+          },
+          {
+            "label": "d1-residual",
+            "verdict": "SUPPORTED",
+            "detail": "entropy decoded on GPU; final sample codes written directly into the registered ALSA ring; endpoint codes matched scalar oracle; committed without discontinuity"
+          },
+          {
+            "label": "d1-noise",
+            "verdict": "SUPPORTED",
+            "detail": "entropy decoded on GPU; final sample codes written directly into the registered ALSA ring; endpoint codes matched scalar oracle; committed without discontinuity"
+          }
+        ]
+      }
+    }
+  },
+  "receipt_sha256": "52605e987b7e238df368ecebcc6fa0b6c83c80e3d6f6677ecf6f1d02dee0b806"
+}
