@@ -98,6 +98,8 @@ pub mod learned_real_corpus_u1;
 #[cfg(feature = "std")]
 pub mod learned_residual;
 #[cfg(feature = "std")]
+pub mod learned_residual_anatomy;
+#[cfg(feature = "std")]
 pub mod learned_residual_codec;
 #[cfg(feature = "std")]
 pub mod learned_residual_codec2;
@@ -319,6 +321,14 @@ FLAC-5 with per-family attribution",
         "U1-domain common-factor fix: the Wasted model wrapper (kind 16) plus the FactorShift residual codec (id 14) against the S0 U1 baseline portfolio and FLAC-5",
     ),
     (
+        "learned-residual-anatomy",
+        "Fourth-pass Seal E0 residual entropy anatomy (diagnostic, no format change): the exact
+S8 winner residual over the effectiveness clips plus representative Phase-M objects, binarized
+canonically, with empirical conditional entropy H(bit | context) under bit position, current
+prefix, previous/previous-two residual magnitudes, previous sign, residual FSM, matched lag,
+local energy and predictor disagreement; held-out Mode C untouched",
+    ),
+    (
         "learned-speech-trace",
         "Seal S0 diagnostic: bit-for-bit trace of the frozen B1 FLAC-5 artifact (subframe kinds, orders, precision, shift, partition order, residual payload) beside the wired three-family Exp2 VOLE byte waterfall, on the real + Mode-C corpus",
     ),
@@ -503,6 +513,7 @@ pub fn run(name: &str, receipts_root: &Path) -> crate::error::Result<Verdict> {
         "learned-speech" => learned_speech::run(receipts_root),
         "learned-real-corpus-u1" => learned_real_corpus_u1::run(receipts_root),
         "learned-u1-wasted" => learned_u1_wasted::run(receipts_root),
+        "learned-residual-anatomy" => learned_residual_anatomy::run(receipts_root),
         "learned-exp2-transfer" => learned_exp2_transfer::run(receipts_root),
         "learned-residual-codec" => learned_residual_codec::run(receipts_root),
         "learned-residual-codec2" => learned_residual_codec2::run(receipts_root),

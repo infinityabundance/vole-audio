@@ -37,7 +37,7 @@ use std::path::Path;
 pub const LEARNED_SPEECH_SHA256: &str =
     "55409530ebc94a031e97c7d7ea1d95c62e29771cc9beabd8c3d457bdd45bda2f";
 
-const CLIPS_PER_SPLIT: usize = 8;
+pub(crate) const CLIPS_PER_SPLIT: usize = 8;
 
 /// The active candidate families (grown one seal at a time).
 pub const ACTIVE_FAMILIES: &[&str] = &[
@@ -57,7 +57,10 @@ fn bytes(o: &LearnedObject) -> Option<u64> {
 
 /// Build the active portfolio for one case. Returns named exact candidates in the
 /// Exp3 profile (every Exp2 candidate plus the Seal S4 residual codecs).
-fn portfolio(case: &RealCase, budget: &TrainBudget) -> Result<Vec<(&'static str, LearnedObject)>> {
+pub(crate) fn portfolio(
+    case: &RealCase,
+    budget: &TrainBudget,
+) -> Result<Vec<(&'static str, LearnedObject)>> {
     let frames = case.frames();
     let rate = case.rate();
     let mut raw: Vec<(&'static str, LearnedObject)> = Vec::new();

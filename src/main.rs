@@ -368,6 +368,7 @@ fn cmd_seal_verify(args: &[String]) -> Result<u8> {
                        learned-speech-trace=SUPPORTED,learned-real-corpus-u1=SUPPORTED,\
                        learned-u1-wasted=SUPPORTED,\
                        learned-speech=SUPPORTED,\
+                       learned-residual-anatomy=SUPPORTED,\
                        compound=SUPPORTED,\
                        cuda=SUPPORTED,d1=SUPPORTED,h2=SUPPORTED,\
                        rocm=UNSUPPORTED_BY_HARDWARE|UNSUPPORTED_BY_API|INCONCLUSIVE,\
