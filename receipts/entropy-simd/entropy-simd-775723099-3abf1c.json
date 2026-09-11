@@ -1,0 +1,1670 @@
+{
+  "schema": "vole.audio.evidence.v1",
+  "schema_version": 1,
+  "receipt": {
+    "schema": "vole.audio.evidence.v1",
+    "schema_version": 1,
+    "run_id": "entropy-simd-775723099-3abf1c",
+    "court": "entropy-simd",
+    "created_unix_ms": 775723099,
+    "result": "SUPPORTED",
+    "result_detail": "scalar == CPU page-parallel decode (up to 16 threads) on 43 jobs; measured speedup surface reported; instruction-level SIMD decode NOT implemented by design (single-state rANS is serial per stream; no fabricated vectorization — H.2.16)",
+    "environment": {
+      "os": {
+        "sysname": "Linux",
+        "release": "7.2.2-1-cachyos",
+        "version": "#1 SMP PREEMPT_DYNAMIC Fri, 28 Aug 2026 08:05:11 +0000",
+        "machine": "x86_64",
+        "nodename": "vanir",
+        "os_pretty_name": "CachyOS"
+      },
+      "cpu": {
+        "model": "AMD Ryzen 7 9800X3D 8-Core Processor",
+        "flags": [
+          "3dnowprefetch",
+          "abm",
+          "adx",
+          "aes",
+          "amd_lbr_pmc_freeze",
+          "amd_lbr_v2",
+          "aperfmperf",
+          "apic",
+          "arat",
+          "avic",
+          "avx",
+          "avx2",
+          "avx512_bf16",
+          "avx512_bitalg",
+          "avx512_vbmi2",
+          "avx512_vnni",
+          "avx512_vp2intersect",
+          "avx512_vpopcntdq",
+          "avx512bw",
+          "avx512cd",
+          "avx512dq",
+          "avx512f",
+          "avx512ifma",
+          "avx512vbmi",
+          "avx512vl",
+          "avx_vnni",
+          "bmi1",
+          "bmi2",
+          "bpext",
+          "bus_lock_detect",
+          "cat_l3",
+          "cdp_l3",
+          "clflush",
+          "clflushopt",
+          "clwb",
+          "clzero",
+          "cmov",
+          "cmp_legacy",
+          "constant_tsc",
+          "cpb",
+          "cppc",
+          "cpuid",
+          "cpuid_fault",
+          "cqm",
+          "cqm_llc",
+          "cqm_mbm_local",
+          "cqm_mbm_total",
+          "cqm_occup_llc",
+          "cr8_legacy",
+          "cx16",
+          "cx8",
+          "de",
+          "decodeassists",
+          "erms",
+          "extapic",
+          "extd_apicid",
+          "f16c",
+          "flush_l1d",
+          "flushbyasid",
+          "fma",
+          "fpu",
+          "fsgsbase",
+          "fsrm",
+          "fxsr",
+          "fxsr_opt",
+          "gfni",
+          "ht",
+          "hw_pstate",
+          "ibpb",
+          "ibrs",
+          "ibrs_enhanced",
+          "ibs",
+          "invpcid",
+          "irperf",
+          "lahf_lm",
+          "lbrv",
+          "lm",
+          "mba",
+          "mca",
+          "mce",
+          "misalignsse",
+          "mmx",
+          "mmxext",
+          "monitor",
+          "movbe",
+          "movdir64b",
+          "movdiri",
+          "msr",
+          "mtrr",
+          "mwaitx",
+          "nonstop_tsc",
+          "nopl",
+          "npt",
+          "nrip_save",
+          "nx",
+          "ospke",
+          "osvw",
+          "overflow_recov",
+          "pae",
+          "pat",
+          "pausefilter",
+          "pclmulqdq",
+          "pdpe1gb",
+          "perfctr_core",
+          "perfctr_llc",
+          "perfctr_nb",
+          "perfmon_v2",
+          "pfthreshold",
+          "pge",
+          "pku",
+          "pni",
+          "popcnt",
+          "pse",
+          "pse36",
+          "rapl",
+          "rdpid",
+          "rdpru",
+          "rdrand",
+          "rdseed",
+          "rdt_a",
+          "rdtscp",
+          "rep_good",
+          "sep",
+          "sha_ni",
+          "skinit",
+          "smap",
+          "smca",
+          "smep",
+          "ssbd",
+          "sse",
+          "sse2",
+          "sse4_1",
+          "sse4_2",
+          "sse4a",
+          "ssse3",
+          "stibp",
+          "succor",
+          "svm",
+          "svm_lock",
+          "syscall",
+          "tce",
+          "topoext",
+          "tsc",
+          "tsc_adjust",
+          "tsc_scale",
+          "umip",
+          "user_shstk",
+          "v_spec_ctrl",
+          "v_vmsave_vmload",
+          "vaes",
+          "vgif",
+          "vmcb_clean",
+          "vme",
+          "vmmcall",
+          "vnmi",
+          "vpclmulqdq",
+          "wbnoinvd",
+          "wdt",
+          "x2avic",
+          "xgetbv1",
+          "xsave",
+          "xsavec",
+          "xsaveerptr",
+          "xsaveopt",
+          "xsaves",
+          "xtopology"
+        ],
+        "has_avx2": true,
+        "has_avx512": true,
+        "has_neon": false
+      },
+      "memory": {
+        "total_bytes": 134689935360
+      },
+      "git_commit": "1b029382a5988a5463de5267b28afb4ea9393a85",
+      "git_dirty": false,
+      "git_branch": "main",
+      "rustc_version": "rustc 1.99.0-nightly (89c61a754 2026-07-23)",
+      "crate_version": "0.42.0",
+      "target_arch": "x86_64",
+      "target_os": "linux",
+      "cpu_governor": "performance",
+      "bios_version": "1402",
+      "git_tree_sha": "e8ca7fec15a78554888a804a3e1d28fdb329561c",
+      "build_git_commit": "1b029382a5988a5463de5267b28afb4ea9393a85",
+      "build_tree_sha": "e8ca7fec15a78554888a804a3e1d28fdb329561c",
+      "build_dirty": false,
+      "build_rustc": "rustc 1.99.0-nightly (89c61a754 2026-07-23)",
+      "build_profile": "release",
+      "build_target": "x86_64-unknown-linux-gnu",
+      "source_binding": "bound",
+      "seal_subject_hash": "632c086c9834c505bcc74422a24f27f837eef1481e7334288e3ca7af8a419dcc"
+    },
+    "hardware": {
+      "pci_devices": [
+        {
+          "bdf": "0000:00:00.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14d8",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": null
+        },
+        {
+          "bdf": "0000:00:00.2",
+          "class": "0x080600",
+          "vendor": "0x1022",
+          "device": "0x14d9",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": null
+        },
+        {
+          "bdf": "0000:00:01.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "0"
+        },
+        {
+          "bdf": "0000:00:01.1",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14db",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "1"
+        },
+        {
+          "bdf": "0000:00:01.2",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14db",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "2"
+        },
+        {
+          "bdf": "0000:00:02.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "3"
+        },
+        {
+          "bdf": "0000:00:02.1",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14db",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "4"
+        },
+        {
+          "bdf": "0000:00:02.2",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14db",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "5"
+        },
+        {
+          "bdf": "0000:00:03.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "6"
+        },
+        {
+          "bdf": "0000:00:04.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "7"
+        },
+        {
+          "bdf": "0000:00:08.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "8"
+        },
+        {
+          "bdf": "0000:00:08.1",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14dd",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "9"
+        },
+        {
+          "bdf": "0000:00:08.3",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14dd",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "10"
+        },
+        {
+          "bdf": "0000:00:14.0",
+          "class": "0x0c0500",
+          "vendor": "0x1022",
+          "device": "0x790b",
+          "driver": "piix4_smbus",
+          "numa_node": -1,
+          "iommu_group": "11"
+        },
+        {
+          "bdf": "0000:00:14.3",
+          "class": "0x060100",
+          "vendor": "0x1022",
+          "device": "0x790e",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "11"
+        },
+        {
+          "bdf": "0000:00:18.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e0",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.1",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e1",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.2",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e2",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.3",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e3",
+          "driver": "k10temp",
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.4",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e4",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.5",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e5",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.6",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e6",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.7",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e7",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:01:00.0",
+          "class": "0x030000",
+          "vendor": "0x10de",
+          "device": "0x2702",
+          "driver": "nvidia",
+          "numa_node": -1,
+          "iommu_group": "13"
+        },
+        {
+          "bdf": "0000:01:00.1",
+          "class": "0x040300",
+          "vendor": "0x10de",
+          "device": "0x22bb",
+          "driver": "snd_hda_intel",
+          "numa_node": -1,
+          "iommu_group": "13"
+        },
+        {
+          "bdf": "0000:02:00.0",
+          "class": "0x010802",
+          "vendor": "0xc0a9",
+          "device": "0x542b",
+          "driver": "nvme",
+          "numa_node": -1,
+          "iommu_group": "14"
+        },
+        {
+          "bdf": "0000:03:00.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f4",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "15"
+        },
+        {
+          "bdf": "0000:04:00.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "16"
+        },
+        {
+          "bdf": "0000:04:04.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "17"
+        },
+        {
+          "bdf": "0000:04:05.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "18"
+        },
+        {
+          "bdf": "0000:04:08.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "19"
+        },
+        {
+          "bdf": "0000:04:0c.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "20"
+        },
+        {
+          "bdf": "0000:04:0d.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "21"
+        },
+        {
+          "bdf": "0000:05:00.0",
+          "class": "0x010802",
+          "vendor": "0x2646",
+          "device": "0x5019",
+          "driver": "nvme",
+          "numa_node": -1,
+          "iommu_group": "16"
+        },
+        {
+          "bdf": "0000:06:00.0",
+          "class": "0x020000",
+          "vendor": "0x10ec",
+          "device": "0x8125",
+          "driver": "r8169",
+          "numa_node": -1,
+          "iommu_group": "17"
+        },
+        {
+          "bdf": "0000:09:00.0",
+          "class": "0x0c0330",
+          "vendor": "0x1022",
+          "device": "0x43fc",
+          "driver": "xhci-pci-prom21",
+          "numa_node": -1,
+          "iommu_group": "20"
+        },
+        {
+          "bdf": "0000:0a:00.0",
+          "class": "0x010601",
+          "vendor": "0x1022",
+          "device": "0x43f6",
+          "driver": "ahci",
+          "numa_node": -1,
+          "iommu_group": "21"
+        },
+        {
+          "bdf": "0000:0b:00.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2421",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "22"
+        },
+        {
+          "bdf": "0000:0c:00.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2423",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "23"
+        },
+        {
+          "bdf": "0000:0c:01.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2423",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "24"
+        },
+        {
+          "bdf": "0000:0c:02.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2423",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "25"
+        },
+        {
+          "bdf": "0000:0c:03.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2423",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "26"
+        },
+        {
+          "bdf": "0000:71:00.0",
+          "class": "0x0c0330",
+          "vendor": "0x1b21",
+          "device": "0x2426",
+          "driver": "xhci_hcd",
+          "numa_node": -1,
+          "iommu_group": "25"
+        },
+        {
+          "bdf": "0000:72:00.0",
+          "class": "0x0c0340",
+          "vendor": "0x1b21",
+          "device": "0x2425",
+          "driver": "thunderbolt",
+          "numa_node": -1,
+          "iommu_group": "26"
+        },
+        {
+          "bdf": "0000:73:00.0",
+          "class": "0x130000",
+          "vendor": "0x1022",
+          "device": "0x14de",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "27"
+        },
+        {
+          "bdf": "0000:73:00.2",
+          "class": "0x108000",
+          "vendor": "0x1022",
+          "device": "0x1649",
+          "driver": "ccp",
+          "numa_node": -1,
+          "iommu_group": "28"
+        },
+        {
+          "bdf": "0000:73:00.3",
+          "class": "0x0c0330",
+          "vendor": "0x1022",
+          "device": "0x15b6",
+          "driver": "xhci_hcd",
+          "numa_node": -1,
+          "iommu_group": "29"
+        },
+        {
+          "bdf": "0000:73:00.4",
+          "class": "0x0c0330",
+          "vendor": "0x1022",
+          "device": "0x15b7",
+          "driver": "xhci_hcd",
+          "numa_node": -1,
+          "iommu_group": "30"
+        },
+        {
+          "bdf": "0000:73:00.6",
+          "class": "0x040300",
+          "vendor": "0x1022",
+          "device": "0x15e3",
+          "driver": "snd_hda_intel",
+          "numa_node": -1,
+          "iommu_group": "31"
+        },
+        {
+          "bdf": "0000:74:00.0",
+          "class": "0x0c0330",
+          "vendor": "0x1022",
+          "device": "0x15b8",
+          "driver": "xhci_hcd",
+          "numa_node": -1,
+          "iommu_group": "32"
+        }
+      ],
+      "gpu": {
+        "vendor": null,
+        "name": null,
+        "bdf": null,
+        "compute_capability": null,
+        "memory_bytes": null,
+        "driver_version": null,
+        "runtime_version": null
+      },
+      "audio": {
+        "card": null,
+        "device": null,
+        "name": null,
+        "subdevice": null
+      }
+    },
+    "params": {
+      "universe": "vole.audio.u1",
+      "profile": "u1/v1 + vole.entropy.p1/p1/v1",
+      "backend": "cpu",
+      "sample_rate_hz": null,
+      "channels": null,
+      "voices": null,
+      "quantum_frames": null,
+      "duration_secs": null,
+      "content_kind": "entropy-corpus-v1 simd-surface"
+    },
+    "counters": {
+      "host_pcm_staging_bytes": 0,
+      "host_pcm_copy_bytes": 0,
+      "gpu_to_host_pcm_bytes": 0,
+      "endpoint_observation_bytes": 0,
+      "device_sample_block_bytes": 0,
+      "transient_compute_words": 0,
+      "host_pcm_resident_peak_bytes": 0,
+      "host_pcm_resident_integral": 0.0,
+      "endpoint_depth_frames": 0,
+      "endpoint_depth_min_frames": 18446744073709551615,
+      "endpoint_depth_max_frames": 0,
+      "quanta_submitted": 0,
+      "events_consumed": 0,
+      "xruns": 0,
+      "kernel_launches": 0,
+      "missed_deadlines": 0
+    },
+    "timing": {
+      "total_ns": null,
+      "deadline_ns": null,
+      "warmup_runs": null,
+      "run_count": null,
+      "observation_count": null,
+      "tail": null
+    },
+    "provenance": {
+      "reference_hash": null,
+      "backend_hash": null,
+      "endpoint_hash": null,
+      "gpu_artifact_hash": null,
+      "source_hash": null,
+      "corpus_hash": null,
+      "table_hashes": [],
+      "benchmark_order": [],
+      "exact_equality": null
+    },
+    "endpoint": {
+      "directness": null,
+      "topology": null,
+      "registered_range": null,
+      "registration_result": null,
+      "device_pointer": null,
+      "synchronization_mechanism": null,
+      "fence_sync_evidence": null,
+      "coherency_assumptions": null,
+      "hidden_staging_investigation": null,
+      "endpoint_clock": null
+    },
+    "energy": null,
+    "trace": null,
+    "limitations": [
+      "this court measures the sanctioned CPU parallel surface (independent pages); it does not claim instruction-level SIMD decode exists — see instruction_simd extra"
+    ],
+    "extras": {
+      "cells": [
+        {
+          "case": "silence sym=2",
+          "pages": 32,
+          "threads": 1,
+          "exact": true,
+          "mean_ms_per_decode": 0.06892510416666667
+        },
+        {
+          "case": "silence sym=2",
+          "pages": 32,
+          "threads": 2,
+          "exact": true,
+          "mean_ms_per_decode": 0.03898577083333333
+        },
+        {
+          "case": "silence sym=2",
+          "pages": 32,
+          "threads": 16,
+          "exact": true,
+          "mean_ms_per_decode": 0.040457895833333334
+        },
+        {
+          "case": "silence sym=3",
+          "pages": 32,
+          "threads": 1,
+          "exact": true,
+          "mean_ms_per_decode": 0.06873139583333333
+        },
+        {
+          "case": "silence sym=3",
+          "pages": 32,
+          "threads": 2,
+          "exact": true,
+          "mean_ms_per_decode": 0.03872695833333333
+        },
+        {
+          "case": "silence sym=3",
+          "pages": 32,
+          "threads": 16,
+          "exact": true,
+          "mean_ms_per_decode": 0.046061875
+        },
+        {
+          "case": "silence sym=4",
+          "pages": 32,
+          "threads": 1,
+          "exact": true,
+          "mean_ms_per_decode": 0.0782121875
+        },
+        {
+          "case": "silence sym=4",
+          "pages": 32,
+          "threads": 2,
+          "exact": true,
+          "mean_ms_per_decode": 0.04170979166666666
+        },
+        {
+          "case": "silence sym=4",
+          "pages": 32,
+          "threads": 16,
+          "exact": true,
+          "mean_ms_per_decode": 0.03290110416666667
+        },
+        {
+          "case": "dc sym=2",
+          "pages": 32,
+          "threads": 1,
+          "exact": true,
+          "mean_ms_per_decode": 0.06825383333333333
+        },
+        {
+          "case": "dc sym=2",
+          "pages": 32,
+          "threads": 2,
+          "exact": true,
+          "mean_ms_per_decode": 0.03861529166666667
+        },
+        {
+          "case": "dc sym=2",
+          "pages": 32,
+          "threads": 16,
+          "exact": true,
+          "mean_ms_per_decode": 0.031259895833333336
+        },
+        {
+          "case": "dc sym=3",
+          "pages": 32,
+          "threads": 1,
+          "exact": true,
+          "mean_ms_per_decode": 0.06896745833333333
+        },
+        {
+          "case": "dc sym=3",
+          "pages": 32,
+          "threads": 2,
+          "exact": true,
+          "mean_ms_per_decode": 0.0406446875
+        },
+        {
+          "case": "dc sym=3",
+          "pages": 32,
+          "threads": 16,
+          "exact": true,
+          "mean_ms_per_decode": 0.030742479166666666
+        },
+        {
+          "case": "dc sym=4",
+          "pages": 32,
+          "threads": 1,
+          "exact": true,
+          "mean_ms_per_decode": 0.13513908333333333
+        },
+        {
+          "case": "dc sym=4",
+          "pages": 32,
+          "threads": 2,
+          "exact": true,
+          "mean_ms_per_decode": 0.07154977083333333
+        },
+        {
+          "case": "dc sym=4",
+          "pages": 32,
+          "threads": 16,
+          "exact": true,
+          "mean_ms_per_decode": 0.0386605625
+        },
+        {
+          "case": "dc-negative sym=2",
+          "pages": 32,
+          "threads": 1,
+          "exact": true,
+          "mean_ms_per_decode": 0.06798770833333333
+        },
+        {
+          "case": "dc-negative sym=2",
+          "pages": 32,
+          "threads": 2,
+          "exact": true,
+          "mean_ms_per_decode": 0.03932347916666667
+        },
+        {
+          "case": "dc-negative sym=2",
+          "pages": 32,
+          "threads": 16,
+          "exact": true,
+          "mean_ms_per_decode": 0.031035729166666665
+        },
+        {
+          "case": "dc-negative sym=3",
+          "pages": 32,
+          "threads": 1,
+          "exact": true,
+          "mean_ms_per_decode": 0.068950125
+        },
+        {
+          "case": "dc-negative sym=3",
+          "pages": 32,
+          "threads": 2,
+          "exact": true,
+          "mean_ms_per_decode": 0.0391915625
+        },
+        {
+          "case": "dc-negative sym=3",
+          "pages": 32,
+          "threads": 16,
+          "exact": true,
+          "mean_ms_per_decode": 0.0323924375
+        },
+        {
+          "case": "dc-negative sym=4",
+          "pages": 32,
+          "threads": 1,
+          "exact": true,
+          "mean_ms_per_decode": 0.24885847916666667
+        },
+        {
+          "case": "dc-negative sym=4",
+          "pages": 32,
+          "threads": 2,
+          "exact": true,
+          "mean_ms_per_decode": 0.12678477083333334
+        },
+        {
+          "case": "dc-negative sym=4",
+          "pages": 32,
+          "threads": 16,
+          "exact": true,
+          "mean_ms_per_decode": 0.05870104166666667
+        },
+        {
+          "case": "single-sine sym=2",
+          "pages": 32,
+          "threads": 1,
+          "exact": true,
+          "mean_ms_per_decode": 1.0730215625
+        },
+        {
+          "case": "single-sine sym=2",
+          "pages": 32,
+          "threads": 2,
+          "exact": true,
+          "mean_ms_per_decode": 0.5500872291666666
+        },
+        {
+          "case": "single-sine sym=2",
+          "pages": 32,
+          "threads": 16,
+          "exact": true,
+          "mean_ms_per_decode": 0.142335
+        },
+        {
+          "case": "single-sine sym=3",
+          "pages": 32,
+          "threads": 1,
+          "exact": true,
+          "mean_ms_per_decode": 0.8446865625000001
+        },
+        {
+          "case": "single-sine sym=3",
+          "pages": 32,
+          "threads": 2,
+          "exact": true,
+          "mean_ms_per_decode": 0.43519293749999993
+        },
+        {
+          "case": "single-sine sym=3",
+          "pages": 32,
+          "threads": 16,
+          "exact": true,
+          "mean_ms_per_decode": 0.1086395
+        },
+        {
+          "case": "single-sine sym=4",
+          "pages": 32,
+          "threads": 1,
+          "exact": true,
+          "mean_ms_per_decode": 0.5625949166666666
+        },
+        {
+          "case": "single-sine sym=4",
+          "pages": 32,
+          "threads": 2,
+          "exact": true,
+          "mean_ms_per_decode": 0.2856764375
+        },
+        {
+          "case": "single-sine sym=4",
+          "pages": 32,
+          "threads": 16,
+          "exact": true,
+          "mean_ms_per_decode": 0.0781180625
+        },
+        {
+          "case": "harmonic-tone sym=2",
+          "pages": 32,
+          "threads": 1,
+          "exact": true,
+          "mean_ms_per_decode": 1.3158625833333335
+        },
+        {
+          "case": "harmonic-tone sym=2",
+          "pages": 32,
+          "threads": 2,
+          "exact": true,
+          "mean_ms_per_decode": 0.6706464583333335
+        },
+        {
+          "case": "harmonic-tone sym=2",
+          "pages": 32,
+          "threads": 16,
+          "exact": true,
+          "mean_ms_per_decode": 0.17229477083333333
+        },
+        {
+          "case": "harmonic-tone sym=3",
+          "pages": 32,
+          "threads": 1,
+          "exact": true,
+          "mean_ms_per_decode": 1.0935281041666667
+        },
+        {
+          "case": "harmonic-tone sym=3",
+          "pages": 32,
+          "threads": 2,
+          "exact": true,
+          "mean_ms_per_decode": 0.5598550208333334
+        },
+        {
+          "case": "harmonic-tone sym=3",
+          "pages": 32,
+          "threads": 16,
+          "exact": true,
+          "mean_ms_per_decode": 0.13415495833333332
+        },
+        {
+          "case": "harmonic-tone sym=4",
+          "pages": 32,
+          "threads": 1,
+          "exact": true,
+          "mean_ms_per_decode": 0.9297805208333334
+        },
+        {
+          "case": "harmonic-tone sym=4",
+          "pages": 32,
+          "threads": 2,
+          "exact": true,
+          "mean_ms_per_decode": 0.47220795833333334
+        },
+        {
+          "case": "harmonic-tone sym=4",
+          "pages": 32,
+          "threads": 16,
+          "exact": true,
+          "mean_ms_per_decode": 0.12012506249999999
+        },
+        {
+          "case": "quasi-periodic sym=2",
+          "pages": 32,
+          "threads": 1,
+          "exact": true,
+          "mean_ms_per_decode": 0.0013721458333333335
+        },
+        {
+          "case": "quasi-periodic sym=2",
+          "pages": 32,
+          "threads": 2,
+          "exact": true,
+          "mean_ms_per_decode": 0.00319325
+        },
+        {
+          "case": "quasi-periodic sym=2",
+          "pages": 32,
+          "threads": 16,
+          "exact": true,
+          "mean_ms_per_decode": 0.025049395833333335
+        },
+        {
+          "case": "quasi-periodic sym=3",
+          "pages": 32,
+          "threads": 1,
+          "exact": true,
+          "mean_ms_per_decode": 0.0012636041666666666
+        },
+        {
+          "case": "quasi-periodic sym=3",
+          "pages": 32,
+          "threads": 2,
+          "exact": true,
+          "mean_ms_per_decode": 0.003316375
+        },
+        {
+          "case": "quasi-periodic sym=3",
+          "pages": 32,
+          "threads": 16,
+          "exact": true,
+          "mean_ms_per_decode": 0.022014354166666666
+        },
+        {
+          "case": "quasi-periodic sym=4",
+          "pages": 32,
+          "threads": 1,
+          "exact": true,
+          "mean_ms_per_decode": 0.0012656875
+        },
+        {
+          "case": "quasi-periodic sym=4",
+          "pages": 32,
+          "threads": 2,
+          "exact": true,
+          "mean_ms_per_decode": 0.0030629999999999998
+        },
+        {
+          "case": "quasi-periodic sym=4",
+          "pages": 32,
+          "threads": 16,
+          "exact": true,
+          "mean_ms_per_decode": 0.02193964583333333
+        },
+        {
+          "case": "impulse-train sym=2",
+          "pages": 32,
+          "threads": 1,
+          "exact": true,
+          "mean_ms_per_decode": 0.12438466666666666
+        },
+        {
+          "case": "impulse-train sym=2",
+          "pages": 32,
+          "threads": 2,
+          "exact": true,
+          "mean_ms_per_decode": 0.06796079166666667
+        },
+        {
+          "case": "impulse-train sym=2",
+          "pages": 32,
+          "threads": 16,
+          "exact": true,
+          "mean_ms_per_decode": 0.03423922916666667
+        },
+        {
+          "case": "impulse-train sym=3",
+          "pages": 32,
+          "threads": 1,
+          "exact": true,
+          "mean_ms_per_decode": 0.125276125
+        },
+        {
+          "case": "impulse-train sym=3",
+          "pages": 32,
+          "threads": 2,
+          "exact": true,
+          "mean_ms_per_decode": 0.070645375
+        },
+        {
+          "case": "impulse-train sym=3",
+          "pages": 32,
+          "threads": 16,
+          "exact": true,
+          "mean_ms_per_decode": 0.03793108333333333
+        },
+        {
+          "case": "impulse-train sym=4",
+          "pages": 32,
+          "threads": 1,
+          "exact": true,
+          "mean_ms_per_decode": 0.33105391666666667
+        },
+        {
+          "case": "impulse-train sym=4",
+          "pages": 32,
+          "threads": 2,
+          "exact": true,
+          "mean_ms_per_decode": 0.16995875000000002
+        },
+        {
+          "case": "impulse-train sym=4",
+          "pages": 32,
+          "threads": 16,
+          "exact": true,
+          "mean_ms_per_decode": 0.05840110416666666
+        },
+        {
+          "case": "transient-heavy sym=2",
+          "pages": 32,
+          "threads": 1,
+          "exact": true,
+          "mean_ms_per_decode": 0.12013677083333335
+        },
+        {
+          "case": "transient-heavy sym=2",
+          "pages": 32,
+          "threads": 2,
+          "exact": true,
+          "mean_ms_per_decode": 0.06510420833333333
+        },
+        {
+          "case": "transient-heavy sym=2",
+          "pages": 32,
+          "threads": 16,
+          "exact": true,
+          "mean_ms_per_decode": 0.04672664583333334
+        },
+        {
+          "case": "transient-heavy sym=3",
+          "pages": 32,
+          "threads": 1,
+          "exact": true,
+          "mean_ms_per_decode": 0.12470066666666667
+        },
+        {
+          "case": "transient-heavy sym=3",
+          "pages": 32,
+          "threads": 2,
+          "exact": true,
+          "mean_ms_per_decode": 0.06755420833333332
+        },
+        {
+          "case": "transient-heavy sym=3",
+          "pages": 32,
+          "threads": 16,
+          "exact": true,
+          "mean_ms_per_decode": 0.042151458333333336
+        },
+        {
+          "case": "transient-heavy sym=4",
+          "pages": 32,
+          "threads": 1,
+          "exact": true,
+          "mean_ms_per_decode": 0.12063204166666668
+        },
+        {
+          "case": "transient-heavy sym=4",
+          "pages": 32,
+          "threads": 2,
+          "exact": true,
+          "mean_ms_per_decode": 0.06369075
+        },
+        {
+          "case": "transient-heavy sym=4",
+          "pages": 32,
+          "threads": 16,
+          "exact": true,
+          "mean_ms_per_decode": 0.04022847916666667
+        },
+        {
+          "case": "am-signal sym=2",
+          "pages": 32,
+          "threads": 1,
+          "exact": true,
+          "mean_ms_per_decode": 0.6140534999999999
+        },
+        {
+          "case": "am-signal sym=2",
+          "pages": 32,
+          "threads": 2,
+          "exact": true,
+          "mean_ms_per_decode": 0.31733625
+        },
+        {
+          "case": "am-signal sym=2",
+          "pages": 32,
+          "threads": 16,
+          "exact": true,
+          "mean_ms_per_decode": 0.08349327083333334
+        },
+        {
+          "case": "am-signal sym=3",
+          "pages": 32,
+          "threads": 1,
+          "exact": true,
+          "mean_ms_per_decode": 0.5114398125
+        },
+        {
+          "case": "am-signal sym=3",
+          "pages": 32,
+          "threads": 2,
+          "exact": true,
+          "mean_ms_per_decode": 0.2662540208333333
+        },
+        {
+          "case": "am-signal sym=3",
+          "pages": 32,
+          "threads": 16,
+          "exact": true,
+          "mean_ms_per_decode": 0.08254254166666666
+        },
+        {
+          "case": "am-signal sym=4",
+          "pages": 32,
+          "threads": 1,
+          "exact": true,
+          "mean_ms_per_decode": 0.477335625
+        },
+        {
+          "case": "am-signal sym=4",
+          "pages": 32,
+          "threads": 2,
+          "exact": true,
+          "mean_ms_per_decode": 0.2440778958333333
+        },
+        {
+          "case": "am-signal sym=4",
+          "pages": 32,
+          "threads": 16,
+          "exact": true,
+          "mean_ms_per_decode": 0.07242220833333333
+        },
+        {
+          "case": "fm-signal sym=2",
+          "pages": 32,
+          "threads": 1,
+          "exact": true,
+          "mean_ms_per_decode": 0.001410125
+        },
+        {
+          "case": "fm-signal sym=2",
+          "pages": 32,
+          "threads": 2,
+          "exact": true,
+          "mean_ms_per_decode": 0.0033948750000000003
+        },
+        {
+          "case": "fm-signal sym=2",
+          "pages": 32,
+          "threads": 16,
+          "exact": true,
+          "mean_ms_per_decode": 0.023760520833333337
+        },
+        {
+          "case": "fm-signal sym=3",
+          "pages": 32,
+          "threads": 1,
+          "exact": true,
+          "mean_ms_per_decode": 0.0012567083333333334
+        },
+        {
+          "case": "fm-signal sym=3",
+          "pages": 32,
+          "threads": 2,
+          "exact": true,
+          "mean_ms_per_decode": 0.0032406250000000004
+        },
+        {
+          "case": "fm-signal sym=3",
+          "pages": 32,
+          "threads": 16,
+          "exact": true,
+          "mean_ms_per_decode": 0.022964875
+        },
+        {
+          "case": "fm-signal sym=4",
+          "pages": 32,
+          "threads": 1,
+          "exact": true,
+          "mean_ms_per_decode": 0.0014011458333333335
+        },
+        {
+          "case": "fm-signal sym=4",
+          "pages": 32,
+          "threads": 2,
+          "exact": true,
+          "mean_ms_per_decode": 0.0031354374999999998
+        },
+        {
+          "case": "fm-signal sym=4",
+          "pages": 32,
+          "threads": 16,
+          "exact": true,
+          "mean_ms_per_decode": 0.021899770833333332
+        },
+        {
+          "case": "stereo-correlated sym=2",
+          "pages": 32,
+          "threads": 1,
+          "exact": true,
+          "mean_ms_per_decode": 1.26571225
+        },
+        {
+          "case": "stereo-correlated sym=2",
+          "pages": 32,
+          "threads": 2,
+          "exact": true,
+          "mean_ms_per_decode": 0.647356375
+        },
+        {
+          "case": "stereo-correlated sym=2",
+          "pages": 32,
+          "threads": 16,
+          "exact": true,
+          "mean_ms_per_decode": 0.14619010416666667
+        },
+        {
+          "case": "stereo-correlated sym=3",
+          "pages": 32,
+          "threads": 1,
+          "exact": true,
+          "mean_ms_per_decode": 1.0367183125
+        },
+        {
+          "case": "stereo-correlated sym=3",
+          "pages": 32,
+          "threads": 2,
+          "exact": true,
+          "mean_ms_per_decode": 0.5514664583333333
+        },
+        {
+          "case": "stereo-correlated sym=3",
+          "pages": 32,
+          "threads": 16,
+          "exact": true,
+          "mean_ms_per_decode": 0.1370468125
+        },
+        {
+          "case": "stereo-correlated sym=4",
+          "pages": 32,
+          "threads": 1,
+          "exact": true,
+          "mean_ms_per_decode": 0.9232107708333334
+        },
+        {
+          "case": "stereo-correlated sym=4",
+          "pages": 32,
+          "threads": 2,
+          "exact": true,
+          "mean_ms_per_decode": 0.4751394375
+        },
+        {
+          "case": "stereo-correlated sym=4",
+          "pages": 32,
+          "threads": 16,
+          "exact": true,
+          "mean_ms_per_decode": 0.1181549375
+        },
+        {
+          "case": "white-noise sym=2",
+          "pages": 32,
+          "threads": 1,
+          "exact": true,
+          "mean_ms_per_decode": 0.0013692291666666664
+        },
+        {
+          "case": "white-noise sym=2",
+          "pages": 32,
+          "threads": 2,
+          "exact": true,
+          "mean_ms_per_decode": 0.002839666666666666
+        },
+        {
+          "case": "white-noise sym=2",
+          "pages": 32,
+          "threads": 16,
+          "exact": true,
+          "mean_ms_per_decode": 0.023862187500000003
+        },
+        {
+          "case": "white-noise sym=3",
+          "pages": 32,
+          "threads": 1,
+          "exact": true,
+          "mean_ms_per_decode": 0.0013412500000000002
+        },
+        {
+          "case": "white-noise sym=3",
+          "pages": 32,
+          "threads": 2,
+          "exact": true,
+          "mean_ms_per_decode": 0.0031360625
+        },
+        {
+          "case": "white-noise sym=3",
+          "pages": 32,
+          "threads": 16,
+          "exact": true,
+          "mean_ms_per_decode": 0.02319927083333333
+        },
+        {
+          "case": "white-noise sym=4",
+          "pages": 32,
+          "threads": 1,
+          "exact": true,
+          "mean_ms_per_decode": 0.0011438125
+        },
+        {
+          "case": "white-noise sym=4",
+          "pages": 32,
+          "threads": 2,
+          "exact": true,
+          "mean_ms_per_decode": 0.0027643333333333335
+        },
+        {
+          "case": "white-noise sym=4",
+          "pages": 32,
+          "threads": 16,
+          "exact": true,
+          "mean_ms_per_decode": 0.02344452083333333
+        },
+        {
+          "case": "random-control sym=2",
+          "pages": 32,
+          "threads": 1,
+          "exact": true,
+          "mean_ms_per_decode": 0.0018663958333333334
+        },
+        {
+          "case": "random-control sym=2",
+          "pages": 32,
+          "threads": 2,
+          "exact": true,
+          "mean_ms_per_decode": 0.003373791666666666
+        },
+        {
+          "case": "random-control sym=2",
+          "pages": 32,
+          "threads": 16,
+          "exact": true,
+          "mean_ms_per_decode": 0.02249358333333333
+        },
+        {
+          "case": "random-control sym=3",
+          "pages": 32,
+          "threads": 1,
+          "exact": true,
+          "mean_ms_per_decode": 0.0017914583333333333
+        },
+        {
+          "case": "random-control sym=3",
+          "pages": 32,
+          "threads": 2,
+          "exact": true,
+          "mean_ms_per_decode": 0.0032587708333333336
+        },
+        {
+          "case": "random-control sym=3",
+          "pages": 32,
+          "threads": 16,
+          "exact": true,
+          "mean_ms_per_decode": 0.022665145833333334
+        },
+        {
+          "case": "random-control sym=4",
+          "pages": 32,
+          "threads": 1,
+          "exact": true,
+          "mean_ms_per_decode": 0.0018332083333333334
+        },
+        {
+          "case": "random-control sym=4",
+          "pages": 32,
+          "threads": 2,
+          "exact": true,
+          "mean_ms_per_decode": 0.003430958333333333
+        },
+        {
+          "case": "random-control sym=4",
+          "pages": 32,
+          "threads": 16,
+          "exact": true,
+          "mean_ms_per_decode": 0.022966749999999998
+        },
+        {
+          "case": "scrambled-control sym=2",
+          "pages": 32,
+          "threads": 1,
+          "exact": true,
+          "mean_ms_per_decode": 0.0011442083333333332
+        },
+        {
+          "case": "scrambled-control sym=2",
+          "pages": 32,
+          "threads": 2,
+          "exact": true,
+          "mean_ms_per_decode": 0.003057770833333333
+        },
+        {
+          "case": "scrambled-control sym=2",
+          "pages": 32,
+          "threads": 16,
+          "exact": true,
+          "mean_ms_per_decode": 0.022665770833333335
+        },
+        {
+          "case": "scrambled-control sym=3",
+          "pages": 32,
+          "threads": 1,
+          "exact": true,
+          "mean_ms_per_decode": 0.0011442083333333332
+        },
+        {
+          "case": "scrambled-control sym=3",
+          "pages": 32,
+          "threads": 2,
+          "exact": true,
+          "mean_ms_per_decode": 0.0029026874999999995
+        },
+        {
+          "case": "scrambled-control sym=3",
+          "pages": 32,
+          "threads": 16,
+          "exact": true,
+          "mean_ms_per_decode": 0.022854666666666665
+        },
+        {
+          "case": "scrambled-control sym=4",
+          "pages": 32,
+          "threads": 1,
+          "exact": true,
+          "mean_ms_per_decode": 0.0011035208333333333
+        },
+        {
+          "case": "scrambled-control sym=4",
+          "pages": 32,
+          "threads": 2,
+          "exact": true,
+          "mean_ms_per_decode": 0.002132729166666667
+        },
+        {
+          "case": "scrambled-control sym=4",
+          "pages": 32,
+          "threads": 16,
+          "exact": true,
+          "mean_ms_per_decode": 0.02261339583333333
+        },
+        {
+          "case": "residual-periodic-sparse",
+          "pages": 8,
+          "threads": 1,
+          "exact": true,
+          "mean_ms_per_decode": 0.005653020833333334
+        },
+        {
+          "case": "residual-periodic-sparse",
+          "pages": 8,
+          "threads": 2,
+          "exact": true,
+          "mean_ms_per_decode": 0.004383583333333333
+        },
+        {
+          "case": "residual-periodic-sparse",
+          "pages": 8,
+          "threads": 8,
+          "exact": true,
+          "mean_ms_per_decode": 0.0062272291666666665
+        }
+      ],
+      "instruction_simd": {
+        "avx2_entropy_decode": "NOT_IMPLEMENTED",
+        "avx512_entropy_decode": "NOT_IMPLEMENTED",
+        "reason": "single-state rANS is inherently serial per stream; a multi-state/interleaved layout enabling real instruction SIMD would be a separately identified representation requiring byte-exact proof — future work, never fabricated",
+        "measured_parallel_surface": "independent entropy pages over CPU threads (exact == scalar on every fixture)"
+      },
+      "mean_page_parallel_speedup": {
+        "over_sequential": 2.2549218080529854
+      },
+      "threads": 16
+    }
+  },
+  "receipt_sha256": "69a1f39fd4310db3bf4e66bafedf2782b2caf32e907bf07521103a1761d4de12"
+}
