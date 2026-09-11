@@ -104,6 +104,8 @@ pub mod learned_residual_codec;
 #[cfg(feature = "std")]
 pub mod learned_residual_codec2;
 #[cfg(feature = "std")]
+pub mod learned_residual_entropy;
+#[cfg(feature = "std")]
 pub mod learned_shared;
 #[cfg(feature = "std")]
 pub mod learned_speech;
@@ -329,6 +331,13 @@ prefix, previous/previous-two residual magnitudes, previous sign, residual FSM, 
 local energy and predictor disagreement; held-out Mode C untouched",
     ),
     (
+        "learned-residual-entropy",
+        "Fourth-pass Seal E1 attributable residual-codec ladder: re-encode the fixed S8 winner
+residual with the pre-E1 Exp3 family versus the Seal E1 signed/FSM adaptive binary range coder
+(id 16), reporting per-object and per-codec bytes with exact round-trip; held-out Mode C
+untouched",
+    ),
+    (
         "learned-speech-trace",
         "Seal S0 diagnostic: bit-for-bit trace of the frozen B1 FLAC-5 artifact (subframe kinds, orders, precision, shift, partition order, residual payload) beside the wired three-family Exp2 VOLE byte waterfall, on the real + Mode-C corpus",
     ),
@@ -514,6 +523,7 @@ pub fn run(name: &str, receipts_root: &Path) -> crate::error::Result<Verdict> {
         "learned-real-corpus-u1" => learned_real_corpus_u1::run(receipts_root),
         "learned-u1-wasted" => learned_u1_wasted::run(receipts_root),
         "learned-residual-anatomy" => learned_residual_anatomy::run(receipts_root),
+        "learned-residual-entropy" => learned_residual_entropy::run(receipts_root),
         "learned-exp2-transfer" => learned_exp2_transfer::run(receipts_root),
         "learned-residual-codec" => learned_residual_codec::run(receipts_root),
         "learned-residual-codec2" => learned_residual_codec2::run(receipts_root),

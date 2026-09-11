@@ -89,6 +89,8 @@ pub enum ResidualCodecV2 {
     FactorShift = 14,
     /// Elias–Fano positions of the nonzero residuals + separate magnitudes.
     EliasFano = 15,
+    /// Signed/FSM adaptive binary range coding of each residual bit (Seal E1).
+    SignedFsm = 16,
 }
 
 impl ResidualCodecV2 {
@@ -128,8 +130,8 @@ impl ResidualCodecV2 {
         ResidualCodecV2::ContextRans,
     ];
 
-    /// The Exp3 additions (Seal S4), in canonical tie order.
-    pub const ALL_V3: [ResidualCodecV2; 16] = [
+    /// The Exp3 additions (Seal S4 + Seal E1), in canonical tie order.
+    pub const ALL_V3: [ResidualCodecV2; 17] = [
         ResidualCodecV2::DenseI32,
         ResidualCodecV2::SparseDelta,
         ResidualCodecV2::ZigZagVarint,
@@ -146,6 +148,7 @@ impl ResidualCodecV2 {
         ResidualCodecV2::CenteredGolomb,
         ResidualCodecV2::FactorShift,
         ResidualCodecV2::EliasFano,
+        ResidualCodecV2::SignedFsm,
     ];
 
     /// Canonical codec identifier byte.
@@ -172,6 +175,7 @@ impl ResidualCodecV2 {
             ResidualCodecV2::CenteredGolomb => "centered_golomb",
             ResidualCodecV2::FactorShift => "factor_shift",
             ResidualCodecV2::EliasFano => "elias_fano",
+            ResidualCodecV2::SignedFsm => "signed_fsm",
         }
     }
 
@@ -194,6 +198,7 @@ impl ResidualCodecV2 {
             13 => Some(ResidualCodecV2::CenteredGolomb),
             14 => Some(ResidualCodecV2::FactorShift),
             15 => Some(ResidualCodecV2::EliasFano),
+            16 => Some(ResidualCodecV2::SignedFsm),
             _ => None,
         }
     }
@@ -247,6 +252,7 @@ impl ResidualCodecV2 {
             ResidualCodecV2::CenteredGolomb => encode_centered_golomb(residual),
             ResidualCodecV2::FactorShift => encode_factor_shift(residual),
             ResidualCodecV2::EliasFano => encode_elias_fano(residual),
+            ResidualCodecV2::SignedFsm => encode_signed_fsm(residual),
         }
     }
 
@@ -274,6 +280,7 @@ impl ResidualCodecV2 {
             ResidualCodecV2::CenteredGolomb => decode_centered_golomb(bytes, len),
             ResidualCodecV2::FactorShift => decode_factor_shift(bytes, len),
             ResidualCodecV2::EliasFano => decode_elias_fano(bytes, len),
+            ResidualCodecV2::SignedFsm => decode_signed_fsm(bytes, len),
         }
     }
 }
@@ -2150,6 +2157,292 @@ fn decode_elias_fano(bytes: &[u8], len: usize) -> Result<Vec<i32>> {
     Ok(out)
 }
 
+// ---------------------------------------------------------------------------
+// Signed/FSM adaptive binary range coder (fourth-pass Seal E1)
+//
+// A forward, carry-less binary range coder (the LZMA arithmetic coder) models
+// each residual bit with an online-adaptive 12-bit probability selected by a
+// decoder-visible context: the residual-event FSM state (Z/S/M/L/T by magnitude
+// class), the previous residual magnitude bucket, the previous sign, the
+// unary-length position, and the already-decoded value prefix. Probability
+// estimates are mixed in the coding domain directly, so a bad estimate costs
+// bits and never correctness. Both encoder and decoder update the same slot
+// after every bit, from information the decoder already has.
+//
+// Binarization (identical to the Seal E0 anatomy, frozen): sign bit, then
+// Exp-Golomb(0) of `|r|` -- `n-1` unary zeros, a terminating one, then the
+// `n-1` low bits of `v = |r| + 1`. Exactly invertible over the whole i32 range.
+// ---------------------------------------------------------------------------
+
+/// Range-coder renormalization threshold.
+const RC_TOP: u32 = 1 << 24;
+/// Probability precision (12-bit probability of a zero bit).
+const RC_BITS: u32 = 12;
+/// Probability total (`1 << RC_BITS`).
+const RC_TOTAL: u32 = 1 << RC_BITS;
+/// Initial probability of a zero bit.
+const RC_INIT: u16 = (RC_TOTAL / 2) as u16;
+/// Probability adaptation shift (LZMA-style).
+const RC_MOVE: u32 = 5;
+
+/// Residual-event FSM state count (Z/S/M/L/T).
+const RC_FSM_STATES: usize = 5;
+/// Magnitude-bucket count used by the context functions.
+const RC_BUCKETS: usize = 16;
+/// Sign-context table size.
+const RC_SIGN_LEN: usize = 2 * RC_FSM_STATES * RC_BUCKETS;
+/// Length-context table size.
+const RC_LEN_LEN: usize = 16 * RC_FSM_STATES * RC_BUCKETS;
+/// Value-context table size.
+const RC_VAL_LEN: usize = 16 * 4 * RC_BUCKETS;
+/// Total adaptive-probability table size.
+const RC_TOTAL_SLOTS: usize = RC_SIGN_LEN + RC_LEN_LEN + RC_VAL_LEN;
+
+#[inline]
+fn rc_bucket(m: u64) -> usize {
+    (64 - m.leading_zeros()).min((RC_BUCKETS - 1) as u32) as usize
+}
+
+#[inline]
+fn rc_fsm_state(m: u64) -> usize {
+    if m == 0 {
+        0
+    } else if m <= 2 {
+        1
+    } else if m <= 16 {
+        2
+    } else if m <= 256 {
+        3
+    } else {
+        4
+    }
+}
+
+#[inline]
+fn rc_adapt(p: u16, bit: u32) -> u16 {
+    if bit == 0 {
+        p + (((RC_TOTAL as u16) - p) >> RC_MOVE)
+    } else {
+        p - (p >> RC_MOVE)
+    }
+}
+
+/// LZMA-style carry-less range encoder.
+struct RangeEncoder {
+    low: u64,
+    range: u32,
+    cache: u8,
+    cache_size: u64,
+    out: Vec<u8>,
+}
+
+impl RangeEncoder {
+    fn new() -> Self {
+        RangeEncoder {
+            low: 0,
+            range: u32::MAX,
+            cache: 0,
+            cache_size: 1,
+            out: Vec::new(),
+        }
+    }
+
+    fn shift_low(&mut self) {
+        if (self.low >> 32) != 0 || (self.low as u32) < 0xFF00_0000 {
+            let carry = (self.low >> 32) as u8;
+            let mut temp = self.cache;
+            loop {
+                self.out.push(temp.wrapping_add(carry));
+                temp = 0xFF;
+                self.cache_size -= 1;
+                if self.cache_size == 0 {
+                    break;
+                }
+            }
+            self.cache = ((self.low >> 24) & 0xFF) as u8;
+        }
+        self.cache_size += 1;
+        self.low = ((self.low as u32) << 8) as u64;
+    }
+
+    #[inline]
+    fn encode_bit(&mut self, prob0: u16, bit: u32) {
+        let bound = (self.range >> RC_BITS) * u32::from(prob0);
+        if bit == 0 {
+            self.range = bound;
+        } else {
+            self.low += u64::from(bound);
+            self.range -= bound;
+        }
+        while self.range < RC_TOP {
+            self.range <<= 8;
+            self.shift_low();
+        }
+    }
+
+    fn finish(mut self) -> Vec<u8> {
+        for _ in 0..5 {
+            self.shift_low();
+        }
+        self.out
+    }
+}
+
+/// LZMA-style range decoder.
+struct RangeDecoder<'a> {
+    bytes: &'a [u8],
+    pos: usize,
+    code: u32,
+    range: u32,
+}
+
+impl<'a> RangeDecoder<'a> {
+    fn new(bytes: &'a [u8]) -> Result<Self> {
+        if bytes.len() < 5 {
+            return Err(Error::malformed(
+                "range stream is shorter than its init window",
+            ));
+        }
+        let mut d = RangeDecoder {
+            bytes,
+            pos: 0,
+            code: 0,
+            range: u32::MAX,
+        };
+        for _ in 0..5 {
+            let b = d.next_byte()?;
+            d.code = (d.code << 8) | u32::from(b);
+        }
+        Ok(d)
+    }
+
+    #[inline]
+    fn next_byte(&mut self) -> Result<u8> {
+        let b = *self
+            .bytes
+            .get(self.pos)
+            .ok_or_else(|| Error::malformed("range stream ran out of bytes"))?;
+        self.pos += 1;
+        Ok(b)
+    }
+
+    #[inline]
+    fn decode_bit(&mut self, prob0: u16) -> Result<u32> {
+        let bound = (self.range >> RC_BITS) * u32::from(prob0);
+        let bit = if self.code < bound {
+            self.range = bound;
+            0
+        } else {
+            self.code -= bound;
+            self.range -= bound;
+            1
+        };
+        while self.range < RC_TOP {
+            self.range <<= 8;
+            let b = self.next_byte()?;
+            self.code = (self.code << 8) | u32::from(b);
+        }
+        Ok(bit)
+    }
+}
+
+#[inline]
+fn rc_encode(enc: &mut RangeEncoder, probs: &mut [u16], ctx: usize, bit: u32) {
+    let p = probs[ctx];
+    enc.encode_bit(p, bit);
+    probs[ctx] = rc_adapt(p, bit);
+}
+
+#[inline]
+fn rc_decode(dec: &mut RangeDecoder<'_>, probs: &mut [u16], ctx: usize) -> Result<u32> {
+    let p = probs[ctx];
+    let bit = dec.decode_bit(p)?;
+    probs[ctx] = rc_adapt(p, bit);
+    Ok(bit)
+}
+
+fn encode_signed_fsm(residual: &[i32]) -> Vec<u8> {
+    let mut enc = RangeEncoder::new();
+    let mut probs = vec![RC_INIT; RC_TOTAL_SLOTS];
+    let mut prev_m: u64 = 0;
+    let mut prev_state = 0usize;
+    let mut prev_neg = 0usize;
+    for &r in residual {
+        let neg = u32::from(r < 0);
+        let m = u64::from(r.unsigned_abs());
+        let pb = rc_bucket(prev_m);
+        // Sign bit.
+        let sign_ctx = (prev_neg * RC_FSM_STATES + prev_state) * RC_BUCKETS + pb;
+        rc_encode(&mut enc, &mut probs, sign_ctx, neg);
+        // Unary length: `n-1` zeros then the terminating one.
+        let v = m + 1;
+        let n = (64 - v.leading_zeros()) as usize;
+        for i in 0..n {
+            let bit = u32::from(i + 1 == n);
+            let idx = RC_SIGN_LEN + (i.min(15) * RC_FSM_STATES + prev_state) * RC_BUCKETS + pb;
+            rc_encode(&mut enc, &mut probs, idx, bit);
+        }
+        // The `n-1` low bits of `v`, most significant first.
+        let mut prefix = 0usize;
+        for j in 0..n - 1 {
+            let bit = ((v >> (n - 2 - j)) & 1) as u32;
+            let idx = RC_SIGN_LEN + RC_LEN_LEN + (j.min(15) * 4 + prefix) * RC_BUCKETS + pb;
+            rc_encode(&mut enc, &mut probs, idx, bit);
+            prefix = ((prefix << 1) | bit as usize) & 3;
+        }
+        prev_m = m;
+        prev_state = rc_fsm_state(m);
+        prev_neg = neg as usize;
+    }
+    enc.finish()
+}
+
+#[allow(clippy::needless_range_loop)]
+fn decode_signed_fsm(bytes: &[u8], len: usize) -> Result<Vec<i32>> {
+    let mut dec = RangeDecoder::new(bytes)?;
+    let mut probs = vec![RC_INIT; RC_TOTAL_SLOTS];
+    let mut out = Vec::with_capacity(len);
+    let mut prev_m: u64 = 0;
+    let mut prev_state = 0usize;
+    let mut prev_neg = 0usize;
+    for _ in 0..len {
+        let pb = rc_bucket(prev_m);
+        let sign_ctx = (prev_neg * RC_FSM_STATES + prev_state) * RC_BUCKETS + pb;
+        let neg = rc_decode(&mut dec, &mut probs, sign_ctx)? != 0;
+        // Unary length.
+        let mut z = 0usize;
+        loop {
+            let idx = RC_SIGN_LEN + (z.min(15) * RC_FSM_STATES + prev_state) * RC_BUCKETS + pb;
+            if rc_decode(&mut dec, &mut probs, idx)? == 1 {
+                break;
+            }
+            z += 1;
+            if z > 32 {
+                return Err(Error::malformed("signed/fsm unary length out of range"));
+            }
+        }
+        // `z` low bits rebuild `v = (1 << z) | bits`, so `m = v - 1`.
+        let mut v: u64 = 1;
+        let mut prefix = 0usize;
+        for j in 0..z {
+            let idx = RC_SIGN_LEN + RC_LEN_LEN + (j.min(15) * 4 + prefix) * RC_BUCKETS + pb;
+            let bit = rc_decode(&mut dec, &mut probs, idx)?;
+            v = (v << 1) | u64::from(bit);
+            prefix = ((prefix << 1) | bit as usize) & 3;
+        }
+        let m = v - 1;
+        if m > (1u64 << 31) {
+            return Err(Error::malformed("signed/fsm magnitude exceeds i32 range"));
+        }
+        let value = if neg { -(m as i64) } else { m as i64 };
+        out.push(value as i32);
+        prev_m = m;
+        prev_state = rc_fsm_state(m);
+        prev_neg = usize::from(neg);
+    }
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2242,6 +2535,45 @@ mod tests {
             let payload = c.encode(&residual);
             let back = c.decode(&payload, residual.len()).unwrap();
             assert_eq!(back, residual);
+        }
+    }
+
+    #[test]
+    fn signed_fsm_round_trips_exactly() {
+        let c = ResidualCodecV2::SignedFsm;
+        assert_eq!(c.name(), "signed_fsm");
+        assert_eq!(ResidualCodecV2::from_id(16), Some(c));
+        for residual in sample_residuals() {
+            let payload = c.encode(&residual);
+            let back = c
+                .decode(&payload, residual.len())
+                .unwrap_or_else(|e| panic!("signed_fsm: {e}"));
+            assert_eq!(back, residual);
+        }
+        // Both i32 extremes, whose magnitudes need the full 32-bit code.
+        let extreme = vec![i32::MIN, i32::MAX, -1, 0, 1, 2, -2, 1 << 30, -(1 << 30)];
+        let payload = c.encode(&extreme);
+        assert_eq!(c.decode(&payload, extreme.len()).unwrap(), extreme);
+    }
+
+    #[test]
+    fn signed_fsm_never_panics_on_truncation_or_garbage() {
+        let c = ResidualCodecV2::SignedFsm;
+        for bytes in [
+            vec![0u8; 1],
+            vec![0xFF; 1],
+            vec![0x80; 8],
+            vec![0u8; 64],
+            vec![0xFF; 64],
+        ] {
+            for len in [0usize, 1, 7, 300] {
+                let _ = c.decode(&bytes, len);
+            }
+        }
+        let residual: Vec<i32> = (0..500).map(|i| ((i * 37) % 101) - 50).collect();
+        let payload = c.encode(&residual);
+        for cut in 1..payload.len().min(64) {
+            let _ = c.decode(&payload[..payload.len() - cut], residual.len());
         }
     }
 
