@@ -126,11 +126,36 @@ honest, small shape the literature predicts: fixed differences are nearly free
 but rarely beat a fitted model on speech. FLAC's own LPC selection confirms it —
 its fixed subframes appear only occasionally (Seal S0 trace).
 
+### Seal S2 — dense local all-pole LPC
+
+New fitter `learned::train::lpc`: per 4096-frame block a Tukey(0.5)-windowed
+autocorrelation and a Levinson–Durbin recursion produce predictor coefficients
+`H[n] = Σ_j c_j·x[n-j]`; the canonical integer form is the kind-`12`
+`LpcPredictor` (Q12 `i16` coefficients, declared precision/shift). Per-block
+coefficients are realised through the existing segmented container, so the
+canonical format is unchanged. The fitter competes a single shared order (1..=8)
+with **per-block order selection** and keeps the smallest complete artifact.
+
+Measured (court `learned-speech`, result `5d492cff…`): the LPC family wins 5/8
+effectiveness clips and the portfolio beats the baseline on 6/8 (and 3/8 on
+held-out Mode C). Totals move from 135 124 → **134 174 B** (effectiveness) and
+147 537 → **147 425 B** (Mode C), i.e. the FLAC gap falls from ~4.6 % to ~2.95 %
+(effectiveness) and ~2.3 % (Mode C). FLAC still wins every clip.
+
+The S2 diagnostic (measured directly from the frozen B1 artifact) shows why the
+remaining gap is prediction, not container: FLAC's per-subframe residual
+magnitude is ~6–18 % smaller than the S2 predictor's (e.g. clip `1272`: 210.7 vs
+223.6; clip `1462`: 99.4 vs 119.1), while VOLE's residual *coding* is already at
+least as good as FLAC's partitioned Rice. The next levers are the encoder-side
+predictor economics Seal S3 adds (variable coefficient precision and right
+shift, error-feedback quantisation) and the estimator/residual work in S4–S6.
+
 ## Status
 
 Implemented and pushed: Track A, Track B (including the entropy decode table),
 and the Report 3 Seal S0 diagnostic courts (`learned-speech-trace`,
-`learned-real-corpus-u1`) and Seal S1 fixed differences (court `learned-speech`).
+`learned-real-corpus-u1`), Seal S1 fixed differences and Seal S2 dense local LPC
+(court `learned-speech`).
 The remaining tracks from the two whole-repository
 optimization reports
 (CPU frame-tile multicore + PartialBank vectorization, GPU work decomposition,

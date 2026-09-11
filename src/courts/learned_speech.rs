@@ -25,18 +25,19 @@ use crate::learned::train::TrainBudget;
 use crate::learned::train::fixed::fit_fixed_diff_sweep;
 use crate::learned::train::hierarchy::fit_hierarchy_object;
 use crate::learned::train::linear::fit_linear_object_exp2;
+use crate::learned::train::lpc::fit_lpc_object;
 use crate::learned::train::sparse::fit_sparse_object;
 use crate::status::Verdict;
 use std::path::Path;
 
 /// Frozen static-result hash (empty means "not yet frozen").
 pub const LEARNED_SPEECH_SHA256: &str =
-    "c92c64ed449764080fa3d6cbf4e6a2ac9842d60dcdf3b0f4ee500f01b735fffa";
+    "5d492cff90a5cc7f03f5b95c72b7308a65d3eca7c018392c8e99e1b0a75a62a1";
 
 const CLIPS_PER_SPLIT: usize = 8;
 
 /// The active candidate families (grown one seal at a time).
-pub const ACTIVE_FAMILIES: &[&str] = &["dense4", "sparse10", "hier2", "fixed_diff"];
+pub const ACTIVE_FAMILIES: &[&str] = &["dense4", "sparse10", "hier2", "fixed_diff", "lpc"];
 
 fn bytes(o: &LearnedObject) -> Option<u64> {
     LearnedCost::of(o).ok().map(|c| c.complete_bytes)
@@ -71,6 +72,22 @@ fn portfolio(case: &RealCase, budget: &TrainBudget) -> Result<Vec<(&'static str,
     if let Ok((o, _)) = fit_fixed_diff_sweep(&case.samples, frames, rate, 4, &ladder, budget) {
         out.push(("fixed_diff", o));
     }
+    // Seal S2: dense per-block all-pole LPC (Tukey 0.5 + autocorrelation +
+    // Levinson-Durbin), local blocks, orders 1..=8.
+    let mut best_lpc: Option<LearnedObject> = None;
+    let mut best_lpc_bytes = u64::MAX;
+    for block in [4096u32, 2048] {
+        if let Ok((o, _)) = fit_lpc_object(&case.samples, frames, rate, block, 8, budget)
+            && let Some(b) = bytes(&o)
+            && b < best_lpc_bytes
+        {
+            best_lpc_bytes = b;
+            best_lpc = Some(o);
+        }
+    }
+    if let Some(o) = best_lpc {
+        out.push(("lpc", o));
+    }
     Ok(out)
 }
 
@@ -93,12 +110,34 @@ fn run_split(cases: &[RealCase], budget: &TrainBudget) -> Result<(SplitReport, b
         let frames = case.frames();
         let cands = portfolio(case, budget)?;
         let mut family_bytes = serde_json::Map::new();
+        let mut family_detail = serde_json::Map::new();
         let mut best: Option<(String, u64)> = None;
         let mut baseline: Option<u64> = None;
         for (name, o) in &cands {
             all_exact &= o.verify(&case.samples);
-            let b = bytes(o).unwrap_or(u64::MAX);
+            let cost = LearnedCost::of(o)?;
+            let b = cost.complete_bytes;
+            let residual = o.residual()?;
+            let mean_abs = if residual.is_empty() {
+                0.0
+            } else {
+                residual
+                    .iter()
+                    .map(|&v| f64::from(v.unsigned_abs()))
+                    .sum::<f64>()
+                    / residual.len() as f64
+            };
             family_bytes.insert((*name).to_string(), serde_json::json!(b));
+            family_detail.insert(
+                (*name).to_string(),
+                serde_json::json!({
+                    "bytes": b,
+                    "model_bytes": cost.model_bytes,
+                    "residual_bytes": cost.residual_bytes,
+                    "residual_codec": o.residual_codec.name(),
+                    "residual_mean_abs": mean_abs,
+                }),
+            );
             if matches!(*name, "dense4" | "sparse10" | "hier2") {
                 baseline = Some(baseline.map_or(b, |x| x.min(b)));
             }
@@ -124,6 +163,7 @@ fn run_split(cases: &[RealCase], budget: &TrainBudget) -> Result<(SplitReport, b
             "flac_bytes": flac,
             "ratio_flac_over_portfolio": if best_bytes == 0 { 0.0 } else { flac as f64 / best_bytes as f64 },
             "families": serde_json::Value::Object(family_bytes),
+            "family_detail": serde_json::Value::Object(family_detail),
         }));
     }
     Ok((report, all_exact))

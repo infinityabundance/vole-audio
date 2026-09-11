@@ -137,10 +137,10 @@ fn model_components(m: &LearnedModel) -> (u64, u64, u64, u64, u64, u64) {
             (weights, bias, 0, 0, 0, 0)
         }
         LearnedModel::Lpc(p) => {
-            // Every canonical coefficient is an `i32`; there is no bias. The
+            // Every canonical coefficient is an `i16`; there is no bias. The
             // header/precision/shift/block fields are the graph remainder.
             let len = p.canonical_bytes().len() as u64;
-            let weights = ((p.coeffs.len() as u64) * 4).min(len);
+            let weights = ((p.coeffs.len() as u64) * 2).min(len);
             (weights, 0, 0, 0, 0, 0)
         }
         LearnedModel::Fixed(p) => {

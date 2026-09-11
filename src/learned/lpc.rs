@@ -59,6 +59,13 @@ impl LpcPredictor {
         if self.shift > 31 {
             return Err(Error::malformed("LPC shift out of range"));
         }
+        // Coefficients are stored canonically as `i16`; every legal precision
+        // (<= 16 bits including sign) fits, so this is not a real restriction.
+        for &q in &self.coeffs {
+            if !(i32::from(i16::MIN)..=i32::from(i16::MAX)).contains(&q) {
+                return Err(Error::malformed("LPC coefficient out of i16 domain"));
+            }
+        }
         // Exact accumulator proof from the *actual* coefficients: each product
         // is `|q|·|x| <= max_abs · 2^31` (`|x| <= 2^31` because history is a
         // canonical `i32`), and the `order`-term sum must stay well inside
@@ -191,16 +198,20 @@ impl LpcPredictor {
 
     /// Canonical bytes:
     /// `kind(12) || channels || order(u16) || precision(u8) || shift(u8) ||
-    ///  coeffs(i32*) || block(u32)`.
+    ///  coeffs(i16*) || block(u32)`.
+    ///
+    /// Coefficients are `i16` (the frozen Q12 weight width); every legal QLP
+    /// precision (<= 16 bits including sign) fits, so the representation never
+    /// silently truncates.
     pub fn canonical_bytes(&self) -> Vec<u8> {
-        let mut out = Vec::with_capacity(1 + 1 + 2 + 1 + 1 + self.coeffs.len() * 4 + 4);
+        let mut out = Vec::with_capacity(1 + 1 + 2 + 1 + 1 + self.coeffs.len() * 2 + 4);
         out.push(12);
         out.push(self.channels);
         out.extend_from_slice(&self.order.to_le_bytes());
         out.push(self.precision);
         out.push(self.shift);
         for &q in &self.coeffs {
-            out.extend_from_slice(&q.to_le_bytes());
+            out.extend_from_slice(&(q as i16).to_le_bytes());
         }
         out.extend_from_slice(&self.block_frames.unwrap_or(0).to_le_bytes());
         out
@@ -208,7 +219,7 @@ impl LpcPredictor {
 
     /// Parse canonical bytes.
     pub fn from_canonical_bytes(bytes: &[u8]) -> Result<LpcPredictor> {
-        if bytes.len() < 13 || bytes[0] != 12 {
+        if bytes.len() < 11 || bytes[0] != 12 {
             return Err(Error::malformed("LPC model header mismatch"));
         }
         let channels = bytes[1];
@@ -216,15 +227,17 @@ impl LpcPredictor {
         let precision = bytes[4];
         let shift = bytes[5];
         let p = usize::from(order);
-        let expect = 1 + 1 + 2 + 1 + 1 + p * 4 + 4;
+        let expect = 1 + 1 + 2 + 1 + 1 + p * 2 + 4;
         if bytes.len() != expect {
             return Err(Error::malformed("LPC model length mismatch"));
         }
         let mut at = 6usize;
         let mut coeffs = Vec::with_capacity(p);
         for _ in 0..p {
-            coeffs.push(i32::from_le_bytes(bytes[at..at + 4].try_into().unwrap()));
-            at += 4;
+            coeffs.push(i32::from(i16::from_le_bytes(
+                bytes[at..at + 2].try_into().unwrap(),
+            )));
+            at += 2;
         }
         let block = u32::from_le_bytes(bytes[at..at + 4].try_into().unwrap());
         let lpc = LpcPredictor {

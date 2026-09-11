@@ -15,6 +15,7 @@ pub mod finite_field;
 pub mod fixed;
 pub mod hierarchy;
 pub mod linear;
+pub mod lpc;
 pub mod ltp;
 pub mod multichannel;
 pub mod objective;
