@@ -72,6 +72,15 @@ a separate, versioned decision.
 | seal | release | subject | result hashes |
 | ---- | ------- | ------- | ------------- |
 | 1 | v0.24.0 | `a347bb22…` | determinism `a0c9f027…`, residual-codec `49f8d5c6…`, linear `db4aed44…`, intrinsic `6080d106…`, transfer `10fc0eb6…`, residual `80c3fbbf…`, quantization `0d8b1250…`, capacity `7879ecc8…`, shared `eab4d545…`, random-access `62b5d41d…`, gpu `542afe4f…`, training-cost `5527eadd…`, inverse `6ce95cb0…`, aggregate `3e3073f7…` |
+| 2 (Exp2) | v0.26.0 | `af5f935d…` | exp2-baseline `3bd61665…`, residual-codec2 `e134f0c3…`, exp2-mechanisms `9ef1b8b5…`, exp2-transfer `a43ec91f…`, exp2-real-corpus `f6a87cc5…` |
+
+Seal 2 detail: the **Exp2 addendum** (profile `vole.audio.learned.exp2`) plus the
+real + held-out Mode-C corpus. `seal verify` is a **45-row** matrix (the Phase M/N
+matrix, the 13 learned courts, the `learned` aggregate, and the five Exp2
+courts). Device artifacts rebuilt at the seal commit and byte-identical to the
+frozen values (`d13d22c3…` PTX, `5c30a4bc…` AMDGPU), so Phase G/J evidence is
+unchanged. The frozen Exp1 court `learned-residual-codec` still reproduces
+`49f8d5c6…`, proving Exp1 is unperturbed.
 
 Seal 1 detail: **40-row** `seal verify` matrix (the Phase M and N matrices plus
 the 13 learned courts and the `learned` aggregate); 513 passed / 12 ignored
