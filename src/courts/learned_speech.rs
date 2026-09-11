@@ -32,7 +32,7 @@ use std::path::Path;
 
 /// Frozen static-result hash (empty means "not yet frozen").
 pub const LEARNED_SPEECH_SHA256: &str =
-    "5d492cff90a5cc7f03f5b95c72b7308a65d3eca7c018392c8e99e1b0a75a62a1";
+    "ba12fd6631f54421dfaf4f5fe0a353aafadcfbc911267fd1b5fee531c324425b";
 
 const CLIPS_PER_SPLIT: usize = 8;
 
@@ -76,7 +76,7 @@ fn portfolio(case: &RealCase, budget: &TrainBudget) -> Result<Vec<(&'static str,
     // Levinson-Durbin), local blocks, orders 1..=8.
     let mut best_lpc: Option<LearnedObject> = None;
     let mut best_lpc_bytes = u64::MAX;
-    for block in [4096u32, 2048] {
+    for block in [4096u32, 2048, 1024] {
         if let Ok((o, _)) = fit_lpc_object(&case.samples, frames, rate, block, 8, budget)
             && let Some(b) = bytes(&o)
             && b < best_lpc_bytes

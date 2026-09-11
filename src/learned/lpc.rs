@@ -53,17 +53,21 @@ impl LpcPredictor {
         if self.coeffs.len() != usize::from(self.order) {
             return Err(Error::malformed("LPC coefficient count mismatch"));
         }
-        if self.precision == 0 || self.precision > 31 {
+        if self.precision == 0 || self.precision > 16 {
             return Err(Error::malformed("LPC precision out of range"));
         }
         if self.shift > 31 {
             return Err(Error::malformed("LPC shift out of range"));
         }
-        // Coefficients are stored canonically as `i16`; every legal precision
-        // (<= 16 bits including sign) fits, so this is not a real restriction.
+        // Coefficients are stored at the declared precision (signed, including
+        // sign bit), so every coefficient's magnitude must be < 2^(p-1).
+        let lo = -(1i64 << (self.precision - 1));
+        let hi = (1i64 << (self.precision - 1)) - 1;
         for &q in &self.coeffs {
-            if !(i32::from(i16::MIN)..=i32::from(i16::MAX)).contains(&q) {
-                return Err(Error::malformed("LPC coefficient out of i16 domain"));
+            if i64::from(q) < lo || i64::from(q) > hi {
+                return Err(Error::malformed(
+                    "LPC coefficient does not fit the declared precision",
+                ));
             }
         }
         // Exact accumulator proof from the *actual* coefficients: each product
@@ -198,28 +202,27 @@ impl LpcPredictor {
 
     /// Canonical bytes:
     /// `kind(12) || channels || order(u16) || precision(u8) || shift(u8) ||
-    ///  coeffs(i16*) || block(u32)`.
+    ///  packed_coeffs(ceil(order·precision/8)) || block(u32)`.
     ///
-    /// Coefficients are `i16` (the frozen Q12 weight width); every legal QLP
-    /// precision (<= 16 bits including sign) fits, so the representation never
-    /// silently truncates.
+    /// Coefficients are packed at the declared `precision` bits each (signed,
+    /// two's complement, MSB-first), so a low-precision predictor pays only for
+    /// the bits it uses.
     pub fn canonical_bytes(&self) -> Vec<u8> {
-        let mut out = Vec::with_capacity(1 + 1 + 2 + 1 + 1 + self.coeffs.len() * 2 + 4);
+        let packed = pack_signed(&self.coeffs, self.precision);
+        let mut out = Vec::with_capacity(6 + packed.len() + 4);
         out.push(12);
         out.push(self.channels);
         out.extend_from_slice(&self.order.to_le_bytes());
         out.push(self.precision);
         out.push(self.shift);
-        for &q in &self.coeffs {
-            out.extend_from_slice(&(q as i16).to_le_bytes());
-        }
+        out.extend_from_slice(&packed);
         out.extend_from_slice(&self.block_frames.unwrap_or(0).to_le_bytes());
         out
     }
 
     /// Parse canonical bytes.
     pub fn from_canonical_bytes(bytes: &[u8]) -> Result<LpcPredictor> {
-        if bytes.len() < 11 || bytes[0] != 12 {
+        if bytes.len() < 10 || bytes[0] != 12 {
             return Err(Error::malformed("LPC model header mismatch"));
         }
         let channels = bytes[1];
@@ -227,18 +230,16 @@ impl LpcPredictor {
         let precision = bytes[4];
         let shift = bytes[5];
         let p = usize::from(order);
-        let expect = 1 + 1 + 2 + 1 + 1 + p * 2 + 4;
+        if precision == 0 || precision > 16 {
+            return Err(Error::malformed("LPC precision out of range"));
+        }
+        let packed_len = (p * usize::from(precision)).div_ceil(8);
+        let expect = 6 + packed_len + 4;
         if bytes.len() != expect {
             return Err(Error::malformed("LPC model length mismatch"));
         }
-        let mut at = 6usize;
-        let mut coeffs = Vec::with_capacity(p);
-        for _ in 0..p {
-            coeffs.push(i32::from(i16::from_le_bytes(
-                bytes[at..at + 2].try_into().unwrap(),
-            )));
-            at += 2;
-        }
+        let coeffs = unpack_signed(&bytes[6..6 + packed_len], precision, p)?;
+        let at = 6 + packed_len;
         let block = u32::from_le_bytes(bytes[at..at + 4].try_into().unwrap());
         let lpc = LpcPredictor {
             channels,
@@ -251,6 +252,54 @@ impl LpcPredictor {
         lpc.validate()?;
         Ok(lpc)
     }
+}
+
+/// Pack signed values at `bits` each, MSB-first, into whole bytes.
+pub fn pack_signed(values: &[i32], bits: u8) -> Vec<u8> {
+    let bits = usize::from(bits);
+    let total = values.len() * bits;
+    let mut out = vec![0u8; total.div_ceil(8)];
+    let mut pos = 0usize;
+    for &v in values {
+        let u = (v as u32) & ((1u32 << bits) - 1);
+        for b in (0..bits).rev() {
+            let bit = (u >> b) & 1;
+            out[pos >> 3] |= (bit as u8) << (7 - (pos & 7));
+            pos += 1;
+        }
+    }
+    out
+}
+
+/// Unpack `count` signed values of `bits` each (MSB-first).
+pub fn unpack_signed(bytes: &[u8], bits: u8, count: usize) -> Result<Vec<i32>> {
+    let bits_usize = usize::from(bits);
+    if bits == 0 || bits > 16 {
+        return Err(Error::malformed("packed coefficient width out of range"));
+    }
+    if bytes.len() * 8 < count * bits_usize {
+        return Err(Error::malformed("packed coefficient payload truncated"));
+    }
+    let mask = (1u32 << bits_usize) - 1;
+    let sign = 1u32 << (bits_usize - 1);
+    let mut out = Vec::with_capacity(count);
+    let mut pos = 0usize;
+    for _ in 0..count {
+        let mut u = 0u32;
+        for _ in 0..bits_usize {
+            let bit = (bytes[pos >> 3] >> (7 - (pos & 7))) & 1;
+            u = (u << 1) | u32::from(bit);
+            pos += 1;
+        }
+        u &= mask;
+        let v = if u & sign != 0 {
+            (u | !mask) as i32
+        } else {
+            u as i32
+        };
+        out.push(v);
+    }
+    Ok(out)
 }
 
 #[cfg(test)]
@@ -274,7 +323,7 @@ mod tests {
         let p = LpcPredictor {
             channels: 1,
             order: 2,
-            precision: 15,
+            precision: 16,
             shift: 15,
             coeffs: vec![16384, 8192],
             block_frames: None,
@@ -290,6 +339,22 @@ mod tests {
         .unwrap();
         assert!(o.verify(&x));
         assert_eq!(o.materialize_range(2000, 40).unwrap(), &x[2000..2040]);
+    }
+
+    #[test]
+    fn packed_coefficients_round_trip() {
+        for precision in [5u8, 8, 12, 15, 16] {
+            let limit = 1i64 << (precision - 1);
+            let values: Vec<i32> = vec![
+                0,
+                (limit - 1) as i32,
+                -(limit) as i32,
+                ((limit / 2) - 1) as i32,
+            ];
+            let packed = pack_signed(&values, precision);
+            let back = unpack_signed(&packed, precision, values.len()).unwrap();
+            assert_eq!(back, values, "precision {precision}");
+        }
     }
 
     #[test]

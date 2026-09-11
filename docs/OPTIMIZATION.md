@@ -142,6 +142,13 @@ held-out Mode C). Totals move from 135 124 → **134 174 B** (effectiveness) and
 147 537 → **147 425 B** (Mode C), i.e. the FLAC gap falls from ~4.6 % to ~2.95 %
 (effectiveness) and ~2.3 % (Mode C). FLAC still wins every clip.
 
+> **Correction (Seal S3).** The S2 Levinson–Durbin recursion updated its
+> coefficient array **in place**, so `a[i-j]` aliased values already rewritten in
+> the same iteration; the coefficients diverged for order ≥ 4 on real speech and
+the S2 numbers understate the family. The S2 receipt and hash remain as the
+> honest measurement of that code; Seal S3 fixes the recursion and supersedes
+> the result below.
+
 The S2 diagnostic (measured directly from the frozen B1 artifact) shows why the
 remaining gap is prediction, not container: FLAC's per-subframe residual
 magnitude is ~6–18 % smaller than the S2 predictor's (e.g. clip `1272`: 210.7 vs
@@ -150,12 +157,36 @@ least as good as FLAC's partitioned Rice. The next levers are the encoder-side
 predictor economics Seal S3 adds (variable coefficient precision and right
 shift, error-feedback quantisation) and the estimator/residual work in S4–S6.
 
+### Seal S3 — variable precision/shift, error-feedback quantisation, recursion fix
+
+Three changes, all encoder-side except the model syntax:
+
+* `LpcPredictor` canonical coefficients are now **packed at the declared
+  precision** (1–16 bits, MSB-first) instead of a fixed width, so a low-precision
+  predictor pays only for the bits it uses.
+* the fitter searches `precision ∈ {10,12,14,16}`, `shift ∈ {10,12,14}` and both
+  an independent-rounding and an **error-feedback** quantiser
+  (`err += c·2^shift; q = round(err); err -= q`), per block, choosing
+  `order × precision × shift × quantiser` by `model bits + optimal-Rice residual
+  bits`, then measuring actual complete bytes;
+* **the Levinson–Durbin recursion is corrected**: the S2 code updated its
+  coefficient array in place, so `a[i-j]` read values already overwritten in the
+  same iteration and the coefficients diverged for order ≥ 4. With the fix the
+  order-8 residual magnitude matches FLAC's (e.g. clip `1462`: 98.7 vs FLAC
+  99.4).
+
+Measured (court `learned-speech`, result `ba12fd66…`): effectiveness
+134 174 → **131 770 B** against FLAC 130 331 (gap **1.1 %**); Mode C
+147 425 → **143 989 B** against FLAC 144 145, i.e. **VOLE now wins the Mode-C
+aggregate and 4/8 held-out clips**. The LPC family wins 6/8 effectiveness clips
+and 7/8 Mode-C clips; `2035-147960` flips to a VOLE win (20 947 vs 21 243 B).
+
 ## Status
 
 Implemented and pushed: Track A, Track B (including the entropy decode table),
 and the Report 3 Seal S0 diagnostic courts (`learned-speech-trace`,
-`learned-real-corpus-u1`), Seal S1 fixed differences and Seal S2 dense local LPC
-(court `learned-speech`).
+`learned-real-corpus-u1`), Seal S1 fixed differences, Seal S2 dense local LPC
+and Seal S3 precision/shift/error-feedback (court `learned-speech`).
 The remaining tracks from the two whole-repository
 optimization reports
 (CPU frame-tile multicore + PartialBank vectorization, GPU work decomposition,

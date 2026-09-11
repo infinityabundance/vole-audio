@@ -1,17 +1,18 @@
-//! Dense short-term LPC fitting (Report 3, **Seal S2**).
+//! Dense short-term LPC fitting (Report 3, Seals S2–S3).
 //!
 //! Speech is the canonical dense all-pole problem, and FLAC-5's real-speech
 //! advantage is a *local, dense, apodized* LPC pipeline: a Tukey(0.5)-windowed
-//! autocorrelation, a Levinson–Durbin recursion, and a chosen integer QLP
-//! predictor per analysis block. This module reproduces that model class inside
-//! VOLE's exact residual-closure constitution.
+//! autocorrelation, a Levinson–Durbin recursion, a chosen integer QLP predictor
+//! per analysis block, and **error-feedback coefficient quantisation** with a
+//! variable coefficient precision and right shift. This module reproduces that
+//! model class inside VOLE's exact residual-closure constitution.
 //!
 //! The float analysis is disposable proposal machinery. The stored predictor is
-//! the canonical integer [`LpcPredictor`] (kind `12`) — coefficients, precision
-//! and an arithmetic right shift — and only the quantized evaluator has
-//! semantic authority. Per-block coefficients are realised through the existing
-//! [`SegmentedModel`] (each block is an independent segment), so the canonical
-//! format is unchanged.
+//! the canonical integer [`LpcPredictor`] (kind `12`) — packed coefficients at a
+//! declared precision, plus an arithmetic right shift — and only the quantized
+//! evaluator has semantic authority. Per-block coefficients are realised through
+//! the existing [`SegmentedModel`] (each block is an independent segment), so the
+//! canonical container is unchanged.
 
 use crate::error::{Error, Result};
 use crate::evidence::timing::Stopwatch;
@@ -21,11 +22,23 @@ use crate::learned::object::LearnedObject;
 use crate::learned::segmented::{Segment, SegmentedModel};
 use crate::learned::train::{TrainBudget, TrainStats};
 
-/// The QLP fixed-point shift used by Seal S2 (S3 searches precision/shift).
+/// The QLP fixed-point shift used when no other is better (Seal S2 default).
 pub const LPC_SHIFT: u8 = 12;
 
-/// The declared coefficient precision (informational at this seal).
-pub const LPC_PRECISION: u8 = 16;
+/// Coefficient precisions searched by the Seal S3 sweep (bits, including sign).
+pub const SEARCH_PRECISIONS: [u8; 4] = [10, 12, 14, 16];
+
+/// Prediction right shifts searched by the Seal S3 sweep.
+pub const SEARCH_SHIFTS: [u8; 3] = [10, 12, 14];
+
+/// The coefficient quantiser searched by the Seal S3 sweep.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Quantizer {
+    /// Round every coefficient independently.
+    Independent,
+    /// Carry quantisation error forward across the coefficient vector.
+    ErrorFeedback,
+}
 
 /// A Tukey window with taper fraction `alpha` (FLAC uses `tukey(0.5)`).
 pub fn tukey_window(len: usize, alpha: f64) -> Vec<f64> {
@@ -76,9 +89,7 @@ pub fn autocorrelation(block: &[i32], order: usize, alpha: f64) -> Vec<f64> {
 }
 
 /// Levinson–Durbin recursion. Returns the *predictor* coefficients `c_j` for
-/// orders `1..=order`: `H[n] = Σ_j c_j · x[n-j]`.
-///
-/// `c[order][j-1]` is the j-th coefficient of the order-`order` predictor.
+/// orders `1..=max_order`: `H[n] = Σ_j c_j · x[n-j]`.
 pub fn levinson_durbin(r: &[f64], max_order: usize) -> Vec<Vec<f64>> {
     let mut out: Vec<Vec<f64>> = Vec::with_capacity(max_order);
     if r.is_empty() || r[0] <= 0.0 || !r[0].is_finite() {
@@ -95,15 +106,15 @@ pub fn levinson_durbin(r: &[f64], max_order: usize) -> Vec<Vec<f64>> {
         if !k.is_finite() {
             break;
         }
-        a[i] = k;
+        // The update must read the *previous* coefficients: `a[i-j]` would
+        // otherwise alias values already rewritten in this iteration (the
+        // classic in-place Levinson–Durbin defect, which diverges for i >= 4).
+        let old = a.clone();
         for j in 1..i {
-            let aj = a[j];
-            a[j] = aj - k * a[i - j];
+            a[j] = old[j] - k * old[i - j];
         }
+        a[i] = k;
         e *= 1.0 - k * k;
-        // Levinson recursion for `x_hat[n] = sum_j a[j] x[n-j]` (the normal
-        // equations `sum_j c_j R[|i-j|] = R[i]`), so the predictor coefficients
-        // are `a[1..=i]` directly.
         let coeffs: Vec<f64> = (1..=i).map(|j| a[j]).collect();
         out.push(coeffs);
         if e <= 0.0 || !e.is_finite() {
@@ -113,27 +124,36 @@ pub fn levinson_durbin(r: &[f64], max_order: usize) -> Vec<Vec<f64>> {
     out
 }
 
-/// Quantize real predictor coefficients to the canonical integer QLP form.
-pub fn quantize_coeffs(coeffs: &[f64], shift: u8) -> Vec<i32> {
+fn round_half_away(v: f64) -> i64 {
+    if v >= 0.0 {
+        (v + 0.5).floor() as i64
+    } else {
+        (v - 0.5).ceil() as i64
+    }
+}
+
+/// Quantise real predictor coefficients at a declared precision/shift.
+pub fn quantize(coeffs: &[f64], shift: u8, precision: u8, quantizer: Quantizer) -> Vec<i32> {
     let scale = f64::from(1u32 << shift);
-    coeffs
-        .iter()
-        .map(|&c| {
-            let scaled = c * scale;
-            let rounded = if scaled >= 0.0 {
-                (scaled + 0.5).floor()
-            } else {
-                (scaled - 0.5).ceil()
-            };
-            if rounded >= f64::from(i32::MAX) {
-                i32::MAX
-            } else if rounded <= f64::from(i32::MIN) {
-                i32::MIN
-            } else {
-                rounded as i32
+    let lo = -(1i64 << (precision - 1));
+    let hi = (1i64 << (precision - 1)) - 1;
+    match quantizer {
+        Quantizer::Independent => coeffs
+            .iter()
+            .map(|&c| round_half_away(c * scale).clamp(lo, hi) as i32)
+            .collect(),
+        Quantizer::ErrorFeedback => {
+            let mut err = 0.0f64;
+            let mut out = Vec::with_capacity(coeffs.len());
+            for &c in coeffs {
+                err += c * scale;
+                let q = round_half_away(err).clamp(lo, hi);
+                err -= q as f64;
+                out.push(q as i32);
             }
-        })
-        .collect()
+            out
+        }
+    }
 }
 
 fn block_ranges(frames: usize, block: usize) -> Vec<(usize, usize)> {
@@ -159,12 +179,16 @@ fn rice_cost_bits(residual: &[i32]) -> u64 {
         return 0;
     }
     let mapped: Vec<u64> = residual.iter().map(|&v| zigzag(v)).collect();
-    let mut best = u64::MAX;
-    for k in 0..=15u32 {
-        let mut bits = 0u64;
-        for &u in &mapped {
-            bits = bits.saturating_add((u >> k) + 1 + u64::from(k));
+    let mut sums = [0u64; 16];
+    for &u in &mapped {
+        for (k, s) in sums.iter_mut().enumerate() {
+            *s += u >> k;
         }
+    }
+    let n = mapped.len() as u64;
+    let mut best = u64::MAX;
+    for (k, &s) in sums.iter().enumerate() {
+        let bits = s + n + n * (k as u64);
         best = best.min(bits);
     }
     best
@@ -180,8 +204,7 @@ fn block_residual(block: &[i32], coeffs: &[i32], shift: u8) -> Vec<i32> {
                 acc += i64::from(c) * i64::from(block[t - 1 - j]);
             }
         }
-        let pred = acc >> shift;
-        *o = block[t] - (pred as i32);
+        *o = block[t] - ((acc >> shift) as i32);
     }
     out
 }
@@ -192,13 +215,58 @@ fn analyse_block(block: &[i32], max_order: usize) -> Vec<Vec<f64>> {
     levinson_durbin(&r, max_order)
 }
 
-fn predictor(coeffs: Vec<i32>, order: usize, shift: u8) -> LpcPredictor {
+/// One block's chosen predictor parameters.
+struct BlockChoice {
+    coeffs: Vec<i32>,
+    order: usize,
+    precision: u8,
+    shift: u8,
+}
+
+/// Choose `(order, precision, shift, quantizer)` for one block by minimising the
+/// encoder-side estimate `model bits + optimal-Rice residual bits`.
+fn choose_block(block: &[i32], max_order: usize) -> BlockChoice {
+    let sets = analyse_block(block, max_order);
+    let mut best: Option<(u64, BlockChoice)> = None;
+    for (idx, coeffs_real) in sets.iter().enumerate() {
+        let order = idx + 1;
+        for &precision in &SEARCH_PRECISIONS {
+            for &shift in &SEARCH_SHIFTS {
+                for quantizer in [Quantizer::Independent, Quantizer::ErrorFeedback] {
+                    let coeffs = quantize(coeffs_real, shift, precision, quantizer);
+                    let residual = block_residual(block, &coeffs, shift);
+                    let model_bits = (order as u64) * u64::from(precision) + 16;
+                    let cost = model_bits + rice_cost_bits(&residual);
+                    if best.as_ref().is_none_or(|(c, _)| cost < *c) {
+                        best = Some((
+                            cost,
+                            BlockChoice {
+                                coeffs,
+                                order,
+                                precision,
+                                shift,
+                            },
+                        ));
+                    }
+                }
+            }
+        }
+    }
+    best.map(|(_, c)| c).unwrap_or(BlockChoice {
+        coeffs: vec![0],
+        order: 1,
+        precision: 10,
+        shift: LPC_SHIFT,
+    })
+}
+
+fn predictor(choice: &BlockChoice) -> LpcPredictor {
     LpcPredictor {
         channels: 1,
-        order: order as u16,
-        precision: LPC_PRECISION,
-        shift,
-        coeffs,
+        order: choice.order as u16,
+        precision: choice.precision,
+        shift: choice.shift,
+        coeffs: choice.coeffs.clone(),
         block_frames: None,
     }
 }
@@ -220,79 +288,7 @@ fn complete_bytes(o: &LearnedObject) -> Result<u64> {
     Ok(crate::learned::accounting::LearnedCost::of(o)?.complete_bytes)
 }
 
-/// Fit one order `P` as a segmented per-block LPC object (a single order for
-/// every block).
-fn fit_order(
-    source: &[i32],
-    frames: u64,
-    sample_rate_hz: u32,
-    block_frames: u32,
-    order: usize,
-    shift: u8,
-) -> Result<LearnedObject> {
-    let ranges = block_ranges(frames as usize, block_frames as usize);
-    let mut segments = Vec::with_capacity(ranges.len());
-    for (from, to) in ranges {
-        let block = &source[from..to];
-        let sets = analyse_block(block, order);
-        let coeffs_real = sets.last().cloned().unwrap_or_else(|| vec![0.0; order]);
-        let coeffs = quantize_coeffs(&coeffs_real, shift);
-        let predictor = predictor(coeffs, order, shift);
-        predictor.validate()?;
-        segments.push(Segment {
-            frames: (to - from) as u32,
-            model: Box::new(LearnedModel::Lpc(predictor)),
-        });
-    }
-    build_segmented(source, frames, sample_rate_hz, segments)
-}
-
-/// Fit with **per-block order selection**: each block chooses the order
-/// minimising its own `model bits + optimal-Rice residual bits` (the encoder-side
-/// heuristic FLAC uses when it picks a subframe order), then the whole object is
-/// measured by its complete bytes.
-fn fit_per_block(
-    source: &[i32],
-    frames: u64,
-    sample_rate_hz: u32,
-    block_frames: u32,
-    max_order: usize,
-    shift: u8,
-) -> Result<LearnedObject> {
-    let ranges = block_ranges(frames as usize, block_frames as usize);
-    let mut segments = Vec::with_capacity(ranges.len());
-    for (from, to) in ranges {
-        let block = &source[from..to];
-        let sets = analyse_block(block, max_order);
-        let mut best: Option<(Vec<i32>, usize, u64)> = None;
-        for (idx, coeffs_real) in sets.iter().enumerate() {
-            let order = idx + 1;
-            let coeffs = quantize_coeffs(coeffs_real, shift);
-            if coeffs
-                .iter()
-                .any(|&q| !(i32::from(i16::MIN)..=i32::from(i16::MAX)).contains(&q))
-            {
-                continue;
-            }
-            let residual = block_residual(block, &coeffs, shift);
-            let model_bits = (order as u64) * 16 + 16;
-            let cost = model_bits + rice_cost_bits(&residual);
-            if best.as_ref().is_none_or(|(_, _, c)| cost < *c) {
-                best = Some((coeffs, order, cost));
-            }
-        }
-        let (coeffs, order, _) = best.unwrap_or_else(|| (vec![0i32; 1], 1, u64::MAX));
-        let predictor = predictor(coeffs, order, shift);
-        predictor.validate()?;
-        segments.push(Segment {
-            frames: (to - from) as u32,
-            model: Box::new(LearnedModel::Lpc(predictor)),
-        });
-    }
-    build_segmented(source, frames, sample_rate_hz, segments)
-}
-
-/// Fit and select a dense per-block LPC object over orders `1..=max_order`.
+/// Fit a dense per-block LPC object with the Seal S3 parameter search.
 ///
 /// Per-block coefficients use the existing segmented container; the residual is
 /// the concatenation of the per-block residuals and is encoded by the Exp2
@@ -316,54 +312,32 @@ pub fn fit_lpc_object(
     }
     let sw = Stopwatch::start();
     let mut stats = TrainStats::default();
-    let mut best: Option<(LearnedObject, u64)> = None;
-    let max_order = max_order.min(crate::limits::MAX_LEARNED_TAPS as u16);
-    // (a) a single order shared by every block.
-    for order in 1..=usize::from(max_order) {
+    let max_order = (max_order as usize).min(crate::limits::MAX_LEARNED_TAPS as usize);
+    let ranges = block_ranges(frames as usize, block_frames as usize);
+    let mut segments = Vec::with_capacity(ranges.len());
+    for (from, to) in ranges {
         stats.candidates += 1;
-        let o = match fit_order(
-            source,
-            frames,
-            sample_rate_hz,
-            block_frames,
-            order,
-            LPC_SHIFT,
-        ) {
-            Ok(o) => o,
-            Err(_) => {
-                stats.rejected += 1;
-                continue;
-            }
-        };
-        if !o.verify(source) {
+        let block = &source[from..to];
+        let choice = choose_block(block, max_order);
+        let p = predictor(&choice);
+        if p.validate().is_err() {
             stats.rejected += 1;
             continue;
         }
-        let b = complete_bytes(&o)?;
-        if best.as_ref().is_none_or(|(_, bb)| b < *bb) {
-            best = Some((o, b));
-        }
+        segments.push(Segment {
+            frames: (to - from) as u32,
+            model: Box::new(LearnedModel::Lpc(p)),
+        });
     }
-    // (b) per-block order selection (FLAC-style local subframe choice).
-    stats.candidates += 1;
-    match fit_per_block(
-        source,
-        frames,
-        sample_rate_hz,
-        block_frames,
-        usize::from(max_order),
-        LPC_SHIFT,
-    ) {
-        Ok(o) if o.verify(source) => {
-            let b = complete_bytes(&o)?;
-            if best.as_ref().is_none_or(|(_, bb)| b < *bb) {
-                best = Some((o, b));
-            }
-        }
-        _ => stats.rejected += 1,
+    if segments.is_empty() {
+        return Err(Error::internal("no dense LPC block could be analysed"));
     }
+    let o = build_segmented(source, frames, sample_rate_hz, segments)?;
+    if !o.verify(source) {
+        return Err(Error::internal("dense LPC candidate did not close exactly"));
+    }
+    let _ = complete_bytes(&o)?;
     stats.fit_ns = sw.elapsed_ns().max(0) as u64;
-    let (o, _) = best.ok_or_else(|| Error::internal("no dense LPC candidate could close"))?;
     Ok((o, stats))
 }
 
@@ -382,7 +356,6 @@ mod tests {
 
     #[test]
     fn levinson_recovers_an_ar2() {
-        // An AR(2) with a1=0.5, a2=0.25 -> predictor c = [0.5, 0.25].
         let mut s = 0x2545_F491_4F6C_DD1Du64;
         let mut x = vec![0i32, 0];
         for t in 2..8192 {
@@ -398,6 +371,22 @@ mod tests {
         let c2 = &sets[1];
         assert!((c2[0] - 0.5).abs() < 0.1, "c1 = {}", c2[0]);
         assert!((c2[1] - 0.25).abs() < 0.1, "c2 = {}", c2[1]);
+    }
+
+    #[test]
+    fn error_feedback_preserves_the_aggregate_better_than_independent_rounding() {
+        // A coefficient vector whose independent rounding accumulates error:
+        // error-feedback must keep the running error smaller.
+        let coeffs = [0.3004f64, 0.3004, 0.3004, 0.3004, 0.3004];
+        let indep = quantize(&coeffs, 0, 16, Quantizer::Independent);
+        let ef = quantize(&coeffs, 0, 16, Quantizer::ErrorFeedback);
+        let sum_indep: i64 = indep.iter().map(|&v| i64::from(v)).sum();
+        let sum_ef: i64 = ef.iter().map(|&v| i64::from(v)).sum();
+        let target = (coeffs.iter().sum::<f64>()).round() as i64;
+        assert!(
+            (sum_ef - target).abs() <= (sum_indep - target).abs(),
+            "ef {sum_ef} indep {sum_indep} target {target}"
+        );
     }
 
     #[test]
