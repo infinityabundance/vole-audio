@@ -220,13 +220,26 @@ Measured (court `learned-speech`, result `2ea09b96…`): effectiveness
 approximately 1.0 on effectiveness and below 1.0 on Mode C. This is statistical
 parity-to-ahead, not yet a decisive margin; S6–S8 target that margin.
 
+### Seal S6 — dense LPC orders above FLAC-5's ceiling
+
+The per-block order search ceiling is raised to the frozen ladder top of **16**
+(FLAC-5 stops at 8), and the court now reports **FLAC-8** (`-l 12`) as a
+secondary control beside the primary FLAC-5.
+
+Measured (court `learned-speech`, result `f8cb4fec…`): effectiveness
+130 320 → **129 652 B** against FLAC-5 130 331 (**0.52 % smaller**) and FLAC-8
+129 713 (edging it, 4/4); Mode C 142 570 → **141 706 B** against FLAC-5 144 145
+(1.7 % smaller, **7/8 wins**, Wilcoxon 39 063 ppm) and FLAC-8 142 714 (0.7 %
+smaller). Higher order still repays its coefficient bytes on this corpus.
+
 ## Status
 
 Implemented and pushed: Track A, Track B (including the entropy decode table),
 and the Report 3 Seal S0 diagnostic courts (`learned-speech-trace`,
 `learned-real-corpus-u1`), Seal S1 fixed differences, Seal S2 dense local LPC,
 Seal S3 precision/shift/error-feedback, Seal S4 general Golomb residual
-coding and Seal S5 estimator diversity (court `learned-speech`).
+coding, Seal S5 estimator diversity and Seal S6 higher dense-LPC orders (court
+`learned-speech`).
 The remaining tracks from the two whole-repository
 optimization reports
 (CPU frame-tile multicore + PartialBank vectorization, GPU work decomposition,

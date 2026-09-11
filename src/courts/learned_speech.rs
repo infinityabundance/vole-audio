@@ -13,6 +13,7 @@
 //! The court is exact: every candidate must close the intrinsic sample for
 //! sample before it can be priced.
 
+use crate::baseline::flac::{B1_LEVEL_CONTROLS, b1_flac_artifact};
 use crate::courts::learned_common as common;
 use crate::error::Result;
 use crate::learned::accounting::LearnedCost;
@@ -33,8 +34,9 @@ use std::path::Path;
 /// Frozen static-result hash (empty means "not yet frozen").
 /// Frozen static-result hash (empty means "not yet frozen").
 /// Frozen static-result hash (empty means "not yet frozen").
+/// Frozen static-result hash (empty means "not yet frozen").
 pub const LEARNED_SPEECH_SHA256: &str =
-    "2ea09b963bc64a5adb8f95fdcde09d322c426cc7fd50f349e2db4c46a80cfc5d";
+    "f8cb4fec2429b501f94a460b61e3d85c8c3bbdacaeea53953ae9416249a2cc9c";
 
 const CLIPS_PER_SPLIT: usize = 8;
 
@@ -80,7 +82,7 @@ fn portfolio(case: &RealCase, budget: &TrainBudget) -> Result<Vec<(&'static str,
     let mut best_lpc: Option<LearnedObject> = None;
     let mut best_lpc_bytes = u64::MAX;
     for block in [4096u32, 2048, 1024] {
-        if let Ok((o, _)) = fit_lpc_object(&case.samples, frames, rate, block, 8, budget)
+        if let Ok((o, _)) = fit_lpc_object(&case.samples, frames, rate, block, 16, budget)
             && let Some(b) = bytes(&o)
             && b < best_lpc_bytes
         {
@@ -113,6 +115,7 @@ struct SplitReport {
     portfolio: Vec<u64>,
     flac: Vec<u64>,
     baseline: Vec<u64>,
+    flac8: Vec<u64>,
 }
 
 fn run_split(cases: &[RealCase], budget: &TrainBudget) -> Result<(SplitReport, bool)> {
@@ -121,6 +124,7 @@ fn run_split(cases: &[RealCase], budget: &TrainBudget) -> Result<(SplitReport, b
         portfolio: Vec::new(),
         flac: Vec::new(),
         baseline: Vec::new(),
+        flac8: Vec::new(),
     };
     let mut all_exact = true;
     for case in cases {
@@ -165,9 +169,15 @@ fn run_split(cases: &[RealCase], budget: &TrainBudget) -> Result<(SplitReport, b
         let (winner, best_bytes) =
             best.ok_or_else(|| crate::error::Error::internal("empty speech portfolio"))?;
         let flac = common::flac5(&case.samples, 1, case.rate()).unwrap_or(u64::MAX);
+        // Secondary control: FLAC level 8 (`-l 12`, stronger apodization).
+        let flac8 = b1_flac_artifact(&case.samples, 1, case.rate(), B1_LEVEL_CONTROLS[1])
+            .ok()
+            .map(|a| a.encoding.encoded_bytes)
+            .unwrap_or(u64::MAX);
         let baseline_bytes = baseline.unwrap_or(u64::MAX);
         report.portfolio.push(best_bytes);
         report.flac.push(flac);
+        report.flac8.push(flac8);
         report.baseline.push(baseline_bytes);
         report.rows.push(serde_json::json!({
             "id": case.clip.id,
@@ -178,6 +188,7 @@ fn run_split(cases: &[RealCase], budget: &TrainBudget) -> Result<(SplitReport, b
             "portfolio_bytes": best_bytes,
             "baseline_bytes": baseline_bytes,
             "flac_bytes": flac,
+            "flac8_bytes": flac8,
             "ratio_flac_over_portfolio": if best_bytes == 0 { 0.0 } else { flac as f64 / best_bytes as f64 },
             "families": serde_json::Value::Object(family_bytes),
             "family_detail": serde_json::Value::Object(family_detail),
@@ -215,6 +226,22 @@ fn summarize(label: &str, rep: &SplitReport) -> serde_json::Value {
     let (wp, wm, ppm) = common::wilcoxon_exact(&diffs);
     let (bp, bm, bppm) = common::wilcoxon_exact(&bdiffs);
     let (lo, hi) = common::bootstrap_median_ppm(&rep.flac, &rep.portfolio, 0x5EED_3001, 4000);
+    let mut f8w = 0u64;
+    let mut f8l = 0u64;
+    let mut f8diffs = Vec::with_capacity(n);
+    let mut t8 = 0u64;
+    for i in 0..n {
+        let p = rep.portfolio[i];
+        let f8 = rep.flac8[i];
+        t8 = t8.saturating_add(f8);
+        if p < f8 {
+            f8w += 1;
+        } else if p > f8 {
+            f8l += 1;
+        }
+        f8diffs.push(f8 as i64 - p as i64);
+    }
+    let (_, _, f8ppm) = common::wilcoxon_exact(&f8diffs);
     serde_json::json!({
         "split": label,
         "clips": n,
@@ -228,6 +255,12 @@ fn summarize(label: &str, rep: &SplitReport) -> serde_json::Value {
         "losses_vs_baseline": blossses,
         "wilcoxon_baseline": {"w_plus": bp, "w_minus": bm, "p_two_sided_ppm": bppm},
         "bootstrap_median_flac_over_portfolio_ppm": {"lo": lo, "hi": hi},
+        "flac8_secondary": {
+            "total_bytes": t8,
+            "wins": f8w,
+            "losses": f8l,
+            "wilcoxon_p_two_sided_ppm": f8ppm,
+        },
     })
 }
 
