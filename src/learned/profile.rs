@@ -39,6 +39,19 @@ pub const LEARNED_EXP2_PROFILE_VERSION: u32 = 1;
 /// Canonical profile tag bytes carried by every Exp2 learned object.
 pub const LEARNED_EXP2_PROFILE_TAG: &[u8] = b"vole.audio.u1/vole.audio.learned.exp2";
 
+/// Exp3 experimental learned representation profile identity (Seal S4).
+///
+/// Exp3 imports every Exp2 candidate and adds the Seal S4 residual codecs
+/// (general Golomb, centered Golomb). It exists so the Exp2 profile and the
+/// frozen Seal-K real-corpus evidence are left byte-for-byte untouched.
+pub const LEARNED_EXP3_PROFILE: &str = "vole.audio.learned.exp3";
+
+/// Exp3 profile version (integer form for binary formats).
+pub const LEARNED_EXP3_PROFILE_VERSION: u32 = 1;
+
+/// Canonical profile tag bytes carried by every Exp3 learned object.
+pub const LEARNED_EXP3_PROFILE_TAG: &[u8] = b"vole.audio.u1/vole.audio.learned.exp3";
+
 /// Canonical learned container magic (shared by both profiles).
 pub const LEARNED_MAGIC: &[u8; 12] = b"vole.learned";
 
@@ -51,6 +64,9 @@ pub const LEARNED_EVIDENCE_SCHEMA: &str = "vole.audio.learned.evidence.v1";
 /// Evidence schema for the Exp2 addendum receipts.
 pub const LEARNED_EXP2_EVIDENCE_SCHEMA: &str = "vole.audio.learned.exp2.evidence.v1";
 
+/// Evidence schema for the Exp3 addendum receipts.
+pub const LEARNED_EXP3_EVIDENCE_SCHEMA: &str = "vole.audio.learned.exp3.evidence.v1";
+
 /// The learned experimental profile an object belongs to.
 ///
 /// The container layout is identical; only the profile tag and the admissible
@@ -62,6 +78,8 @@ pub enum LearnedProfile {
     Exp1 = 1,
     /// `vole.audio.learned.exp2` — the optimization addendum.
     Exp2 = 2,
+    /// `vole.audio.learned.exp3` — the Seal S4 residual-codec addendum.
+    Exp3 = 3,
 }
 
 impl LearnedProfile {
@@ -70,6 +88,7 @@ impl LearnedProfile {
         match self {
             LearnedProfile::Exp1 => LEARNED_PROFILE,
             LearnedProfile::Exp2 => LEARNED_EXP2_PROFILE,
+            LearnedProfile::Exp3 => LEARNED_EXP3_PROFILE,
         }
     }
 
@@ -78,6 +97,7 @@ impl LearnedProfile {
         match self {
             LearnedProfile::Exp1 => LEARNED_PROFILE_VERSION,
             LearnedProfile::Exp2 => LEARNED_EXP2_PROFILE_VERSION,
+            LearnedProfile::Exp3 => LEARNED_EXP3_PROFILE_VERSION,
         }
     }
 
@@ -86,6 +106,7 @@ impl LearnedProfile {
         match self {
             LearnedProfile::Exp1 => LEARNED_PROFILE_TAG,
             LearnedProfile::Exp2 => LEARNED_EXP2_PROFILE_TAG,
+            LearnedProfile::Exp3 => LEARNED_EXP3_PROFILE_TAG,
         }
     }
 
@@ -95,6 +116,8 @@ impl LearnedProfile {
             Some(LearnedProfile::Exp1)
         } else if tag == LEARNED_EXP2_PROFILE_TAG {
             Some(LearnedProfile::Exp2)
+        } else if tag == LEARNED_EXP3_PROFILE_TAG {
+            Some(LearnedProfile::Exp3)
         } else {
             None
         }

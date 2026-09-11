@@ -31,8 +31,9 @@ use crate::status::Verdict;
 use std::path::Path;
 
 /// Frozen static-result hash (empty means "not yet frozen").
+/// Frozen static-result hash (empty means "not yet frozen").
 pub const LEARNED_SPEECH_SHA256: &str =
-    "ba12fd6631f54421dfaf4f5fe0a353aafadcfbc911267fd1b5fee531c324425b";
+    "3e8d99f35be66d478cfa5d7ebe7afb83b8965fb303394b300153650378229f4b";
 
 const CLIPS_PER_SPLIT: usize = 8;
 
@@ -43,11 +44,12 @@ fn bytes(o: &LearnedObject) -> Option<u64> {
     LearnedCost::of(o).ok().map(|c| c.complete_bytes)
 }
 
-/// Build the active portfolio for one case. Returns named exact candidates.
+/// Build the active portfolio for one case. Returns named exact candidates in the
+/// Exp3 profile (every Exp2 candidate plus the Seal S4 residual codecs).
 fn portfolio(case: &RealCase, budget: &TrainBudget) -> Result<Vec<(&'static str, LearnedObject)>> {
     let frames = case.frames();
     let rate = case.rate();
-    let mut out: Vec<(&'static str, LearnedObject)> = Vec::new();
+    let mut raw: Vec<(&'static str, LearnedObject)> = Vec::new();
 
     if let Ok((o, _)) = fit_linear_object_exp2(
         &case.samples,
@@ -59,21 +61,21 @@ fn portfolio(case: &RealCase, budget: &TrainBudget) -> Result<Vec<(&'static str,
         frames as usize,
         budget,
     ) {
-        out.push(("dense4", o));
+        raw.push(("dense4", o));
     }
     if let Ok((o, _)) = fit_sparse_object(&case.samples, frames, rate, 10, None, budget) {
-        out.push(("sparse10", o));
+        raw.push(("sparse10", o));
     }
     if let Ok((o, _)) = fit_hierarchy_object(&case.samples, frames, rate, 2, budget) {
-        out.push(("hier2", o));
+        raw.push(("hier2", o));
     }
     // Seal S1: fixed finite differences over a frozen block-size ladder.
     let ladder = [None, Some(4096u32), Some(2048), Some(1024), Some(512)];
     if let Ok((o, _)) = fit_fixed_diff_sweep(&case.samples, frames, rate, 4, &ladder, budget) {
-        out.push(("fixed_diff", o));
+        raw.push(("fixed_diff", o));
     }
-    // Seal S2: dense per-block all-pole LPC (Tukey 0.5 + autocorrelation +
-    // Levinson-Durbin), local blocks, orders 1..=8.
+    // Seal S2/S3: dense per-block all-pole LPC (Tukey 0.5 + autocorrelation +
+    // Levinson-Durbin) with precision/shift/quantiser search, orders 1..=8.
     let mut best_lpc: Option<LearnedObject> = None;
     let mut best_lpc_bytes = u64::MAX;
     for block in [4096u32, 2048, 1024] {
@@ -86,7 +88,21 @@ fn portfolio(case: &RealCase, budget: &TrainBudget) -> Result<Vec<(&'static str,
         }
     }
     if let Some(o) = best_lpc {
-        out.push(("lpc", o));
+        raw.push(("lpc", o));
+    }
+    // Re-encode every Exp2 candidate under Exp3 so the Seal S4 residual codecs
+    // (general Golomb, centered Golomb) are selectable.
+    let mut out = Vec::with_capacity(raw.len());
+    for (name, o) in raw {
+        let upgraded = LearnedObject::from_intrinsic_exp3(
+            o.model,
+            o.channels,
+            o.frames,
+            o.sample_rate_hz,
+            o.dependencies,
+            &case.samples,
+        )?;
+        out.push((name, upgraded));
     }
     Ok(out)
 }
@@ -274,7 +290,7 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
         Verdict::FailedCorrectness
     };
 
-    common::finish_exp2(
+    common::finish_exp3(
         "learned-speech",
         receipts_root,
         LEARNED_SPEECH_SHA256,
@@ -297,6 +313,7 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
                 "method",
                 serde_json::json!({
                     "active_families": ACTIVE_FAMILIES,
+                    "profile": crate::learned::profile::LEARNED_EXP3_PROFILE,
                     "sample_domain": "sign-extended i16 in i32 (the Seal-K experimental domain)",
                     "baseline": "the wired three-family Exp2 real-speech portfolio",
                     "attribution": "per-family standalone bytes are reported for every clip",

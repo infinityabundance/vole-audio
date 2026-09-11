@@ -16,6 +16,7 @@ use crate::learned::model::LearnedModel;
 use crate::learned::profile::LearnedProfile;
 use crate::learned::residual_codec2::{
     ResidualCodecV2, ResidualEncodingV2, decode_encoding_v2, encode_best_v1, encode_best_v2,
+    encode_best_v3,
 };
 use crate::learned::serialization;
 use crate::object::id::ContentId;
@@ -179,6 +180,29 @@ impl LearnedObject {
         )
     }
 
+    /// Build the canonical **Exp3** learned object that closes `source` exactly
+    /// under `model`. Exp3 imports every Exp2 candidate and adds the Seal S4
+    /// residual codecs; Exp1 and Exp2 remain byte-for-byte unchanged.
+    pub fn from_intrinsic_exp3(
+        model: LearnedModel,
+        channels: u8,
+        frames: u64,
+        sample_rate_hz: u32,
+        dependencies: Vec<ContentId>,
+        source: &[i32],
+    ) -> Result<LearnedObject> {
+        Self::build(
+            LearnedProfile::Exp3,
+            model,
+            channels,
+            frames,
+            sample_rate_hz,
+            dependencies,
+            source,
+            source,
+        )
+    }
+
     /// Build the canonical transfer object whose operator maps `source` onto
     /// `target`, with exact closure `X_hat == target`.
     #[allow(clippy::too_many_arguments)]
@@ -277,6 +301,7 @@ impl LearnedObject {
         let enc = match profile {
             LearnedProfile::Exp1 => encode_best_v1(&residual),
             LearnedProfile::Exp2 => encode_best_v2(&residual),
+            LearnedProfile::Exp3 => encode_best_v3(&residual),
         };
         let object = LearnedObject {
             profile,

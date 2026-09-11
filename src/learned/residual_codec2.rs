@@ -80,6 +80,11 @@ pub enum ResidualCodecV2 {
     ZeroMaskRice = 9,
     BytePlane = 10,
     ContextRans = 11,
+    // --- Exp3 additions (Seal S4) ---
+    /// Partitioned general Golomb coding (arbitrary, non-power-of-two `M`).
+    Golomb = 12,
+    /// Centered partitioned general Golomb (a stored residual center).
+    CenteredGolomb = 13,
 }
 
 impl ResidualCodecV2 {
@@ -119,6 +124,24 @@ impl ResidualCodecV2 {
         ResidualCodecV2::ContextRans,
     ];
 
+    /// The Exp3 additions (Seal S4), in canonical tie order.
+    pub const ALL_V3: [ResidualCodecV2; 14] = [
+        ResidualCodecV2::DenseI32,
+        ResidualCodecV2::SparseDelta,
+        ResidualCodecV2::ZigZagVarint,
+        ResidualCodecV2::BlockRice,
+        ResidualCodecV2::PredictiveRice,
+        ResidualCodecV2::LiteralResidual,
+        ResidualCodecV2::PartitionRice,
+        ResidualCodecV2::CoreTailRice,
+        ResidualCodecV2::RunLengthRice,
+        ResidualCodecV2::ZeroMaskRice,
+        ResidualCodecV2::BytePlane,
+        ResidualCodecV2::ContextRans,
+        ResidualCodecV2::Golomb,
+        ResidualCodecV2::CenteredGolomb,
+    ];
+
     /// Canonical codec identifier byte.
     pub const fn id(self) -> u8 {
         self as u8
@@ -139,6 +162,8 @@ impl ResidualCodecV2 {
             ResidualCodecV2::ZeroMaskRice => "zero_mask_rice",
             ResidualCodecV2::BytePlane => "byte_plane",
             ResidualCodecV2::ContextRans => "context_rans",
+            ResidualCodecV2::Golomb => "golomb",
+            ResidualCodecV2::CenteredGolomb => "centered_golomb",
         }
     }
 
@@ -157,6 +182,8 @@ impl ResidualCodecV2 {
             9 => Some(ResidualCodecV2::ZeroMaskRice),
             10 => Some(ResidualCodecV2::BytePlane),
             11 => Some(ResidualCodecV2::ContextRans),
+            12 => Some(ResidualCodecV2::Golomb),
+            13 => Some(ResidualCodecV2::CenteredGolomb),
             _ => None,
         }
     }
@@ -206,6 +233,8 @@ impl ResidualCodecV2 {
             ResidualCodecV2::ZeroMaskRice => encode_zero_mask_rice(residual),
             ResidualCodecV2::BytePlane => encode_byte_plane(residual),
             ResidualCodecV2::ContextRans => encode_context_rans(residual),
+            ResidualCodecV2::Golomb => encode_golomb(residual),
+            ResidualCodecV2::CenteredGolomb => encode_centered_golomb(residual),
         }
     }
 
@@ -229,6 +258,8 @@ impl ResidualCodecV2 {
             ResidualCodecV2::ZeroMaskRice => decode_zero_mask_rice(bytes, len),
             ResidualCodecV2::BytePlane => decode_byte_plane(bytes, len),
             ResidualCodecV2::ContextRans => decode_context_rans(bytes, len),
+            ResidualCodecV2::Golomb => decode_golomb(bytes, len),
+            ResidualCodecV2::CenteredGolomb => decode_centered_golomb(bytes, len),
         }
     }
 }
@@ -272,6 +303,46 @@ impl ResidualEncodingV2 {
     pub fn decode(&self, len: usize) -> Result<Vec<i32>> {
         self.codec.decode(&self.bytes[1..], len)
     }
+}
+
+/// Encode `residual` with every v3 codec (the whole v2 family plus the Seal S4
+/// additions) and return the smallest canonical encoding; ties break by
+/// ascending id.
+pub fn encode_best_v3(residual: &[i32]) -> ResidualEncodingV2 {
+    let mut best: Option<ResidualEncodingV2> = None;
+    for codec in ResidualCodecV2::ALL_V3 {
+        let payload = codec.encode(residual);
+        let mut bytes = Vec::with_capacity(payload.len() + 1);
+        bytes.push(codec.id());
+        bytes.extend_from_slice(&payload);
+        let candidate = ResidualEncodingV2 { codec, bytes };
+        match &best {
+            None => best = Some(candidate),
+            Some(b) if candidate.complete_bytes() < b.complete_bytes() => best = Some(candidate),
+            Some(_) => {}
+        }
+    }
+    best.expect("the codec family is non-empty")
+}
+
+/// Measure every v3 codec's cost for a residual.
+pub fn encode_all_v3(residual: &[i32]) -> Vec<ResidualEncodingV2> {
+    ResidualCodecV2::ALL_V3
+        .iter()
+        .map(|&codec| {
+            let payload = codec.encode(residual);
+            let mut bytes = Vec::with_capacity(payload.len() + 1);
+            bytes.push(codec.id());
+            bytes.extend_from_slice(&payload);
+            ResidualEncodingV2 { codec, bytes }
+        })
+        .collect()
+}
+
+/// Decode `[codec_id] || payload`, validating the declared length (v3 accepts
+/// every v2 id and the Seal S4 additions).
+pub fn decode_encoding_v3(bytes: &[u8], len: usize) -> Result<ResidualEncodingV2> {
+    decode_encoding_v2(bytes, len)
 }
 
 /// The frozen Exp1 minimum (`best_v1`), preserved exactly.
@@ -424,6 +495,15 @@ impl<'a> Reader<'a> {
     }
     fn u64le(&mut self) -> Result<u64> {
         Ok(u64::from_le_bytes(self.take(8)?.try_into().unwrap()))
+    }
+    fn u32le(&mut self) -> Result<u32> {
+        Ok(u32::from_le_bytes(self.take(4)?.try_into().unwrap()))
+    }
+    fn i32le(&mut self) -> Result<i32> {
+        Ok(i32::from_le_bytes(self.take(4)?.try_into().unwrap()))
+    }
+    fn rest(&self) -> &'a [u8] {
+        &self.bytes[self.pos.min(self.bytes.len())..]
     }
     fn uvarint(&mut self) -> Result<u64> {
         let mut v: u64 = 0;
@@ -1623,6 +1703,260 @@ fn decode_context_rans(bytes: &[u8], len: usize) -> Result<Vec<i32>> {
     Ok(out)
 }
 
+// ---------------------------------------------------------------------------
+// id 12: Golomb (partitioned, arbitrary non-power-of-two M)
+// id 13: CenteredGolomb (partitioned, with a stored residual center)
+// ---------------------------------------------------------------------------
+
+/// Frozen partition size of the Golomb codecs (samples per partition).
+const GOLOMB_CHUNK: usize = 512;
+
+/// Upper bound on a Golomb divisor considered by the encoder search.
+const MAX_GOLOMB_M: u64 = 1 << 20;
+
+#[inline]
+fn zigzag_i64(v: i64) -> u64 {
+    ((v << 1) ^ (v >> 63)) as u64
+}
+
+#[inline]
+fn unzigzag_i64(u: u64) -> i64 {
+    ((u >> 1) as i64) ^ -((u & 1) as i64)
+}
+
+/// Bit cost of coding `values` with divisor `m` (unary quotient + truncated
+/// binary remainder).
+fn golomb_cost_bits(values: &[u64], m: u64) -> u64 {
+    let m = m.max(1);
+    let b = 63 - m.leading_zeros() as u64; // floor(log2 m)
+    let t = (1u64 << (b + 1)) - m;
+    let mut bits = 0u64;
+    for &u in values {
+        let q = u / m;
+        let r = u % m;
+        let extra = if r < t { b } else { b + 1 };
+        bits = bits
+            .saturating_add(q)
+            .saturating_add(1)
+            .saturating_add(extra);
+    }
+    bits
+}
+
+/// Choose the Golomb divisor minimizing the bit cost, bounded so no unary run is
+/// pathological.
+fn best_golomb_m(values: &[u64]) -> u64 {
+    if values.is_empty() {
+        return 1;
+    }
+    let n = values.len() as u64;
+    let sum: u64 = values.iter().sum();
+    let mean = (sum / n).max(1);
+    let max_u = *values.iter().max().unwrap_or(&0);
+    let lo = (max_u / MAX_RICE_UNARY2).max(1);
+    let hi = mean.saturating_mul(3).max(lo).min(MAX_GOLOMB_M);
+    let mut best_m = lo;
+    let mut best = u64::MAX;
+    let mut m = lo;
+    while m <= hi {
+        let c = golomb_cost_bits(values, m);
+        if c < best {
+            best = c;
+            best_m = m;
+        }
+        m += 1;
+    }
+    best_m
+}
+
+fn write_golomb_group(w: &mut BitWriter, values: &[u64], m: u64) -> Result<()> {
+    let b = 63 - m.leading_zeros();
+    let t = (1u64 << (b + 1)) - m;
+    for &u in values {
+        let q = u / m;
+        let r = u % m;
+        if q > MAX_RICE_UNARY2 {
+            return Err(Error::internal("golomb unary run exceeds the bound"));
+        }
+        for _ in 0..q {
+            w.bit(false);
+        }
+        w.bit(true);
+        if r < t {
+            if b > 0 {
+                w.bits(r, b);
+            }
+        } else {
+            w.bits(r + t, b + 1);
+        }
+    }
+    Ok(())
+}
+
+fn read_golomb_group(r: &mut BitReader<'_>, count: usize, m: u64) -> Result<Vec<u64>> {
+    let b = 63 - m.leading_zeros();
+    let t = (1u64 << (b + 1)) - m;
+    let mut out = Vec::with_capacity(count);
+    for _ in 0..count {
+        let mut q = 0u64;
+        loop {
+            if r.read_bit()? {
+                break;
+            }
+            q += 1;
+            if q > MAX_RICE_UNARY2 {
+                return Err(Error::malformed("golomb unary run exceeds the bound"));
+            }
+        }
+        // Truncated binary: read `b` bits; if they are below the cutoff read one
+        // more and subtract the cutoff.
+        let rem = if b == 0 {
+            0u64
+        } else {
+            let y = r.read_bits(b)?;
+            if y < t {
+                y
+            } else {
+                let z = u64::from(r.read_bit()?);
+                ((y << 1) | z) - t
+            }
+        };
+        out.push(q * m + rem);
+    }
+    Ok(out)
+}
+
+fn encode_golomb(residual: &[i32]) -> Vec<u8> {
+    let mapped = zigzag_map(residual);
+    encode_golomb_mapped(&mapped)
+}
+
+fn encode_golomb_mapped(mapped: &[u64]) -> Vec<u8> {
+    let n = mapped.len();
+    let mut out = Vec::new();
+    out.extend_from_slice(&(n as u64).to_le_bytes());
+    out.extend_from_slice(&(GOLOMB_CHUNK as u32).to_le_bytes());
+    let nchunks = n.div_ceil(GOLOMB_CHUNK);
+    out.extend_from_slice(&(nchunks as u32).to_le_bytes());
+    let mut params = Vec::with_capacity(nchunks);
+    for c in 0..nchunks {
+        let from = c * GOLOMB_CHUNK;
+        let to = (from + GOLOMB_CHUNK).min(n);
+        let m = best_golomb_m(&mapped[from..to]);
+        params.push(m);
+    }
+    for &m in &params {
+        put_uvarint(&mut out, m);
+    }
+    let mut w = BitWriter::new();
+    for (c, &m) in params.iter().enumerate() {
+        let from = c * GOLOMB_CHUNK;
+        let to = (from + GOLOMB_CHUNK).min(n);
+        if write_golomb_group(&mut w, &mapped[from..to], m).is_err() {
+            // Bounded unary run: fall back to a divisor guaranteeing it.
+            let max_u = mapped[from..to].iter().copied().max().unwrap_or(0);
+            let mm = (max_u / MAX_RICE_UNARY2).max(1);
+            let _ = write_golomb_group(&mut w, &mapped[from..to], mm);
+        }
+    }
+    out.extend_from_slice(&w.finish());
+    out
+}
+
+fn decode_golomb(bytes: &[u8], len: usize) -> Result<Vec<i32>> {
+    let (mapped, _) = decode_golomb_mapped(bytes, len)?;
+    mapped.iter().map(|&u| to_i32(u)).collect()
+}
+
+fn decode_golomb_mapped(bytes: &[u8], len: usize) -> Result<(Vec<u64>, usize)> {
+    let mut r = Reader::new(bytes);
+    let total = r.u64le()? as usize;
+    if total != len {
+        return Err(Error::malformed("golomb length mismatch"));
+    }
+    if len == 0 {
+        return Ok((Vec::new(), 0));
+    }
+    let chunk = r.u32le()? as usize;
+    if chunk == 0 || chunk > (1 << 24) {
+        return Err(Error::malformed("golomb partition size out of range"));
+    }
+    let nchunks = r.u32le()? as usize;
+    if nchunks != len.div_ceil(chunk) {
+        return Err(Error::malformed("golomb partition count mismatch"));
+    }
+    let mut params = Vec::with_capacity(nchunks);
+    for _ in 0..nchunks {
+        let m = r.uvarint()?;
+        if m == 0 || m > MAX_GOLOMB_M {
+            return Err(Error::malformed("golomb divisor out of range"));
+        }
+        params.push(m);
+    }
+    let rest = r.rest();
+    let mut br = BitReader::new(rest);
+    let mut out = Vec::with_capacity(len);
+    for (c, &m) in params.iter().enumerate() {
+        let from = c * chunk;
+        let count = (from + chunk).min(len) - from;
+        let vals = read_golomb_group(&mut br, count, m)?;
+        out.extend_from_slice(&vals);
+    }
+    Ok((out, len))
+}
+
+fn encode_centered_golomb(residual: &[i32]) -> Vec<u8> {
+    let n = residual.len();
+    let mut out = Vec::new();
+    out.extend_from_slice(&(n as u64).to_le_bytes());
+    if n == 0 {
+        out.extend_from_slice(&0i32.to_le_bytes());
+        return out;
+    }
+    let center = median_i32(residual);
+    out.extend_from_slice(&center.to_le_bytes());
+    let mapped: Vec<u64> = residual
+        .iter()
+        .map(|&v| zigzag_i64(i64::from(v) - i64::from(center)))
+        .collect();
+    // The Golomb body carries its own length prefix; decode reads it back.
+    let body = encode_golomb_mapped(&mapped);
+    out.extend_from_slice(&body);
+    out
+}
+
+fn decode_centered_golomb(bytes: &[u8], len: usize) -> Result<Vec<i32>> {
+    let mut r = Reader::new(bytes);
+    let total = r.u64le()? as usize;
+    if total != len {
+        return Err(Error::malformed("centered-golomb length mismatch"));
+    }
+    if len == 0 {
+        return Ok(Vec::new());
+    }
+    let center = r.i32le()?;
+    let rest = r.rest();
+    let (mapped, _) = decode_golomb_mapped(rest, len)?;
+    let mut out = Vec::with_capacity(len);
+    for &u in &mapped {
+        let e = unzigzag_i64(u);
+        let v = i64::from(center)
+            .checked_add(e)
+            .ok_or_else(|| Error::malformed("centered-golomb value overflows"))?;
+        if v < i64::from(i32::MIN) || v > i64::from(i32::MAX) {
+            return Err(Error::malformed("centered-golomb value out of i32 domain"));
+        }
+        out.push(v as i32);
+    }
+    Ok(out)
+}
+
+fn median_i32(values: &[i32]) -> i32 {
+    let mut v: Vec<i32> = values.to_vec();
+    v.sort_unstable();
+    v[v.len() / 2]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1678,6 +2012,29 @@ mod tests {
                 let back = codec.decode(&bytes, residual.len()).unwrap();
                 assert_eq!(back, residual, "codec {} case {n}", codec.name());
             }
+        }
+    }
+
+    #[test]
+    fn golomb_codecs_round_trip_exactly() {
+        for residual in sample_residuals() {
+            for codec in [ResidualCodecV2::Golomb, ResidualCodecV2::CenteredGolomb] {
+                let payload = codec.encode(&residual);
+                let back = codec
+                    .decode(&payload, residual.len())
+                    .unwrap_or_else(|e| panic!("{:?}: {e}", codec));
+                assert_eq!(back, residual, "{:?}", codec);
+            }
+        }
+    }
+
+    #[test]
+    fn best_v3_is_never_larger_than_best_v2() {
+        for residual in sample_residuals() {
+            let v2 = encode_best_v2(&residual);
+            let v3 = encode_best_v3(&residual);
+            assert!(v3.complete_bytes() <= v2.complete_bytes());
+            assert_eq!(v3.decode(residual.len()).unwrap(), residual);
         }
     }
 

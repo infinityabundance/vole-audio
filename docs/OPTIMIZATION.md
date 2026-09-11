@@ -181,12 +181,35 @@ Measured (court `learned-speech`, result `ba12fd66…`): effectiveness
 aggregate and 4/8 held-out clips**. The LPC family wins 6/8 effectiveness clips
 and 7/8 Mode-C clips; `2035-147960` flips to a VOLE win (20 947 vs 21 243 B).
 
+### Seal S4 — general Golomb and centered Golomb residual coding
+
+A new **Exp3** profile (`vole.audio.learned.exp3`) imports every Exp2 candidate
+and adds two residual codecs, leaving Exp2 and the frozen Seal-K evidence
+byte-for-byte untouched:
+
+* `Golomb` (id 12): partitioned general Golomb coding with an arbitrary,
+  **non-power-of-two** divisor `M` per 512-sample partition, a quotient in unary
+  and a truncated-binary remainder. Rice is the `M = 2^k` special case; searching
+  arbitrary `M` removes the power-of-two quantisation of the Rice parameter.
+* `CenteredGolomb` (id 13): the median residual is stored once and the centered
+  values are Golomb-coded, which pays on asymmetric residual tails.
+
+The `learned-speech` portfolio now re-encodes every candidate under Exp3, so the
+new codecs are selected by actual complete bytes.
+
+Measured (court `learned-speech`, result `3e8d99f3…`): effectiveness
+131 770 → **130 395 B** against FLAC 130 331 — a **0.05 %** gap, with VOLE winning
+5/8 clips; Mode C 143 989 → **142 684 B** against FLAC 144 145, i.e. VOLE is
+**1.0 % smaller and wins 5/8 held-out clips**. General Golomb is selected on
+almost every clip (`centered_golomb` on the strongly skewed `1988-147956`).
+
 ## Status
 
 Implemented and pushed: Track A, Track B (including the entropy decode table),
 and the Report 3 Seal S0 diagnostic courts (`learned-speech-trace`,
-`learned-real-corpus-u1`), Seal S1 fixed differences, Seal S2 dense local LPC
-and Seal S3 precision/shift/error-feedback (court `learned-speech`).
+`learned-real-corpus-u1`), Seal S1 fixed differences, Seal S2 dense local LPC,
+Seal S3 precision/shift/error-feedback and Seal S4 general Golomb residual
+coding (court `learned-speech`).
 The remaining tracks from the two whole-repository
 optimization reports
 (CPU frame-tile multicore + PartialBank vectorization, GPU work decomposition,

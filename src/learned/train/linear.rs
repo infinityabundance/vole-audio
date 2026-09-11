@@ -267,6 +267,14 @@ pub fn fit_linear_object_profile(
             Vec::new(),
             source,
         ),
+        crate::learned::profile::LearnedProfile::Exp3 => LearnedObject::from_intrinsic_exp3(
+            crate::learned::model::LearnedModel::Linear(predictor),
+            channels,
+            frames,
+            sample_rate_hz,
+            Vec::new(),
+            source,
+        ),
     }?;
     stats.fit_ns = sw.elapsed_ns().max(0) as u64;
     Ok((object, stats))

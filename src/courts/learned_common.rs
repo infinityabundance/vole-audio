@@ -769,6 +769,29 @@ pub fn finish_exp2(
     )
 }
 
+/// Freeze-or-write an **Exp3** learned court's receipt.
+#[allow(clippy::too_many_arguments)]
+pub fn finish_exp3(
+    court: &str,
+    receipts_root: &std::path::Path,
+    frozen: &str,
+    projection: &[u8],
+    verdict: crate::status::Verdict,
+    detail: String,
+    extras: Vec<(&str, serde_json::Value)>,
+) -> Result<crate::status::Verdict> {
+    finish_with_profile(
+        court,
+        crate::learned::profile::LearnedProfile::Exp3,
+        receipts_root,
+        frozen,
+        projection,
+        verdict,
+        detail,
+        extras,
+    )
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn finish_with_profile(
     court: &str,
@@ -802,6 +825,9 @@ pub fn finish_with_profile(
         }
         crate::learned::profile::LearnedProfile::Exp2 => {
             crate::learned::profile::LEARNED_EXP2_EVIDENCE_SCHEMA
+        }
+        crate::learned::profile::LearnedProfile::Exp3 => {
+            crate::learned::profile::LEARNED_EXP3_EVIDENCE_SCHEMA
         }
     };
     let mut builder = ReceiptBuilder::new(court);
