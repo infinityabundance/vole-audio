@@ -1,0 +1,1712 @@
+{
+  "schema": "vole.audio.evidence.v1",
+  "schema_version": 1,
+  "receipt": {
+    "schema": "vole.audio.evidence.v1",
+    "schema_version": 1,
+    "run_id": "learned-speech-749312247-29de0f",
+    "court": "learned-speech",
+    "created_unix_ms": 749312247,
+    "result": "SUPPORTED",
+    "result_detail": "real-speech portfolio (families: dense4, sparse10, hier2, fixed_diff, lpc) over 8 effectiveness + 8 held-out Mode-C clips, paired against FLAC-5 with exact Wilcoxon signed-rank and a deterministic bootstrap median CI; result sha256 0bd95606961a00d0229f008d2ffacf8d14000c12a6c3167e5ffe1499ab8a4567",
+    "environment": {
+      "os": {
+        "sysname": "Linux",
+        "release": "7.2.2-1-cachyos",
+        "version": "#1 SMP PREEMPT_DYNAMIC Fri, 28 Aug 2026 08:05:11 +0000",
+        "machine": "x86_64",
+        "nodename": "vanir",
+        "os_pretty_name": "CachyOS"
+      },
+      "cpu": {
+        "model": "AMD Ryzen 7 9800X3D 8-Core Processor",
+        "flags": [
+          "3dnowprefetch",
+          "abm",
+          "adx",
+          "aes",
+          "amd_lbr_pmc_freeze",
+          "amd_lbr_v2",
+          "aperfmperf",
+          "apic",
+          "arat",
+          "avic",
+          "avx",
+          "avx2",
+          "avx512_bf16",
+          "avx512_bitalg",
+          "avx512_vbmi2",
+          "avx512_vnni",
+          "avx512_vp2intersect",
+          "avx512_vpopcntdq",
+          "avx512bw",
+          "avx512cd",
+          "avx512dq",
+          "avx512f",
+          "avx512ifma",
+          "avx512vbmi",
+          "avx512vl",
+          "avx_vnni",
+          "bmi1",
+          "bmi2",
+          "bpext",
+          "bus_lock_detect",
+          "cat_l3",
+          "cdp_l3",
+          "clflush",
+          "clflushopt",
+          "clwb",
+          "clzero",
+          "cmov",
+          "cmp_legacy",
+          "constant_tsc",
+          "cpb",
+          "cppc",
+          "cpuid",
+          "cpuid_fault",
+          "cqm",
+          "cqm_llc",
+          "cqm_mbm_local",
+          "cqm_mbm_total",
+          "cqm_occup_llc",
+          "cr8_legacy",
+          "cx16",
+          "cx8",
+          "de",
+          "decodeassists",
+          "erms",
+          "extapic",
+          "extd_apicid",
+          "f16c",
+          "flush_l1d",
+          "flushbyasid",
+          "fma",
+          "fpu",
+          "fsgsbase",
+          "fsrm",
+          "fxsr",
+          "fxsr_opt",
+          "gfni",
+          "ht",
+          "hw_pstate",
+          "ibpb",
+          "ibrs",
+          "ibrs_enhanced",
+          "ibs",
+          "invpcid",
+          "irperf",
+          "lahf_lm",
+          "lbrv",
+          "lm",
+          "mba",
+          "mca",
+          "mce",
+          "misalignsse",
+          "mmx",
+          "mmxext",
+          "monitor",
+          "movbe",
+          "movdir64b",
+          "movdiri",
+          "msr",
+          "mtrr",
+          "mwaitx",
+          "nonstop_tsc",
+          "nopl",
+          "npt",
+          "nrip_save",
+          "nx",
+          "ospke",
+          "osvw",
+          "overflow_recov",
+          "pae",
+          "pat",
+          "pausefilter",
+          "pclmulqdq",
+          "pdpe1gb",
+          "perfctr_core",
+          "perfctr_llc",
+          "perfctr_nb",
+          "perfmon_v2",
+          "pfthreshold",
+          "pge",
+          "pku",
+          "pni",
+          "popcnt",
+          "pse",
+          "pse36",
+          "rapl",
+          "rdpid",
+          "rdpru",
+          "rdrand",
+          "rdseed",
+          "rdt_a",
+          "rdtscp",
+          "rep_good",
+          "sep",
+          "sha_ni",
+          "skinit",
+          "smap",
+          "smca",
+          "smep",
+          "ssbd",
+          "sse",
+          "sse2",
+          "sse4_1",
+          "sse4_2",
+          "sse4a",
+          "ssse3",
+          "stibp",
+          "succor",
+          "svm",
+          "svm_lock",
+          "syscall",
+          "tce",
+          "topoext",
+          "tsc",
+          "tsc_adjust",
+          "tsc_scale",
+          "umip",
+          "user_shstk",
+          "v_spec_ctrl",
+          "v_vmsave_vmload",
+          "vaes",
+          "vgif",
+          "vmcb_clean",
+          "vme",
+          "vmmcall",
+          "vnmi",
+          "vpclmulqdq",
+          "wbnoinvd",
+          "wdt",
+          "x2avic",
+          "xgetbv1",
+          "xsave",
+          "xsavec",
+          "xsaveerptr",
+          "xsaveopt",
+          "xsaves",
+          "xtopology"
+        ],
+        "has_avx2": true,
+        "has_avx512": true,
+        "has_neon": false
+      },
+      "memory": {
+        "total_bytes": 134689935360
+      },
+      "git_commit": "66fa28aa843b78c3e7e6b6996cc6b6ee085c2e78",
+      "git_dirty": true,
+      "git_branch": "main",
+      "rustc_version": "rustc 1.99.0-nightly (89c61a754 2026-07-23)",
+      "crate_version": "0.30.0",
+      "target_arch": "x86_64",
+      "target_os": "linux",
+      "cpu_governor": "performance",
+      "bios_version": "1402",
+      "git_tree_sha": "829559833e667bba9247d6715db33ca82e775956",
+      "build_git_commit": "66fa28aa843b78c3e7e6b6996cc6b6ee085c2e78",
+      "build_tree_sha": "829559833e667bba9247d6715db33ca82e775956",
+      "build_dirty": true,
+      "build_rustc": "rustc 1.99.0-nightly (89c61a754 2026-07-23)",
+      "build_profile": "debug",
+      "build_target": "x86_64-unknown-linux-gnu",
+      "source_binding": "dirty",
+      "seal_subject_hash": "ec84298280ed3db375533cb4226ab29fddd6c24ebd1900d377a54db13035682f"
+    },
+    "hardware": {
+      "pci_devices": [
+        {
+          "bdf": "0000:00:00.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14d8",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": null
+        },
+        {
+          "bdf": "0000:00:00.2",
+          "class": "0x080600",
+          "vendor": "0x1022",
+          "device": "0x14d9",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": null
+        },
+        {
+          "bdf": "0000:00:01.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "0"
+        },
+        {
+          "bdf": "0000:00:01.1",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14db",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "1"
+        },
+        {
+          "bdf": "0000:00:01.2",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14db",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "2"
+        },
+        {
+          "bdf": "0000:00:02.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "3"
+        },
+        {
+          "bdf": "0000:00:02.1",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14db",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "4"
+        },
+        {
+          "bdf": "0000:00:02.2",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14db",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "5"
+        },
+        {
+          "bdf": "0000:00:03.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "6"
+        },
+        {
+          "bdf": "0000:00:04.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "7"
+        },
+        {
+          "bdf": "0000:00:08.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "8"
+        },
+        {
+          "bdf": "0000:00:08.1",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14dd",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "9"
+        },
+        {
+          "bdf": "0000:00:08.3",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14dd",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "10"
+        },
+        {
+          "bdf": "0000:00:14.0",
+          "class": "0x0c0500",
+          "vendor": "0x1022",
+          "device": "0x790b",
+          "driver": "piix4_smbus",
+          "numa_node": -1,
+          "iommu_group": "11"
+        },
+        {
+          "bdf": "0000:00:14.3",
+          "class": "0x060100",
+          "vendor": "0x1022",
+          "device": "0x790e",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "11"
+        },
+        {
+          "bdf": "0000:00:18.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e0",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.1",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e1",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.2",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e2",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.3",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e3",
+          "driver": "k10temp",
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.4",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e4",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.5",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e5",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.6",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e6",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.7",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e7",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:01:00.0",
+          "class": "0x030000",
+          "vendor": "0x10de",
+          "device": "0x2702",
+          "driver": "nvidia",
+          "numa_node": -1,
+          "iommu_group": "13"
+        },
+        {
+          "bdf": "0000:01:00.1",
+          "class": "0x040300",
+          "vendor": "0x10de",
+          "device": "0x22bb",
+          "driver": "snd_hda_intel",
+          "numa_node": -1,
+          "iommu_group": "13"
+        },
+        {
+          "bdf": "0000:02:00.0",
+          "class": "0x010802",
+          "vendor": "0xc0a9",
+          "device": "0x542b",
+          "driver": "nvme",
+          "numa_node": -1,
+          "iommu_group": "14"
+        },
+        {
+          "bdf": "0000:03:00.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f4",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "15"
+        },
+        {
+          "bdf": "0000:04:00.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "16"
+        },
+        {
+          "bdf": "0000:04:04.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "17"
+        },
+        {
+          "bdf": "0000:04:05.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "18"
+        },
+        {
+          "bdf": "0000:04:08.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "19"
+        },
+        {
+          "bdf": "0000:04:0c.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "20"
+        },
+        {
+          "bdf": "0000:04:0d.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "21"
+        },
+        {
+          "bdf": "0000:05:00.0",
+          "class": "0x010802",
+          "vendor": "0x2646",
+          "device": "0x5019",
+          "driver": "nvme",
+          "numa_node": -1,
+          "iommu_group": "16"
+        },
+        {
+          "bdf": "0000:06:00.0",
+          "class": "0x020000",
+          "vendor": "0x10ec",
+          "device": "0x8125",
+          "driver": "r8169",
+          "numa_node": -1,
+          "iommu_group": "17"
+        },
+        {
+          "bdf": "0000:09:00.0",
+          "class": "0x0c0330",
+          "vendor": "0x1022",
+          "device": "0x43fc",
+          "driver": "xhci-pci-prom21",
+          "numa_node": -1,
+          "iommu_group": "20"
+        },
+        {
+          "bdf": "0000:0a:00.0",
+          "class": "0x010601",
+          "vendor": "0x1022",
+          "device": "0x43f6",
+          "driver": "ahci",
+          "numa_node": -1,
+          "iommu_group": "21"
+        },
+        {
+          "bdf": "0000:0b:00.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2421",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "22"
+        },
+        {
+          "bdf": "0000:0c:00.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2423",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "23"
+        },
+        {
+          "bdf": "0000:0c:01.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2423",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "24"
+        },
+        {
+          "bdf": "0000:0c:02.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2423",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "25"
+        },
+        {
+          "bdf": "0000:0c:03.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2423",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "26"
+        },
+        {
+          "bdf": "0000:71:00.0",
+          "class": "0x0c0330",
+          "vendor": "0x1b21",
+          "device": "0x2426",
+          "driver": "xhci_hcd",
+          "numa_node": -1,
+          "iommu_group": "25"
+        },
+        {
+          "bdf": "0000:72:00.0",
+          "class": "0x0c0340",
+          "vendor": "0x1b21",
+          "device": "0x2425",
+          "driver": "thunderbolt",
+          "numa_node": -1,
+          "iommu_group": "26"
+        },
+        {
+          "bdf": "0000:73:00.0",
+          "class": "0x130000",
+          "vendor": "0x1022",
+          "device": "0x14de",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "27"
+        },
+        {
+          "bdf": "0000:73:00.2",
+          "class": "0x108000",
+          "vendor": "0x1022",
+          "device": "0x1649",
+          "driver": "ccp",
+          "numa_node": -1,
+          "iommu_group": "28"
+        },
+        {
+          "bdf": "0000:73:00.3",
+          "class": "0x0c0330",
+          "vendor": "0x1022",
+          "device": "0x15b6",
+          "driver": "xhci_hcd",
+          "numa_node": -1,
+          "iommu_group": "29"
+        },
+        {
+          "bdf": "0000:73:00.4",
+          "class": "0x0c0330",
+          "vendor": "0x1022",
+          "device": "0x15b7",
+          "driver": "xhci_hcd",
+          "numa_node": -1,
+          "iommu_group": "30"
+        },
+        {
+          "bdf": "0000:73:00.6",
+          "class": "0x040300",
+          "vendor": "0x1022",
+          "device": "0x15e3",
+          "driver": "snd_hda_intel",
+          "numa_node": -1,
+          "iommu_group": "31"
+        },
+        {
+          "bdf": "0000:74:00.0",
+          "class": "0x0c0330",
+          "vendor": "0x1022",
+          "device": "0x15b8",
+          "driver": "xhci_hcd",
+          "numa_node": -1,
+          "iommu_group": "32"
+        }
+      ],
+      "gpu": {
+        "vendor": null,
+        "name": null,
+        "bdf": null,
+        "compute_capability": null,
+        "memory_bytes": null,
+        "driver_version": null,
+        "runtime_version": null
+      },
+      "audio": {
+        "card": null,
+        "device": null,
+        "name": null,
+        "subdevice": null
+      }
+    },
+    "params": {
+      "universe": "vole.audio.u1",
+      "profile": "vole.audio.learned.exp2",
+      "backend": "scalar canonical learned evaluator",
+      "sample_rate_hz": null,
+      "channels": null,
+      "voices": null,
+      "quantum_frames": null,
+      "duration_secs": null,
+      "content_kind": "Phase O learned deterministic prediction"
+    },
+    "counters": {
+      "host_pcm_staging_bytes": 0,
+      "host_pcm_copy_bytes": 0,
+      "gpu_to_host_pcm_bytes": 0,
+      "endpoint_observation_bytes": 0,
+      "device_sample_block_bytes": 0,
+      "transient_compute_words": 0,
+      "host_pcm_resident_peak_bytes": 0,
+      "host_pcm_resident_integral": 0.0,
+      "endpoint_depth_frames": 0,
+      "endpoint_depth_min_frames": 18446744073709551615,
+      "endpoint_depth_max_frames": 0,
+      "quanta_submitted": 0,
+      "events_consumed": 0,
+      "xruns": 0,
+      "kernel_launches": 0,
+      "missed_deadlines": 0
+    },
+    "timing": {
+      "total_ns": null,
+      "deadline_ns": null,
+      "warmup_runs": null,
+      "run_count": null,
+      "observation_count": null,
+      "tail": null
+    },
+    "provenance": {
+      "reference_hash": "0bd95606961a00d0229f008d2ffacf8d14000c12a6c3167e5ffe1499ab8a4567",
+      "backend_hash": null,
+      "endpoint_hash": null,
+      "gpu_artifact_hash": null,
+      "source_hash": null,
+      "corpus_hash": null,
+      "table_hashes": [],
+      "benchmark_order": [],
+      "exact_equality": null
+    },
+    "endpoint": {
+      "directness": null,
+      "topology": null,
+      "registered_range": null,
+      "registration_result": null,
+      "device_pointer": null,
+      "synchronization_mechanism": null,
+      "fence_sync_evidence": null,
+      "coherency_assumptions": null,
+      "hidden_staging_investigation": null,
+      "endpoint_clock": null
+    },
+    "energy": null,
+    "trace": null,
+    "limitations": [
+      "learned prediction is an experimental profile: it does not change u1/v1, the literal fallback remains mandatory, and negative learned results are preserved rather than hidden"
+    ],
+    "extras": {
+      "effectiveness": {
+        "split": "effectiveness (dev-clean)",
+        "clips": 8,
+        "total_portfolio_bytes": 134431,
+        "total_flac_bytes": 130331,
+        "total_baseline_bytes": 135124,
+        "wins_vs_flac": 0,
+        "losses_vs_flac": 8,
+        "wilcoxon_flac": {
+          "w_plus": 0,
+          "w_minus": 36,
+          "p_two_sided_ppm": 7813
+        },
+        "wins_vs_baseline": 4,
+        "losses_vs_baseline": 0,
+        "wilcoxon_baseline": {
+          "w_plus": 10,
+          "w_minus": 0,
+          "p_two_sided_ppm": 125000
+        },
+        "bootstrap_median_flac_over_portfolio_ppm": {
+          "lo": 955659,
+          "hi": 977534
+        }
+      },
+      "effectiveness_clips": [
+        {
+          "id": "1272-128104-0000",
+          "split": "dev-clean",
+          "speaker": "1272",
+          "frames": 16384,
+          "winner": "lpc",
+          "portfolio_bytes": 16062,
+          "baseline_bytes": 16147,
+          "flac_bytes": 15670,
+          "ratio_flac_over_portfolio": 0.9755945710372307,
+          "families": {
+            "dense4": 16383,
+            "sparse10": 16147,
+            "hier2": 16187,
+            "fixed_diff": 16274,
+            "lpc": 16062
+          },
+          "family_detail": {
+            "dense4": {
+              "bytes": 16383,
+              "model_bytes": 20,
+              "residual_bytes": 16247,
+              "residual_codec": "partition_rice",
+              "residual_mean_abs": 230.55535888671875
+            },
+            "sparse10": {
+              "bytes": 16147,
+              "model_bytes": 22,
+              "residual_bytes": 16009,
+              "residual_codec": "partition_rice",
+              "residual_mean_abs": 251.96954345703125
+            },
+            "hier2": {
+              "bytes": 16187,
+              "model_bytes": 29,
+              "residual_bytes": 16042,
+              "residual_codec": "partition_rice",
+              "residual_mean_abs": 254.4925537109375
+            },
+            "fixed_diff": {
+              "bytes": 16274,
+              "model_bytes": 7,
+              "residual_bytes": 16151,
+              "residual_codec": "partition_rice",
+              "residual_mean_abs": 277.49267578125
+            },
+            "lpc": {
+              "bytes": 16062,
+              "model_bytes": 118,
+              "residual_bytes": 15828,
+              "residual_codec": "partition_rice",
+              "residual_mean_abs": 224.11138916015625
+            }
+          }
+        },
+        {
+          "id": "1462-170138-0000",
+          "split": "dev-clean",
+          "speaker": "1462",
+          "frames": 16384,
+          "winner": "lpc",
+          "portfolio_bytes": 16286,
+          "baseline_bytes": 16498,
+          "flac_bytes": 15517,
+          "ratio_flac_over_portfolio": 0.9527815301485939,
+          "families": {
+            "dense4": 16980,
+            "sparse10": 16601,
+            "hier2": 16498,
+            "fixed_diff": 16662,
+            "lpc": 16286
+          },
+          "family_detail": {
+            "dense4": {
+              "bytes": 16980,
+              "model_bytes": 20,
+              "residual_bytes": 16844,
+              "residual_codec": "partition_rice",
+              "residual_mean_abs": 107.9473876953125
+            },
+            "sparse10": {
+              "bytes": 16601,
+              "model_bytes": 16,
+              "residual_bytes": 16469,
+              "residual_codec": "predictive_rice",
+              "residual_mean_abs": 291.29278564453125
+            },
+            "hier2": {
+              "bytes": 16498,
+              "model_bytes": 43,
+              "residual_bytes": 16339,
+              "residual_codec": "partition_rice",
+              "residual_mean_abs": 121.52471923828125
+            },
+            "fixed_diff": {
+              "bytes": 16662,
+              "model_bytes": 7,
+              "residual_bytes": 16539,
+              "residual_codec": "predictive_rice",
+              "residual_mean_abs": 256.8197021484375
+            },
+            "lpc": {
+              "bytes": 16286,
+              "model_bytes": 110,
+              "residual_bytes": 16060,
+              "residual_codec": "partition_rice",
+              "residual_mean_abs": 119.172607421875
+            }
+          }
+        },
+        {
+          "id": "1673-143396-0000",
+          "split": "dev-clean",
+          "speaker": "1673",
+          "frames": 16384,
+          "winner": "lpc",
+          "portfolio_bytes": 18235,
+          "baseline_bytes": 18369,
+          "flac_bytes": 17837,
+          "ratio_flac_over_portfolio": 0.9781738415135728,
+          "families": {
+            "dense4": 18557,
+            "sparse10": 18369,
+            "hier2": 18407,
+            "fixed_diff": 18853,
+            "lpc": 18235
+          },
+          "family_detail": {
+            "dense4": {
+              "bytes": 18557,
+              "model_bytes": 20,
+              "residual_bytes": 18421,
+              "residual_codec": "partition_rice",
+              "residual_mean_abs": 245.3062744140625
+            },
+            "sparse10": {
+              "bytes": 18369,
+              "model_bytes": 44,
+              "residual_bytes": 18209,
+              "residual_codec": "partition_rice",
+              "residual_mean_abs": 208.42938232421875
+            },
+            "hier2": {
+              "bytes": 18407,
+              "model_bytes": 59,
+              "residual_bytes": 18232,
+              "residual_codec": "partition_rice",
+              "residual_mean_abs": 220.34674072265625
+            },
+            "fixed_diff": {
+              "bytes": 18853,
+              "model_bytes": 7,
+              "residual_bytes": 18730,
+              "residual_codec": "partition_rice",
+              "residual_mean_abs": 298.571044921875
+            },
+            "lpc": {
+              "bytes": 18235,
+              "model_bytes": 110,
+              "residual_bytes": 18009,
+              "residual_codec": "partition_rice",
+              "residual_mean_abs": 246.34796142578125
+            }
+          }
+        },
+        {
+          "id": "174-168635-0000",
+          "split": "dev-clean",
+          "speaker": "174",
+          "frames": 16384,
+          "winner": "hier2",
+          "portfolio_bytes": 15997,
+          "baseline_bytes": 15997,
+          "flac_bytes": 15555,
+          "ratio_flac_over_portfolio": 0.9723698193411264,
+          "families": {
+            "dense4": 16127,
+            "sparse10": 16014,
+            "hier2": 15997,
+            "fixed_diff": 16127,
+            "lpc": 16057
+          },
+          "family_detail": {
+            "dense4": {
+              "bytes": 16127,
+              "model_bytes": 20,
+              "residual_bytes": 15991,
+              "residual_codec": "partition_rice",
+              "residual_mean_abs": 140.55303955078125
+            },
+            "sparse10": {
+              "bytes": 16014,
+              "model_bytes": 23,
+              "residual_bytes": 15875,
+              "residual_codec": "partition_rice",
+              "residual_mean_abs": 147.74542236328125
+            },
+            "hier2": {
+              "bytes": 15997,
+              "model_bytes": 64,
+              "residual_bytes": 15817,
+              "residual_codec": "partition_rice",
+              "residual_mean_abs": 135.9827880859375
+            },
+            "fixed_diff": {
+              "bytes": 16127,
+              "model_bytes": 7,
+              "residual_bytes": 16004,
+              "residual_codec": "predictive_rice",
+              "residual_mean_abs": 581.9971923828125
+            },
+            "lpc": {
+              "bytes": 16057,
+              "model_bytes": 110,
+              "residual_bytes": 15831,
+              "residual_codec": "block_rice",
+              "residual_mean_abs": 153.4122314453125
+            }
+          }
+        },
+        {
+          "id": "1919-142785-0000",
+          "split": "dev-clean",
+          "speaker": "1919",
+          "frames": 16384,
+          "winner": "lpc",
+          "portfolio_bytes": 19006,
+          "baseline_bytes": 19268,
+          "flac_bytes": 18579,
+          "ratio_flac_over_portfolio": 0.9775334105019468,
+          "families": {
+            "dense4": 19621,
+            "sparse10": 19268,
+            "hier2": 19275,
+            "fixed_diff": 19420,
+            "lpc": 19006
+          },
+          "family_detail": {
+            "dense4": {
+              "bytes": 19621,
+              "model_bytes": 20,
+              "residual_bytes": 19485,
+              "residual_codec": "predictive_rice",
+              "residual_mean_abs": 766.2296142578125
+            },
+            "sparse10": {
+              "bytes": 19268,
+              "model_bytes": 16,
+              "residual_bytes": 19136,
+              "residual_codec": "predictive_rice",
+              "residual_mean_abs": 1057.5672607421875
+            },
+            "hier2": {
+              "bytes": 19275,
+              "model_bytes": 23,
+              "residual_bytes": 19136,
+              "residual_codec": "predictive_rice",
+              "residual_mean_abs": 1057.5672607421875
+            },
+            "fixed_diff": {
+              "bytes": 19420,
+              "model_bytes": 7,
+              "residual_bytes": 19297,
+              "residual_codec": "partition_rice",
+              "residual_mean_abs": 806.7532958984375
+            },
+            "lpc": {
+              "bytes": 19006,
+              "model_bytes": 214,
+              "residual_bytes": 18676,
+              "residual_codec": "partition_rice",
+              "residual_mean_abs": 602.2681884765625
+            }
+          }
+        },
+        {
+          "id": "1988-147956-0000",
+          "split": "dev-clean",
+          "speaker": "1988",
+          "frames": 16384,
+          "winner": "sparse10",
+          "portfolio_bytes": 13995,
+          "baseline_bytes": 13995,
+          "flac_bytes": 13646,
+          "ratio_flac_over_portfolio": 0.9750625223294034,
+          "families": {
+            "dense4": 14536,
+            "sparse10": 13995,
+            "hier2": 14002,
+            "fixed_diff": 14226,
+            "lpc": 14295
+          },
+          "family_detail": {
+            "dense4": {
+              "bytes": 14536,
+              "model_bytes": 20,
+              "residual_bytes": 14400,
+              "residual_codec": "predictive_rice",
+              "residual_mean_abs": 101.7314453125
+            },
+            "sparse10": {
+              "bytes": 13995,
+              "model_bytes": 16,
+              "residual_bytes": 13863,
+              "residual_codec": "predictive_rice",
+              "residual_mean_abs": 263.31353759765625
+            },
+            "hier2": {
+              "bytes": 14002,
+              "model_bytes": 23,
+              "residual_bytes": 13863,
+              "residual_codec": "predictive_rice",
+              "residual_mean_abs": 263.31353759765625
+            },
+            "fixed_diff": {
+              "bytes": 14226,
+              "model_bytes": 7,
+              "residual_bytes": 14103,
+              "residual_codec": "predictive_rice",
+              "residual_mean_abs": 112.17706298828125
+            },
+            "lpc": {
+              "bytes": 14295,
+              "model_bytes": 102,
+              "residual_bytes": 14077,
+              "residual_codec": "predictive_rice",
+              "residual_mean_abs": 118.4306640625
+            }
+          }
+        },
+        {
+          "id": "1993-147149-0000",
+          "split": "dev-clean",
+          "speaker": "1993",
+          "frames": 16384,
+          "winner": "hier2",
+          "portfolio_bytes": 12854,
+          "baseline_bytes": 12854,
+          "flac_bytes": 12284,
+          "ratio_flac_over_portfolio": 0.9556558269799285,
+          "families": {
+            "dense4": 13119,
+            "sparse10": 12865,
+            "hier2": 12854,
+            "fixed_diff": 13086,
+            "lpc": 13071
+          },
+          "family_detail": {
+            "dense4": {
+              "bytes": 13119,
+              "model_bytes": 20,
+              "residual_bytes": 12983,
+              "residual_codec": "partition_rice",
+              "residual_mean_abs": 25.7119140625
+            },
+            "sparse10": {
+              "bytes": 12865,
+              "model_bytes": 43,
+              "residual_bytes": 12706,
+              "residual_codec": "partition_rice",
+              "residual_mean_abs": 23.21240234375
+            },
+            "hier2": {
+              "bytes": 12854,
+              "model_bytes": 40,
+              "residual_bytes": 12698,
+              "residual_codec": "partition_rice",
+              "residual_mean_abs": 23.53851318359375
+            },
+            "fixed_diff": {
+              "bytes": 13086,
+              "model_bytes": 7,
+              "residual_bytes": 12963,
+              "residual_codec": "partition_rice",
+              "residual_mean_abs": 34.84991455078125
+            },
+            "lpc": {
+              "bytes": 13071,
+              "model_bytes": 230,
+              "residual_bytes": 12725,
+              "residual_codec": "partition_rice",
+              "residual_mean_abs": 31.2490234375
+            }
+          }
+        },
+        {
+          "id": "2035-147960-0000",
+          "split": "dev-clean",
+          "speaker": "2035",
+          "frames": 16384,
+          "winner": "hier2",
+          "portfolio_bytes": 21996,
+          "baseline_bytes": 21996,
+          "flac_bytes": 21243,
+          "ratio_flac_over_portfolio": 0.9657665030005456,
+          "families": {
+            "dense4": 22185,
+            "sparse10": 22011,
+            "hier2": 21996,
+            "fixed_diff": 22797,
+            "lpc": 22107
+          },
+          "family_detail": {
+            "dense4": {
+              "bytes": 22185,
+              "model_bytes": 20,
+              "residual_bytes": 22049,
+              "residual_codec": "partition_rice",
+              "residual_mean_abs": 509.7313232421875
+            },
+            "sparse10": {
+              "bytes": 22011,
+              "model_bytes": 42,
+              "residual_bytes": 21853,
+              "residual_codec": "partition_rice",
+              "residual_mean_abs": 425.54876708984375
+            },
+            "hier2": {
+              "bytes": 21996,
+              "model_bytes": 70,
+              "residual_bytes": 21810,
+              "residual_codec": "partition_rice",
+              "residual_mean_abs": 403.69244384765625
+            },
+            "fixed_diff": {
+              "bytes": 22797,
+              "model_bytes": 7,
+              "residual_bytes": 22674,
+              "residual_codec": "partition_rice",
+              "residual_mean_abs": 653.3352661132812
+            },
+            "lpc": {
+              "bytes": 22107,
+              "model_bytes": 214,
+              "residual_bytes": 21777,
+              "residual_codec": "partition_rice",
+              "residual_mean_abs": 419.70794677734375
+            }
+          }
+        }
+      ],
+      "limitations": [
+        "object-specific fitting is representation selection, never a generalization claim",
+        "the portfolio grows one seal at a time; this receipt names its active set"
+      ],
+      "method": {
+        "active_families": [
+          "dense4",
+          "sparse10",
+          "hier2",
+          "fixed_diff",
+          "lpc"
+        ],
+        "sample_domain": "sign-extended i16 in i32 (the Seal-K experimental domain)",
+        "baseline": "the wired three-family Exp2 real-speech portfolio",
+        "attribution": "per-family standalone bytes are reported for every clip"
+      },
+      "mode_c": {
+        "split": "mode-c held-out (test-clean)",
+        "clips": 8,
+        "total_portfolio_bytes": 147518,
+        "total_flac_bytes": 144145,
+        "total_baseline_bytes": 147537,
+        "wins_vs_flac": 0,
+        "losses_vs_flac": 8,
+        "wilcoxon_flac": {
+          "w_plus": 0,
+          "w_minus": 36,
+          "p_two_sided_ppm": 7813
+        },
+        "wins_vs_baseline": 2,
+        "losses_vs_baseline": 0,
+        "wilcoxon_baseline": {
+          "w_plus": 3,
+          "w_minus": 0,
+          "p_two_sided_ppm": 500000
+        },
+        "bootstrap_median_flac_over_portfolio_ppm": {
+          "lo": 965036,
+          "hi": 986654
+        }
+      },
+      "mode_c_clips": [
+        {
+          "id": "1089-134686-0000",
+          "split": "test-clean",
+          "speaker": "1089",
+          "frames": 16384,
+          "winner": "lpc",
+          "portfolio_bytes": 15945,
+          "baseline_bytes": 15959,
+          "flac_bytes": 15428,
+          "ratio_flac_over_portfolio": 0.9675760426465977,
+          "families": {
+            "dense4": 16299,
+            "sparse10": 15959,
+            "hier2": 15966,
+            "fixed_diff": 16272,
+            "lpc": 15945
+          },
+          "family_detail": {
+            "dense4": {
+              "bytes": 16299,
+              "model_bytes": 20,
+              "residual_bytes": 16163,
+              "residual_codec": "block_rice",
+              "residual_mean_abs": 99.5283203125
+            },
+            "sparse10": {
+              "bytes": 15959,
+              "model_bytes": 20,
+              "residual_bytes": 15823,
+              "residual_codec": "partition_rice",
+              "residual_mean_abs": 120.67059326171875
+            },
+            "hier2": {
+              "bytes": 15966,
+              "model_bytes": 27,
+              "residual_bytes": 15823,
+              "residual_codec": "partition_rice",
+              "residual_mean_abs": 120.67059326171875
+            },
+            "fixed_diff": {
+              "bytes": 16272,
+              "model_bytes": 7,
+              "residual_bytes": 16149,
+              "residual_codec": "predictive_rice",
+              "residual_mean_abs": 187.61962890625
+            },
+            "lpc": {
+              "bytes": 15945,
+              "model_bytes": 110,
+              "residual_bytes": 15719,
+              "residual_codec": "partition_rice",
+              "residual_mean_abs": 124.05712890625
+            }
+          }
+        },
+        {
+          "id": "1188-133604-0000",
+          "split": "test-clean",
+          "speaker": "1188",
+          "frames": 16384,
+          "winner": "sparse10",
+          "portfolio_bytes": 13770,
+          "baseline_bytes": 13770,
+          "flac_bytes": 13547,
+          "ratio_flac_over_portfolio": 0.9838053740014524,
+          "families": {
+            "dense4": 13955,
+            "sparse10": 13770,
+            "hier2": 13846,
+            "fixed_diff": 13972,
+            "lpc": 14056
+          },
+          "family_detail": {
+            "dense4": {
+              "bytes": 13955,
+              "model_bytes": 20,
+              "residual_bytes": 13819,
+              "residual_codec": "block_rice",
+              "residual_mean_abs": 53.8555908203125
+            },
+            "sparse10": {
+              "bytes": 13770,
+              "model_bytes": 35,
+              "residual_bytes": 13619,
+              "residual_codec": "partition_rice",
+              "residual_mean_abs": 52.34075927734375
+            },
+            "hier2": {
+              "bytes": 13846,
+              "model_bytes": 36,
+              "residual_bytes": 13694,
+              "residual_codec": "block_rice",
+              "residual_mean_abs": 52.8367919921875
+            },
+            "fixed_diff": {
+              "bytes": 13972,
+              "model_bytes": 7,
+              "residual_bytes": 13849,
+              "residual_codec": "predictive_rice",
+              "residual_mean_abs": 107.2664794921875
+            },
+            "lpc": {
+              "bytes": 14056,
+              "model_bytes": 102,
+              "residual_bytes": 13838,
+              "residual_codec": "predictive_rice",
+              "residual_mean_abs": 108.2301025390625
+            }
+          }
+        },
+        {
+          "id": "121-121726-0000",
+          "split": "test-clean",
+          "speaker": "121",
+          "frames": 16384,
+          "winner": "hier2",
+          "portfolio_bytes": 20322,
+          "baseline_bytes": 20322,
+          "flac_bytes": 19529,
+          "ratio_flac_over_portfolio": 0.9609782501722272,
+          "families": {
+            "dense4": 20684,
+            "sparse10": 20360,
+            "hier2": 20322,
+            "fixed_diff": 20664,
+            "lpc": 20388
+          },
+          "family_detail": {
+            "dense4": {
+              "bytes": 20684,
+              "model_bytes": 20,
+              "residual_bytes": 20548,
+              "residual_codec": "predictive_rice",
+              "residual_mean_abs": 789.4862670898438
+            },
+            "sparse10": {
+              "bytes": 20360,
+              "model_bytes": 43,
+              "residual_bytes": 20201,
+              "residual_codec": "predictive_rice",
+              "residual_mean_abs": 790.2240600585938
+            },
+            "hier2": {
+              "bytes": 20322,
+              "model_bytes": 37,
+              "residual_bytes": 20169,
+              "residual_codec": "predictive_rice",
+              "residual_mean_abs": 759.6808471679688
+            },
+            "fixed_diff": {
+              "bytes": 20664,
+              "model_bytes": 7,
+              "residual_bytes": 20541,
+              "residual_codec": "predictive_rice",
+              "residual_mean_abs": 1631.7227172851562
+            },
+            "lpc": {
+              "bytes": 20388,
+              "model_bytes": 134,
+              "residual_bytes": 20138,
+              "residual_codec": "block_rice",
+              "residual_mean_abs": 705.828369140625
+            }
+          }
+        },
+        {
+          "id": "1221-135766-0000",
+          "split": "test-clean",
+          "speaker": "1221",
+          "frames": 16384,
+          "winner": "fixed_diff",
+          "portfolio_bytes": 21810,
+          "baseline_bytes": 21815,
+          "flac_bytes": 21409,
+          "ratio_flac_over_portfolio": 0.9816139385602934,
+          "families": {
+            "dense4": 22007,
+            "sparse10": 21815,
+            "hier2": 21821,
+            "fixed_diff": 21810,
+            "lpc": 21959
+          },
+          "family_detail": {
+            "dense4": {
+              "bytes": 22007,
+              "model_bytes": 20,
+              "residual_bytes": 21871,
+              "residual_codec": "predictive_rice",
+              "residual_mean_abs": 583.8589477539062
+            },
+            "sparse10": {
+              "bytes": 21815,
+              "model_bytes": 22,
+              "residual_bytes": 21677,
+              "residual_codec": "predictive_rice",
+              "residual_mean_abs": 716.6314086914062
+            },
+            "hier2": {
+              "bytes": 21821,
+              "model_bytes": 23,
+              "residual_bytes": 21682,
+              "residual_codec": "predictive_rice",
+              "residual_mean_abs": 729.1144409179688
+            },
+            "fixed_diff": {
+              "bytes": 21810,
+              "model_bytes": 7,
+              "residual_bytes": 21687,
+              "residual_codec": "predictive_rice",
+              "residual_mean_abs": 759.7824096679688
+            },
+            "lpc": {
+              "bytes": 21959,
+              "model_bytes": 158,
+              "residual_bytes": 21685,
+              "residual_codec": "partition_rice",
+              "residual_mean_abs": 540.7711181640625
+            }
+          }
+        },
+        {
+          "id": "1284-1180-0000",
+          "split": "test-clean",
+          "speaker": "1284",
+          "frames": 16384,
+          "winner": "hier2",
+          "portfolio_bytes": 18161,
+          "baseline_bytes": 18161,
+          "flac_bytes": 17526,
+          "ratio_flac_over_portfolio": 0.965034965034965,
+          "families": {
+            "dense4": 18545,
+            "sparse10": 18180,
+            "hier2": 18161,
+            "fixed_diff": 18508,
+            "lpc": 18228
+          },
+          "family_detail": {
+            "dense4": {
+              "bytes": 18545,
+              "model_bytes": 20,
+              "residual_bytes": 18409,
+              "residual_codec": "predictive_rice",
+              "residual_mean_abs": 251.05743408203125
+            },
+            "sparse10": {
+              "bytes": 18180,
+              "model_bytes": 25,
+              "residual_bytes": 18039,
+              "residual_codec": "predictive_rice",
+              "residual_mean_abs": 302.446533203125
+            },
+            "hier2": {
+              "bytes": 18161,
+              "model_bytes": 66,
+              "residual_bytes": 17979,
+              "residual_codec": "predictive_rice",
+              "residual_mean_abs": 230.9132080078125
+            },
+            "fixed_diff": {
+              "bytes": 18508,
+              "model_bytes": 7,
+              "residual_bytes": 18385,
+              "residual_codec": "partition_rice",
+              "residual_mean_abs": 344.2156982421875
+            },
+            "lpc": {
+              "bytes": 18228,
+              "model_bytes": 118,
+              "residual_bytes": 17994,
+              "residual_codec": "predictive_rice",
+              "residual_mean_abs": 302.59783935546875
+            }
+          }
+        },
+        {
+          "id": "1320-122612-0000",
+          "split": "test-clean",
+          "speaker": "1320",
+          "frames": 16384,
+          "winner": "sparse10",
+          "portfolio_bytes": 21229,
+          "baseline_bytes": 21229,
+          "flac_bytes": 21047,
+          "ratio_flac_over_portfolio": 0.9914268218003675,
+          "families": {
+            "dense4": 21486,
+            "sparse10": 21229,
+            "hier2": 21272,
+            "fixed_diff": 21497,
+            "lpc": 21454
+          },
+          "family_detail": {
+            "dense4": {
+              "bytes": 21486,
+              "model_bytes": 20,
+              "residual_bytes": 21350,
+              "residual_codec": "predictive_rice",
+              "residual_mean_abs": 647.30078125
+            },
+            "sparse10": {
+              "bytes": 21229,
+              "model_bytes": 22,
+              "residual_bytes": 21091,
+              "residual_codec": "predictive_rice",
+              "residual_mean_abs": 949.9092407226562
+            },
+            "hier2": {
+              "bytes": 21272,
+              "model_bytes": 49,
+              "residual_bytes": 21107,
+              "residual_codec": "predictive_rice",
+              "residual_mean_abs": 814.3526000976562
+            },
+            "fixed_diff": {
+              "bytes": 21497,
+              "model_bytes": 7,
+              "residual_bytes": 21374,
+              "residual_codec": "predictive_rice",
+              "residual_mean_abs": 1467.7603149414062
+            },
+            "lpc": {
+              "bytes": 21454,
+              "model_bytes": 118,
+              "residual_bytes": 21220,
+              "residual_codec": "predictive_rice",
+              "residual_mean_abs": 547.4661254882812
+            }
+          }
+        },
+        {
+          "id": "1580-141083-0000",
+          "split": "test-clean",
+          "speaker": "1580",
+          "frames": 16384,
+          "winner": "sparse10",
+          "portfolio_bytes": 20022,
+          "baseline_bytes": 20022,
+          "flac_bytes": 19617,
+          "ratio_flac_over_portfolio": 0.9797722505244232,
+          "families": {
+            "dense4": 20177,
+            "sparse10": 20022,
+            "hier2": 20138,
+            "fixed_diff": 20731,
+            "lpc": 20383
+          },
+          "family_detail": {
+            "dense4": {
+              "bytes": 20177,
+              "model_bytes": 20,
+              "residual_bytes": 20041,
+              "residual_codec": "partition_rice",
+              "residual_mean_abs": 342.50933837890625
+            },
+            "sparse10": {
+              "bytes": 20022,
+              "model_bytes": 39,
+              "residual_bytes": 19867,
+              "residual_codec": "block_rice",
+              "residual_mean_abs": 312.84210205078125
+            },
+            "hier2": {
+              "bytes": 20138,
+              "model_bytes": 34,
+              "residual_bytes": 19988,
+              "residual_codec": "partition_rice",
+              "residual_mean_abs": 341.4239501953125
+            },
+            "fixed_diff": {
+              "bytes": 20731,
+              "model_bytes": 7,
+              "residual_bytes": 20608,
+              "residual_codec": "predictive_rice",
+              "residual_mean_abs": 926.2896118164062
+            },
+            "lpc": {
+              "bytes": 20383,
+              "model_bytes": 142,
+              "residual_bytes": 20125,
+              "residual_codec": "partition_rice",
+              "residual_mean_abs": 384.11126708984375
+            }
+          }
+        },
+        {
+          "id": "1995-1826-0000",
+          "split": "test-clean",
+          "speaker": "1995",
+          "frames": 16384,
+          "winner": "hier2",
+          "portfolio_bytes": 16259,
+          "baseline_bytes": 16259,
+          "flac_bytes": 16042,
+          "ratio_flac_over_portfolio": 0.9866535457285196,
+          "families": {
+            "dense4": 16547,
+            "sparse10": 16298,
+            "hier2": 16259,
+            "fixed_diff": 16693,
+            "lpc": 16669
+          },
+          "family_detail": {
+            "dense4": {
+              "bytes": 16547,
+              "model_bytes": 20,
+              "residual_bytes": 16411,
+              "residual_codec": "partition_rice",
+              "residual_mean_abs": 129.212646484375
+            },
+            "sparse10": {
+              "bytes": 16298,
+              "model_bytes": 40,
+              "residual_bytes": 16142,
+              "residual_codec": "partition_rice",
+              "residual_mean_abs": 109.6920166015625
+            },
+            "hier2": {
+              "bytes": 16259,
+              "model_bytes": 38,
+              "residual_bytes": 16105,
+              "residual_codec": "partition_rice",
+              "residual_mean_abs": 113.14752197265625
+            },
+            "fixed_diff": {
+              "bytes": 16693,
+              "model_bytes": 7,
+              "residual_bytes": 16570,
+              "residual_codec": "partition_rice",
+              "residual_mean_abs": 133.5264892578125
+            },
+            "lpc": {
+              "bytes": 16669,
+              "model_bytes": 110,
+              "residual_bytes": 16443,
+              "residual_codec": "partition_rice",
+              "residual_mean_abs": 135.43115234375
+            }
+          }
+        }
+      ],
+      "protocol": {
+        "protocol_schema": "vole.audio.learned.protocol.v1",
+        "schema": "vole.audio.learned.exp2.evidence.v1",
+        "profile": "vole.audio.learned.exp2",
+        "version": 1,
+        "semantic_authority": "none: a learned hypothesis is a candidate family, never truth; scalar exact closure decides acceptance"
+      }
+    }
+  },
+  "receipt_sha256": "96fc88b5c61936eea3357ddf00d1214d1436b66afd4d853090c660379adb15d5"
+}
