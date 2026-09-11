@@ -30,7 +30,7 @@ use std::path::Path;
 
 /// Frozen static-result hash (empty means "not yet frozen").
 pub const LEARNED_U1_WASTED_SHA256: &str =
-    "8f58639a8648990a5d98575e693e9ca34c6dcfd823f3a9b0ab660088a0c04643";
+    "91c7d7f6ad694929c37e322ba2afd2867b6e3d5bce448a725caeb9f266dd433d";
 
 const CLIPS: usize = 8;
 /// The U1 s16 ingest shift.

@@ -1968,50 +1968,70 @@ fn median_i32(values: &[i32]) -> i32 {
 // id 14: FactorShift (strip a common power-of-two factor)
 // ---------------------------------------------------------------------------
 
-/// Encode the residual quotients after dividing out their common power-of-two
-/// factor. The factor is stored as a shift count.
+/// Encode the residual quotients after dividing out their exact common integer
+/// factor. The factor is stored as a varint (so non-power-of-two factors such as
+/// `3`, `10` or `100` are captured, not just shifts of two).
 fn encode_factor_shift(residual: &[i32]) -> Vec<u8> {
     let n = residual.len();
     let mut out = Vec::new();
     out.extend_from_slice(&(n as u64).to_le_bytes());
     if n == 0 {
-        out.push(0);
+        put_uvarint(&mut out, 1);
         return out;
     }
-    let mut t = 32u32;
+    let mut g = 0u64;
     for &v in residual {
-        if v != 0 {
-            t = t.min(v.trailing_zeros());
-        }
+        g = gcd_u64(g, i64::from(v).unsigned_abs());
     }
-    if t == 32 {
-        t = 0; // all zero
+    if g == 0 {
+        g = 1;
     }
-    t = t.min(31);
-    out.push(t as u8);
-    let q: Vec<i32> = residual.iter().map(|&v| v >> t).collect();
+    put_uvarint(&mut out, g);
+    let q: Vec<i32> = residual
+        .iter()
+        .map(|&v| (i64::from(v) / g as i64) as i32)
+        .collect();
     let inner = encode_best_v2(&q);
     out.extend_from_slice(&inner.bytes);
     out
+}
+
+fn gcd_u64(mut a: u64, mut b: u64) -> u64 {
+    while b != 0 {
+        let t = a % b;
+        a = b;
+        b = t;
+    }
+    a
 }
 
 fn decode_factor_shift(bytes: &[u8], len: usize) -> Result<Vec<i32>> {
     let mut r = Reader::new(bytes);
     let total = r.u64le()? as usize;
     if total != len {
-        return Err(Error::malformed("factor-shift length mismatch"));
+        return Err(Error::malformed("factor length mismatch"));
     }
     if len == 0 {
         return Ok(Vec::new());
     }
-    let t = r.u8()? as u32;
-    if t > 31 {
-        return Err(Error::malformed("factor-shift factor out of range"));
+    let g = r.uvarint()?;
+    if g == 0 || g > (1u64 << 32) {
+        return Err(Error::malformed("factor out of range"));
     }
     let rest = r.rest();
     let inner = decode_encoding_v2(rest, len)?;
     let q = inner.decode(len)?;
-    Ok(q.into_iter().map(|v| v << t).collect())
+    let mut out = Vec::with_capacity(len);
+    for v in q {
+        let x = i64::from(v)
+            .checked_mul(g as i64)
+            .ok_or_else(|| Error::malformed("factor reconstruction overflows"))?;
+        if x < i64::from(i32::MIN) || x > i64::from(i32::MAX) {
+            return Err(Error::malformed("factor reconstruction out of i32 domain"));
+        }
+        out.push(x as i32);
+    }
+    Ok(out)
 }
 
 #[cfg(test)]
@@ -2070,6 +2090,20 @@ mod tests {
                 assert_eq!(back, residual, "codec {} case {n}", codec.name());
             }
         }
+    }
+
+    #[test]
+    fn factor_shift_handles_non_power_of_two_factors() {
+        // Every value is a multiple of 300 (a non-power-of-two factor).
+        let residual: Vec<i32> = (0..300).map(|i| (((i * 7) % 13) - 6) * 300).collect();
+        let c = ResidualCodecV2::FactorShift;
+        let payload = c.encode(&residual);
+        assert_eq!(c.decode(&payload, residual.len()).unwrap(), residual);
+        // The factor codec never makes the portfolio larger.
+        assert!(
+            encode_best_v3(&residual).complete_bytes()
+                <= encode_best_v2(&residual).complete_bytes()
+        );
     }
 
     #[test]

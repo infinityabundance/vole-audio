@@ -285,15 +285,17 @@ learned model did not. Two pieces fix it, both exact:
 * a **`Wasted` model wrapper** (kind `16`, Exp3) models the quotients `X >> 16`
   with any inner hypothesis and scales the prediction back — a pure integer
 transform;
-* a **`FactorShift` residual codec** (id `14`) stores the common power-of-two
-  factor of the exact residual and encodes the quotients with the v2 family.
+* a **`FactorShift` residual codec** (id `14`) stores the exact common integer
+  factor `g` of the residual as a varint and encodes the quotients `R / g` with
+  the v2 family — so non-power-of-two factors such as `3`, `10` or `100` are
+  captured, not only shifts of two.
 
 The wrapper is only accepted when the scaled prediction does not saturate, so
 closure stays exact.
 
-Measured (court `learned-u1-wasted`, result `8f58639a…`): over the 8 U1-mapped
+Measured (court `learned-u1-wasted`, result `91c7d7f6…`): over the 8 U1-mapped
 effectiveness clips the S0 baseline portfolio is **397 283 B** and the
-wasted-wrapped LPC portfolio is **133 400 B** — a **2.98×** reduction, winning
+wasted-wrapped LPC portfolio is **133 416 B** — a **2.98×** reduction, winning
 8/8 clips, against FLAC-5's 130 006 B. `factor_shift` is selected on every clip.
 The U1-domain 3× gap is closed to ~2.6 %.
 
