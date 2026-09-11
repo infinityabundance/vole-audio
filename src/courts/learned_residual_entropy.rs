@@ -45,7 +45,7 @@ use std::path::{Path, PathBuf};
 
 /// Frozen static-result hash (empty means "not yet frozen").
 pub const LEARNED_RESIDUAL_ENTROPY_SHA256: &str =
-    "762fe11883127f746b9e1e5952ba2d0e468d39ddfc3e7da1f3557834878fa5ac";
+    "1366036a4a561e6eac2a36a842b8c4fd568b1d2bda1e3f84b137bbd8f9bac02e";
 
 /// Maximum representative Phase-M objects (one per distinct class tuple).
 const MAX_PHASE_M_OBJECTS: usize = 12;
@@ -191,6 +191,9 @@ fn phase_m_codecs() -> Vec<ResidualCodecV2> {
         .collect()
 }
 
+/// The fourth-pass E-ladder codecs measured against the pre-existing family.
+const E_CODECS: [ResidualCodecV2; 2] = [ResidualCodecV2::SignedFsm, ResidualCodecV2::SignedFsmSse];
+
 /// Evaluate the ladder over one population with an explicit codec set.
 fn evaluate(
     population: &'static str,
@@ -200,36 +203,51 @@ fn evaluate(
     let pre: Vec<ResidualCodecV2> = codecs
         .iter()
         .copied()
-        .filter(|c| *c != ResidualCodecV2::SignedFsm)
+        .filter(|c| !E_CODECS.contains(c))
+        .collect();
+    let active: Vec<ResidualCodecV2> = E_CODECS
+        .iter()
+        .copied()
+        .filter(|c| codecs.contains(c))
         .collect();
     let mut rows = Vec::with_capacity(cases.len());
     let mut projection = Vec::new();
     let mut exact = true;
-    let (mut pre_total, mut e1_total, mut post_total) = (0u64, 0u64, 0u64);
+    let mut pre_total = 0u64;
+    let mut with_total = 0u64;
+    let mut e_totals: Vec<u64> = vec![0; active.len()];
     let mut codec_totals = vec![0u64; codecs.len()];
     let mut concat: Vec<i32> = Vec::new();
 
     for case in cases {
         let (pre_codec, pre_b) = best_over(&pre, &case.residual);
-        let e1_payload = ResidualCodecV2::SignedFsm.encode(&case.residual);
-        let e1_b = e1_payload.len() as u64 + 1;
-        let (post_codec, post_b) = best_over(codecs, &case.residual);
-        match ResidualCodecV2::SignedFsm.decode(&e1_payload, case.residual.len()) {
-            Ok(back) => exact &= back == case.residual,
-            Err(_) => exact = false,
+        let mut ladder = serde_json::Map::new();
+        let mut e_bytes = Vec::with_capacity(active.len());
+        for (k, &codec) in active.iter().enumerate() {
+            let payload = codec.encode(&case.residual);
+            match codec.decode(&payload, case.residual.len()) {
+                Ok(back) => exact &= back == case.residual,
+                Err(_) => exact = false,
+            }
+            let b = payload.len() as u64 + 1;
+            e_totals[k] += b;
+            e_bytes.push(b);
+            ladder.insert(codec.name().to_string(), serde_json::json!(b));
         }
+        let (with_codec, with_b) = best_over(codecs, &case.residual);
         for (i, codec) in codecs.iter().enumerate() {
             codec_totals[i] += codec.encode(&case.residual).len() as u64 + 1;
         }
         pre_total += pre_b;
-        e1_total += e1_b;
-        post_total += post_b;
+        with_total += with_b;
         concat.extend_from_slice(&case.residual);
 
         common::push_label(&mut projection, &case.id);
         common::push_u64(&mut projection, pre_b);
-        common::push_u64(&mut projection, e1_b);
-        common::push_u64(&mut projection, post_b);
+        for &b in &e_bytes {
+            common::push_u64(&mut projection, b);
+        }
+        common::push_u64(&mut projection, with_b);
 
         rows.push(serde_json::json!({
             "id": case.id,
@@ -237,55 +255,65 @@ fn evaluate(
             "family": case.family,
             "class": case.class,
             "samples": case.residual.len(),
-            "pre_e1_codec": pre_codec.name(),
-            "pre_e1_bytes": pre_b,
-            "signed_fsm_bytes": e1_b,
-            "with_e1_codec": post_codec.name(),
-            "with_e1_bytes": post_b,
-            "e1_gain_bytes": pre_b as i64 - e1_b as i64,
-            "ladder_gain_bytes": pre_b as i64 - post_b as i64,
+            "pre_codec": pre_codec.name(),
+            "pre_bytes": pre_b,
+            "e_ladder_bytes": serde_json::Value::Object(ladder),
+            "with_codec": with_codec.name(),
+            "with_bytes": with_b,
+            "ladder_gain_bytes": pre_b as i64 - with_b as i64,
         }));
     }
 
-    // (Unhashed) wall-clock timing on the concatenated population residual.
-    let (enc_ns, dec_ns) = if concat.is_empty() {
-        (0, 0)
-    } else {
+    // (Unhashed) per-sample wall-clock timings on the concatenated residual.
+    let samples = concat.len() as u64;
+    let mut timings = serde_json::Map::new();
+    for &codec in &active {
+        if concat.is_empty() {
+            continue;
+        }
         let sw = Stopwatch::start();
         for _ in 0..TIMING_REPS {
-            let _ = ResidualCodecV2::SignedFsm.encode(&concat);
+            let _ = codec.encode(&concat);
         }
         let enc_ns = sw.elapsed_ns().max(0) as u64 / u64::from(TIMING_REPS);
-        let payload = ResidualCodecV2::SignedFsm.encode(&concat);
+        let payload = codec.encode(&concat);
         let sw = Stopwatch::start();
         for _ in 0..TIMING_REPS {
-            let _ = ResidualCodecV2::SignedFsm.decode(&payload, concat.len());
+            let _ = codec.decode(&payload, concat.len());
         }
         let dec_ns = sw.elapsed_ns().max(0) as u64 / u64::from(TIMING_REPS);
-        (enc_ns, dec_ns)
-    };
+        timings.insert(
+            codec.name().to_string(),
+            serde_json::json!({
+                "encode_ns_per_sample": enc_ns as f64 / samples as f64,
+                "decode_ns_per_sample": dec_ns as f64 / samples as f64,
+            }),
+        );
+    }
 
     let codec_map: serde_json::Map<String, serde_json::Value> = codecs
         .iter()
         .zip(&codec_totals)
         .map(|(c, b)| (c.name().to_string(), serde_json::json!(b)))
         .collect();
-    let samples = concat.len() as u64;
+    let mut e_map = serde_json::Map::new();
+    for (k, &codec) in active.iter().enumerate() {
+        e_map.insert(codec.name().to_string(), serde_json::json!(e_totals[k]));
+    }
     let summary = serde_json::json!({
         "population": population,
         "objects": cases.len(),
         "residual_samples": samples,
         "all_exact": exact,
         "active_codecs": codecs.iter().map(|c| c.name()).collect::<Vec<_>>(),
-        "pre_e1_best_bytes": pre_total,
-        "signed_fsm_bytes": e1_total,
-        "with_e1_best_bytes": post_total,
-        "e1_gain_bytes": pre_total as i64 - e1_total as i64,
-        "ladder_gain_bytes": pre_total as i64 - post_total as i64,
+        "e_ladder": active.iter().map(|c| c.name()).collect::<Vec<_>>(),
+        "pre_e_best_bytes": pre_total,
+        "e_ladder_bytes": serde_json::Value::Object(e_map),
+        "with_e_best_bytes": with_total,
+        "ladder_gain_bytes": pre_total as i64 - with_total as i64,
         "codec_totals_bytes": serde_json::Value::Object(codec_map),
         "timing": {
-            "encode_ns_per_sample": if samples == 0 { 0.0 } else { enc_ns as f64 / samples as f64 },
-            "decode_ns_per_sample": if samples == 0 { 0.0 } else { dec_ns as f64 / samples as f64 },
+            "per_codec": serde_json::Value::Object(timings),
             "repetitions": TIMING_REPS,
             "note": "wall-clock, never hashed",
         },
@@ -357,8 +385,9 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
         verdict,
         format!(
             "attributable residual-codec ladder over the fixed S8 winner residual ({} effectiveness \
-             clips) and {} representative Phase-M channel streams: pre-E1 Exp3 family vs the Seal \
-             E1 signed/FSM adaptive range coder (id 16), with the selected minimum reported",
+             clips) and {} representative Phase-M channel streams: pre-E family vs the Seal E1 \
+             signed/FSM adaptive range coder (id 16) and the Seal E2 SSE/APM-corrected variant \
+             (id 17), with the selected minimum reported",
             speech_cases.len(),
             phase_m.len()
         ),
@@ -371,11 +400,20 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
                     "fixed_predictor": "the S8 portfolio winner per effectiveness clip and a cheap \
                                         exact fixed-difference closure per Phase-M channel; the \
                                         dense residual is identical for every codec",
-                    "ladder": ["pre_e1 (ids 0..=15)", "signed_fsm (id 16)", "with_e1 minimum"],
+                    "ladder": [
+                        "pre_e (ids 0..=15)",
+                        "signed_fsm (id 16)",
+                        "signed_fsm_sse (id 17)",
+                        "with_e minimum",
+                    ],
                     "e1_codec": "forward carry-less binary range coder (LZMA arithmetic coder) with \
                                  online 12-bit adaptive probabilities over the residual-event FSM \
                                  state, previous magnitude bucket, previous sign, unary-length \
                                  position and decoded value prefix",
+                    "e2_codec": "the same base coder with an SSE/APM stage: the base 12-bit \
+                                 probability is quantized in the integer stretch domain into 33 \
+                                 interpolation points and adaptively corrected under a \
+                                 phase × magnitude-bucket context, then interpolated",
                     "binarization": "sign bit, then Exp-Golomb(0) of |r| (identical to Seal E0)",
                     "profile": crate::learned::profile::LEARNED_EXP3_PROFILE,
                     "mode_c": "deliberately not measured (held out from architecture tuning)",

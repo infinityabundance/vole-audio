@@ -91,6 +91,8 @@ pub enum ResidualCodecV2 {
     EliasFano = 15,
     /// Signed/FSM adaptive binary range coding of each residual bit (Seal E1).
     SignedFsm = 16,
+    /// Signed/FSM range coding with an SSE/APM probability correction (Seal E2).
+    SignedFsmSse = 17,
 }
 
 impl ResidualCodecV2 {
@@ -130,8 +132,8 @@ impl ResidualCodecV2 {
         ResidualCodecV2::ContextRans,
     ];
 
-    /// The Exp3 additions (Seal S4 + Seal E1), in canonical tie order.
-    pub const ALL_V3: [ResidualCodecV2; 17] = [
+    /// The Exp3 additions (Seal S4, E1, E2), in canonical tie order.
+    pub const ALL_V3: [ResidualCodecV2; 18] = [
         ResidualCodecV2::DenseI32,
         ResidualCodecV2::SparseDelta,
         ResidualCodecV2::ZigZagVarint,
@@ -149,6 +151,7 @@ impl ResidualCodecV2 {
         ResidualCodecV2::FactorShift,
         ResidualCodecV2::EliasFano,
         ResidualCodecV2::SignedFsm,
+        ResidualCodecV2::SignedFsmSse,
     ];
 
     /// Canonical codec identifier byte.
@@ -176,6 +179,7 @@ impl ResidualCodecV2 {
             ResidualCodecV2::FactorShift => "factor_shift",
             ResidualCodecV2::EliasFano => "elias_fano",
             ResidualCodecV2::SignedFsm => "signed_fsm",
+            ResidualCodecV2::SignedFsmSse => "signed_fsm_sse",
         }
     }
 
@@ -199,6 +203,7 @@ impl ResidualCodecV2 {
             14 => Some(ResidualCodecV2::FactorShift),
             15 => Some(ResidualCodecV2::EliasFano),
             16 => Some(ResidualCodecV2::SignedFsm),
+            17 => Some(ResidualCodecV2::SignedFsmSse),
             _ => None,
         }
     }
@@ -253,6 +258,7 @@ impl ResidualCodecV2 {
             ResidualCodecV2::FactorShift => encode_factor_shift(residual),
             ResidualCodecV2::EliasFano => encode_elias_fano(residual),
             ResidualCodecV2::SignedFsm => encode_signed_fsm(residual),
+            ResidualCodecV2::SignedFsmSse => encode_signed_fsm_sse(residual),
         }
     }
 
@@ -281,6 +287,7 @@ impl ResidualCodecV2 {
             ResidualCodecV2::FactorShift => decode_factor_shift(bytes, len),
             ResidualCodecV2::EliasFano => decode_elias_fano(bytes, len),
             ResidualCodecV2::SignedFsm => decode_signed_fsm(bytes, len),
+            ResidualCodecV2::SignedFsmSse => decode_signed_fsm_sse(bytes, len),
         }
     }
 }
@@ -2346,24 +2353,162 @@ impl<'a> RangeDecoder<'a> {
     }
 }
 
-#[inline]
-fn rc_encode(enc: &mut RangeEncoder, probs: &mut [u16], ctx: usize, bit: u32) {
-    let p = probs[ctx];
-    enc.encode_bit(p, bit);
-    probs[ctx] = rc_adapt(p, bit);
+// ---------------------------------------------------------------------------
+// Secondary symbol estimation / adaptive probability map (fourth-pass Seal E2)
+//
+// An APM takes the base model's 12-bit probability, quantizes it in the
+// logistic (stretch) domain into `APM_BINS` interpolation points, interpolates
+// an adaptively corrected probability, and updates the two touched points toward
+// the observed bit. It learns systematic miscalibration of the base model
+// without a larger direct context table. The squash/stretch transforms are pure
+// integer fixed point, so the corrected bitstream is portable.
+// ---------------------------------------------------------------------------
+
+/// APM interpolation points.
+const APM_BINS: usize = 33;
+/// APM adaptation shift.
+const APM_RATE: u32 = 7;
+/// SSE context count: 3 bit phases (sign / length / value) × 16 magnitude buckets.
+const APM_CONTEXTS: usize = 3 * RC_BUCKETS;
+
+/// PAQ integer squash: `d` in `[-2047, 2047]` (logit, 1/256 unit) to a 12-bit
+/// probability of a zero bit.
+fn squash(d: i32) -> i32 {
+    const T: [i32; 33] = [
+        1, 2, 3, 6, 10, 16, 27, 45, 73, 120, 194, 310, 488, 747, 1101, 1546, 2047, 2549, 2994,
+        3348, 3607, 3785, 3901, 3975, 4024, 4050, 4068, 4079, 4085, 4089, 4092, 4093, 4094,
+    ];
+    if d > 2047 {
+        return 4095;
+    }
+    if d < -2047 {
+        return 0;
+    }
+    let w = d & 127;
+    let i = ((d >> 7) + 16) as usize;
+    (T[i] * (128 - w) + T[i + 1] * w + 64) >> 7
+}
+
+/// The integer inverse of [`squash`], built once.
+fn stretch() -> &'static [i16; 4096] {
+    use std::sync::OnceLock;
+    static S: OnceLock<[i16; 4096]> = OnceLock::new();
+    S.get_or_init(|| {
+        let mut s = [0i16; 4096];
+        let mut d = -2047i32;
+        for p in 0..4096i32 {
+            while d < 2047 && squash(d) < p {
+                d += 1;
+            }
+            s[p as usize] = d as i16;
+        }
+        s
+    })
+}
+
+struct Apm {
+    t: Vec<u16>,
+    idx: usize,
+    wt: u32,
+}
+
+impl Apm {
+    fn new(contexts: usize) -> Self {
+        let mut t = vec![0u16; APM_BINS * contexts];
+        for (j, slot) in t.iter_mut().enumerate().take(APM_BINS) {
+            *slot = squash((j as i32 - 16) * 128).clamp(0, 4095) as u16;
+        }
+        for c in 1..contexts {
+            for j in 0..APM_BINS {
+                t[c * APM_BINS + j] = t[j];
+            }
+        }
+        Apm { t, idx: 0, wt: 0 }
+    }
+
+    /// Correct `pr` (12-bit probability of zero) under context `cx`.
+    fn pp(&mut self, pr: u16, cx: usize) -> u16 {
+        let st = i32::from(stretch()[pr as usize]);
+        let mapped = (st + 2048) * 32; // 32..131040 in 12-bit fixed point
+        let mut bin = (mapped >> 12) as usize;
+        if bin > APM_BINS - 2 {
+            bin = APM_BINS - 2;
+        }
+        self.idx = cx * APM_BINS + bin;
+        self.wt = (mapped & 0xFFF) as u32;
+        let a = u32::from(self.t[self.idx]);
+        let b = u32::from(self.t[self.idx + 1]);
+        (((a * (4096 - self.wt) + b * self.wt) >> 12).clamp(1, 4095)) as u16
+    }
+
+    fn update(&mut self, bit: u32) {
+        let target: i32 = if bit == 0 { 4095 } else { 0 };
+        for k in 0..2 {
+            let i = self.idx + k;
+            let v = i32::from(self.t[i]);
+            self.t[i] = (v + ((target - v) >> APM_RATE)).clamp(0, 4095) as u16;
+        }
+    }
 }
 
 #[inline]
-fn rc_decode(dec: &mut RangeDecoder<'_>, probs: &mut [u16], ctx: usize) -> Result<u32> {
+fn rc_code_enc(
+    enc: &mut RangeEncoder,
+    probs: &mut [u16],
+    apm: &mut Option<Apm>,
+    ctx: usize,
+    sse_cx: usize,
+    bit: u32,
+) {
     let p = probs[ctx];
-    let bit = dec.decode_bit(p)?;
+    let coded = match apm.as_mut() {
+        Some(a) => a.pp(p, sse_cx),
+        None => p,
+    };
+    enc.encode_bit(coded, bit);
     probs[ctx] = rc_adapt(p, bit);
+    if let Some(a) = apm.as_mut() {
+        a.update(bit);
+    }
+}
+
+#[inline]
+fn rc_code_dec(
+    dec: &mut RangeDecoder<'_>,
+    probs: &mut [u16],
+    apm: &mut Option<Apm>,
+    ctx: usize,
+    sse_cx: usize,
+) -> Result<u32> {
+    let p = probs[ctx];
+    let coded = match apm.as_mut() {
+        Some(a) => a.pp(p, sse_cx),
+        None => p,
+    };
+    let bit = dec.decode_bit(coded)?;
+    probs[ctx] = rc_adapt(p, bit);
+    if let Some(a) = apm.as_mut() {
+        a.update(bit);
+    }
     Ok(bit)
 }
 
 fn encode_signed_fsm(residual: &[i32]) -> Vec<u8> {
+    encode_signed_fsm_impl(residual, false)
+}
+
+fn encode_signed_fsm_sse(residual: &[i32]) -> Vec<u8> {
+    encode_signed_fsm_impl(residual, true)
+}
+
+fn encode_signed_fsm_impl(residual: &[i32], sse: bool) -> Vec<u8> {
     let mut enc = RangeEncoder::new();
     let mut probs = vec![RC_INIT; RC_TOTAL_SLOTS];
+    let mut apm = if sse {
+        Some(Apm::new(APM_CONTEXTS))
+    } else {
+        None
+    };
     let mut prev_m: u64 = 0;
     let mut prev_state = 0usize;
     let mut prev_neg = 0usize;
@@ -2373,21 +2518,28 @@ fn encode_signed_fsm(residual: &[i32]) -> Vec<u8> {
         let pb = rc_bucket(prev_m);
         // Sign bit.
         let sign_ctx = (prev_neg * RC_FSM_STATES + prev_state) * RC_BUCKETS + pb;
-        rc_encode(&mut enc, &mut probs, sign_ctx, neg);
+        rc_code_enc(&mut enc, &mut probs, &mut apm, sign_ctx, pb, neg);
         // Unary length: `n-1` zeros then the terminating one.
         let v = m + 1;
         let n = (64 - v.leading_zeros()) as usize;
         for i in 0..n {
             let bit = u32::from(i + 1 == n);
             let idx = RC_SIGN_LEN + (i.min(15) * RC_FSM_STATES + prev_state) * RC_BUCKETS + pb;
-            rc_encode(&mut enc, &mut probs, idx, bit);
+            rc_code_enc(&mut enc, &mut probs, &mut apm, idx, RC_BUCKETS + pb, bit);
         }
         // The `n-1` low bits of `v`, most significant first.
         let mut prefix = 0usize;
         for j in 0..n - 1 {
             let bit = ((v >> (n - 2 - j)) & 1) as u32;
             let idx = RC_SIGN_LEN + RC_LEN_LEN + (j.min(15) * 4 + prefix) * RC_BUCKETS + pb;
-            rc_encode(&mut enc, &mut probs, idx, bit);
+            rc_code_enc(
+                &mut enc,
+                &mut probs,
+                &mut apm,
+                idx,
+                2 * RC_BUCKETS + pb,
+                bit,
+            );
             prefix = ((prefix << 1) | bit as usize) & 3;
         }
         prev_m = m;
@@ -2397,10 +2549,22 @@ fn encode_signed_fsm(residual: &[i32]) -> Vec<u8> {
     enc.finish()
 }
 
-#[allow(clippy::needless_range_loop)]
 fn decode_signed_fsm(bytes: &[u8], len: usize) -> Result<Vec<i32>> {
+    decode_signed_fsm_impl(bytes, len, false)
+}
+
+fn decode_signed_fsm_sse(bytes: &[u8], len: usize) -> Result<Vec<i32>> {
+    decode_signed_fsm_impl(bytes, len, true)
+}
+
+fn decode_signed_fsm_impl(bytes: &[u8], len: usize, sse: bool) -> Result<Vec<i32>> {
     let mut dec = RangeDecoder::new(bytes)?;
     let mut probs = vec![RC_INIT; RC_TOTAL_SLOTS];
+    let mut apm = if sse {
+        Some(Apm::new(APM_CONTEXTS))
+    } else {
+        None
+    };
     let mut out = Vec::with_capacity(len);
     let mut prev_m: u64 = 0;
     let mut prev_state = 0usize;
@@ -2408,12 +2572,12 @@ fn decode_signed_fsm(bytes: &[u8], len: usize) -> Result<Vec<i32>> {
     for _ in 0..len {
         let pb = rc_bucket(prev_m);
         let sign_ctx = (prev_neg * RC_FSM_STATES + prev_state) * RC_BUCKETS + pb;
-        let neg = rc_decode(&mut dec, &mut probs, sign_ctx)? != 0;
+        let neg = rc_code_dec(&mut dec, &mut probs, &mut apm, sign_ctx, pb)? != 0;
         // Unary length.
         let mut z = 0usize;
         loop {
             let idx = RC_SIGN_LEN + (z.min(15) * RC_FSM_STATES + prev_state) * RC_BUCKETS + pb;
-            if rc_decode(&mut dec, &mut probs, idx)? == 1 {
+            if rc_code_dec(&mut dec, &mut probs, &mut apm, idx, RC_BUCKETS + pb)? == 1 {
                 break;
             }
             z += 1;
@@ -2426,7 +2590,7 @@ fn decode_signed_fsm(bytes: &[u8], len: usize) -> Result<Vec<i32>> {
         let mut prefix = 0usize;
         for j in 0..z {
             let idx = RC_SIGN_LEN + RC_LEN_LEN + (j.min(15) * 4 + prefix) * RC_BUCKETS + pb;
-            let bit = rc_decode(&mut dec, &mut probs, idx)?;
+            let bit = rc_code_dec(&mut dec, &mut probs, &mut apm, idx, 2 * RC_BUCKETS + pb)?;
             v = (v << 1) | u64::from(bit);
             prefix = ((prefix << 1) | bit as usize) & 3;
         }
@@ -2554,6 +2718,29 @@ mod tests {
         let extreme = vec![i32::MIN, i32::MAX, -1, 0, 1, 2, -2, 1 << 30, -(1 << 30)];
         let payload = c.encode(&extreme);
         assert_eq!(c.decode(&payload, extreme.len()).unwrap(), extreme);
+    }
+
+    #[test]
+    fn signed_fsm_sse_round_trips_exactly() {
+        let c = ResidualCodecV2::SignedFsmSse;
+        assert_eq!(c.name(), "signed_fsm_sse");
+        assert_eq!(ResidualCodecV2::from_id(17), Some(c));
+        for residual in sample_residuals() {
+            let payload = c.encode(&residual);
+            let back = c
+                .decode(&payload, residual.len())
+                .unwrap_or_else(|e| panic!("signed_fsm_sse: {e}"));
+            assert_eq!(back, residual);
+        }
+        let extreme = vec![i32::MIN, i32::MAX, -1, 0, 1, 2, -2, 1 << 30, -(1 << 30)];
+        let payload = c.encode(&extreme);
+        assert_eq!(c.decode(&payload, extreme.len()).unwrap(), extreme);
+        // The SSE stage must not be bit-identical to the base coder in general.
+        let residual: Vec<i32> = (0..2000).map(|i| ((i * 53) % 997) - 498).collect();
+        assert_ne!(
+            ResidualCodecV2::SignedFsm.encode(&residual),
+            c.encode(&residual)
+        );
     }
 
     #[test]
