@@ -18,6 +18,7 @@ pub mod finite_field;
 pub mod graph;
 pub mod ltp;
 pub mod model;
+pub mod multichannel;
 pub mod object;
 pub mod profile;
 pub mod quantize;

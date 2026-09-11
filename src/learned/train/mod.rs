@@ -12,6 +12,7 @@
 pub mod finite_field;
 pub mod linear;
 pub mod ltp;
+pub mod multichannel;
 pub mod objective;
 pub mod optimizer;
 pub mod optimizer2;

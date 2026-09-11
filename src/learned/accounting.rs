@@ -74,6 +74,20 @@ fn model_components(m: &LearnedModel) -> (u64, u64, u64, u64, u64, u64) {
             let bias = sb.min(len - weights);
             (weights, bias, 0, 0, 0, 0)
         }
+        LearnedModel::Multichannel(p) => {
+            let len = p.canonical_bytes().len() as u64;
+            let mut w = 0u64;
+            let mut b = 0u64;
+            for pred in &p.predictors {
+                let (sw, sb, _, _, _, _) =
+                    model_components(&LearnedModel::SparseLinear(pred.clone()));
+                w += sw;
+                b += sb;
+            }
+            let weights = w.min(len);
+            let bias = b.min(len - weights);
+            (weights, bias, 0, 0, 0, 0)
+        }
         LearnedModel::Segmented(s) => {
             let mut w = 0u64;
             let mut b = 0u64;

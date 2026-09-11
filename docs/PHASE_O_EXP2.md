@@ -49,7 +49,7 @@ cells; doing so would be benchmark gaming.
 | C | Complete-byte adaptive segmentation | `learned::segmented`, `learned::segmentation` | `learned-exp2-mechanisms` | **implemented** |
 | D | Sparse / high-order linear prediction | `learned::sparse`, `learned::train::sparse` | `learned-exp2-mechanisms` | **implemented** |
 | E | Long-term / pitch prediction | `learned::ltp`, `learned::train::ltp` | `learned-exp2-mechanisms` | **implemented** |
-| F | Multichannel prediction / lifting | — | — | pending |
+| F | Multichannel prediction / lifting | `learned::multichannel`, `learned::train::multichannel` | `learned-exp2-mechanisms` | **implemented** |
 | G | Optimizer v2 (multiscale + beam + memo) | `learned::train::optimizer2` | `learned-exp2-mechanisms` | **implemented** |
 | H | Context mixture + backward adaptation | — | — | pending |
 | I | Hierarchical residual prediction | — | — | pending |
@@ -81,7 +81,7 @@ unit tests.
 | ----- | ------------- |
 | `learned-exp2-baseline` | `3bd61665b214a0bb85e3eee311bf598cbcb7f76e94cc646c057406897682f111` |
 | `learned-residual-codec2` | `e134f0c3457a9593e8ab56d071e142c2d3c03a60280c9434e62eca0c433cbcf2` |
-| `learned-exp2-mechanisms` | `38ee079fb7444185cf223d2e89c4c7a846732dcebf53327af454ef5a9a24337f` |
+| `learned-exp2-mechanisms` | `640cdfb7643bf8068d4e6133f049a5c761b4feb27b2be38ca5c5bb2a95429f7f` |
 
 The frozen Exp1 court `learned-residual-codec` still reproduces its sealed hash
 `49f8d5c6…` after the Exp2 changes, so Exp1 is provably unperturbed.
@@ -99,24 +99,28 @@ on exactly the material the literature predicts:
 | `square-mix` | periodic-rich | 5 397 B | **3 908 B** | 8 118 B |
 | `vibrato-tone` | quasi-periodic | 5 108 B | **3 883 B** | 8 704 B |
 | `detuned-partials` | quasi-periodic | 5 052 B | **4 342 B** | 8 999 B |
+| `stereo-unison` | identical stereo | 9 327 B | **1 443 B** | 15 053 B |
 
-The `triangle-220` case is the clearest mechanism win: a periodic signal is
-explained by a handful of selected lags at 839 B rather than 7 348 B of dense
-coefficients.
+The `triangle-220` case is the clearest single-channel mechanism win: a periodic
+signal is explained by a handful of selected lags at 839 B rather than 7 348 B
+of dense coefficients. The `stereo-unison` case is the clearest multichannel
+win: reversible mid/side lifting collapses the identical channels so only the
+mid component costs bytes — 1 443 B versus 9 327 B for the dense stereo FIR and
+15 053 B for the best non-learned baseline.
 
 ## Honest limitations (recorded, not hidden)
 
-* Seals C, D, E and G are implemented with unit tests and covered by the
+* Seals C, D, E, F and G are implemented with unit tests and covered by the
   `learned-exp2-mechanisms` court, but no new `seal verify` receipt matrix has
   been written yet: the Phase M/N batteries were not re-run in this change set.
-* Seals F (multichannel), H (context mixture + backward adaptation), I
-  (hierarchical residual prediction), J (transfer v2) and K (real + held-out
-  Mode-C corpus) are **not implemented** in this change set; they remain the
-  declared remainder of the Exp2 sequence.
+* Seals H (context mixture + backward adaptation), I (hierarchical residual
+  prediction), J (transfer v2) and K (real + held-out Mode-C corpus) are **not
+  implemented** in this change set; they remain the declared remainder of the
+  Exp2 sequence.
 * `RunLengthRice` is a VOLE-native adaptive run-length/Rice design; it is in the
   RLGR family but is not bit-compatible with Malvar's RLGR1.
-* Sparse and long-term prediction are mono-first in this build; dense linear
-  `TransferOperator` remains the multichannel learned path until Seal F lands.
+* Sparse and long-term prediction are mono-first in this build; multichannel
+  structure is handled by the dedicated reversible-lifting family (Seal F).
 * The WavPack baseline is an external row (verified to round-trip exactly) and
   has no VOLE semantic authority; SRLA and MPEG-4 ALS are recorded as
   unavailable (no reproducible implementation on this host).

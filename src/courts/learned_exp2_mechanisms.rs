@@ -21,13 +21,14 @@ use crate::learned::object::LearnedObject;
 use crate::learned::segmentation::{DEFAULT_BOUNDARY_GRID, build_segmented_with_regions};
 use crate::learned::train::linear::{fit_linear_object, fit_linear_object_exp2};
 use crate::learned::train::ltp::fit_ltp_object;
+use crate::learned::train::multichannel::fit_multichannel_object;
 use crate::learned::train::sparse::fit_sparse_object;
 use crate::status::Verdict;
 use std::path::Path;
 
 /// Frozen static-result hash (empty means "not yet frozen").
 pub const LEARNED_EXP2_MECHANISMS_SHA256: &str =
-    "38ee079fb7444185cf223d2e89c4c7a846732dcebf53327af454ef5a9a24337f";
+    "640cdfb7643bf8068d4e6133f049a5c761b4feb27b2be38ca5c5bb2a95429f7f";
 
 fn bytes(o: &LearnedObject) -> Option<u64> {
     crate::learned::accounting::LearnedCost::of(o)
@@ -138,10 +139,34 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
             None
         };
 
+        // Multichannel (reversible lifting + per-component sparse).
+        let multichannel_bytes = if case.channels > 1 {
+            fit_multichannel_object(
+                &case.samples,
+                case.channels,
+                frames,
+                case.sample_rate_hz,
+                &budget,
+            )
+            .ok()
+            .map(|(o, _)| {
+                all_exact &= o.verify(&case.samples);
+                bytes(&o).unwrap_or(u64::MAX)
+            })
+        } else {
+            None
+        };
+
         let best_nonlearned =
             common::best_simple_bytes(&case.samples, case.channels, frames, case.sample_rate_hz);
 
-        let candidates = [exp2_bytes, sparse_bytes, ltp_bytes, segmented_bytes];
+        let candidates = [
+            exp2_bytes,
+            sparse_bytes,
+            ltp_bytes,
+            segmented_bytes,
+            multichannel_bytes,
+        ];
         let best_exp2 = candidates.iter().filter_map(|b| *b).min();
         if let (Some(b2), Some(l2)) = (best_exp2, exp2_bytes) {
             portfolio_le_exp2_linear &= b2 <= l2;
@@ -156,6 +181,7 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
             sparse_bytes.unwrap_or(u64::MAX),
             ltp_bytes.unwrap_or(u64::MAX),
             segmented_bytes.unwrap_or(u64::MAX),
+            multichannel_bytes.unwrap_or(u64::MAX),
         ] {
             common::push_u64(&mut projection, v);
         }
@@ -168,6 +194,7 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
             "sparse_bytes": sparse_bytes,
             "ltp_bytes": ltp_bytes,
             "segmented_bytes": segmented_bytes,
+            "multichannel_bytes": multichannel_bytes,
             "best_exp2_bytes": best_exp2,
             "best_nonlearned_bytes": if best_nonlearned == u64::MAX { None } else { Some(best_nonlearned) },
         }));
