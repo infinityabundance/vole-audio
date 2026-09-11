@@ -326,6 +326,47 @@ impl RepresentedLiteral {
         Ok(out)
     }
 
+    /// Materialize directly into `dst` (which must be `frames × channels`),
+    /// decoding only intersecting pages. Returns `(pages_touched,
+    /// encoded_bytes_examined)` as a by-product of the traversal, so the caller
+    /// needs no second metadata pass.
+    pub fn materialize_into(
+        &self,
+        start_frame: u64,
+        frames: u32,
+        dst: &mut [i32],
+    ) -> Result<(u32, u64)> {
+        let channels = usize::from(self.descriptor.layout.count());
+        if dst.len() != frames as usize * channels {
+            return Err(Error::malformed("literal destination length mismatch"));
+        }
+        if frames == 0 {
+            return Ok((0, 0));
+        }
+        let extent = self.descriptor.extent_frames;
+        if start_frame >= extent || start_frame + u64::from(frames) > extent {
+            return Err(Error::malformed("materialize range outside object extent"));
+        }
+        let end = start_frame + u64::from(frames);
+        let mut pages = 0u32;
+        let mut examined = 0u64;
+        for page in &self.pages {
+            let ps = page.start_frame;
+            let pe = ps + u64::from(page.frames);
+            if ps >= end || pe <= start_frame {
+                continue;
+            }
+            let samples = self.page_samples(page)?;
+            let take_lo = start_frame.saturating_sub(ps) as usize * channels;
+            let take_hi = (end.min(pe) - ps) as usize * channels;
+            let dst_off = (ps.max(start_frame) - start_frame) as usize * channels;
+            dst[dst_off..dst_off + (take_hi - take_lo)].copy_from_slice(&samples[take_lo..take_hi]);
+            pages += 1;
+            examined += self.page_payload_bytes(page)?;
+        }
+        Ok((pages, examined))
+    }
+
     /// Full materialization (equality anchor for partial == full slices).
     pub fn materialize_full(&self) -> Result<Vec<i32>> {
         let mut out = Vec::with_capacity(
@@ -554,6 +595,54 @@ impl RepresentedResidual {
             }
         }
         Ok(out)
+    }
+
+    /// Materialize the residual closure directly into `dst`. Returns
+    /// `(pages_touched, encoded_bytes_examined)` with no second metadata walk.
+    pub fn materialize_closure_into(
+        &self,
+        start_frame: u64,
+        frames: u32,
+        dst: &mut [i32],
+    ) -> Result<(u32, u64)> {
+        let channels = usize::from(self.descriptor.layout.count());
+        if dst.len() != frames as usize * channels {
+            return Err(Error::malformed("residual destination length mismatch"));
+        }
+        if frames == 0 {
+            return Ok((0, 0));
+        }
+        let extent = self.descriptor.extent_frames;
+        if start_frame >= extent || start_frame + u64::from(frames) > extent {
+            return Err(Error::malformed("closure range outside object extent"));
+        }
+        let end = start_frame + u64::from(frames);
+        if channels >= 1 {
+            for (f, frame_slot) in dst.chunks_exact_mut(channels).enumerate() {
+                frame_slot[0] = self.model.model_sample(start_frame + f as u64);
+            }
+        }
+        let mut pages = 0u32;
+        let mut examined = 0u64;
+        for page in &self.pages {
+            let ps = page.start_frame;
+            let pe = ps + u64::from(page.frames);
+            if ps >= end || pe <= start_frame {
+                continue;
+            }
+            for r in self.page_records(page)? {
+                if r.frame < start_frame || r.frame >= end {
+                    continue;
+                }
+                let f = (r.frame - start_frame) as usize;
+                let slot = f * channels + usize::from(r.channel);
+                let h = i64::from(dst[slot]);
+                dst[slot] = crate::universe::arithmetic::sat_i32(h + i64::from(r.delta));
+            }
+            pages += 1;
+            examined += self.page_payload_bytes(page)?;
+        }
+        Ok((pages, examined))
     }
 
     /// Pages intersecting `[start, start + frames)` (observation halo info).

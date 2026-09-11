@@ -412,9 +412,18 @@ pub fn decode_rans_stream(
         return Err(Error::malformed("truncated or below-range rANS state"));
     };
     let mut out = vec![0u8; n];
+    // Above a modest threshold, a derived slot table beats the per-symbol
+    // binary search; the table is derived from the canonical model and changes
+    // no stored byte (the decoded symbols are identical).
+    const SLOT_TABLE_THRESHOLD: usize = 4096;
+    let table = if n >= SLOT_TABLE_THRESHOLD {
+        Some(model.slot_table())
+    } else {
+        None
+    };
     for i in (0..n).rev() {
         let slot = rans::dec_slot(&state, scale_bits);
-        let idx = model.slot_index(slot);
+        let idx = model.slot_index_with(slot, table.as_deref());
         // Interval containment is guaranteed by model.validate(); assert in
         // debug and reject defensively in release (slot - start underflow
         // protection).

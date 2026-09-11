@@ -129,6 +129,8 @@ pub struct FullObjectReader {
     verified: Arc<VerifiedFullObject>,
     prepared: Vec<Option<Prepared>>,
     working_state_bytes: u64,
+    /// Monotonic sequential-read cursor (segment index hint).
+    cursor: usize,
 }
 
 impl FullObjectReader {
@@ -138,7 +140,27 @@ impl FullObjectReader {
             verified,
             prepared: (0..n).map(|_| None).collect(),
             working_state_bytes: 0,
+            cursor: 0,
         }
+    }
+
+    /// First segment index whose end is strictly after `start_frame`.
+    ///
+    /// Segments are sorted and contiguous, so this is a binary search; a
+    /// monotonic cursor short-circuits sequential reads (the common playback
+    /// case) without a second pass.
+    fn first_segment(&self, start_frame: u64) -> usize {
+        let segs = &self.verified.decoded.segments;
+        // The cursor is only valid when the window starts inside its segment.
+        if self.cursor < segs.len() {
+            let s = &segs[self.cursor];
+            if s.plan.start_frame <= start_frame
+                && s.plan.start_frame + s.plan.frame_count > start_frame
+            {
+                return self.cursor;
+            }
+        }
+        segs.partition_point(|s| s.plan.start_frame + s.plan.frame_count <= start_frame)
     }
 
     /// Parse every segment's encoded representation before measurement.
@@ -210,54 +232,45 @@ impl FullObjectReader {
         Ok(true)
     }
 
-    /// Materialize `[local_start, local_start + count)` within segment `i`.
-    #[allow(clippy::type_complexity)]
-    fn materialize_segment(
+    /// Materialize `[local_start, local_start + count)` within segment `i`
+    /// directly into `dst`, returning `(pages, examined, page_peak)` as a
+    /// by-product of the single traversal.
+    fn materialize_segment_into(
         &self,
         i: usize,
         local_start: u64,
         count: u32,
         ch: usize,
-    ) -> Result<(Vec<i32>, u32, u64, u64)> {
+        dst: &mut [i32],
+    ) -> Result<(u32, u64, u64)> {
         match self.prepared[i]
             .as_ref()
             .ok_or_else(|| Error::internal("segment not prepared"))?
         {
             Prepared::Literal(rl) => {
-                let samples = rl.materialize(local_start, count)?;
-                let mut pages = 0u32;
-                let mut examined = 0u64;
-                let mut peak = 0u64;
-                let touching: std::collections::BTreeSet<u64> =
-                    rl.pages_touching(local_start, count).into_iter().collect();
-                for p in &rl.pages {
-                    if touching.contains(&p.start_frame) {
-                        pages += 1;
-                        examined += rl.page_payload_bytes(p)?;
-                        peak = peak.max(u64::from(p.frames) * ch as u64 * 4);
-                    }
-                }
-                Ok((samples, pages, examined, peak))
+                let (pages, examined) = rl.materialize_into(local_start, count, dst)?;
+                let peak = rl
+                    .pages
+                    .iter()
+                    .map(|p| u64::from(p.frames) * ch as u64 * 4)
+                    .max()
+                    .unwrap_or(0);
+                Ok((pages, examined, peak))
             }
             Prepared::Residual(rr) => {
-                let samples = rr.materialize_closure(local_start, count)?;
-                let mut pages = 0u32;
-                let mut examined = 0u64;
-                let mut peak = 0u64;
-                let touching: std::collections::BTreeSet<u64> =
-                    rr.pages_touching(local_start, count).into_iter().collect();
-                for p in &rr.pages {
-                    if touching.contains(&p.start_frame) {
-                        pages += 1;
-                        examined += rr.page_payload_bytes(p)?;
-                        peak = peak.max(u64::from(p.frames) * ch as u64 * 4);
-                    }
-                }
-                Ok((samples, pages, examined, peak))
+                let (pages, examined) = rr.materialize_closure_into(local_start, count, dst)?;
+                let peak = rr
+                    .pages
+                    .iter()
+                    .map(|p| u64::from(p.frames) * ch as u64 * 4)
+                    .max()
+                    .unwrap_or(0);
+                Ok((pages, examined, peak))
             }
             Prepared::Canonical(descriptor, data) => {
                 let samples = canonical_window(descriptor, data, local_start, count, ch)?;
-                Ok((samples, 0, 0, 0))
+                dst.copy_from_slice(&samples);
+                Ok((0, 0, 0))
             }
         }
     }
@@ -282,13 +295,17 @@ impl FullObjectReader {
             ));
         }
         let mut stats = ReadStats::default();
-        for i in 0..self.verified.decoded.segments.len() {
+        let first = self.first_segment(start_frame);
+        self.cursor = first;
+        let nseg = self.verified.decoded.segments.len();
+        let mut i = first;
+        while i < nseg {
             let seg = self.verified.decoded.segments[i];
             let seg_start = seg.plan.start_frame;
-            let seg_end = seg_start + seg.plan.frame_count;
-            if seg_end <= start_frame || seg_start >= end {
-                continue;
+            if seg_start >= end {
+                break;
             }
+            let seg_end = seg_start + seg.plan.frame_count;
             let lo = start_frame.max(seg_start);
             let hi = end.min(seg_end);
             let count = (hi - lo) as u32;
@@ -297,10 +314,15 @@ impl FullObjectReader {
             if freshly_parsed {
                 stats.encoded_bytes_parsed += seg.payload_length;
             }
-            let (chunk, pages, examined, page_peak) =
-                self.materialize_segment(i, local_start, count, ch)?;
             let dst_off = (lo - start_frame) as usize * ch;
-            dst[dst_off..dst_off + count as usize * ch].copy_from_slice(&chunk);
+            let span = count as usize * ch;
+            let (pages, examined, page_peak) = self.materialize_segment_into(
+                i,
+                local_start,
+                count,
+                ch,
+                &mut dst[dst_off..dst_off + span],
+            )?;
             stats.segments_touched += 1;
             stats.pages_touched += pages;
             stats.encoded_bytes_examined += examined;
@@ -308,6 +330,7 @@ impl FullObjectReader {
             stats.scratch_peak_bytes = stats
                 .scratch_peak_bytes
                 .max(u64::from(count) * ch as u64 * 4 + page_peak);
+            i += 1;
         }
         stats.working_state_bytes = self.working_state_bytes;
         Ok(stats)

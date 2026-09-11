@@ -245,6 +245,32 @@ impl SymbolModel {
     }
 
     /// Decode a frequency slot into the model index of the symbol whose
+    /// Derived decode table: `slot -> entry index` over the frozen
+    /// `RANS_MODEL_TOTAL` slot domain. This is not stored in any canonical
+    /// artifact; it is runtime state derived from the already-canonical model,
+    /// and it turns the per-symbol binary search into an O(1) indexed load
+    /// while producing byte-identical rANS semantics.
+    pub fn slot_table(&self) -> Vec<u16> {
+        let mut t = vec![0u16; RANS_MODEL_TOTAL as usize];
+        for idx in 0..self.symbols.len() {
+            let s = self.start[idx];
+            let f = self.freq[idx];
+            for slot in s..s + f {
+                t[slot as usize] = idx as u16;
+            }
+        }
+        t
+    }
+
+    /// Decode entry index for `slot`, using `table` when present.
+    #[inline]
+    pub fn slot_index_with(&self, slot: u32, table: Option<&[u16]>) -> usize {
+        match table {
+            Some(t) => t[slot as usize] as usize,
+            None => self.slot_index(slot),
+        }
+    }
+
     /// interval contains it (binary search over cumulative starts).
     #[inline]
     pub fn slot_index(&self, slot: u32) -> usize {
@@ -378,7 +404,7 @@ mod tests {
     }
 
     #[test]
-    fn model_validate_and_slot_search() {
+    fn derived_slot_table_matches_the_binary_search() {
         let counts = [0u64; 256];
         let mut counts = counts;
         for (i, c) in counts.iter_mut().enumerate() {
@@ -393,6 +419,13 @@ mod tests {
                 let got = m.slot_index(slot);
                 assert_eq!(got, idx, "slot {slot} -> symbol {idx}");
             }
+        }
+        // The derived decode table agrees with the binary search at every slot.
+        let table = m.slot_table();
+        assert_eq!(table.len(), RANS_MODEL_TOTAL as usize);
+        for slot in 0..RANS_MODEL_TOTAL {
+            assert_eq!(table[slot as usize] as usize, m.slot_index(slot));
+            assert_eq!(m.slot_index_with(slot, Some(&table)), m.slot_index(slot));
         }
         // Present symbols are exactly the counted ones.
         for (v, &c) in counts.iter().enumerate() {
