@@ -351,6 +351,7 @@ fn cmd_seal_verify(args: &[String]) -> Result<u8> {
                        facts=SUPPORTED,inverse=SUPPORTED,flattening=SUPPORTED,\
                        inverse-search=SUPPORTED,conventional=SUPPORTED,corpus=SUPPORTED,\
                        fullobj=SUPPORTED,flagship=SUPPORTED,runtime=SUPPORTED,\
+                       runtime-advanced=SUPPORTED,\
                        random-access=SUPPORTED,negative=SUPPORTED,depth=SUPPORTED,\
                        interference=SUPPORTED,all=SUPPORTED,\
                        archive=SUPPORTED,transport=SUPPORTED,phase-n=SUPPORTED,\

@@ -130,6 +130,8 @@ pub mod rocm_d1;
 #[cfg(feature = "std")]
 pub mod runtime;
 #[cfg(feature = "std")]
+pub mod runtime_advanced;
+#[cfg(feature = "std")]
 pub mod semantic;
 #[cfg(feature = "std")]
 pub mod simd;
@@ -208,6 +210,10 @@ selected representations and comparison buckets",
 (first-play and prepared control), over the frozen sequential 512-frame trace repeated with \
 rotated source order; harness-owned latency, split storage/residency accounting, two explicit \
 populations, and a stratified crossover surface",
+    ),
+    (
+        "runtime-advanced",
+        "Report 3 whole-repository runtime surfaces: hybrid sleep-then-spin deadline entry, huge-page execution arenas, and SCHED_FIFO/SCHED_DEADLINE/mlockall attempts (optional and additive)",
     ),
     (
         "random-access",
@@ -484,6 +490,7 @@ pub fn run(name: &str, receipts_root: &Path) -> crate::error::Result<Verdict> {
         "fullobj" => fullobj::run(receipts_root),
         "flagship" => flagship::run(receipts_root),
         "runtime" => runtime::run(receipts_root),
+        "runtime-advanced" => runtime_advanced::run(receipts_root),
         "random-access" => random_access::run(receipts_root),
         "negative" => negative::run(receipts_root),
         "depth" => depth::run(receipts_root),

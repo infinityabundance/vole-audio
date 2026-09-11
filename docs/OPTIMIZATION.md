@@ -320,6 +320,27 @@ speech residuals. **Compressed warmup** is already covered: warmup samples appea
 as residual values and are adaptively coded by the partitioned-Rice/Golomb
 partitions, so a separate state coder is not warranted on this corpus.
 
+## Report 3 — whole-repository runtime surfaces (court `runtime-advanced`)
+
+Optional, explicitly-reported host surfaces beside the frozen B2–B5
+architectures (`runtime::advanced`); nothing replaces a baseline. Only
+deterministic facts enter the projection — wall-clock tails are extras.
+
+Measured on this host (result `d6efe447…`, then `…` after the scheduler restore):
+
+| surface | measurement |
+| ------- | ----------- |
+| hybrid deadline entry | pure sleep p50 **51 436 ns** / p99 66 399 ns; δ=100 µs spin p50 **34 ns** / p99 56 ns — ~1500× tail reduction for a 100 µs busy budget |
+| huge-page arena | 64 MiB `mmap`+`MADV_HUGEPAGE`; `AnonHugePages` delta **65 536 KiB** (fully backed); THP setting `[always] madvise never` |
+| `SCHED_FIFO` | **applied** (priority 1) |
+| `SCHED_DEADLINE` | refused (EPERM; needs `CAP_SYS_NICE`) — honest host limitation |
+| `mlockall` | refused (ENOMEM; needs `CAP_IPC_LOCK`/`RLIMIT_MEMLOCK`) — honest limitation |
+
+The default scheduler policy is restored before the court returns, so later
+courts are never measured under a real-time policy the user did not request.
+The remaining Report 3 runtime surfaces (`io_uring` registered files/fixed
+buffers, CUDA persisting-L2 windows) and the Report 1/2 program are still open.
+
 ## Status
 
 Implemented and pushed: Track A, Track B (including the entropy decode table),
@@ -332,7 +353,9 @@ lattice/PARCOR realisation and Seal S8 pole-zero/ARMA closure (court
 and the U1 common-factor fix (`learned-u1-wasted`) closes the S0 U1-domain 3×
 gap to ~2.6 %. The remaining speech mechanisms (forward/reverse direction,
 lattice precision search, Elias–Fano positions) are implemented as non-regressing
-candidates.
+candidates, and the Report 3 whole-repository runtime surfaces are implemented
+(`runtime-advanced`: hybrid deadline entry, huge-page arenas, `SCHED_FIFO`/
+`SCHED_DEADLINE`/`mlockall`).
 The remaining tracks from the two whole-repository
 optimization reports
 (CPU frame-tile multicore + PartialBank vectorization, GPU work decomposition,

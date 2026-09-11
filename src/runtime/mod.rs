@@ -25,6 +25,7 @@
 //! materialization**, not endpoint resampling, so there are no gains, pans,
 //! filters or random seeks.
 
+pub mod advanced;
 pub mod cache;
 pub mod energy;
 pub mod load;
