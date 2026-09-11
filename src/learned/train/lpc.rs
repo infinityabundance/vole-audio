@@ -469,22 +469,23 @@ pub fn fit_lattice_object(
         let r = autocorrelation(block, max_order, 0.5);
         let lev = levinson_reflections(&r, max_order);
         let burg = burg_reflections(block, max_order);
-        let mut best: Option<(i32, Vec<i32>, u64)> = None;
-        for order in 1..=max_order {
-            for refl in [&lev, &burg] {
-                let Some((residual, _)) = lattice_object(block, order, refl, shift) else {
-                    continue;
-                };
-                let model_bits = (order as u64) * 16 + 16;
-                let cost = model_bits + rice_cost_bits(&residual);
-                if best.as_ref().is_none_or(|(_, _, c)| cost < *c) {
-                    let ks = quantize_reflections(&refl[..order], shift);
-                    let order_i = order as i32;
-                    best = Some((order_i, ks, cost));
+        let mut best: Option<(i32, u8, Vec<i32>, u64)> = None;
+        for &shift in &[8u8, 10, 12, 13, 14, 15] {
+            for order in 1..=max_order {
+                for refl in [&lev, &burg] {
+                    let Some((residual, _)) = lattice_object(block, order, refl, shift) else {
+                        continue;
+                    };
+                    let model_bits = (order as u64) * 16 + 16;
+                    let cost = model_bits + rice_cost_bits(&residual);
+                    if best.as_ref().is_none_or(|(_, _, _, c)| cost < *c) {
+                        let ks = quantize_reflections(&refl[..order], shift);
+                        best = Some((order as i32, shift, ks, cost));
+                    }
                 }
             }
         }
-        let (order, ks, _) = best.unwrap_or((1, vec![0], u64::MAX));
+        let (order, shift, ks, _) = best.unwrap_or((1, shift, vec![0], u64::MAX));
         let p = crate::learned::lattice::LatticePredictor {
             channels: 1,
             order: order as u16,
@@ -582,6 +583,68 @@ fn predictor(choice: &BlockChoice) -> LpcPredictor {
         coeffs: choice.coeffs.clone(),
         block_frames: None,
     }
+}
+
+/// The encoder-side estimate for one block choice.
+fn estimate_choice(block: &[i32], c: &BlockChoice) -> u64 {
+    let residual = block_residual(block, &c.coeffs, c.shift);
+    (c.order as u64) * u64::from(c.precision) + 16 + rice_cost_bits(&residual)
+}
+
+/// Fit dense LPC with a **per-block forward/reverse direction choice**.
+pub fn fit_lpc_bidir_object(
+    source: &[i32],
+    frames: u64,
+    sample_rate_hz: u32,
+    block_frames: u32,
+    max_order: u16,
+    budget: &TrainBudget,
+) -> Result<(LearnedObject, TrainStats)> {
+    budget.validate()?;
+    if source.len() != frames as usize {
+        return Err(Error::malformed(
+            "bidirectional LPC fit is mono-only and expects one sample per frame",
+        ));
+    }
+    if block_frames == 0 {
+        return Err(Error::malformed(
+            "bidirectional LPC block size must be positive",
+        ));
+    }
+    let sw = Stopwatch::start();
+    let mut stats = TrainStats::default();
+    let max_order = (max_order as usize).min(crate::limits::MAX_LEARNED_TAPS as usize);
+    let ranges = block_ranges(frames as usize, block_frames as usize);
+    let mut segments = Vec::with_capacity(ranges.len());
+    for (from, to) in ranges {
+        stats.candidates += 2;
+        let block = &source[from..to];
+        let rev: Vec<i32> = block.iter().rev().copied().collect();
+        let cf = choose_block(block, max_order);
+        let cr = choose_block(&rev, max_order);
+        let cost_f = estimate_choice(block, &cf);
+        let cost_r = estimate_choice(&rev, &cr);
+        let model = if cost_r < cost_f {
+            LearnedModel::Reverse(crate::learned::reverse::ReversePredictor {
+                channels: 1,
+                inner: Box::new(LearnedModel::Lpc(predictor(&cr))),
+            })
+        } else {
+            LearnedModel::Lpc(predictor(&cf))
+        };
+        segments.push(Segment {
+            frames: (to - from) as u32,
+            model: Box::new(model),
+        });
+    }
+    let o = build_segmented(source, frames, sample_rate_hz, segments)?;
+    if !o.verify(source) {
+        return Err(Error::internal(
+            "bidirectional LPC candidate did not close exactly",
+        ));
+    }
+    stats.fit_ns = sw.elapsed_ns().max(0) as u64;
+    Ok((o, stats))
 }
 
 fn build_segmented(

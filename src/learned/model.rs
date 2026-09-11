@@ -54,6 +54,8 @@ pub enum LearnedModel {
     PoleZero(crate::learned::polezero::PoleZeroPredictor),
     /// A wasted-bits / common-factor wrapper (Exp3, mechanism 14).
     Wasted(crate::learned::wasted::WastedPredictor),
+    /// A reverse-direction realisation of an inner model (Exp3, speech direction).
+    Reverse(crate::learned::reverse::ReversePredictor),
 }
 
 impl LearnedModel {
@@ -77,6 +79,7 @@ impl LearnedModel {
             LearnedModel::Lattice(_) => 14,
             LearnedModel::PoleZero(_) => 15,
             LearnedModel::Wasted(_) => 16,
+            LearnedModel::Reverse(_) => 17,
         }
     }
 
@@ -100,6 +103,7 @@ impl LearnedModel {
             LearnedModel::Lattice(_) => "lattice",
             LearnedModel::PoleZero(_) => "pole_zero",
             LearnedModel::Wasted(_) => "wasted",
+            LearnedModel::Reverse(_) => "reverse",
         }
     }
 
@@ -123,6 +127,7 @@ impl LearnedModel {
             LearnedModel::Lattice(p) => p.validate(),
             LearnedModel::PoleZero(p) => p.validate(),
             LearnedModel::Wasted(p) => p.validate(),
+            LearnedModel::Reverse(p) => p.validate(),
         }
     }
 
@@ -146,6 +151,7 @@ impl LearnedModel {
             LearnedModel::Lattice(p) => p.channels,
             LearnedModel::PoleZero(p) => p.channels,
             LearnedModel::Wasted(p) => p.channels,
+            LearnedModel::Reverse(p) => p.channels,
         }
     }
 
@@ -169,6 +175,7 @@ impl LearnedModel {
             LearnedModel::Lattice(p) => p.receptive_field(),
             LearnedModel::PoleZero(p) => p.receptive_field(),
             LearnedModel::Wasted(p) => p.receptive_field(),
+            LearnedModel::Reverse(p) => p.receptive_field(),
         }
     }
 
@@ -192,6 +199,7 @@ impl LearnedModel {
             LearnedModel::Lattice(p) => p.ops_per_sample(),
             LearnedModel::PoleZero(p) => p.ops_per_sample(),
             LearnedModel::Wasted(p) => p.ops_per_sample(),
+            LearnedModel::Reverse(p) => p.ops_per_sample(),
         }
     }
 
@@ -215,6 +223,7 @@ impl LearnedModel {
             LearnedModel::Lattice(p) => p.state_bytes(),
             LearnedModel::PoleZero(p) => p.state_bytes(),
             LearnedModel::Wasted(p) => p.state_bytes(),
+            LearnedModel::Reverse(p) => p.state_bytes(),
         }
     }
 
@@ -238,6 +247,7 @@ impl LearnedModel {
             LearnedModel::Lattice(p) => p.checkpoint_count(),
             LearnedModel::PoleZero(p) => p.checkpoint_count(),
             LearnedModel::Wasted(p) => p.checkpoint_count(),
+            LearnedModel::Reverse(p) => p.checkpoint_count(),
         }
     }
 
@@ -261,6 +271,7 @@ impl LearnedModel {
             LearnedModel::Lattice(p) => p.canonical_bytes(),
             LearnedModel::PoleZero(p) => p.canonical_bytes(),
             LearnedModel::Wasted(p) => p.canonical_bytes(),
+            LearnedModel::Reverse(p) => p.canonical_bytes(),
         }
     }
 
@@ -321,6 +332,9 @@ impl LearnedModel {
             16 => LearnedModel::Wasted(
                 crate::learned::wasted::WastedPredictor::from_canonical_bytes(bytes)?,
             ),
+            17 => LearnedModel::Reverse(
+                crate::learned::reverse::ReversePredictor::from_canonical_bytes(bytes)?,
+            ),
             other => {
                 return Err(Error::new(
                     crate::error::Kind::Unsupported,
@@ -354,6 +368,7 @@ impl LearnedModel {
             LearnedModel::Lattice(p) => p.hypothesis_all_from_source(source, frames),
             LearnedModel::PoleZero(p) => p.hypothesis_all_from_source(source, frames),
             LearnedModel::Wasted(p) => p.hypothesis_all_from_source(source, frames),
+            LearnedModel::Reverse(p) => p.hypothesis_all_from_source(source, frames),
         }
     }
 
@@ -385,6 +400,7 @@ impl LearnedModel {
             LearnedModel::Lattice(p) => p.evaluate_range(residual, frames, start, len),
             LearnedModel::PoleZero(p) => p.evaluate_range(residual, frames, start, len),
             LearnedModel::Wasted(p) => p.evaluate_range(residual, frames, start, len),
+            LearnedModel::Reverse(p) => p.evaluate_range(residual, frames, start, len),
         }
     }
 
@@ -408,6 +424,7 @@ impl LearnedModel {
             LearnedModel::Lattice(p) => p.replay_frames(start),
             LearnedModel::PoleZero(p) => p.replay_frames(start),
             LearnedModel::Wasted(p) => p.replay_frames(start),
+            LearnedModel::Reverse(p) => p.replay_frames(start),
         }
     }
 

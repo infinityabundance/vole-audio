@@ -168,6 +168,12 @@ fn model_components(m: &LearnedModel) -> (u64, u64, u64, u64, u64, u64) {
             let named = (w + b + a + cp + td + st).min(len);
             (named, 0, 0, 0, 0, 0)
         }
+        LearnedModel::Reverse(p) => {
+            let len = p.canonical_bytes().len() as u64;
+            let (w, b, a, cp, td, st) = model_components(&p.inner);
+            let named = (w + b + a + cp + td + st).min(len);
+            (named, 0, 0, 0, 0, 0)
+        }
         LearnedModel::Segmented(s) => {
             let mut w = 0u64;
             let mut b = 0u64;

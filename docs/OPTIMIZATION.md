@@ -299,6 +299,27 @@ wasted-wrapped LPC portfolio is **133 416 B** — a **2.98×** reduction, winnin
 8/8 clips, against FLAC-5's 130 006 B. `factor_shift` is selected on every clip.
 The U1-domain 3× gap is closed to ~2.6 %.
 
+### Remaining speech mechanisms (forward/reverse, lattice precision, Elias–Fano)
+
+Three more bounded, exact mechanisms land as non-regressing portfolio candidates:
+
+* **per-block forward/reverse direction** (`learned::reverse`, model kind `17`, court
+  family `lpc_bidir`): a block may be predicted right-to-left from its terminal
+  state; the fitter estimates both directions and keeps the cheaper one.
+* **lattice precision search**: `fit_lattice_object` now searches reflection
+  shifts `{8,10,12,13,14,15}` instead of a fixed Q14.
+* **Elias–Fano sparse residual positions** (`ResidualCodecV2::EliasFano`, id `15`):
+  the monotone nonzero-position sequence is Elias–Fano coded and the magnitudes
+  are carried separately, beside the factor codec (id `14`).
+
+Measured (court `learned-speech`, result `55409530…`): effectiveness unchanged at
+129 612 B; Mode C 141 704 → **141 700 B** (7/8 wins). The direction choice and
+lattice are honest near-negatives on dense speech (bidir 15 722 B vs 15 700 B for
+direct LPC on `1272`); Elias–Fano targets sparse material rather than dense
+speech residuals. **Compressed warmup** is already covered: warmup samples appear
+as residual values and are adaptively coded by the partitioned-Rice/Golomb
+partitions, so a separate state coder is not warranted on this corpus.
+
 ## Status
 
 Implemented and pushed: Track A, Track B (including the entropy decode table),
@@ -309,7 +330,9 @@ coding, Seal S5 estimator diversity, Seal S6 higher dense-LPC orders, Seal S7
 lattice/PARCOR realisation and Seal S8 pole-zero/ARMA closure (court
 `learned-speech`). The campaign places VOLE ahead of FLAC-5 on both splits,
 and the U1 common-factor fix (`learned-u1-wasted`) closes the S0 U1-domain 3×
-gap to ~2.6 %.
+gap to ~2.6 %. The remaining speech mechanisms (forward/reverse direction,
+lattice precision search, Elias–Fano positions) are implemented as non-regressing
+candidates.
 The remaining tracks from the two whole-repository
 optimization reports
 (CPU frame-tile multicore + PartialBank vectorization, GPU work decomposition,

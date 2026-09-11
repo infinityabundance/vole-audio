@@ -26,14 +26,16 @@ use crate::learned::train::TrainBudget;
 use crate::learned::train::fixed::fit_fixed_diff_sweep;
 use crate::learned::train::hierarchy::fit_hierarchy_object;
 use crate::learned::train::linear::fit_linear_object_exp2;
-use crate::learned::train::lpc::{fit_lattice_object, fit_lpc_object, fit_pz_object};
+use crate::learned::train::lpc::{
+    fit_lattice_object, fit_lpc_bidir_object, fit_lpc_object, fit_pz_object,
+};
 use crate::learned::train::sparse::fit_sparse_object;
 use crate::status::Verdict;
 use std::path::Path;
 
 /// Frozen static-result hash (empty means "not yet frozen").
 pub const LEARNED_SPEECH_SHA256: &str =
-    "83c3e06e86dd25fa6b39ab448d40e9e24ee6e9161c675f20616bac3b8aec3c25";
+    "55409530ebc94a031e97c7d7ea1d95c62e29771cc9beabd8c3d457bdd45bda2f";
 
 const CLIPS_PER_SPLIT: usize = 8;
 
@@ -44,6 +46,7 @@ pub const ACTIVE_FAMILIES: &[&str] = &[
     "hier2",
     "fixed_diff",
     "lpc",
+    "lpc_bidir",
     "lattice",
     "polezero",
 ];
@@ -97,6 +100,21 @@ fn portfolio(case: &RealCase, budget: &TrainBudget) -> Result<Vec<(&'static str,
     }
     if let Some(o) = best_lpc {
         raw.push(("lpc", o));
+    }
+    // Speech mechanism: per-block forward/reverse direction choice.
+    let mut best_bidir: Option<LearnedObject> = None;
+    let mut best_bidir_bytes = u64::MAX;
+    for block in [4096u32, 2048] {
+        if let Ok((o, _)) = fit_lpc_bidir_object(&case.samples, frames, rate, block, 16, budget)
+            && let Some(b) = bytes(&o)
+            && b < best_bidir_bytes
+        {
+            best_bidir_bytes = b;
+            best_bidir = Some(o);
+        }
+    }
+    if let Some(o) = best_bidir {
+        raw.push(("lpc_bidir", o));
     }
     // Seal S7: lattice/PARCOR realisation over a frozen block ladder.
     let mut best_lat: Option<LearnedObject> = None;

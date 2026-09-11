@@ -33,6 +33,7 @@ pub mod profile;
 pub mod quantize;
 pub mod residual_codec;
 pub mod residual_codec2;
+pub mod reverse;
 pub mod segmentation;
 pub mod segmented;
 pub mod serialization;

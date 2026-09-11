@@ -87,6 +87,8 @@ pub enum ResidualCodecV2 {
     CenteredGolomb = 13,
     /// Strip a common power-of-two factor, then encode the quotients.
     FactorShift = 14,
+    /// Elias–Fano positions of the nonzero residuals + separate magnitudes.
+    EliasFano = 15,
 }
 
 impl ResidualCodecV2 {
@@ -127,7 +129,7 @@ impl ResidualCodecV2 {
     ];
 
     /// The Exp3 additions (Seal S4), in canonical tie order.
-    pub const ALL_V3: [ResidualCodecV2; 15] = [
+    pub const ALL_V3: [ResidualCodecV2; 16] = [
         ResidualCodecV2::DenseI32,
         ResidualCodecV2::SparseDelta,
         ResidualCodecV2::ZigZagVarint,
@@ -143,6 +145,7 @@ impl ResidualCodecV2 {
         ResidualCodecV2::Golomb,
         ResidualCodecV2::CenteredGolomb,
         ResidualCodecV2::FactorShift,
+        ResidualCodecV2::EliasFano,
     ];
 
     /// Canonical codec identifier byte.
@@ -168,6 +171,7 @@ impl ResidualCodecV2 {
             ResidualCodecV2::Golomb => "golomb",
             ResidualCodecV2::CenteredGolomb => "centered_golomb",
             ResidualCodecV2::FactorShift => "factor_shift",
+            ResidualCodecV2::EliasFano => "elias_fano",
         }
     }
 
@@ -189,6 +193,7 @@ impl ResidualCodecV2 {
             12 => Some(ResidualCodecV2::Golomb),
             13 => Some(ResidualCodecV2::CenteredGolomb),
             14 => Some(ResidualCodecV2::FactorShift),
+            15 => Some(ResidualCodecV2::EliasFano),
             _ => None,
         }
     }
@@ -241,6 +246,7 @@ impl ResidualCodecV2 {
             ResidualCodecV2::Golomb => encode_golomb(residual),
             ResidualCodecV2::CenteredGolomb => encode_centered_golomb(residual),
             ResidualCodecV2::FactorShift => encode_factor_shift(residual),
+            ResidualCodecV2::EliasFano => encode_elias_fano(residual),
         }
     }
 
@@ -267,6 +273,7 @@ impl ResidualCodecV2 {
             ResidualCodecV2::Golomb => decode_golomb(bytes, len),
             ResidualCodecV2::CenteredGolomb => decode_centered_golomb(bytes, len),
             ResidualCodecV2::FactorShift => decode_factor_shift(bytes, len),
+            ResidualCodecV2::EliasFano => decode_elias_fano(bytes, len),
         }
     }
 }
@@ -2034,6 +2041,115 @@ fn decode_factor_shift(bytes: &[u8], len: usize) -> Result<Vec<i32>> {
     Ok(out)
 }
 
+// ---------------------------------------------------------------------------
+// id 15: EliasFano (nonzero positions + separate magnitudes)
+// ---------------------------------------------------------------------------
+
+fn encode_elias_fano(residual: &[i32]) -> Vec<u8> {
+    let n = residual.len();
+    let mut out = Vec::new();
+    out.extend_from_slice(&(n as u64).to_le_bytes());
+    let positions: Vec<u64> = residual
+        .iter()
+        .enumerate()
+        .filter(|&(_, &v)| v != 0)
+        .map(|(i, _)| i as u64)
+        .collect();
+    let m = positions.len() as u64;
+    out.extend_from_slice(&m.to_le_bytes());
+    if n == 0 || m == 0 {
+        return out;
+    }
+    let ratio = (n as u64) / m;
+    let l = if ratio <= 1 {
+        0u32
+    } else {
+        63 - ratio.leading_zeros()
+    };
+    out.push(l as u8);
+    let mask = if l == 0 { 0 } else { (1u64 << l) - 1 };
+    let mut low = BitWriter::new();
+    for &p in &positions {
+        if l > 0 {
+            low.bits(p & mask, l);
+        }
+    }
+    let low_bytes = low.finish();
+    out.extend_from_slice(&(low_bytes.len() as u32).to_le_bytes());
+    out.extend_from_slice(&low_bytes);
+    let high_len = (m as usize) + ((n as u64) >> l) as usize + 1;
+    let mut high = vec![0u8; high_len.div_ceil(8)];
+    for (i, &p) in positions.iter().enumerate() {
+        let pos = i + ((p >> l) as usize);
+        if pos < high_len {
+            high[pos >> 3] |= 1 << (7 - (pos & 7));
+        }
+    }
+    out.extend_from_slice(&(high.len() as u32).to_le_bytes());
+    out.extend_from_slice(&high);
+    let mags: Vec<i32> = residual.iter().filter(|&&v| v != 0).copied().collect();
+    let inner = encode_best_v2(&mags);
+    out.extend_from_slice(&inner.bytes);
+    out
+}
+
+#[allow(clippy::needless_range_loop)]
+fn decode_elias_fano(bytes: &[u8], len: usize) -> Result<Vec<i32>> {
+    let mut r = Reader::new(bytes);
+    let n = r.u64le()? as usize;
+    if n != len {
+        return Err(Error::malformed("elias-fano length mismatch"));
+    }
+    let m = r.u64le()? as usize;
+    if n == 0 || m == 0 {
+        return Ok(vec![0i32; n]);
+    }
+    if m > n {
+        return Err(Error::malformed("elias-fano nonzero count exceeds length"));
+    }
+    let l = r.u8()? as u32;
+    if l > 40 {
+        return Err(Error::malformed("elias-fano low width out of range"));
+    }
+    let low_len = r.u32le()? as usize;
+    let low_bytes = r.take(low_len)?.to_vec();
+    let high_len = r.u32le()? as usize;
+    let high = r.take(high_len)?.to_vec();
+    let rest = r.rest();
+    // Recover positions.
+    let mut lr = BitReader::new(&low_bytes);
+    let mut positions: Vec<usize> = Vec::with_capacity(m);
+    let mut seen = 0usize;
+    'outer: for byte_i in 0..high.len() {
+        let byte = high[byte_i];
+        for bit in 0..8usize {
+            let pos = byte_i * 8 + bit;
+            if byte & (1 << (7 - bit)) != 0 {
+                let lowval = if l == 0 { 0 } else { lr.read_bits(l)? };
+                let highpart = (pos - seen) as u64;
+                positions.push(((highpart << l) | lowval) as usize);
+                seen += 1;
+                if seen == m {
+                    break 'outer;
+                }
+            }
+        }
+    }
+    if positions.len() != m {
+        return Err(Error::malformed("elias-fano position count mismatch"));
+    }
+    let inner = decode_encoding_v2(rest, m)?;
+    let mags = inner.decode(m)?;
+    let mut out = vec![0i32; n];
+    for (k, &p) in positions.iter().enumerate() {
+        if p >= n {
+            return Err(Error::malformed("elias-fano position out of range"));
+        }
+        out[p] = mags[k];
+    }
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2116,6 +2232,16 @@ mod tests {
                     .unwrap_or_else(|e| panic!("{:?}: {e}", codec));
                 assert_eq!(back, residual, "{:?}", codec);
             }
+        }
+    }
+
+    #[test]
+    fn elias_fano_round_trips() {
+        for residual in sample_residuals() {
+            let c = ResidualCodecV2::EliasFano;
+            let payload = c.encode(&residual);
+            let back = c.decode(&payload, residual.len()).unwrap();
+            assert_eq!(back, residual);
         }
     }
 
