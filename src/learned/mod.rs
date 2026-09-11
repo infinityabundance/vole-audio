@@ -17,6 +17,7 @@ pub mod analytical;
 pub mod arithmetic;
 pub mod context_mixture;
 pub mod corpus;
+pub mod corpus_real;
 pub mod finite_field;
 pub mod graph;
 pub mod hierarchy;

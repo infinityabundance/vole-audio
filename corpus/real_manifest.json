@@ -1,0 +1,235 @@
+{
+  "schema": "vole.audio.learned.real_corpus.v1",
+  "universe": "vole.audio.u1",
+  "profile": "vole.audio.learned.exp2",
+  "state": "FROZEN",
+  "note": "Frozen before the Exp2 real-corpus court is run. Membership and truncation are deterministic and are not changed because a result is unfavourable. source: LibriSpeech (OpenSLR SLR12), CC BY 4.0.",
+  "source": "LibriSpeech dev-clean + test-clean (OpenSLR SLR12, CC BY 4.0)",
+  "license": "CC BY 4.0",
+  "frozen_frames_per_clip": 16384,
+  "conversion": "FLAC -> 16-bit PCM (flac CLI) -> sign-extended little-endian i32; first frozen_frames_per_clip frames; no dither, shift or resample",
+  "effectiveness": [
+    {
+      "id": "1272-128104-0000",
+      "split": "dev-clean",
+      "speaker": "1272",
+      "path": "dev-clean/1272/128104/1272-128104-0000.flac",
+      "sample_rate_hz": 16000,
+      "channels": 1,
+      "frames": 16384,
+      "duration_ms": 1024,
+      "canonical_i32_sha256": "ee30c428ff1d993d9b7fdb00157ff627657500cd190e4cde8b1049a4846dba3d"
+    },
+    {
+      "id": "1462-170138-0000",
+      "split": "dev-clean",
+      "speaker": "1462",
+      "path": "dev-clean/1462/170138/1462-170138-0000.flac",
+      "sample_rate_hz": 16000,
+      "channels": 1,
+      "frames": 16384,
+      "duration_ms": 1024,
+      "canonical_i32_sha256": "d784c88a065b987ea82ba4b9791c027c0d067f754bbb3cadbf0e89caf6ae2f71"
+    },
+    {
+      "id": "1673-143396-0000",
+      "split": "dev-clean",
+      "speaker": "1673",
+      "path": "dev-clean/1673/143396/1673-143396-0000.flac",
+      "sample_rate_hz": 16000,
+      "channels": 1,
+      "frames": 16384,
+      "duration_ms": 1024,
+      "canonical_i32_sha256": "38447d137ad6f6f9f93209931c8a126e22bd37f7e0c443ea6958f38f1deb96f6"
+    },
+    {
+      "id": "174-168635-0000",
+      "split": "dev-clean",
+      "speaker": "174",
+      "path": "dev-clean/174/168635/174-168635-0000.flac",
+      "sample_rate_hz": 16000,
+      "channels": 1,
+      "frames": 16384,
+      "duration_ms": 1024,
+      "canonical_i32_sha256": "5198ca75c35ece06468cba2d64bfabe61316c839924c3944f6e81bea8b1be399"
+    },
+    {
+      "id": "1919-142785-0000",
+      "split": "dev-clean",
+      "speaker": "1919",
+      "path": "dev-clean/1919/142785/1919-142785-0000.flac",
+      "sample_rate_hz": 16000,
+      "channels": 1,
+      "frames": 16384,
+      "duration_ms": 1024,
+      "canonical_i32_sha256": "e066929149d3bc8b43aae58632024a17a76b2bf6924d831c63d067fd417222d5"
+    },
+    {
+      "id": "1988-147956-0000",
+      "split": "dev-clean",
+      "speaker": "1988",
+      "path": "dev-clean/1988/147956/1988-147956-0000.flac",
+      "sample_rate_hz": 16000,
+      "channels": 1,
+      "frames": 16384,
+      "duration_ms": 1024,
+      "canonical_i32_sha256": "0045d7d11a1f84fd67722788be2aadc991ef171fe2677f2672777228a9a9a2ba"
+    },
+    {
+      "id": "1993-147149-0000",
+      "split": "dev-clean",
+      "speaker": "1993",
+      "path": "dev-clean/1993/147149/1993-147149-0000.flac",
+      "sample_rate_hz": 16000,
+      "channels": 1,
+      "frames": 16384,
+      "duration_ms": 1024,
+      "canonical_i32_sha256": "92bea0e8902a11be7ce7ba2c42d7402fe7c18b9f0f681023e012f27f61d7163d"
+    },
+    {
+      "id": "2035-147960-0000",
+      "split": "dev-clean",
+      "speaker": "2035",
+      "path": "dev-clean/2035/147960/2035-147960-0000.flac",
+      "sample_rate_hz": 16000,
+      "channels": 1,
+      "frames": 16384,
+      "duration_ms": 1024,
+      "canonical_i32_sha256": "586776965c49c6ed18f05f866e804ddd59b7bb77303121fef93e5fea663d7a23"
+    },
+    {
+      "id": "2078-142845-0000",
+      "split": "dev-clean",
+      "speaker": "2078",
+      "path": "dev-clean/2078/142845/2078-142845-0000.flac",
+      "sample_rate_hz": 16000,
+      "channels": 1,
+      "frames": 16384,
+      "duration_ms": 1024,
+      "canonical_i32_sha256": "c04b2cc13189cd625c2b9703a14716a39ea5aee884865deee810ef7d5e7f2f16"
+    },
+    {
+      "id": "2086-149214-0000",
+      "split": "dev-clean",
+      "speaker": "2086",
+      "path": "dev-clean/2086/149214/2086-149214-0000.flac",
+      "sample_rate_hz": 16000,
+      "channels": 1,
+      "frames": 16384,
+      "duration_ms": 1024,
+      "canonical_i32_sha256": "3afa44a23a966d378da42d4a3ecac0328e4ec53f5598743db3fa9327f7c1d42a"
+    },
+    {
+      "id": "2277-149874-0000",
+      "split": "dev-clean",
+      "speaker": "2277",
+      "path": "dev-clean/2277/149874/2277-149874-0000.flac",
+      "sample_rate_hz": 16000,
+      "channels": 1,
+      "frames": 16384,
+      "duration_ms": 1024,
+      "canonical_i32_sha256": "2cab67c628ad51f00499a50e1ac9e965df124490d02b530d19285a4918d6449f"
+    },
+    {
+      "id": "2412-153947-0000",
+      "split": "dev-clean",
+      "speaker": "2412",
+      "path": "dev-clean/2412/153947/2412-153947-0000.flac",
+      "sample_rate_hz": 16000,
+      "channels": 1,
+      "frames": 16384,
+      "duration_ms": 1024,
+      "canonical_i32_sha256": "1bfa38ea5dacd74366c624e11c060108c35f96b60cdcacc8da87f27a027658b3"
+    }
+  ],
+  "mode_c": [
+    {
+      "id": "1089-134686-0000",
+      "split": "test-clean",
+      "speaker": "1089",
+      "path": "test-clean/1089/134686/1089-134686-0000.flac",
+      "sample_rate_hz": 16000,
+      "channels": 1,
+      "frames": 16384,
+      "duration_ms": 1024,
+      "canonical_i32_sha256": "749c759ea70ebaddea97ddbdc96f0eed438da94289f5c3002a42ca998addac41"
+    },
+    {
+      "id": "1188-133604-0000",
+      "split": "test-clean",
+      "speaker": "1188",
+      "path": "test-clean/1188/133604/1188-133604-0000.flac",
+      "sample_rate_hz": 16000,
+      "channels": 1,
+      "frames": 16384,
+      "duration_ms": 1024,
+      "canonical_i32_sha256": "e9ce4ad1f8b00828ffb5a6e622f90ed74fc83927fd9bec45afc9c5b2455d706f"
+    },
+    {
+      "id": "121-121726-0000",
+      "split": "test-clean",
+      "speaker": "121",
+      "path": "test-clean/121/121726/121-121726-0000.flac",
+      "sample_rate_hz": 16000,
+      "channels": 1,
+      "frames": 16384,
+      "duration_ms": 1024,
+      "canonical_i32_sha256": "1880c4a8ff8176e2ca372bfb9256152b4645fc60f4c0e2e3b5155b25fe040de7"
+    },
+    {
+      "id": "1221-135766-0000",
+      "split": "test-clean",
+      "speaker": "1221",
+      "path": "test-clean/1221/135766/1221-135766-0000.flac",
+      "sample_rate_hz": 16000,
+      "channels": 1,
+      "frames": 16384,
+      "duration_ms": 1024,
+      "canonical_i32_sha256": "bc282ee4911826e68409e2e5f8b823a02d428c0b934bec8e37232ea780a3ff82"
+    },
+    {
+      "id": "1284-1180-0000",
+      "split": "test-clean",
+      "speaker": "1284",
+      "path": "test-clean/1284/1180/1284-1180-0000.flac",
+      "sample_rate_hz": 16000,
+      "channels": 1,
+      "frames": 16384,
+      "duration_ms": 1024,
+      "canonical_i32_sha256": "763cd309b2af39245f766880461802519c96542dd4cef8c33fb5a3d2da132ad5"
+    },
+    {
+      "id": "1320-122612-0000",
+      "split": "test-clean",
+      "speaker": "1320",
+      "path": "test-clean/1320/122612/1320-122612-0000.flac",
+      "sample_rate_hz": 16000,
+      "channels": 1,
+      "frames": 16384,
+      "duration_ms": 1024,
+      "canonical_i32_sha256": "2c1a357d6b51a3620d2a6d58afda65cde28f74b153055703b5a7e9a62513b2cf"
+    },
+    {
+      "id": "1580-141083-0000",
+      "split": "test-clean",
+      "speaker": "1580",
+      "path": "test-clean/1580/141083/1580-141083-0000.flac",
+      "sample_rate_hz": 16000,
+      "channels": 1,
+      "frames": 16384,
+      "duration_ms": 1024,
+      "canonical_i32_sha256": "893835c3e31f2258f2fd93c47b87a9cadde3582357709415db4f7a895c30e6ca"
+    },
+    {
+      "id": "1995-1826-0000",
+      "split": "test-clean",
+      "speaker": "1995",
+      "path": "test-clean/1995/1826/1995-1826-0000.flac",
+      "sample_rate_hz": 16000,
+      "channels": 1,
+      "frames": 16384,
+      "duration_ms": 1024,
+      "canonical_i32_sha256": "4fea384f59970ab0d35404d6e0b82321bb2ab559f2273b66bc491d071f220531"
+    }
+  ]
+}

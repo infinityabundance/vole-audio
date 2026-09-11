@@ -23,3 +23,8 @@ target/device/
 # ALSA / endpoint scratch
 *.core
 core
+
+# Bulk real-corpus audio (LibriSpeech subset). The manifest of identities and
+# canonical i32 hashes IS committed (corpus/real_manifest.json); the audio bulk
+# is not, because it is externally sourced (CC BY 4.0, OpenSLR SLR12).
+/corpus/real/

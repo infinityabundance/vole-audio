@@ -361,6 +361,9 @@ fn cmd_seal_verify(args: &[String]) -> Result<u8> {
                        learned-shared=SUPPORTED,learned-random-access=SUPPORTED,\
                        learned-gpu=SUPPORTED,learned-training-cost=SUPPORTED,\
                        learned-inverse=SUPPORTED,learned=SUPPORTED,\
+                       learned-exp2-baseline=SUPPORTED,learned-residual-codec2=SUPPORTED,\
+                       learned-exp2-mechanisms=SUPPORTED,learned-exp2-transfer=SUPPORTED,\
+                       learned-exp2-real-corpus=SUPPORTED,\
                        cuda=SUPPORTED,d1=SUPPORTED,h2=SUPPORTED,\
                        rocm=UNSUPPORTED_BY_HARDWARE|UNSUPPORTED_BY_API|INCONCLUSIVE,\
                        rocm-d0=UNSUPPORTED_BY_HARDWARE|UNSUPPORTED_BY_API|INCONCLUSIVE,\

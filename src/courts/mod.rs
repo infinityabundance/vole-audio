@@ -77,6 +77,8 @@ pub mod learned_exp2_baseline;
 #[cfg(feature = "std")]
 pub mod learned_exp2_mechanisms;
 #[cfg(feature = "std")]
+pub mod learned_exp2_real_corpus;
+#[cfg(feature = "std")]
 pub mod learned_exp2_transfer;
 #[cfg(feature = "std")]
 pub mod learned_gpu;
@@ -276,6 +278,12 @@ the structural portfolio no-regression gates",
 an optional bounded learned correction over the analytic residual, with a paired no-regression gate",
     ),
     (
+        "learned-exp2-real-corpus",
+        "Exp2 real + held-out Mode-C corpus (LibriSpeech, CC BY 4.0): the portfolio against FLAC and \
+the Exp1 baseline with exact Wilcoxon signed-rank and a deterministic bootstrap median CI, \
+reporting effectiveness and held-out Mode C separately",
+    ),
+    (
         "learned-residual-codec2",
         "Exp2 Seal B residual codec family: PartitionRice / CoreTailRice / RunLengthRice / \
 ZeroMaskRice / BytePlane / ContextRans beside the frozen Exp1 codecs, with the structural gate \
@@ -450,6 +458,7 @@ pub fn run(name: &str, receipts_root: &Path) -> crate::error::Result<Verdict> {
         "learned-determinism" => learned_determinism::run(receipts_root),
         "learned-exp2-baseline" => learned_exp2_baseline::run(receipts_root),
         "learned-exp2-mechanisms" => learned_exp2_mechanisms::run(receipts_root),
+        "learned-exp2-real-corpus" => learned_exp2_real_corpus::run(receipts_root),
         "learned-exp2-transfer" => learned_exp2_transfer::run(receipts_root),
         "learned-residual-codec" => learned_residual_codec::run(receipts_root),
         "learned-residual-codec2" => learned_residual_codec2::run(receipts_root),

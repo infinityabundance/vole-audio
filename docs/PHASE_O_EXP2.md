@@ -54,7 +54,7 @@ cells; doing so would be benchmark gaming.
 | H | Context mixture + backward adaptation | `learned::context_mixture`, `learned::train::context_mixture`, `learned::adaptive`, `learned::train::adaptive` | `learned-exp2-mechanisms` | **implemented** |
 | I | Hierarchical residual prediction | `learned::hierarchy`, `learned::train::hierarchy` | `learned-exp2-mechanisms` | **implemented** |
 | J | Transfer v2 (analytic-first) | `learned::analytical`, `courts::learned_exp2_transfer` | `learned-exp2-transfer` | **implemented** |
-| K | Real + held-out Mode-C corpus | — | — | pending |
+| K | Real + held-out Mode-C corpus | `learned::corpus_real`, `courts::learned_exp2_real_corpus` | `learned-exp2-real-corpus` | **sealed** |
 | L | Stronger external baselines | `baseline::wavpack` | — | **implemented (WavPack)** |
 
 ## Seal B — residual codec v2
@@ -83,6 +83,7 @@ unit tests.
 | `learned-residual-codec2` | `e134f0c3457a9593e8ab56d071e142c2d3c03a60280c9434e62eca0c433cbcf2` |
 | `learned-exp2-mechanisms` | `9ef1b8b5ae79b6ed0a2f42532e8ce4d19107675d4de010b788cf7c5704a53ba9` |
 | `learned-exp2-transfer` | `a43ec91fbb31efd9e585e6cfaaa3fefe3bc6e8381aec7049f508cc3d212d265a` |
+| `learned-exp2-real-corpus` | `f6a87cc5a9e53401a6f9cb4d66ba6e42993deab47ffa600826f07d16e2d92446` |
 
 The frozen Exp1 court `learned-residual-codec` still reproduces its sealed hash
 `49f8d5c6…` after the Exp2 changes, so Exp1 is provably unperturbed.
@@ -147,16 +148,36 @@ here: on the stationary synthetic cases it costs essentially the same as sparse
 gate adds framing without changing the local regime. It is expected to pay only
 where the residual regime genuinely changes within a window.
 
+## Real corpus and held-out Mode C (Seal K)
+
+The real corpus is LibriSpeech (OpenSLR SLR12, CC BY 4.0): 8 `dev-clean` clips
+(effectiveness) and 8 `test-clean` clips (held-out Mode C), one per speaker,
+truncated to 16 384 frames of 16-bit mono speech at 16 kHz. Membership and
+canonical i32 hashes are frozen in `corpus/real_manifest.json` before the court
+runs; the audio bulk is external and not committed.
+
+The court reports **paired** statistics (exact two-sided Wilcoxon signed-rank
+and a deterministic bootstrap 95% median-ratio CI), not aggregate bytes:
+
+| split | wins vs Exp1 | losses vs Exp1 | wins vs FLAC | losses vs FLAC | median FLAC/Exp2 |
+| ----- | ------------ | -------------- | ------------ | -------------- | ---------------- |
+| effectiveness (dev-clean) | 8 | 0 | 0 | 8 | 0.956 |
+| Mode C (test-clean, held out) | 8 | 0 | 0 | 8 | 0.965 |
+
+The exact Wilcoxon signed-rank is 7813 ppm (1/128, the minimum for n = 8) in
+both directions: the Exp2 portfolio dominates the Exp1 dense-linear baseline on
+every real clip, and FLAC dominates the Exp2 portfolio on every real clip by
+roughly 3.5-4.5%. **This is an honest negative**: Exp2 does not beat FLAC on
+real speech, and the held-out Mode C replicates it. Object-specific fitting is
+representation selection, never a generalization claim.
+
 ## Honest limitations (recorded, not hidden)
 
-* Seals C, D, E, F, G, H, I and J are fully implemented and covered by the
-  `learned-exp2-mechanisms` / `learned-exp2-transfer` courts.
-* No new `seal verify` receipt matrix has been written yet: the Phase M/N
-  batteries were not re-run in this change set.
-* Seal K (real + held-out Mode-C corpus) is **not implemented**; it remains the
-  declared remainder of the Exp2 sequence, and the real-recording stratum stays
-  `VACANT_DECLARED` as in Phase M (no rights-clean source audio is present on
-  this host).
+* Seals C, D, E, F, G, H, I, J and K are fully implemented and covered by the
+  `learned-exp2-mechanisms` / `learned-exp2-transfer` / `learned-exp2-real-corpus`
+  courts. The real-corpus court is an honest negative against FLAC on real
+  speech (see Seal K above).
+* The `seal verify` expectation matrix now includes the Exp2 courts.
 * `RunLengthRice` is a VOLE-native adaptive run-length/Rice design; it is in the
   RLGR family but is not bit-compatible with Malvar's RLGR1.
 * Sparse and long-term prediction are mono-first in this build; multichannel
