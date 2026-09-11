@@ -203,13 +203,30 @@ Measured (court `learned-speech`, result `3e8d99f3…`): effectiveness
 **1.0 % smaller and wins 5/8 held-out clips**. General Golomb is selected on
 almost every clip (`centered_golomb` on the strongly skewed `1988-147956`).
 
+### Seal S5 — estimator diversity (Burg and covariance/least-squares)
+
+Three estimators now propose coefficients for the *same* canonical integer
+decoder syntax: Tukey-windowed autocorrelation + Levinson, **Burg**, and the
+**covariance/least-squares** normal equations (Gaussian elimination with partial
+pivoting). For each block and order every proposal is quantised across the S3
+precision/shift/quantiser sweep, and the proposal minimising the estimated
+`model + Rice` cost is kept. The estimator has no semantic authority.
+
+Measured (court `learned-speech`, result `2ea09b96…`): effectiveness
+130 395 → **130 320 B** against FLAC 130 331 — VOLE is now **ahead**, winning
+5/8 clips; Mode C 142 684 → **142 570 B** against FLAC 144 145 (1.1 % smaller,
+6/8 held-out wins). The paired exact Wilcoxon is 945313 ppm (effectiveness) and
+78125 ppm (Mode C); the deterministic bootstrap median `FLAC/VOLE` ratio is
+approximately 1.0 on effectiveness and below 1.0 on Mode C. This is statistical
+parity-to-ahead, not yet a decisive margin; S6–S8 target that margin.
+
 ## Status
 
 Implemented and pushed: Track A, Track B (including the entropy decode table),
 and the Report 3 Seal S0 diagnostic courts (`learned-speech-trace`,
 `learned-real-corpus-u1`), Seal S1 fixed differences, Seal S2 dense local LPC,
-Seal S3 precision/shift/error-feedback and Seal S4 general Golomb residual
-coding (court `learned-speech`).
+Seal S3 precision/shift/error-feedback, Seal S4 general Golomb residual
+coding and Seal S5 estimator diversity (court `learned-speech`).
 The remaining tracks from the two whole-repository
 optimization reports
 (CPU frame-tile multicore + PartialBank vectorization, GPU work decomposition,

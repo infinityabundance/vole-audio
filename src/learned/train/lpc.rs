@@ -215,6 +215,146 @@ fn analyse_block(block: &[i32], max_order: usize) -> Vec<Vec<f64>> {
     levinson_durbin(&r, max_order)
 }
 
+/// Burg's maximum-entropy estimator (forward/backward error minimisation).
+/// Returns the predictor coefficients `c_j` (`x_hat[n] = Σ c_j x[n-j]`) for each
+/// order `1..=max_order`.
+pub fn burg_sets(block: &[i32], max_order: usize) -> Vec<Vec<f64>> {
+    let n = block.len();
+    if n == 0 || max_order == 0 || n <= max_order + 1 {
+        return Vec::new();
+    }
+    let x: Vec<f64> = block.iter().map(|&v| f64::from(v)).collect();
+    let mut f = x.clone();
+    let mut b = x.clone();
+    let mut a = vec![0.0f64; max_order + 1];
+    a[0] = 1.0;
+    let mut out = Vec::with_capacity(max_order);
+    for m in 1..=max_order {
+        let mut num = 0.0f64;
+        let mut den = 0.0f64;
+        for i in m..n {
+            num += f[i] * b[i - 1];
+            den += f[i] * f[i] + b[i - 1] * b[i - 1];
+        }
+        if den <= 0.0 {
+            break;
+        }
+        let k = 2.0 * num / den;
+        let old = a.clone();
+        for j in 1..m {
+            a[j] = old[j] - k * old[m - j];
+        }
+        a[m] = -k;
+        for i in (m..n).rev() {
+            let fi = f[i];
+            let bi = b[i - 1];
+            f[i] = fi - k * bi;
+            b[i] = bi - k * fi;
+        }
+        out.push((1..=m).map(|j| -a[j]).collect());
+    }
+    out
+}
+
+/// Covariance / least-squares estimator: the coefficient vector minimising the
+/// exact squared error on the block, solved through the normal equations.
+/// Returns `None` for a singular system.
+#[allow(clippy::needless_range_loop)]
+pub fn lsq_coefficients(block: &[i32], order: usize) -> Option<Vec<f64>> {
+    let n = block.len();
+    if order == 0 || n <= order + 1 {
+        return None;
+    }
+    let mut a = vec![vec![0.0f64; order]; order];
+    let mut rhs = vec![0.0f64; order];
+    for t in order..n {
+        let y = f64::from(block[t]);
+        for i in 1..=order {
+            let xi = f64::from(block[t - i]);
+            rhs[i - 1] += xi * y;
+            for j in 1..=i {
+                a[i - 1][j - 1] += xi * f64::from(block[t - j]);
+            }
+        }
+    }
+    for i in 0..order {
+        for j in 0..i {
+            a[j][i] = a[i][j];
+        }
+    }
+    solve_linear(a, rhs)
+}
+
+/// Gaussian elimination with partial pivoting.
+#[allow(clippy::needless_range_loop)]
+fn solve_linear(mut m: Vec<Vec<f64>>, mut b: Vec<f64>) -> Option<Vec<f64>> {
+    let n = b.len();
+    for col in 0..n {
+        let mut piv = col;
+        let mut best = m[col][col].abs();
+        for r in col + 1..n {
+            if m[r][col].abs() > best {
+                best = m[r][col].abs();
+                piv = r;
+            }
+        }
+        if best < 1e-300 {
+            return None;
+        }
+        m.swap(col, piv);
+        b.swap(col, piv);
+        let d = m[col][col];
+        for r in col + 1..n {
+            let fac = m[r][col] / d;
+            if fac == 0.0 {
+                continue;
+            }
+            for c in col..n {
+                m[r][c] -= fac * m[col][c];
+            }
+            b[r] -= fac * b[col];
+        }
+    }
+    let mut x = vec![0.0f64; n];
+    for i in (0..n).rev() {
+        let mut s = b[i];
+        for j in i + 1..n {
+            s -= m[i][j] * x[j];
+        }
+        if m[i][i] == 0.0 {
+            return None;
+        }
+        x[i] = s / m[i][i];
+    }
+    if x.iter().any(|v| !v.is_finite()) {
+        return None;
+    }
+    Some(x)
+}
+
+/// The estimator that proposed a coefficient set (evidence only).
+pub const ESTIMATORS: [&str; 3] = ["autocorrelation_levinson", "burg", "covariance_lsq"];
+
+/// All estimator proposals for one order, in deterministic order.
+fn estimator_proposals(
+    block: &[i32],
+    levinson: &[Vec<f64>],
+    burg: &[Vec<f64>],
+    order: usize,
+) -> Vec<Vec<f64>> {
+    let mut out = Vec::new();
+    if let Some(c) = levinson.get(order - 1) {
+        out.push(c.clone());
+    }
+    if let Some(c) = burg.get(order - 1) {
+        out.push(c.clone());
+    }
+    if let Some(c) = lsq_coefficients(block, order) {
+        out.push(c);
+    }
+    out
+}
+
 /// One block's chosen predictor parameters.
 struct BlockChoice {
     coeffs: Vec<i32>,
@@ -226,27 +366,29 @@ struct BlockChoice {
 /// Choose `(order, precision, shift, quantizer)` for one block by minimising the
 /// encoder-side estimate `model bits + optimal-Rice residual bits`.
 fn choose_block(block: &[i32], max_order: usize) -> BlockChoice {
-    let sets = analyse_block(block, max_order);
+    let levinson = analyse_block(block, max_order);
+    let burg = burg_sets(block, max_order);
     let mut best: Option<(u64, BlockChoice)> = None;
-    for (idx, coeffs_real) in sets.iter().enumerate() {
-        let order = idx + 1;
-        for &precision in &SEARCH_PRECISIONS {
-            for &shift in &SEARCH_SHIFTS {
-                for quantizer in [Quantizer::Independent, Quantizer::ErrorFeedback] {
-                    let coeffs = quantize(coeffs_real, shift, precision, quantizer);
-                    let residual = block_residual(block, &coeffs, shift);
-                    let model_bits = (order as u64) * u64::from(precision) + 16;
-                    let cost = model_bits + rice_cost_bits(&residual);
-                    if best.as_ref().is_none_or(|(c, _)| cost < *c) {
-                        best = Some((
-                            cost,
-                            BlockChoice {
-                                coeffs,
-                                order,
-                                precision,
-                                shift,
-                            },
-                        ));
+    for order in 1..=max_order {
+        for coeffs_real in estimator_proposals(block, &levinson, &burg, order) {
+            for &precision in &SEARCH_PRECISIONS {
+                for &shift in &SEARCH_SHIFTS {
+                    for quantizer in [Quantizer::Independent, Quantizer::ErrorFeedback] {
+                        let coeffs = quantize(&coeffs_real, shift, precision, quantizer);
+                        let residual = block_residual(block, &coeffs, shift);
+                        let model_bits = (order as u64) * u64::from(precision) + 16;
+                        let cost = model_bits + rice_cost_bits(&residual);
+                        if best.as_ref().is_none_or(|(c, _)| cost < *c) {
+                            best = Some((
+                                cost,
+                                BlockChoice {
+                                    coeffs,
+                                    order,
+                                    precision,
+                                    shift,
+                                },
+                            ));
+                        }
                     }
                 }
             }
@@ -387,6 +529,26 @@ mod tests {
             (sum_ef - target).abs() <= (sum_indep - target).abs(),
             "ef {sum_ef} indep {sum_indep} target {target}"
         );
+    }
+
+    #[test]
+    fn burg_and_lsq_recover_an_ar2() {
+        let mut s = 0x2545_F491_4F6C_DD1Du64;
+        let mut x = vec![0i32, 0];
+        for t in 2..8192 {
+            s ^= s << 13;
+            s ^= s >> 7;
+            s ^= s << 17;
+            let d = (s >> 40) as i64 % 2001 - 1000;
+            let v = i64::from(x[t - 1]) / 2 + i64::from(x[t - 2]) / 4 + d;
+            x.push(v.clamp(i64::from(i32::MIN), i64::from(i32::MAX)) as i32);
+        }
+        let b = burg_sets(&x, 4);
+        assert!((b[1][0] - 0.5).abs() < 0.12, "burg c1 = {}", b[1][0]);
+        assert!((b[1][1] - 0.25).abs() < 0.12, "burg c2 = {}", b[1][1]);
+        let c = lsq_coefficients(&x, 2).unwrap();
+        assert!((c[0] - 0.5).abs() < 0.05, "lsq c1 = {}", c[0]);
+        assert!((c[1] - 0.25).abs() < 0.05, "lsq c2 = {}", c[1]);
     }
 
     #[test]

@@ -32,8 +32,9 @@ use std::path::Path;
 
 /// Frozen static-result hash (empty means "not yet frozen").
 /// Frozen static-result hash (empty means "not yet frozen").
+/// Frozen static-result hash (empty means "not yet frozen").
 pub const LEARNED_SPEECH_SHA256: &str =
-    "3e8d99f35be66d478cfa5d7ebe7afb83b8965fb303394b300153650378229f4b";
+    "2ea09b963bc64a5adb8f95fdcde09d322c426cc7fd50f349e2db4c46a80cfc5d";
 
 const CLIPS_PER_SPLIT: usize = 8;
 
