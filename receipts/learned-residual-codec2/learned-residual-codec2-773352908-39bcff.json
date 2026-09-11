@@ -1,0 +1,1798 @@
+{
+  "schema": "vole.audio.evidence.v1",
+  "schema_version": 1,
+  "receipt": {
+    "schema": "vole.audio.evidence.v1",
+    "schema_version": 1,
+    "run_id": "learned-residual-codec2-773352908-39bcff",
+    "court": "learned-residual-codec2",
+    "created_unix_ms": 773352908,
+    "result": "SUPPORTED",
+    "result_detail": "twelve canonical residual codecs over 11 synthetic shapes and 8 corpus residuals; every codec round-trips exactly and best_v2 ≤ best_v1 on every residual; result sha256 e134f0c3457a9593e8ab56d071e142c2d3c03a60280c9434e62eca0c433cbcf2",
+    "environment": {
+      "os": {
+        "sysname": "Linux",
+        "release": "7.2.2-1-cachyos",
+        "version": "#1 SMP PREEMPT_DYNAMIC Fri, 28 Aug 2026 08:05:11 +0000",
+        "machine": "x86_64",
+        "nodename": "vanir",
+        "os_pretty_name": "CachyOS"
+      },
+      "cpu": {
+        "model": "AMD Ryzen 7 9800X3D 8-Core Processor",
+        "flags": [
+          "3dnowprefetch",
+          "abm",
+          "adx",
+          "aes",
+          "amd_lbr_pmc_freeze",
+          "amd_lbr_v2",
+          "aperfmperf",
+          "apic",
+          "arat",
+          "avic",
+          "avx",
+          "avx2",
+          "avx512_bf16",
+          "avx512_bitalg",
+          "avx512_vbmi2",
+          "avx512_vnni",
+          "avx512_vp2intersect",
+          "avx512_vpopcntdq",
+          "avx512bw",
+          "avx512cd",
+          "avx512dq",
+          "avx512f",
+          "avx512ifma",
+          "avx512vbmi",
+          "avx512vl",
+          "avx_vnni",
+          "bmi1",
+          "bmi2",
+          "bpext",
+          "bus_lock_detect",
+          "cat_l3",
+          "cdp_l3",
+          "clflush",
+          "clflushopt",
+          "clwb",
+          "clzero",
+          "cmov",
+          "cmp_legacy",
+          "constant_tsc",
+          "cpb",
+          "cppc",
+          "cpuid",
+          "cpuid_fault",
+          "cqm",
+          "cqm_llc",
+          "cqm_mbm_local",
+          "cqm_mbm_total",
+          "cqm_occup_llc",
+          "cr8_legacy",
+          "cx16",
+          "cx8",
+          "de",
+          "decodeassists",
+          "erms",
+          "extapic",
+          "extd_apicid",
+          "f16c",
+          "flush_l1d",
+          "flushbyasid",
+          "fma",
+          "fpu",
+          "fsgsbase",
+          "fsrm",
+          "fxsr",
+          "fxsr_opt",
+          "gfni",
+          "ht",
+          "hw_pstate",
+          "ibpb",
+          "ibrs",
+          "ibrs_enhanced",
+          "ibs",
+          "invpcid",
+          "irperf",
+          "lahf_lm",
+          "lbrv",
+          "lm",
+          "mba",
+          "mca",
+          "mce",
+          "misalignsse",
+          "mmx",
+          "mmxext",
+          "monitor",
+          "movbe",
+          "movdir64b",
+          "movdiri",
+          "msr",
+          "mtrr",
+          "mwaitx",
+          "nonstop_tsc",
+          "nopl",
+          "npt",
+          "nrip_save",
+          "nx",
+          "ospke",
+          "osvw",
+          "overflow_recov",
+          "pae",
+          "pat",
+          "pausefilter",
+          "pclmulqdq",
+          "pdpe1gb",
+          "perfctr_core",
+          "perfctr_llc",
+          "perfctr_nb",
+          "perfmon_v2",
+          "pfthreshold",
+          "pge",
+          "pku",
+          "pni",
+          "popcnt",
+          "pse",
+          "pse36",
+          "rapl",
+          "rdpid",
+          "rdpru",
+          "rdrand",
+          "rdseed",
+          "rdt_a",
+          "rdtscp",
+          "rep_good",
+          "sep",
+          "sha_ni",
+          "skinit",
+          "smap",
+          "smca",
+          "smep",
+          "ssbd",
+          "sse",
+          "sse2",
+          "sse4_1",
+          "sse4_2",
+          "sse4a",
+          "ssse3",
+          "stibp",
+          "succor",
+          "svm",
+          "svm_lock",
+          "syscall",
+          "tce",
+          "topoext",
+          "tsc",
+          "tsc_adjust",
+          "tsc_scale",
+          "umip",
+          "user_shstk",
+          "v_spec_ctrl",
+          "v_vmsave_vmload",
+          "vaes",
+          "vgif",
+          "vmcb_clean",
+          "vme",
+          "vmmcall",
+          "vnmi",
+          "vpclmulqdq",
+          "wbnoinvd",
+          "wdt",
+          "x2avic",
+          "xgetbv1",
+          "xsave",
+          "xsavec",
+          "xsaveerptr",
+          "xsaveopt",
+          "xsaves",
+          "xtopology"
+        ],
+        "has_avx2": true,
+        "has_avx512": true,
+        "has_neon": false
+      },
+      "memory": {
+        "total_bytes": 134689935360
+      },
+      "git_commit": "f0a748b951bea48e699542f39ee039efe31763b0",
+      "git_dirty": false,
+      "git_branch": "main",
+      "rustc_version": "rustc 1.99.0-nightly (89c61a754 2026-07-23)",
+      "crate_version": "0.41.0",
+      "target_arch": "x86_64",
+      "target_os": "linux",
+      "cpu_governor": "performance",
+      "bios_version": "1402",
+      "git_tree_sha": "a2565c0821e8d89e5daffc3576fd7cb2d101bdf9",
+      "build_git_commit": "f0a748b951bea48e699542f39ee039efe31763b0",
+      "build_tree_sha": "a2565c0821e8d89e5daffc3576fd7cb2d101bdf9",
+      "build_dirty": false,
+      "build_rustc": "rustc 1.99.0-nightly (89c61a754 2026-07-23)",
+      "build_profile": "release",
+      "build_target": "x86_64-unknown-linux-gnu",
+      "source_binding": "bound",
+      "seal_subject_hash": "48c5082bf34ca128aa7e5e4244083563ad09dfa07b3ef223509a4fbf95a65ab2"
+    },
+    "hardware": {
+      "pci_devices": [
+        {
+          "bdf": "0000:00:00.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14d8",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": null
+        },
+        {
+          "bdf": "0000:00:00.2",
+          "class": "0x080600",
+          "vendor": "0x1022",
+          "device": "0x14d9",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": null
+        },
+        {
+          "bdf": "0000:00:01.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "0"
+        },
+        {
+          "bdf": "0000:00:01.1",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14db",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "1"
+        },
+        {
+          "bdf": "0000:00:01.2",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14db",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "2"
+        },
+        {
+          "bdf": "0000:00:02.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "3"
+        },
+        {
+          "bdf": "0000:00:02.1",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14db",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "4"
+        },
+        {
+          "bdf": "0000:00:02.2",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14db",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "5"
+        },
+        {
+          "bdf": "0000:00:03.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "6"
+        },
+        {
+          "bdf": "0000:00:04.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "7"
+        },
+        {
+          "bdf": "0000:00:08.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "8"
+        },
+        {
+          "bdf": "0000:00:08.1",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14dd",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "9"
+        },
+        {
+          "bdf": "0000:00:08.3",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14dd",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "10"
+        },
+        {
+          "bdf": "0000:00:14.0",
+          "class": "0x0c0500",
+          "vendor": "0x1022",
+          "device": "0x790b",
+          "driver": "piix4_smbus",
+          "numa_node": -1,
+          "iommu_group": "11"
+        },
+        {
+          "bdf": "0000:00:14.3",
+          "class": "0x060100",
+          "vendor": "0x1022",
+          "device": "0x790e",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "11"
+        },
+        {
+          "bdf": "0000:00:18.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e0",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.1",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e1",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.2",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e2",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.3",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e3",
+          "driver": "k10temp",
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.4",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e4",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.5",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e5",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.6",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e6",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.7",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e7",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:01:00.0",
+          "class": "0x030000",
+          "vendor": "0x10de",
+          "device": "0x2702",
+          "driver": "nvidia",
+          "numa_node": -1,
+          "iommu_group": "13"
+        },
+        {
+          "bdf": "0000:01:00.1",
+          "class": "0x040300",
+          "vendor": "0x10de",
+          "device": "0x22bb",
+          "driver": "snd_hda_intel",
+          "numa_node": -1,
+          "iommu_group": "13"
+        },
+        {
+          "bdf": "0000:02:00.0",
+          "class": "0x010802",
+          "vendor": "0xc0a9",
+          "device": "0x542b",
+          "driver": "nvme",
+          "numa_node": -1,
+          "iommu_group": "14"
+        },
+        {
+          "bdf": "0000:03:00.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f4",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "15"
+        },
+        {
+          "bdf": "0000:04:00.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "16"
+        },
+        {
+          "bdf": "0000:04:04.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "17"
+        },
+        {
+          "bdf": "0000:04:05.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "18"
+        },
+        {
+          "bdf": "0000:04:08.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "19"
+        },
+        {
+          "bdf": "0000:04:0c.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "20"
+        },
+        {
+          "bdf": "0000:04:0d.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "21"
+        },
+        {
+          "bdf": "0000:05:00.0",
+          "class": "0x010802",
+          "vendor": "0x2646",
+          "device": "0x5019",
+          "driver": "nvme",
+          "numa_node": -1,
+          "iommu_group": "16"
+        },
+        {
+          "bdf": "0000:06:00.0",
+          "class": "0x020000",
+          "vendor": "0x10ec",
+          "device": "0x8125",
+          "driver": "r8169",
+          "numa_node": -1,
+          "iommu_group": "17"
+        },
+        {
+          "bdf": "0000:09:00.0",
+          "class": "0x0c0330",
+          "vendor": "0x1022",
+          "device": "0x43fc",
+          "driver": "xhci-pci-prom21",
+          "numa_node": -1,
+          "iommu_group": "20"
+        },
+        {
+          "bdf": "0000:0a:00.0",
+          "class": "0x010601",
+          "vendor": "0x1022",
+          "device": "0x43f6",
+          "driver": "ahci",
+          "numa_node": -1,
+          "iommu_group": "21"
+        },
+        {
+          "bdf": "0000:0b:00.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2421",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "22"
+        },
+        {
+          "bdf": "0000:0c:00.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2423",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "23"
+        },
+        {
+          "bdf": "0000:0c:01.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2423",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "24"
+        },
+        {
+          "bdf": "0000:0c:02.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2423",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "25"
+        },
+        {
+          "bdf": "0000:0c:03.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2423",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "26"
+        },
+        {
+          "bdf": "0000:71:00.0",
+          "class": "0x0c0330",
+          "vendor": "0x1b21",
+          "device": "0x2426",
+          "driver": "xhci_hcd",
+          "numa_node": -1,
+          "iommu_group": "25"
+        },
+        {
+          "bdf": "0000:72:00.0",
+          "class": "0x0c0340",
+          "vendor": "0x1b21",
+          "device": "0x2425",
+          "driver": "thunderbolt",
+          "numa_node": -1,
+          "iommu_group": "26"
+        },
+        {
+          "bdf": "0000:73:00.0",
+          "class": "0x130000",
+          "vendor": "0x1022",
+          "device": "0x14de",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "27"
+        },
+        {
+          "bdf": "0000:73:00.2",
+          "class": "0x108000",
+          "vendor": "0x1022",
+          "device": "0x1649",
+          "driver": "ccp",
+          "numa_node": -1,
+          "iommu_group": "28"
+        },
+        {
+          "bdf": "0000:73:00.3",
+          "class": "0x0c0330",
+          "vendor": "0x1022",
+          "device": "0x15b6",
+          "driver": "xhci_hcd",
+          "numa_node": -1,
+          "iommu_group": "29"
+        },
+        {
+          "bdf": "0000:73:00.4",
+          "class": "0x0c0330",
+          "vendor": "0x1022",
+          "device": "0x15b7",
+          "driver": "xhci_hcd",
+          "numa_node": -1,
+          "iommu_group": "30"
+        },
+        {
+          "bdf": "0000:73:00.6",
+          "class": "0x040300",
+          "vendor": "0x1022",
+          "device": "0x15e3",
+          "driver": "snd_hda_intel",
+          "numa_node": -1,
+          "iommu_group": "31"
+        },
+        {
+          "bdf": "0000:74:00.0",
+          "class": "0x0c0330",
+          "vendor": "0x1022",
+          "device": "0x15b8",
+          "driver": "xhci_hcd",
+          "numa_node": -1,
+          "iommu_group": "32"
+        }
+      ],
+      "gpu": {
+        "vendor": null,
+        "name": null,
+        "bdf": null,
+        "compute_capability": null,
+        "memory_bytes": null,
+        "driver_version": null,
+        "runtime_version": null
+      },
+      "audio": {
+        "card": null,
+        "device": null,
+        "name": null,
+        "subdevice": null
+      }
+    },
+    "params": {
+      "universe": "vole.audio.u1",
+      "profile": "vole.audio.learned.exp2",
+      "backend": "scalar canonical learned evaluator",
+      "sample_rate_hz": null,
+      "channels": null,
+      "voices": null,
+      "quantum_frames": null,
+      "duration_secs": null,
+      "content_kind": "Phase O learned deterministic prediction"
+    },
+    "counters": {
+      "host_pcm_staging_bytes": 0,
+      "host_pcm_copy_bytes": 0,
+      "gpu_to_host_pcm_bytes": 0,
+      "endpoint_observation_bytes": 0,
+      "device_sample_block_bytes": 0,
+      "transient_compute_words": 0,
+      "host_pcm_resident_peak_bytes": 0,
+      "host_pcm_resident_integral": 0.0,
+      "endpoint_depth_frames": 0,
+      "endpoint_depth_min_frames": 18446744073709551615,
+      "endpoint_depth_max_frames": 0,
+      "quanta_submitted": 0,
+      "events_consumed": 0,
+      "xruns": 0,
+      "kernel_launches": 0,
+      "missed_deadlines": 0
+    },
+    "timing": {
+      "total_ns": null,
+      "deadline_ns": null,
+      "warmup_runs": null,
+      "run_count": null,
+      "observation_count": null,
+      "tail": null
+    },
+    "provenance": {
+      "reference_hash": "e134f0c3457a9593e8ab56d071e142c2d3c03a60280c9434e62eca0c433cbcf2",
+      "backend_hash": null,
+      "endpoint_hash": null,
+      "gpu_artifact_hash": null,
+      "source_hash": null,
+      "corpus_hash": null,
+      "table_hashes": [],
+      "benchmark_order": [],
+      "exact_equality": null
+    },
+    "endpoint": {
+      "directness": null,
+      "topology": null,
+      "registered_range": null,
+      "registration_result": null,
+      "device_pointer": null,
+      "synchronization_mechanism": null,
+      "fence_sync_evidence": null,
+      "coherency_assumptions": null,
+      "hidden_staging_investigation": null,
+      "endpoint_clock": null
+    },
+    "energy": null,
+    "trace": null,
+    "limitations": [
+      "learned prediction is an experimental profile: it does not change u1/v1, the literal fallback remains mandatory, and negative learned results are preserved rather than hidden"
+    ],
+    "extras": {
+      "codecs": [
+        {
+          "id": 0,
+          "name": "dense_i32",
+          "family": "exp1_frozen"
+        },
+        {
+          "id": 1,
+          "name": "sparse_delta",
+          "family": "exp1_frozen"
+        },
+        {
+          "id": 2,
+          "name": "zigzag_varint",
+          "family": "exp1_frozen"
+        },
+        {
+          "id": 3,
+          "name": "block_rice",
+          "family": "exp1_frozen"
+        },
+        {
+          "id": 4,
+          "name": "predictive_rice",
+          "family": "exp1_frozen"
+        },
+        {
+          "id": 5,
+          "name": "literal_residual",
+          "family": "exp1_frozen"
+        },
+        {
+          "id": 6,
+          "name": "partition_rice",
+          "family": "exp2"
+        },
+        {
+          "id": 7,
+          "name": "core_tail_rice",
+          "family": "exp2"
+        },
+        {
+          "id": 8,
+          "name": "run_length_rice",
+          "family": "exp2"
+        },
+        {
+          "id": 9,
+          "name": "zero_mask_rice",
+          "family": "exp2"
+        },
+        {
+          "id": 10,
+          "name": "byte_plane",
+          "family": "exp2"
+        },
+        {
+          "id": 11,
+          "name": "context_rans",
+          "family": "exp2"
+        }
+      ],
+      "corpus_residuals": [
+        {
+          "id": "sine-440",
+          "class": "pure_tone",
+          "selected": "predictive_rice",
+          "selected_bytes": 4293,
+          "v1_bytes": 4293
+        },
+        {
+          "id": "triangle-220",
+          "class": "periodic",
+          "selected": "predictive_rice",
+          "selected_bytes": 7212,
+          "v1_bytes": 7212
+        },
+        {
+          "id": "square-mix",
+          "class": "periodic_rich",
+          "selected": "predictive_rice",
+          "selected_bytes": 5261,
+          "v1_bytes": 5261
+        },
+        {
+          "id": "stereo-unison",
+          "class": "identical_stereo",
+          "selected": "predictive_rice",
+          "selected_bytes": 9163,
+          "v1_bytes": 9163
+        },
+        {
+          "id": "vibrato-tone",
+          "class": "quasi_periodic",
+          "selected": "predictive_rice",
+          "selected_bytes": 4972,
+          "v1_bytes": 4972
+        },
+        {
+          "id": "detuned-partials",
+          "class": "quasi_periodic",
+          "selected": "predictive_rice",
+          "selected_bytes": 4916,
+          "v1_bytes": 4916
+        },
+        {
+          "id": "pluck-decay",
+          "class": "transient_decay",
+          "selected": "predictive_rice",
+          "selected_bytes": 2982,
+          "v1_bytes": 2982
+        },
+        {
+          "id": "sparse-clicks",
+          "class": "sparse_transient",
+          "selected": "predictive_rice",
+          "selected_bytes": 7007,
+          "v1_bytes": 7007
+        }
+      ],
+      "gates": {
+        "all_codecs_exact": true,
+        "best_v2_le_best_v1": true,
+        "hostile_safe": true
+      },
+      "limitations": [
+        "PartitionRice searches a frozen length ladder (16..1024) by deterministic shortest path with per-partition Rice parameters",
+        "CoreTailRice uses a two-regime Rice with an Exp-Golomb escape and a global frozen parameter search",
+        "RunLengthRice is a VOLE-native adaptive run-length/Rice in the RLGR family; it is not bit-compatible with Malvar's RLGR",
+        "ContextRans reuses the frozen audio rANS core with a causal magnitude-bucket context and a transmitted normalized model",
+        "no codec is privileged: the selected member is always the minimum complete cost"
+      ],
+      "protocol": {
+        "protocol_schema": "vole.audio.learned.protocol.v1",
+        "schema": "vole.audio.learned.exp2.evidence.v1",
+        "profile": "vole.audio.learned.exp2",
+        "version": 1,
+        "semantic_authority": "none: a learned hypothesis is a candidate family, never truth; scalar exact closure decides acceptance"
+      },
+      "synthetic": [
+        {
+          "shape": "all_zero",
+          "values": 1024,
+          "codecs": [
+            {
+              "codec": "dense_i32",
+              "id": 0,
+              "bytes": 4097,
+              "exact": true
+            },
+            {
+              "codec": "sparse_delta",
+              "id": 1,
+              "bytes": 17,
+              "exact": true
+            },
+            {
+              "codec": "zigzag_varint",
+              "id": 2,
+              "bytes": 1025,
+              "exact": true
+            },
+            {
+              "codec": "block_rice",
+              "id": 3,
+              "bytes": 169,
+              "exact": true
+            },
+            {
+              "codec": "predictive_rice",
+              "id": 4,
+              "bytes": 169,
+              "exact": true
+            },
+            {
+              "codec": "literal_residual",
+              "id": 5,
+              "bytes": 17,
+              "exact": true
+            },
+            {
+              "codec": "partition_rice",
+              "id": 6,
+              "bytes": 144,
+              "exact": true
+            },
+            {
+              "codec": "core_tail_rice",
+              "id": 7,
+              "bytes": 139,
+              "exact": true
+            },
+            {
+              "codec": "run_length_rice",
+              "id": 8,
+              "bytes": 12,
+              "exact": true
+            },
+            {
+              "codec": "zero_mask_rice",
+              "id": 9,
+              "bytes": 13,
+              "exact": true
+            },
+            {
+              "codec": "byte_plane",
+              "id": 10,
+              "bytes": 649,
+              "exact": true
+            },
+            {
+              "codec": "context_rans",
+              "id": 11,
+              "bytes": 287,
+              "exact": true
+            }
+          ],
+          "selected": "run_length_rice",
+          "selected_bytes": 12,
+          "v1_bytes": 17,
+          "v2_le_v1": true
+        },
+        {
+          "shape": "sparse_exceptions",
+          "values": 1024,
+          "codecs": [
+            {
+              "codec": "dense_i32",
+              "id": 0,
+              "bytes": 4097,
+              "exact": true
+            },
+            {
+              "codec": "sparse_delta",
+              "id": 1,
+              "bytes": 26,
+              "exact": true
+            },
+            {
+              "codec": "zigzag_varint",
+              "id": 2,
+              "bytes": 1029,
+              "exact": true
+            },
+            {
+              "codec": "block_rice",
+              "id": 3,
+              "bytes": 272,
+              "exact": true
+            },
+            {
+              "codec": "predictive_rice",
+              "id": 4,
+              "bytes": 328,
+              "exact": true
+            },
+            {
+              "codec": "literal_residual",
+              "id": 5,
+              "bytes": 41,
+              "exact": true
+            },
+            {
+              "codec": "partition_rice",
+              "id": 6,
+              "bytes": 216,
+              "exact": true
+            },
+            {
+              "codec": "core_tail_rice",
+              "id": 7,
+              "bytes": 148,
+              "exact": true
+            },
+            {
+              "codec": "run_length_rice",
+              "id": 8,
+              "bytes": 2672,
+              "exact": true
+            },
+            {
+              "codec": "zero_mask_rice",
+              "id": 9,
+              "bytes": 22,
+              "exact": true
+            },
+            {
+              "codec": "byte_plane",
+              "id": 10,
+              "bytes": 654,
+              "exact": true
+            },
+            {
+              "codec": "context_rans",
+              "id": 11,
+              "bytes": 294,
+              "exact": true
+            }
+          ],
+          "selected": "zero_mask_rice",
+          "selected_bytes": 22,
+          "v1_bytes": 26,
+          "v2_le_v1": true
+        },
+        {
+          "shape": "sparse_runs",
+          "values": 1024,
+          "codecs": [
+            {
+              "codec": "dense_i32",
+              "id": 0,
+              "bytes": 4097,
+              "exact": true
+            },
+            {
+              "codec": "sparse_delta",
+              "id": 1,
+              "bytes": 56,
+              "exact": true
+            },
+            {
+              "codec": "zigzag_varint",
+              "id": 2,
+              "bytes": 1041,
+              "exact": true
+            },
+            {
+              "codec": "block_rice",
+              "id": 3,
+              "bytes": 703,
+              "exact": true
+            },
+            {
+              "codec": "predictive_rice",
+              "id": 4,
+              "bytes": 735,
+              "exact": true
+            },
+            {
+              "codec": "literal_residual",
+              "id": 5,
+              "bytes": 113,
+              "exact": true
+            },
+            {
+              "codec": "partition_rice",
+              "id": 6,
+              "bytes": 488,
+              "exact": true
+            },
+            {
+              "codec": "core_tail_rice",
+              "id": 7,
+              "bytes": 181,
+              "exact": true
+            },
+            {
+              "codec": "run_length_rice",
+              "id": 8,
+              "bytes": 30267,
+              "exact": true
+            },
+            {
+              "codec": "zero_mask_rice",
+              "id": 9,
+              "bytes": 51,
+              "exact": true
+            },
+            {
+              "codec": "byte_plane",
+              "id": 10,
+              "bytes": 673,
+              "exact": true
+            },
+            {
+              "codec": "context_rans",
+              "id": 11,
+              "bytes": 315,
+              "exact": true
+            }
+          ],
+          "selected": "zero_mask_rice",
+          "selected_bytes": 51,
+          "v1_bytes": 56,
+          "v2_le_v1": true
+        },
+        {
+          "shape": "dense_small",
+          "values": 1024,
+          "codecs": [
+            {
+              "codec": "dense_i32",
+              "id": 0,
+              "bytes": 4097,
+              "exact": true
+            },
+            {
+              "codec": "sparse_delta",
+              "id": 1,
+              "bytes": 1837,
+              "exact": true
+            },
+            {
+              "codec": "zigzag_varint",
+              "id": 2,
+              "bytes": 1025,
+              "exact": true
+            },
+            {
+              "codec": "block_rice",
+              "id": 3,
+              "bytes": 511,
+              "exact": true
+            },
+            {
+              "codec": "predictive_rice",
+              "id": 4,
+              "bytes": 468,
+              "exact": true
+            },
+            {
+              "codec": "literal_residual",
+              "id": 5,
+              "bytes": 10937,
+              "exact": true
+            },
+            {
+              "codec": "partition_rice",
+              "id": 6,
+              "bytes": 486,
+              "exact": true
+            },
+            {
+              "codec": "core_tail_rice",
+              "id": 7,
+              "bytes": 481,
+              "exact": true
+            },
+            {
+              "codec": "run_length_rice",
+              "id": 8,
+              "bytes": 621,
+              "exact": true
+            },
+            {
+              "codec": "zero_mask_rice",
+              "id": 9,
+              "bytes": 571,
+              "exact": true
+            },
+            {
+              "codec": "byte_plane",
+              "id": 10,
+              "bytes": 1559,
+              "exact": true
+            },
+            {
+              "codec": "context_rans",
+              "id": 11,
+              "bytes": 701,
+              "exact": true
+            }
+          ],
+          "selected": "predictive_rice",
+          "selected_bytes": 468,
+          "v1_bytes": 468,
+          "v2_le_v1": true
+        },
+        {
+          "shape": "alternating",
+          "values": 1024,
+          "codecs": [
+            {
+              "codec": "dense_i32",
+              "id": 0,
+              "bytes": 4097,
+              "exact": true
+            },
+            {
+              "codec": "sparse_delta",
+              "id": 1,
+              "bytes": 2065,
+              "exact": true
+            },
+            {
+              "codec": "zigzag_varint",
+              "id": 2,
+              "bytes": 1025,
+              "exact": true
+            },
+            {
+              "codec": "block_rice",
+              "id": 3,
+              "bytes": 361,
+              "exact": true
+            },
+            {
+              "codec": "predictive_rice",
+              "id": 4,
+              "bytes": 489,
+              "exact": true
+            },
+            {
+              "codec": "literal_residual",
+              "id": 5,
+              "bytes": 12305,
+              "exact": true
+            },
+            {
+              "codec": "partition_rice",
+              "id": 6,
+              "bytes": 336,
+              "exact": true
+            },
+            {
+              "codec": "core_tail_rice",
+              "id": 7,
+              "bytes": 331,
+              "exact": true
+            },
+            {
+              "codec": "run_length_rice",
+              "id": 8,
+              "bytes": 522,
+              "exact": true
+            },
+            {
+              "codec": "zero_mask_rice",
+              "id": 9,
+              "bytes": 338,
+              "exact": true
+            },
+            {
+              "codec": "byte_plane",
+              "id": 10,
+              "bytes": 1673,
+              "exact": true
+            },
+            {
+              "codec": "context_rans",
+              "id": 11,
+              "bytes": 479,
+              "exact": true
+            }
+          ],
+          "selected": "core_tail_rice",
+          "selected_bytes": 331,
+          "v1_bytes": 361,
+          "v2_le_v1": true
+        },
+        {
+          "shape": "heavy_tail",
+          "values": 1024,
+          "codecs": [
+            {
+              "codec": "dense_i32",
+              "id": 0,
+              "bytes": 4097,
+              "exact": true
+            },
+            {
+              "codec": "sparse_delta",
+              "id": 1,
+              "bytes": 1424,
+              "exact": true
+            },
+            {
+              "codec": "zigzag_varint",
+              "id": 2,
+              "bytes": 1058,
+              "exact": true
+            },
+            {
+              "codec": "block_rice",
+              "id": 3,
+              "bytes": 1017,
+              "exact": true
+            },
+            {
+              "codec": "predictive_rice",
+              "id": 4,
+              "bytes": 1143,
+              "exact": true
+            },
+            {
+              "codec": "literal_residual",
+              "id": 5,
+              "bytes": 8261,
+              "exact": true
+            },
+            {
+              "codec": "partition_rice",
+              "id": 6,
+              "bytes": 716,
+              "exact": true
+            },
+            {
+              "codec": "core_tail_rice",
+              "id": 7,
+              "bytes": 331,
+              "exact": true
+            },
+            {
+              "codec": "run_length_rice",
+              "id": 8,
+              "bytes": 90604,
+              "exact": true
+            },
+            {
+              "codec": "zero_mask_rice",
+              "id": 9,
+              "bytes": 863,
+              "exact": true
+            },
+            {
+              "codec": "byte_plane",
+              "id": 10,
+              "bytes": 1358,
+              "exact": true
+            },
+            {
+              "codec": "context_rans",
+              "id": 11,
+              "bytes": 455,
+              "exact": true
+            }
+          ],
+          "selected": "core_tail_rice",
+          "selected_bytes": 331,
+          "v1_bytes": 1017,
+          "v2_le_v1": true
+        },
+        {
+          "shape": "full_width_random",
+          "values": 1024,
+          "codecs": [
+            {
+              "codec": "dense_i32",
+              "id": 0,
+              "bytes": 4097,
+              "exact": true
+            },
+            {
+              "codec": "sparse_delta",
+              "id": 1,
+              "bytes": 6087,
+              "exact": true
+            },
+            {
+              "codec": "zigzag_varint",
+              "id": 2,
+              "bytes": 5047,
+              "exact": true
+            },
+            {
+              "codec": "block_rice",
+              "id": 3,
+              "bytes": 4191,
+              "exact": true
+            },
+            {
+              "codec": "predictive_rice",
+              "id": 4,
+              "bytes": 4246,
+              "exact": true
+            },
+            {
+              "codec": "literal_residual",
+              "id": 5,
+              "bytes": 12305,
+              "exact": true
+            },
+            {
+              "codec": "partition_rice",
+              "id": 6,
+              "bytes": 4181,
+              "exact": true
+            },
+            {
+              "codec": "core_tail_rice",
+              "id": 7,
+              "bytes": 4165,
+              "exact": true
+            },
+            {
+              "codec": "run_length_rice",
+              "id": 8,
+              "bytes": 115485,
+              "exact": true
+            },
+            {
+              "codec": "zero_mask_rice",
+              "id": 9,
+              "bytes": 4172,
+              "exact": true
+            },
+            {
+              "codec": "byte_plane",
+              "id": 10,
+              "bytes": 4739,
+              "exact": true
+            },
+            {
+              "codec": "context_rans",
+              "id": 11,
+              "bytes": 4383,
+              "exact": true
+            }
+          ],
+          "selected": "dense_i32",
+          "selected_bytes": 4097,
+          "v1_bytes": 4097,
+          "v2_le_v1": true
+        },
+        {
+          "shape": "extremes",
+          "values": 256,
+          "codecs": [
+            {
+              "codec": "dense_i32",
+              "id": 0,
+              "bytes": 1025,
+              "exact": true
+            },
+            {
+              "codec": "sparse_delta",
+              "id": 1,
+              "bytes": 1553,
+              "exact": true
+            },
+            {
+              "codec": "zigzag_varint",
+              "id": 2,
+              "bytes": 1281,
+              "exact": true
+            },
+            {
+              "codec": "block_rice",
+              "id": 3,
+              "bytes": 1073,
+              "exact": true
+            },
+            {
+              "codec": "predictive_rice",
+              "id": 4,
+              "bytes": 1095,
+              "exact": true
+            },
+            {
+              "codec": "literal_residual",
+              "id": 5,
+              "bytes": 3089,
+              "exact": true
+            },
+            {
+              "codec": "partition_rice",
+              "id": 6,
+              "bytes": 1072,
+              "exact": true
+            },
+            {
+              "codec": "core_tail_rice",
+              "id": 7,
+              "bytes": 1067,
+              "exact": true
+            },
+            {
+              "codec": "run_length_rice",
+              "id": 8,
+              "bytes": 124009,
+              "exact": true
+            },
+            {
+              "codec": "zero_mask_rice",
+              "id": 9,
+              "bytes": 1074,
+              "exact": true
+            },
+            {
+              "codec": "byte_plane",
+              "id": 10,
+              "bytes": 1193,
+              "exact": true
+            },
+            {
+              "codec": "context_rans",
+              "id": 11,
+              "bytes": 1279,
+              "exact": true
+            }
+          ],
+          "selected": "dense_i32",
+          "selected_bytes": 1025,
+          "v1_bytes": 1025,
+          "v2_le_v1": true
+        },
+        {
+          "shape": "constant_dc",
+          "values": 512,
+          "codecs": [
+            {
+              "codec": "dense_i32",
+              "id": 0,
+              "bytes": 2049,
+              "exact": true
+            },
+            {
+              "codec": "sparse_delta",
+              "id": 1,
+              "bytes": 2065,
+              "exact": true
+            },
+            {
+              "codec": "zigzag_varint",
+              "id": 2,
+              "bytes": 1537,
+              "exact": true
+            },
+            {
+              "codec": "block_rice",
+              "id": 3,
+              "bytes": 1241,
+              "exact": true
+            },
+            {
+              "codec": "predictive_rice",
+              "id": 4,
+              "bytes": 145,
+              "exact": true
+            },
+            {
+              "codec": "literal_residual",
+              "id": 5,
+              "bytes": 6161,
+              "exact": true
+            },
+            {
+              "codec": "partition_rice",
+              "id": 6,
+              "bytes": 1232,
+              "exact": true
+            },
+            {
+              "codec": "core_tail_rice",
+              "id": 7,
+              "bytes": 1227,
+              "exact": true
+            },
+            {
+              "codec": "run_length_rice",
+              "id": 8,
+              "bytes": 8990,
+              "exact": true
+            },
+            {
+              "codec": "zero_mask_rice",
+              "id": 9,
+              "bytes": 1234,
+              "exact": true
+            },
+            {
+              "codec": "byte_plane",
+              "id": 10,
+              "bytes": 1865,
+              "exact": true
+            },
+            {
+              "codec": "context_rans",
+              "id": 11,
+              "bytes": 1375,
+              "exact": true
+            }
+          ],
+          "selected": "predictive_rice",
+          "selected_bytes": 145,
+          "v1_bytes": 145,
+          "v2_le_v1": true
+        },
+        {
+          "shape": "ramp",
+          "values": 512,
+          "codecs": [
+            {
+              "codec": "dense_i32",
+              "id": 0,
+              "bytes": 2049,
+              "exact": true
+            },
+            {
+              "codec": "sparse_delta",
+              "id": 1,
+              "bytes": 1619,
+              "exact": true
+            },
+            {
+              "codec": "zigzag_varint",
+              "id": 2,
+              "bytes": 1091,
+              "exact": true
+            },
+            {
+              "codec": "block_rice",
+              "id": 3,
+              "bytes": 941,
+              "exact": true
+            },
+            {
+              "codec": "predictive_rice",
+              "id": 4,
+              "bytes": 550,
+              "exact": true
+            },
+            {
+              "codec": "literal_residual",
+              "id": 5,
+              "bytes": 6161,
+              "exact": true
+            },
+            {
+              "codec": "partition_rice",
+              "id": 6,
+              "bytes": 946,
+              "exact": true
+            },
+            {
+              "codec": "core_tail_rice",
+              "id": 7,
+              "bytes": 952,
+              "exact": true
+            },
+            {
+              "codec": "run_length_rice",
+              "id": 8,
+              "bytes": 1537,
+              "exact": true
+            },
+            {
+              "codec": "zero_mask_rice",
+              "id": 9,
+              "bytes": 959,
+              "exact": true
+            },
+            {
+              "codec": "byte_plane",
+              "id": 10,
+              "bytes": 1339,
+              "exact": true
+            },
+            {
+              "codec": "context_rans",
+              "id": 11,
+              "bytes": 1173,
+              "exact": true
+            }
+          ],
+          "selected": "predictive_rice",
+          "selected_bytes": 550,
+          "v1_bytes": 550,
+          "v2_le_v1": true
+        },
+        {
+          "shape": "changepoint",
+          "values": 512,
+          "codecs": [
+            {
+              "codec": "dense_i32",
+              "id": 0,
+              "bytes": 2049,
+              "exact": true
+            },
+            {
+              "codec": "sparse_delta",
+              "id": 1,
+              "bytes": 1383,
+              "exact": true
+            },
+            {
+              "codec": "zigzag_varint",
+              "id": 2,
+              "bytes": 1025,
+              "exact": true
+            },
+            {
+              "codec": "block_rice",
+              "id": 3,
+              "bytes": 761,
+              "exact": true
+            },
+            {
+              "codec": "predictive_rice",
+              "id": 4,
+              "bytes": 521,
+              "exact": true
+            },
+            {
+              "codec": "literal_residual",
+              "id": 5,
+              "bytes": 5141,
+              "exact": true
+            },
+            {
+              "codec": "partition_rice",
+              "id": 6,
+              "bytes": 755,
+              "exact": true
+            },
+            {
+              "codec": "core_tail_rice",
+              "id": 7,
+              "bytes": 1305,
+              "exact": true
+            },
+            {
+              "codec": "run_length_rice",
+              "id": 8,
+              "bytes": 25070,
+              "exact": true
+            },
+            {
+              "codec": "zero_mask_rice",
+              "id": 9,
+              "bytes": 1017,
+              "exact": true
+            },
+            {
+              "codec": "byte_plane",
+              "id": 10,
+              "bytes": 1268,
+              "exact": true
+            },
+            {
+              "codec": "context_rans",
+              "id": 11,
+              "bytes": 933,
+              "exact": true
+            }
+          ],
+          "selected": "predictive_rice",
+          "selected_bytes": 521,
+          "v1_bytes": 521,
+          "v2_le_v1": true
+        }
+      ]
+    }
+  },
+  "receipt_sha256": "b72875a708d0d8e4853d0994394ba69ac818f8690bf519cf8f7e7335752801f2"
+}
