@@ -102,6 +102,20 @@ fn model_components(m: &LearnedModel) -> (u64, u64, u64, u64, u64, u64) {
             let bias = b.min(len - weights);
             (weights, bias, 0, 0, 0, 0)
         }
+        LearnedModel::AnalyticTransfer(t) => {
+            let len = t.canonical_bytes().len() as u64;
+            let (w, b) = if t.has_correction {
+                (
+                    (t.correction.weights.len() as u64) * 2,
+                    (t.correction.bias.len() as u64) * 4,
+                )
+            } else {
+                (0, 0)
+            };
+            let weights = w.min(len);
+            let bias = b.min(len - weights);
+            (weights, bias, 0, 0, 0, 0)
+        }
         LearnedModel::Segmented(s) => {
             let mut w = 0u64;
             let mut b = 0u64;

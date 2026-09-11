@@ -12,6 +12,7 @@
 //! training/fitting path uses floating point and host facilities.
 
 pub mod accounting;
+pub mod analytical;
 pub mod arithmetic;
 pub mod corpus;
 pub mod finite_field;

@@ -53,7 +53,7 @@ cells; doing so would be benchmark gaming.
 | G | Optimizer v2 (multiscale + beam + memo) | `learned::train::optimizer2` | `learned-exp2-mechanisms` | **implemented** |
 | H | Context mixture + backward adaptation | — | — | pending |
 | I | Hierarchical residual prediction | `learned::hierarchy`, `learned::train::hierarchy` | `learned-exp2-mechanisms` | **implemented** |
-| J | Transfer v2 (analytic-first) | — | — | pending |
+| J | Transfer v2 (analytic-first) | `learned::analytical`, `courts::learned_exp2_transfer` | `learned-exp2-transfer` | **implemented** |
 | K | Real + held-out Mode-C corpus | — | — | pending |
 | L | Stronger external baselines | `baseline::wavpack` | — | **implemented (WavPack)** |
 
@@ -82,6 +82,7 @@ unit tests.
 | `learned-exp2-baseline` | `3bd61665b214a0bb85e3eee311bf598cbcb7f76e94cc646c057406897682f111` |
 | `learned-residual-codec2` | `e134f0c3457a9593e8ab56d071e142c2d3c03a60280c9434e62eca0c433cbcf2` |
 | `learned-exp2-mechanisms` | `4166a0c141bf6d926a7e5ddac1907ba6a87292d4dd54c342536bb9c6be53ea4f` |
+| `learned-exp2-transfer` | `a43ec91fbb31efd9e585e6cfaaa3fefe3bc6e8381aec7049f508cc3d212d265a` |
 
 The frozen Exp1 court `learned-residual-codec` still reproduces its sealed hash
 `49f8d5c6…` after the Exp2 changes, so Exp1 is provably unperturbed.
@@ -109,14 +110,36 @@ multichannel win: reversible mid/side lifting collapses identical stereo to
 1 443 B versus 9 327 B for the dense stereo FIR and 15 053 B for the best
 non-learned baseline.
 
+## Measured analytic-first transfer results (first run)
+
+The analytic-first decomposition does the right thing on both ends of the
+spectrum (court `learned-exp2-transfer`):
+
+| pair | transform | analytic-only | analytic+correction | winner |
+| ---- | --------- | ------------- | ------------------- | ------ |
+| `identity` | identity | **197 B** | 226 B | analytic |
+| `delay-13` | delay | **197 B** | 226 B | analytic |
+| `gain-0.5` | fixed gain | **1 082 B** | 1 111 B | analytic |
+| `affine` | affine | **1 082 B** | 1 111 B | analytic |
+| `fir3` | FIR | 9 223 B | **3 590 B** | correction |
+| `iir1` | IIR | 9 810 B | **9 183 B** | correction |
+| `room` | convolution | 9 228 B | **9 176 B** | correction |
+| `bandlimit-b0.25` | bandwidth limit | 9 391 B | **8 007 B** | correction |
+| `procedural-to-sampled` | procedural manifestation | 9 448 B | **6 016 B** | correction |
+
+Trivial relations deliberately stay analytic (the learned correction is larger
+and is rejected); complex deterministic relations earn a learned correction.
+This is the intended separation between analytic syntax and learning.
+
 ## Honest limitations (recorded, not hidden)
 
-* Seals C, D, E, F, G and I are implemented with unit tests and covered by the
-  `learned-exp2-mechanisms` court, but no new `seal verify` receipt matrix has
-  been written yet: the Phase M/N batteries were not re-run in this change set.
-* Seals H (context mixture + backward adaptation), J (transfer v2) and K
-  (real + held-out Mode-C corpus) are **not implemented** in this change set;
-  they remain the declared remainder of the Exp2 sequence.
+* Seals C, D, E, F, G, I and J are implemented with unit tests and covered by
+  the `learned-exp2-mechanisms` / `learned-exp2-transfer` courts, but no new
+  `seal verify` receipt matrix has been written yet: the Phase M/N batteries
+  were not re-run in this change set.
+* Seal H (context mixture + backward adaptation) and Seal K (real + held-out
+  Mode-C corpus) are **not implemented** in this change set; they remain the
+  declared remainder of the Exp2 sequence.
 * `RunLengthRice` is a VOLE-native adaptive run-length/Rice design; it is in the
   RLGR family but is not bit-compatible with Malvar's RLGR1.
 * Sparse and long-term prediction are mono-first in this build; multichannel

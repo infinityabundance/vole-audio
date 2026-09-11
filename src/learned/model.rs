@@ -38,6 +38,8 @@ pub enum LearnedModel {
     Multichannel(crate::learned::multichannel::MultichannelPredictor),
     /// A cascade of stage predictors over successive residuals (Exp2).
     Hierarchical(crate::learned::hierarchy::HierarchicalPredictor),
+    /// An analytic source transform plus an optional learned correction (Exp2).
+    AnalyticTransfer(crate::learned::analytical::AnalyticTransfer),
 }
 
 impl LearnedModel {
@@ -53,6 +55,7 @@ impl LearnedModel {
             LearnedModel::LongTerm(_) => 6,
             LearnedModel::Multichannel(_) => 7,
             LearnedModel::Hierarchical(_) => 8,
+            LearnedModel::AnalyticTransfer(_) => 9,
         }
     }
 
@@ -68,6 +71,7 @@ impl LearnedModel {
             LearnedModel::LongTerm(_) => "long_term",
             LearnedModel::Multichannel(_) => "multichannel",
             LearnedModel::Hierarchical(_) => "hierarchical",
+            LearnedModel::AnalyticTransfer(_) => "analytic_transfer",
         }
     }
 
@@ -83,6 +87,7 @@ impl LearnedModel {
             LearnedModel::LongTerm(p) => p.validate(),
             LearnedModel::Multichannel(p) => p.validate(),
             LearnedModel::Hierarchical(p) => p.validate(),
+            LearnedModel::AnalyticTransfer(p) => p.validate(),
         }
     }
 
@@ -98,6 +103,7 @@ impl LearnedModel {
             LearnedModel::LongTerm(p) => p.channels,
             LearnedModel::Multichannel(p) => p.channels,
             LearnedModel::Hierarchical(p) => p.channels,
+            LearnedModel::AnalyticTransfer(p) => p.channels,
         }
     }
 
@@ -113,6 +119,7 @@ impl LearnedModel {
             LearnedModel::LongTerm(p) => p.receptive_field(),
             LearnedModel::Multichannel(p) => p.receptive_field(),
             LearnedModel::Hierarchical(p) => p.receptive_field(),
+            LearnedModel::AnalyticTransfer(p) => p.receptive_field(),
         }
     }
 
@@ -128,6 +135,7 @@ impl LearnedModel {
             LearnedModel::LongTerm(p) => p.ops_per_sample(),
             LearnedModel::Multichannel(p) => p.ops_per_sample(),
             LearnedModel::Hierarchical(p) => p.ops_per_sample(),
+            LearnedModel::AnalyticTransfer(p) => p.ops_per_sample(),
         }
     }
 
@@ -143,6 +151,7 @@ impl LearnedModel {
             LearnedModel::LongTerm(p) => p.state_bytes(),
             LearnedModel::Multichannel(p) => p.state_bytes(),
             LearnedModel::Hierarchical(p) => p.state_bytes(),
+            LearnedModel::AnalyticTransfer(p) => p.state_bytes(),
         }
     }
 
@@ -158,6 +167,7 @@ impl LearnedModel {
             LearnedModel::LongTerm(p) => p.checkpoint_count(),
             LearnedModel::Multichannel(p) => p.checkpoint_count(),
             LearnedModel::Hierarchical(p) => p.checkpoint_count(),
+            LearnedModel::AnalyticTransfer(p) => p.checkpoint_count(),
         }
     }
 
@@ -173,6 +183,7 @@ impl LearnedModel {
             LearnedModel::LongTerm(p) => p.canonical_bytes(),
             LearnedModel::Multichannel(p) => p.canonical_bytes(),
             LearnedModel::Hierarchical(p) => p.canonical_bytes(),
+            LearnedModel::AnalyticTransfer(p) => p.canonical_bytes(),
         }
     }
 
@@ -207,6 +218,9 @@ impl LearnedModel {
             8 => LearnedModel::Hierarchical(
                 crate::learned::hierarchy::HierarchicalPredictor::from_canonical_bytes(bytes)?,
             ),
+            9 => LearnedModel::AnalyticTransfer(
+                crate::learned::analytical::AnalyticTransfer::from_canonical_bytes(bytes)?,
+            ),
             other => {
                 return Err(Error::new(
                     crate::error::Kind::Unsupported,
@@ -232,6 +246,7 @@ impl LearnedModel {
             LearnedModel::LongTerm(p) => p.hypothesis_all_from_source(source, frames),
             LearnedModel::Multichannel(p) => p.hypothesis_all_from_source(source, frames),
             LearnedModel::Hierarchical(p) => p.hypothesis_all_from_source(source, frames),
+            LearnedModel::AnalyticTransfer(p) => p.hypothesis_from_source(source, frames),
         }
     }
 
@@ -253,6 +268,9 @@ impl LearnedModel {
             LearnedModel::LongTerm(p) => p.evaluate_range(residual, frames, start, len),
             LearnedModel::Multichannel(p) => p.evaluate_range(residual, frames, start, len),
             LearnedModel::Hierarchical(p) => p.evaluate_range(residual, frames, start, len),
+            LearnedModel::AnalyticTransfer(_) => Err(Error::dependency(
+                "analytic transfer requires its source samples",
+            )),
         }
     }
 
@@ -268,12 +286,16 @@ impl LearnedModel {
             LearnedModel::LongTerm(p) => p.replay_frames(start),
             LearnedModel::Multichannel(p) => p.replay_frames(start),
             LearnedModel::Hierarchical(p) => p.replay_frames(start),
+            LearnedModel::AnalyticTransfer(p) => p.replay_frames(start),
         }
     }
 
     /// True when the family reads a source object (a declared dependency).
     pub const fn requires_source(&self) -> bool {
-        matches!(self, LearnedModel::Transfer(_))
+        matches!(
+            self,
+            LearnedModel::Transfer(_) | LearnedModel::AnalyticTransfer(_)
+        )
     }
 
     /// Reconstruct `[start, start+len)` exactly, supplying a transfer source
@@ -290,6 +312,12 @@ impl LearnedModel {
             LearnedModel::Transfer(t) => {
                 let s = source.ok_or_else(|| {
                     Error::dependency("transfer object requires its source samples")
+                })?;
+                t.evaluate_range_with_source(residual, s, frames, start, len)
+            }
+            LearnedModel::AnalyticTransfer(t) => {
+                let s = source.ok_or_else(|| {
+                    Error::dependency("analytic transfer object requires its source samples")
                 })?;
                 t.evaluate_range_with_source(residual, s, frames, start, len)
             }

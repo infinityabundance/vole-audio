@@ -77,6 +77,8 @@ pub mod learned_exp2_baseline;
 #[cfg(feature = "std")]
 pub mod learned_exp2_mechanisms;
 #[cfg(feature = "std")]
+pub mod learned_exp2_transfer;
+#[cfg(feature = "std")]
 pub mod learned_gpu;
 #[cfg(feature = "std")]
 pub mod learned_intrinsic;
@@ -269,6 +271,11 @@ linear prediction + long-term prediction + optimizer v2 over the frozen intrinsi
 the structural portfolio no-regression gates",
     ),
     (
+        "learned-exp2-transfer",
+        "Exp2 analytic-first transfer: identity / polarity / delay / affine analytic candidates plus \
+an optional bounded learned correction over the analytic residual, with a paired no-regression gate",
+    ),
+    (
         "learned-residual-codec2",
         "Exp2 Seal B residual codec family: PartitionRice / CoreTailRice / RunLengthRice / \
 ZeroMaskRice / BytePlane / ContextRans beside the frozen Exp1 codecs, with the structural gate \
@@ -443,6 +450,7 @@ pub fn run(name: &str, receipts_root: &Path) -> crate::error::Result<Verdict> {
         "learned-determinism" => learned_determinism::run(receipts_root),
         "learned-exp2-baseline" => learned_exp2_baseline::run(receipts_root),
         "learned-exp2-mechanisms" => learned_exp2_mechanisms::run(receipts_root),
+        "learned-exp2-transfer" => learned_exp2_transfer::run(receipts_root),
         "learned-residual-codec" => learned_residual_codec::run(receipts_root),
         "learned-residual-codec2" => learned_residual_codec2::run(receipts_root),
         "learned-linear" => learned_linear::run(receipts_root),
