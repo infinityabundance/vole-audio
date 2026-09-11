@@ -35,7 +35,7 @@ use std::path::Path;
 
 /// Frozen static-result hash (empty means "not yet frozen").
 pub const LEARNED_SPEECH_SHA256: &str =
-    "e0cdeab93d532e94f6e9c4b8551046f6e3e2eb19fd81906a55a024eda32dc461";
+    "aedcd974a12e3a51f61d88144b22722923a8c1ba9edf3a3b53b3789008617732";
 
 pub(crate) const CLIPS_PER_SPLIT: usize = 8;
 

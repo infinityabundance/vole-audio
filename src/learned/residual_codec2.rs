@@ -99,6 +99,8 @@ pub enum ResidualCodecV2 {
     SignedFsmMix = 19,
     /// Full RCM research mode: mixer followed by an ISSE stage (Seal E5).
     SignedFsmRcm = 20,
+    /// BGMC-style high/coarse arithmetic coding with a raw low remainder (Seal C0).
+    Bgmc = 21,
 }
 
 impl ResidualCodecV2 {
@@ -138,8 +140,8 @@ impl ResidualCodecV2 {
         ResidualCodecV2::ContextRans,
     ];
 
-    /// The Exp3 additions (Seal S4, E1..E5), in canonical tie order.
-    pub const ALL_V3: [ResidualCodecV2; 21] = [
+    /// The Exp3 additions (Seal S4, E1..E5, C0), in canonical tie order.
+    pub const ALL_V3: [ResidualCodecV2; 22] = [
         ResidualCodecV2::DenseI32,
         ResidualCodecV2::SparseDelta,
         ResidualCodecV2::ZigZagVarint,
@@ -161,6 +163,7 @@ impl ResidualCodecV2 {
         ResidualCodecV2::SignedFsmLag,
         ResidualCodecV2::SignedFsmMix,
         ResidualCodecV2::SignedFsmRcm,
+        ResidualCodecV2::Bgmc,
     ];
 
     /// Canonical codec identifier byte.
@@ -192,6 +195,7 @@ impl ResidualCodecV2 {
             ResidualCodecV2::SignedFsmLag => "signed_fsm_lag",
             ResidualCodecV2::SignedFsmMix => "signed_fsm_mix",
             ResidualCodecV2::SignedFsmRcm => "signed_fsm_rcm",
+            ResidualCodecV2::Bgmc => "bgmc",
         }
     }
 
@@ -219,6 +223,7 @@ impl ResidualCodecV2 {
             18 => Some(ResidualCodecV2::SignedFsmLag),
             19 => Some(ResidualCodecV2::SignedFsmMix),
             20 => Some(ResidualCodecV2::SignedFsmRcm),
+            21 => Some(ResidualCodecV2::Bgmc),
             _ => None,
         }
     }
@@ -277,6 +282,7 @@ impl ResidualCodecV2 {
             ResidualCodecV2::SignedFsmLag => encode_signed_fsm_lag(residual),
             ResidualCodecV2::SignedFsmMix => encode_signed_fsm_mix(residual),
             ResidualCodecV2::SignedFsmRcm => encode_signed_fsm_rcm(residual),
+            ResidualCodecV2::Bgmc => encode_bgmc(residual),
         }
     }
 
@@ -309,6 +315,7 @@ impl ResidualCodecV2 {
             ResidualCodecV2::SignedFsmLag => decode_signed_fsm_lag(bytes, len),
             ResidualCodecV2::SignedFsmMix => decode_signed_fsm_mix(bytes, len),
             ResidualCodecV2::SignedFsmRcm => decode_signed_fsm_rcm(bytes, len),
+            ResidualCodecV2::Bgmc => decode_bgmc(bytes, len),
         }
     }
 }
@@ -3132,6 +3139,153 @@ fn decode_signed_fsm_rcm(bytes: &[u8], len: usize) -> Result<Vec<i32>> {
     Ok(out)
 }
 
+// ---------------------------------------------------------------------------
+// BGMC-style residual codec (fourth-pass Seal C0)
+//
+// MPEG-4 ALS offers Block Gilbert-Moore Coding as an arithmetic alternative to
+// Rice: the high/coarse component of each magnitude enters a probability code
+// while the low remainder is sent raw. This clean-room realisation splits
+// `m = |r|` at a block-adaptive `shift`, arithmetic-codes the high part
+// `m >> shift` with an adaptive binary model (Exp-Golomb binarization), and
+// bypass-codes the `shift` low bits at a uniform probability, so the model's
+// capacity is spent on the structured high component rather than on
+// incompressible low bits. Exactly invertible over the whole i32 range.
+// ---------------------------------------------------------------------------
+
+/// Sign-context table size (previous sign × previous magnitude bucket).
+const BGMC_SIGN: usize = 2 * RC_BUCKETS;
+/// High-part context table size (bit position, capped).
+const BGMC_HIGH: usize = 40;
+/// Total adaptive-probability table size.
+const BGMC_SLOTS: usize = BGMC_SIGN + BGMC_HIGH;
+
+/// Choose the magnitude split for a residual from its mean magnitude.
+fn bgmc_shift(residual: &[i32]) -> u32 {
+    if residual.is_empty() {
+        return 0;
+    }
+    let sum: u128 = residual.iter().map(|&v| u128::from(v.unsigned_abs())).sum();
+    let mean = (sum / residual.len() as u128) as u64;
+    let bl = 64 - mean.max(1).leading_zeros();
+    bl.saturating_sub(2).min(24)
+}
+
+#[inline]
+fn bgmc_enc(enc: &mut RangeEncoder, probs: &mut [u16], ctx: usize, bit: u32) {
+    let p = probs[ctx];
+    enc.encode_bit(p, bit);
+    probs[ctx] = rc_adapt(p, bit);
+}
+
+#[inline]
+fn bgmc_dec(dec: &mut RangeDecoder<'_>, probs: &mut [u16], ctx: usize) -> Result<u32> {
+    let p = probs[ctx];
+    let bit = dec.decode_bit(p)?;
+    probs[ctx] = rc_adapt(p, bit);
+    Ok(bit)
+}
+
+fn encode_bgmc_with_shift(residual: &[i32], shift: u32) -> Vec<u8> {
+    let mut enc = RangeEncoder::new();
+    let mut probs = vec![RC_INIT; BGMC_SLOTS];
+    let mut prev_m: u64 = 0;
+    let mut prev_neg = 0usize;
+    for &r in residual {
+        let neg = u32::from(r < 0);
+        let m = u64::from(r.unsigned_abs());
+        let pb = rc_bucket(prev_m);
+        bgmc_enc(&mut enc, &mut probs, prev_neg * RC_BUCKETS + pb, neg);
+        // High part: Exp-Golomb(0) of `m >> shift`.
+        let high = m >> shift;
+        let v = high + 1;
+        let n = (64 - v.leading_zeros()) as usize;
+        for i in 0..n {
+            let bit = u32::from(i + 1 == n);
+            bgmc_enc(&mut enc, &mut probs, BGMC_SIGN + i.min(19), bit);
+        }
+        for j in 0..n - 1 {
+            let bit = ((v >> (n - 2 - j)) & 1) as u32;
+            bgmc_enc(&mut enc, &mut probs, BGMC_SIGN + 20 + j.min(19), bit);
+        }
+        // Low remainder: `shift` bypass bits, most significant first.
+        for i in (0..shift).rev() {
+            let bit = ((m >> i) & 1) as u32;
+            enc.encode_bit(RC_INIT, bit);
+        }
+        prev_m = m;
+        prev_neg = neg as usize;
+    }
+    let mut out = Vec::with_capacity(1);
+    out.push(shift as u8);
+    out.extend_from_slice(&enc.finish());
+    out
+}
+
+fn encode_bgmc(residual: &[i32]) -> Vec<u8> {
+    let base = bgmc_shift(residual);
+    // A tiny ladder around the estimate; the smallest payload wins.
+    let mut best: Option<Vec<u8>> = None;
+    for shift in [base.saturating_sub(2), base, (base + 2).min(24)] {
+        let candidate = encode_bgmc_with_shift(residual, shift);
+        if best.as_ref().is_none_or(|b| candidate.len() < b.len()) {
+            best = Some(candidate);
+        }
+    }
+    best.expect("bgmc always produces a candidate")
+}
+
+fn decode_bgmc(bytes: &[u8], len: usize) -> Result<Vec<i32>> {
+    let (&shift_byte, rest) = bytes
+        .split_first()
+        .ok_or_else(|| Error::malformed("bgmc stream has no shift header"))?;
+    let shift = u32::from(shift_byte);
+    if shift > 24 {
+        return Err(Error::malformed("bgmc shift out of range"));
+    }
+    let mut dec = RangeDecoder::new(rest)?;
+    let mut probs = vec![RC_INIT; BGMC_SLOTS];
+    let mut out = Vec::with_capacity(len);
+    let mut prev_m: u64 = 0;
+    let mut prev_neg = 0usize;
+    for _ in 0..len {
+        let pb = rc_bucket(prev_m);
+        let neg = bgmc_dec(&mut dec, &mut probs, prev_neg * RC_BUCKETS + pb)? != 0;
+        // High part.
+        let mut z = 0usize;
+        loop {
+            let bit = bgmc_dec(&mut dec, &mut probs, BGMC_SIGN + z.min(19))?;
+            if bit == 1 {
+                break;
+            }
+            z += 1;
+            if z > 32 {
+                return Err(Error::malformed("bgmc high part out of range"));
+            }
+        }
+        let mut v: u64 = 1;
+        for j in 0..z {
+            let bit = bgmc_dec(&mut dec, &mut probs, BGMC_SIGN + 20 + j.min(19))?;
+            v = (v << 1) | u64::from(bit);
+        }
+        let high = v - 1;
+        // Low remainder.
+        let mut low: u64 = 0;
+        for _ in 0..shift {
+            let bit = dec.decode_bit(RC_INIT)?;
+            low = (low << 1) | u64::from(bit);
+        }
+        let m = (high << shift) | low;
+        if m > (1u64 << 31) {
+            return Err(Error::malformed("bgmc magnitude exceeds i32 range"));
+        }
+        let value = if neg { -(m as i64) } else { m as i64 };
+        out.push(value as i32);
+        prev_m = m;
+        prev_neg = usize::from(neg);
+    }
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3312,6 +3466,23 @@ mod tests {
             let back = c
                 .decode(&payload, residual.len())
                 .unwrap_or_else(|e| panic!("signed_fsm_rcm: {e}"));
+            assert_eq!(back, residual);
+        }
+        let extreme = vec![i32::MIN, i32::MAX, -1, 0, 1, 2, -2, 1 << 30, -(1 << 30)];
+        let payload = c.encode(&extreme);
+        assert_eq!(c.decode(&payload, extreme.len()).unwrap(), extreme);
+    }
+
+    #[test]
+    fn bgmc_round_trips_exactly() {
+        let c = ResidualCodecV2::Bgmc;
+        assert_eq!(c.name(), "bgmc");
+        assert_eq!(ResidualCodecV2::from_id(21), Some(c));
+        for residual in sample_residuals() {
+            let payload = c.encode(&residual);
+            let back = c
+                .decode(&payload, residual.len())
+                .unwrap_or_else(|e| panic!("bgmc: {e}"));
             assert_eq!(back, residual);
         }
         let extreme = vec![i32::MIN, i32::MAX, -1, 0, 1, 2, -2, 1 << 30, -(1 << 30)];

@@ -45,7 +45,7 @@ use std::path::{Path, PathBuf};
 
 /// Frozen static-result hash (empty means "not yet frozen").
 pub const LEARNED_RESIDUAL_ENTROPY_SHA256: &str =
-    "bfa2b7b684e5947e4e1e260e7154cf47a7ebb5e47b3a68f3df77c0d9057c49a6";
+    "b0213f61247b100087c0dc0e928e282f1e02ba683f2802f5d202465deaa3cd4d";
 
 /// Maximum representative Phase-M objects (one per distinct class tuple).
 const MAX_PHASE_M_OBJECTS: usize = 12;
@@ -192,12 +192,13 @@ fn phase_m_codecs() -> Vec<ResidualCodecV2> {
 }
 
 /// The fourth-pass E-ladder codecs measured against the pre-existing family.
-const E_CODECS: [ResidualCodecV2; 5] = [
+const E_CODECS: [ResidualCodecV2; 6] = [
     ResidualCodecV2::SignedFsm,
     ResidualCodecV2::SignedFsmSse,
     ResidualCodecV2::SignedFsmLag,
     ResidualCodecV2::SignedFsmMix,
     ResidualCodecV2::SignedFsmRcm,
+    ResidualCodecV2::Bgmc,
 ];
 
 /// Evaluate the ladder over one population with an explicit codec set.
@@ -414,6 +415,7 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
                         "signed_fsm_lag (id 18)",
                         "signed_fsm_mix (id 19)",
                         "signed_fsm_rcm (id 20)",
+                        "bgmc (id 21)",
                         "with_e minimum",
                     ],
                     "e1_codec": "forward carry-less binary range coder (LZMA arithmetic coder) with \
