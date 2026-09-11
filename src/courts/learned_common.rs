@@ -682,7 +682,7 @@ pub fn finish_exp2(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn finish_with_profile(
+pub fn finish_with_profile(
     court: &str,
     profile: crate::learned::profile::LearnedProfile,
     receipts_root: &std::path::Path,

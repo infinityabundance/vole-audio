@@ -18,6 +18,7 @@ pub mod archive;
 #[cfg(feature = "std")]
 pub mod authored;
 #[cfg(feature = "std")]
+pub mod compound;
 pub mod conventional;
 #[cfg(feature = "std")]
 pub mod corpus;
@@ -231,6 +232,12 @@ under CPU contention; uncontrolled conditions and unavailable energy are reporte
         "Phase-M aggregate: runs every Phase-M court (conventional, corpus, fullobj, flagship, \
 runtime, random-access, negative, depth, interference) in sequence and is SUPPORTED only when \
 all of them are",
+    ),
+    (
+        "compound",
+        "Native procedural composition (optimization Track A, experimental profile \
+vole.audio.compound.exp1): known constructions materialized exactly and priced against the literal \
+floor, FLAC and the bounded VOLE inverse compiler",
     ),
     (
         "archive",
@@ -475,6 +482,7 @@ pub fn run(name: &str, receipts_root: &Path) -> crate::error::Result<Verdict> {
         "learned-inverse" => learned_inverse::run(receipts_root),
         "learned" => learned::run(receipts_root),
         "all" => all::run(receipts_root),
+        "compound" => compound::run(receipts_root),
         "archive" => archive::run(receipts_root),
         "transport" => transport::run(receipts_root),
         "phase-n" => phase_n::run(receipts_root),

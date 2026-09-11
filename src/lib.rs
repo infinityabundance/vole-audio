@@ -73,6 +73,8 @@ pub mod backend;
 #[cfg(feature = "std")]
 pub mod baseline;
 #[cfg(feature = "std")]
+pub mod compound;
+#[cfg(feature = "std")]
 pub mod corpus;
 #[cfg(feature = "std")]
 pub mod courts;
