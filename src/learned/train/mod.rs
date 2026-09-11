@@ -10,6 +10,7 @@
 //! passes) is used instead, and only for the vocabulary that already has courts.
 
 pub mod finite_field;
+pub mod hierarchy;
 pub mod linear;
 pub mod ltp;
 pub mod multichannel;

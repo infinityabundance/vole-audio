@@ -36,6 +36,8 @@ pub enum LearnedModel {
     LongTerm(crate::learned::ltp::LongTermPredictor),
     /// A reversible channel transform plus per-component predictors (Exp2).
     Multichannel(crate::learned::multichannel::MultichannelPredictor),
+    /// A cascade of stage predictors over successive residuals (Exp2).
+    Hierarchical(crate::learned::hierarchy::HierarchicalPredictor),
 }
 
 impl LearnedModel {
@@ -50,6 +52,7 @@ impl LearnedModel {
             LearnedModel::SparseLinear(_) => 5,
             LearnedModel::LongTerm(_) => 6,
             LearnedModel::Multichannel(_) => 7,
+            LearnedModel::Hierarchical(_) => 8,
         }
     }
 
@@ -64,6 +67,7 @@ impl LearnedModel {
             LearnedModel::SparseLinear(_) => "sparse_linear",
             LearnedModel::LongTerm(_) => "long_term",
             LearnedModel::Multichannel(_) => "multichannel",
+            LearnedModel::Hierarchical(_) => "hierarchical",
         }
     }
 
@@ -78,6 +82,7 @@ impl LearnedModel {
             LearnedModel::SparseLinear(p) => p.validate(),
             LearnedModel::LongTerm(p) => p.validate(),
             LearnedModel::Multichannel(p) => p.validate(),
+            LearnedModel::Hierarchical(p) => p.validate(),
         }
     }
 
@@ -92,6 +97,7 @@ impl LearnedModel {
             LearnedModel::SparseLinear(p) => p.channels,
             LearnedModel::LongTerm(p) => p.channels,
             LearnedModel::Multichannel(p) => p.channels,
+            LearnedModel::Hierarchical(p) => p.channels,
         }
     }
 
@@ -106,6 +112,7 @@ impl LearnedModel {
             LearnedModel::SparseLinear(p) => p.receptive_field(),
             LearnedModel::LongTerm(p) => p.receptive_field(),
             LearnedModel::Multichannel(p) => p.receptive_field(),
+            LearnedModel::Hierarchical(p) => p.receptive_field(),
         }
     }
 
@@ -120,6 +127,7 @@ impl LearnedModel {
             LearnedModel::SparseLinear(p) => p.ops_per_sample(),
             LearnedModel::LongTerm(p) => p.ops_per_sample(),
             LearnedModel::Multichannel(p) => p.ops_per_sample(),
+            LearnedModel::Hierarchical(p) => p.ops_per_sample(),
         }
     }
 
@@ -134,6 +142,7 @@ impl LearnedModel {
             LearnedModel::SparseLinear(p) => p.state_bytes(),
             LearnedModel::LongTerm(p) => p.state_bytes(),
             LearnedModel::Multichannel(p) => p.state_bytes(),
+            LearnedModel::Hierarchical(p) => p.state_bytes(),
         }
     }
 
@@ -148,6 +157,7 @@ impl LearnedModel {
             LearnedModel::SparseLinear(p) => p.checkpoint_count(),
             LearnedModel::LongTerm(p) => p.checkpoint_count(),
             LearnedModel::Multichannel(p) => p.checkpoint_count(),
+            LearnedModel::Hierarchical(p) => p.checkpoint_count(),
         }
     }
 
@@ -162,6 +172,7 @@ impl LearnedModel {
             LearnedModel::SparseLinear(p) => p.canonical_bytes(),
             LearnedModel::LongTerm(p) => p.canonical_bytes(),
             LearnedModel::Multichannel(p) => p.canonical_bytes(),
+            LearnedModel::Hierarchical(p) => p.canonical_bytes(),
         }
     }
 
@@ -193,6 +204,9 @@ impl LearnedModel {
             7 => LearnedModel::Multichannel(
                 crate::learned::multichannel::MultichannelPredictor::from_canonical_bytes(bytes)?,
             ),
+            8 => LearnedModel::Hierarchical(
+                crate::learned::hierarchy::HierarchicalPredictor::from_canonical_bytes(bytes)?,
+            ),
             other => {
                 return Err(Error::new(
                     crate::error::Kind::Unsupported,
@@ -217,6 +231,7 @@ impl LearnedModel {
             LearnedModel::SparseLinear(p) => p.hypothesis_all_from_source(source, frames),
             LearnedModel::LongTerm(p) => p.hypothesis_all_from_source(source, frames),
             LearnedModel::Multichannel(p) => p.hypothesis_all_from_source(source, frames),
+            LearnedModel::Hierarchical(p) => p.hypothesis_all_from_source(source, frames),
         }
     }
 
@@ -237,6 +252,7 @@ impl LearnedModel {
             LearnedModel::SparseLinear(p) => p.evaluate_range(residual, frames, start, len),
             LearnedModel::LongTerm(p) => p.evaluate_range(residual, frames, start, len),
             LearnedModel::Multichannel(p) => p.evaluate_range(residual, frames, start, len),
+            LearnedModel::Hierarchical(p) => p.evaluate_range(residual, frames, start, len),
         }
     }
 
@@ -251,6 +267,7 @@ impl LearnedModel {
             LearnedModel::SparseLinear(p) => p.replay_frames(start),
             LearnedModel::LongTerm(p) => p.replay_frames(start),
             LearnedModel::Multichannel(p) => p.replay_frames(start),
+            LearnedModel::Hierarchical(p) => p.replay_frames(start),
         }
     }
 
