@@ -95,6 +95,8 @@ pub enum ResidualCodecV2 {
     SignedFsmSse = 17,
     /// SSE/APM coding with a decoder-visible matched-lag context (Seal E3).
     SignedFsmLag = 18,
+    /// PAQ-light logistic mixture of six context experts (Seal E4).
+    SignedFsmMix = 19,
 }
 
 impl ResidualCodecV2 {
@@ -134,8 +136,8 @@ impl ResidualCodecV2 {
         ResidualCodecV2::ContextRans,
     ];
 
-    /// The Exp3 additions (Seal S4, E1, E2, E3), in canonical tie order.
-    pub const ALL_V3: [ResidualCodecV2; 19] = [
+    /// The Exp3 additions (Seal S4, E1..E4), in canonical tie order.
+    pub const ALL_V3: [ResidualCodecV2; 20] = [
         ResidualCodecV2::DenseI32,
         ResidualCodecV2::SparseDelta,
         ResidualCodecV2::ZigZagVarint,
@@ -155,6 +157,7 @@ impl ResidualCodecV2 {
         ResidualCodecV2::SignedFsm,
         ResidualCodecV2::SignedFsmSse,
         ResidualCodecV2::SignedFsmLag,
+        ResidualCodecV2::SignedFsmMix,
     ];
 
     /// Canonical codec identifier byte.
@@ -184,6 +187,7 @@ impl ResidualCodecV2 {
             ResidualCodecV2::SignedFsm => "signed_fsm",
             ResidualCodecV2::SignedFsmSse => "signed_fsm_sse",
             ResidualCodecV2::SignedFsmLag => "signed_fsm_lag",
+            ResidualCodecV2::SignedFsmMix => "signed_fsm_mix",
         }
     }
 
@@ -209,6 +213,7 @@ impl ResidualCodecV2 {
             16 => Some(ResidualCodecV2::SignedFsm),
             17 => Some(ResidualCodecV2::SignedFsmSse),
             18 => Some(ResidualCodecV2::SignedFsmLag),
+            19 => Some(ResidualCodecV2::SignedFsmMix),
             _ => None,
         }
     }
@@ -265,6 +270,7 @@ impl ResidualCodecV2 {
             ResidualCodecV2::SignedFsm => encode_signed_fsm(residual),
             ResidualCodecV2::SignedFsmSse => encode_signed_fsm_sse(residual),
             ResidualCodecV2::SignedFsmLag => encode_signed_fsm_lag(residual),
+            ResidualCodecV2::SignedFsmMix => encode_signed_fsm_mix(residual),
         }
     }
 
@@ -295,6 +301,7 @@ impl ResidualCodecV2 {
             ResidualCodecV2::SignedFsm => decode_signed_fsm(bytes, len),
             ResidualCodecV2::SignedFsmSse => decode_signed_fsm_sse(bytes, len),
             ResidualCodecV2::SignedFsmLag => decode_signed_fsm_lag(bytes, len),
+            ResidualCodecV2::SignedFsmMix => decode_signed_fsm_mix(bytes, len),
         }
     }
 }
@@ -2743,6 +2750,196 @@ fn decode_signed_fsm_impl(bytes: &[u8], len: usize, kind: Ecoder) -> Result<Vec<
     Ok(out)
 }
 
+// ---------------------------------------------------------------------------
+// PAQ-light residual context mixer (fourth-pass Seal E4)
+//
+// Six context experts each predict the current residual bit; their predictions
+// are combined by an integer logistic mixer whose weights are trained online to
+// minimize coding loss, then the mixed probability drives the same range coder.
+// The mixer optimizes `-log P(bit)` (bits), not sample MSE, and every expert and
+// weight update is decoder-visible integer arithmetic.
+// ---------------------------------------------------------------------------
+
+/// Number of mixer experts.
+const MIX_EXPERTS: usize = 6;
+/// Flattened expert probability-table size.
+const MIX_TOTAL: usize = 192 + 48 + 6 + 15 + 204 + 272;
+/// Flattened offsets of each expert table.
+const MIX_OFFSETS: [usize; MIX_EXPERTS] = [0, 192, 240, 246, 261, 465];
+/// Mixer weight learning-rate shift.
+const MIX_SHIFT: u32 = 14;
+/// Mixer weight bound.
+const MIX_WMAX: i32 = 1 << 20;
+
+/// The six expert indices for one residual bit.
+#[inline]
+fn mix_indices(
+    phase: usize,
+    tpos: usize,
+    pb: usize,
+    prev_neg: usize,
+    prev_state: usize,
+    prefix2: usize,
+    lag_state: usize,
+) -> [usize; MIX_EXPERTS] {
+    [
+        phase * 64 + tpos.min(63),
+        phase * RC_BUCKETS + pb,
+        phase * 2 + prev_neg,
+        phase * RC_FSM_STATES + prev_state,
+        (phase * 4 + prefix2) * LAG_STATES + lag_state,
+        pb * LAG_STATES + lag_state,
+    ]
+}
+
+/// Predict: mix the experts, returning the coded probability and the per-expert
+/// stretched predictions (for the later weight update).
+#[inline]
+fn mix_predict(
+    probs: &[u16],
+    w: &[i32; MIX_EXPERTS],
+    idxs: &[usize; MIX_EXPERTS],
+) -> (u16, [i32; MIX_EXPERTS]) {
+    let mut sts = [0i32; MIX_EXPERTS];
+    let mut dot: i64 = 0;
+    for k in 0..MIX_EXPERTS {
+        let i = MIX_OFFSETS[k] + idxs[k];
+        let st = i32::from(stretch()[probs[i] as usize]);
+        sts[k] = st;
+        dot += i64::from(w[k]) * i64::from(st);
+    }
+    let mixed = (dot >> 16).clamp(-2047, 2047) as i32;
+    let p0 = squash(mixed).clamp(1, 4095) as u16;
+    (p0, sts)
+}
+
+/// Update the experts and mixer weights after the bit is known.
+///
+/// The weight update is the logistic-gradient step `w += lr · (target − p) · st`
+/// with the error in 12-bit probability units (never stretch units).
+#[inline]
+fn mix_update(
+    probs: &mut [u16],
+    w: &mut [i32; MIX_EXPERTS],
+    idxs: &[usize; MIX_EXPERTS],
+    sts: &[i32; MIX_EXPERTS],
+    p0: u16,
+    bit: u32,
+) {
+    for k in 0..MIX_EXPERTS {
+        let i = MIX_OFFSETS[k] + idxs[k];
+        probs[i] = rc_adapt(probs[i], bit);
+    }
+    let target: i32 = if bit == 0 { 4095 } else { 0 };
+    let err = target - i32::from(p0);
+    for k in 0..MIX_EXPERTS {
+        w[k] = (w[k] + ((err * sts[k]) >> MIX_SHIFT)).clamp(-MIX_WMAX, MIX_WMAX);
+    }
+}
+
+fn encode_signed_fsm_mix(residual: &[i32]) -> Vec<u8> {
+    let lag = choose_lag(residual);
+    let mut out = Vec::new();
+    out.push(lag as u8);
+    let mut enc = RangeEncoder::new();
+    let mut probs = vec![RC_INIT; MIX_TOTAL];
+    let mut w = [65536 / MIX_EXPERTS as i32; MIX_EXPERTS];
+    let mut prev_m: u64 = 0;
+    let mut prev_state = 0usize;
+    let mut prev_neg = 0usize;
+    for (t, &r) in residual.iter().enumerate() {
+        let neg = u32::from(r < 0);
+        let m = u64::from(r.unsigned_abs());
+        let pb = rc_bucket(prev_m);
+        let ls = lag_state_for(residual, t, lag);
+        let sign_ctx = mix_indices(0, 0, pb, prev_neg, prev_state, 0, ls);
+        let (p0, sts) = mix_predict(&probs, &w, &sign_ctx);
+        enc.encode_bit(p0, neg);
+        mix_update(&mut probs, &mut w, &sign_ctx, &sts, p0, neg);
+        let v = m + 1;
+        let n = (64 - v.leading_zeros()) as usize;
+        for i in 0..n {
+            let bit = u32::from(i + 1 == n);
+            let idxs = mix_indices(1, i, pb, prev_neg, prev_state, 0, ls);
+            let (p0, sts) = mix_predict(&probs, &w, &idxs);
+            enc.encode_bit(p0, bit);
+            mix_update(&mut probs, &mut w, &idxs, &sts, p0, bit);
+        }
+        let mut prefix = 0usize;
+        for j in 0..n - 1 {
+            let bit = ((v >> (n - 2 - j)) & 1) as u32;
+            let idxs = mix_indices(2, j, pb, prev_neg, prev_state, prefix, ls);
+            let (p0, sts) = mix_predict(&probs, &w, &idxs);
+            enc.encode_bit(p0, bit);
+            mix_update(&mut probs, &mut w, &idxs, &sts, p0, bit);
+            prefix = ((prefix << 1) | bit as usize) & 3;
+        }
+        prev_m = m;
+        prev_state = rc_fsm_state(m);
+        prev_neg = neg as usize;
+    }
+    out.extend_from_slice(&enc.finish());
+    out
+}
+
+fn decode_signed_fsm_mix(bytes: &[u8], len: usize) -> Result<Vec<i32>> {
+    let (&lag, rest) = bytes
+        .split_first()
+        .ok_or_else(|| Error::malformed("signed/fsm mix stream has no lag header"))?;
+    let lag = u32::from(lag);
+    let mut dec = RangeDecoder::new(rest)?;
+    let mut probs = vec![RC_INIT; MIX_TOTAL];
+    let mut w = [65536 / MIX_EXPERTS as i32; MIX_EXPERTS];
+    let mut out = Vec::with_capacity(len);
+    let mut prev_m: u64 = 0;
+    let mut prev_state = 0usize;
+    let mut prev_neg = 0usize;
+    for t in 0..len {
+        let pb = rc_bucket(prev_m);
+        let ls = lag_state_for(&out, t, lag);
+        let sign_ctx = mix_indices(0, 0, pb, prev_neg, prev_state, 0, ls);
+        let (p0, sts) = mix_predict(&probs, &w, &sign_ctx);
+        let neg = dec.decode_bit(p0)? != 0;
+        mix_update(&mut probs, &mut w, &sign_ctx, &sts, p0, u32::from(neg));
+        let mut z = 0usize;
+        loop {
+            let idxs = mix_indices(1, z, pb, prev_neg, prev_state, 0, ls);
+            let (p0, sts) = mix_predict(&probs, &w, &idxs);
+            let bit = dec.decode_bit(p0)?;
+            mix_update(&mut probs, &mut w, &idxs, &sts, p0, bit);
+            if bit == 1 {
+                break;
+            }
+            z += 1;
+            if z > 32 {
+                return Err(Error::malformed("signed/fsm mix unary length out of range"));
+            }
+        }
+        let mut v: u64 = 1;
+        let mut prefix = 0usize;
+        for j in 0..z {
+            let idxs = mix_indices(2, j, pb, prev_neg, prev_state, prefix, ls);
+            let (p0, sts) = mix_predict(&probs, &w, &idxs);
+            let bit = dec.decode_bit(p0)?;
+            mix_update(&mut probs, &mut w, &idxs, &sts, p0, bit);
+            v = (v << 1) | u64::from(bit);
+            prefix = ((prefix << 1) | bit as usize) & 3;
+        }
+        let m = v - 1;
+        if m > (1u64 << 31) {
+            return Err(Error::malformed(
+                "signed/fsm mix magnitude exceeds i32 range",
+            ));
+        }
+        let value = if neg { -(m as i64) } else { m as i64 };
+        out.push(value as i32);
+        prev_m = m;
+        prev_state = rc_fsm_state(m);
+        prev_neg = usize::from(neg);
+    }
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2889,6 +3086,23 @@ mod tests {
             let back = c
                 .decode(&payload, residual.len())
                 .unwrap_or_else(|e| panic!("signed_fsm_lag: {e}"));
+            assert_eq!(back, residual);
+        }
+        let extreme = vec![i32::MIN, i32::MAX, -1, 0, 1, 2, -2, 1 << 30, -(1 << 30)];
+        let payload = c.encode(&extreme);
+        assert_eq!(c.decode(&payload, extreme.len()).unwrap(), extreme);
+    }
+
+    #[test]
+    fn signed_fsm_mix_round_trips_exactly() {
+        let c = ResidualCodecV2::SignedFsmMix;
+        assert_eq!(c.name(), "signed_fsm_mix");
+        assert_eq!(ResidualCodecV2::from_id(19), Some(c));
+        for residual in sample_residuals() {
+            let payload = c.encode(&residual);
+            let back = c
+                .decode(&payload, residual.len())
+                .unwrap_or_else(|e| panic!("signed_fsm_mix: {e}"));
             assert_eq!(back, residual);
         }
         let extreme = vec![i32::MIN, i32::MAX, -1, 0, 1, 2, -2, 1 << 30, -(1 << 30)];
