@@ -108,6 +108,8 @@ pub mod learned_residual_codec2;
 #[cfg(feature = "std")]
 pub mod learned_residual_entropy;
 #[cfg(feature = "std")]
+pub mod learned_residual_fusion;
+#[cfg(feature = "std")]
 pub mod learned_shared;
 #[cfg(feature = "std")]
 pub mod learned_speech;
@@ -347,6 +349,13 @@ the existing sign-sign adaptive family, by actual complete bytes and residual ma
 the effectiveness clips and a synthetic drifting AR(2)",
     ),
     (
+        "learned-residual-fusion",
+        "Fourth-pass Seal F0 multi-hypothesis fusion diagnostic (no format change): the plug-in
+conditional entropy H(bit | disagreement feature) of the exact S8 winner residual over a small
+exact hypothesis ensemble, measuring the upper bound before paying for a side stream or a
+closed-loop entropy coder; held-out Mode C untouched",
+    ),
+    (
         "learned-speech-trace",
         "Seal S0 diagnostic: bit-for-bit trace of the frozen B1 FLAC-5 artifact (subframe kinds, orders, precision, shift, partition order, residual payload) beside the wired three-family Exp2 VOLE byte waterfall, on the real + Mode-C corpus",
     ),
@@ -534,6 +543,7 @@ pub fn run(name: &str, receipts_root: &Path) -> crate::error::Result<Verdict> {
         "learned-residual-anatomy" => learned_residual_anatomy::run(receipts_root),
         "learned-residual-entropy" => learned_residual_entropy::run(receipts_root),
         "learned-ngsa" => learned_ngsa::run(receipts_root),
+        "learned-residual-fusion" => learned_residual_fusion::run(receipts_root),
         "learned-exp2-transfer" => learned_exp2_transfer::run(receipts_root),
         "learned-residual-codec" => learned_residual_codec::run(receipts_root),
         "learned-residual-codec2" => learned_residual_codec2::run(receipts_root),

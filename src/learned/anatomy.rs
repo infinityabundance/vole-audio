@@ -471,6 +471,49 @@ pub fn merge_into(acc: &mut Anatomy, add: &Anatomy) {
     acc.bits += add.bits;
 }
 
+/// Empirical conditional entropy of one binarized residual given one context
+/// value per residual sample, in **bits per residual sample**.
+///
+/// Uses the same frozen binarization as [`anatomy`] (sign, then Exp-Golomb(0) of
+/// `|r|`). `contexts` must be aligned with `residual`; it is the general entry
+/// point for measuring the value of a candidate decoder-visible feature (for
+/// example a multi-hypothesis disagreement bucket).
+#[allow(clippy::needless_range_loop)]
+pub fn conditional_bits_per_sample(residual: &[i32], contexts: &[u64]) -> f64 {
+    let n = residual.len();
+    if n == 0 || contexts.len() != n {
+        return 0.0;
+    }
+    let mut counts: HashMap<u64, (u64, u64)> = HashMap::new();
+    let mut total_bits = 0u64;
+    for (t, &r) in residual.iter().enumerate() {
+        let key = contexts[t];
+        let sign = u64::from(r < 0);
+        let m = u64::from(r.unsigned_abs());
+        let v = m + 1;
+        let nb = bit_length_u64(v);
+        let bits = (0..nb)
+            .map(|i| u64::from(i + 1 == nb))
+            .chain((0..nb - 1).rev().map(|i| (v >> i) & 1));
+        feed(&mut counts, key, sign);
+        total_bits += 1;
+        for b in bits {
+            feed(&mut counts, key, b);
+            total_bits += 1;
+        }
+    }
+    if total_bits == 0 {
+        return 0.0;
+    }
+    conditional_bits(&counts) * (total_bits as f64) / (n as f64)
+}
+
+/// Order-0 entropy of the same binarization, in bits per residual sample.
+pub fn order0_bits_per_sample(residual: &[i32]) -> f64 {
+    let zeros = vec![0u64; residual.len()];
+    conditional_bits_per_sample(residual, &zeros)
+}
+
 /// The bits-per-residual saved by a context relative to order-0, as a JSON
 /// object keyed by [`CONTEXT_NAMES`].
 pub fn savings_json(a: &Anatomy) -> serde_json::Value {
