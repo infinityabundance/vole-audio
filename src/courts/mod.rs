@@ -90,6 +90,8 @@ pub mod learned_inverse;
 #[cfg(feature = "std")]
 pub mod learned_linear;
 #[cfg(feature = "std")]
+pub mod learned_ngsa;
+#[cfg(feature = "std")]
 pub mod learned_quantization;
 #[cfg(feature = "std")]
 pub mod learned_random_access;
@@ -338,6 +340,13 @@ residual with the pre-E1 Exp3 family versus the Seal E1 signed/FSM adaptive bina
 untouched",
     ),
     (
+        "learned-ngsa",
+        "Fourth-pass Seal A0 natural-gradient experiment: a clean-room fixed-point NNGSA
+backward-adaptive predictor (model kind 18, preconditioned by an O(p) AR(1) inverse) against
+the existing sign-sign adaptive family, by actual complete bytes and residual magnitude, over
+the effectiveness clips and a synthetic drifting AR(2)",
+    ),
+    (
         "learned-speech-trace",
         "Seal S0 diagnostic: bit-for-bit trace of the frozen B1 FLAC-5 artifact (subframe kinds, orders, precision, shift, partition order, residual payload) beside the wired three-family Exp2 VOLE byte waterfall, on the real + Mode-C corpus",
     ),
@@ -524,6 +533,7 @@ pub fn run(name: &str, receipts_root: &Path) -> crate::error::Result<Verdict> {
         "learned-u1-wasted" => learned_u1_wasted::run(receipts_root),
         "learned-residual-anatomy" => learned_residual_anatomy::run(receipts_root),
         "learned-residual-entropy" => learned_residual_entropy::run(receipts_root),
+        "learned-ngsa" => learned_ngsa::run(receipts_root),
         "learned-exp2-transfer" => learned_exp2_transfer::run(receipts_root),
         "learned-residual-codec" => learned_residual_codec::run(receipts_root),
         "learned-residual-codec2" => learned_residual_codec2::run(receipts_root),

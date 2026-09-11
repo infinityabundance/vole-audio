@@ -56,6 +56,8 @@ pub enum LearnedModel {
     Wasted(crate::learned::wasted::WastedPredictor),
     /// A reverse-direction realisation of an inner model (Exp3, speech direction).
     Reverse(crate::learned::reverse::ReversePredictor),
+    /// A natural-gradient backward-adaptive predictor (Seal A0, NARU-inspired).
+    Ngsa(crate::learned::ngsa::NgsaPredictor),
 }
 
 impl LearnedModel {
@@ -80,6 +82,7 @@ impl LearnedModel {
             LearnedModel::PoleZero(_) => 15,
             LearnedModel::Wasted(_) => 16,
             LearnedModel::Reverse(_) => 17,
+            LearnedModel::Ngsa(_) => 18,
         }
     }
 
@@ -104,6 +107,7 @@ impl LearnedModel {
             LearnedModel::PoleZero(_) => "pole_zero",
             LearnedModel::Wasted(_) => "wasted",
             LearnedModel::Reverse(_) => "reverse",
+            LearnedModel::Ngsa(_) => "natural_gradient",
         }
     }
 
@@ -128,6 +132,7 @@ impl LearnedModel {
             LearnedModel::PoleZero(p) => p.validate(),
             LearnedModel::Wasted(p) => p.validate(),
             LearnedModel::Reverse(p) => p.validate(),
+            LearnedModel::Ngsa(p) => p.validate(),
         }
     }
 
@@ -152,6 +157,7 @@ impl LearnedModel {
             LearnedModel::PoleZero(p) => p.channels,
             LearnedModel::Wasted(p) => p.channels,
             LearnedModel::Reverse(p) => p.channels,
+            LearnedModel::Ngsa(p) => p.channels,
         }
     }
 
@@ -176,6 +182,7 @@ impl LearnedModel {
             LearnedModel::PoleZero(p) => p.receptive_field(),
             LearnedModel::Wasted(p) => p.receptive_field(),
             LearnedModel::Reverse(p) => p.receptive_field(),
+            LearnedModel::Ngsa(p) => p.receptive_field(),
         }
     }
 
@@ -200,6 +207,7 @@ impl LearnedModel {
             LearnedModel::PoleZero(p) => p.ops_per_sample(),
             LearnedModel::Wasted(p) => p.ops_per_sample(),
             LearnedModel::Reverse(p) => p.ops_per_sample(),
+            LearnedModel::Ngsa(p) => p.ops_per_sample(),
         }
     }
 
@@ -224,6 +232,7 @@ impl LearnedModel {
             LearnedModel::PoleZero(p) => p.state_bytes(),
             LearnedModel::Wasted(p) => p.state_bytes(),
             LearnedModel::Reverse(p) => p.state_bytes(),
+            LearnedModel::Ngsa(p) => p.state_bytes(),
         }
     }
 
@@ -248,6 +257,7 @@ impl LearnedModel {
             LearnedModel::PoleZero(p) => p.checkpoint_count(),
             LearnedModel::Wasted(p) => p.checkpoint_count(),
             LearnedModel::Reverse(p) => p.checkpoint_count(),
+            LearnedModel::Ngsa(p) => p.checkpoint_count(),
         }
     }
 
@@ -272,6 +282,7 @@ impl LearnedModel {
             LearnedModel::PoleZero(p) => p.canonical_bytes(),
             LearnedModel::Wasted(p) => p.canonical_bytes(),
             LearnedModel::Reverse(p) => p.canonical_bytes(),
+            LearnedModel::Ngsa(p) => p.canonical_bytes(),
         }
     }
 
@@ -335,6 +346,9 @@ impl LearnedModel {
             17 => LearnedModel::Reverse(
                 crate::learned::reverse::ReversePredictor::from_canonical_bytes(bytes)?,
             ),
+            18 => LearnedModel::Ngsa(crate::learned::ngsa::NgsaPredictor::from_canonical_bytes(
+                bytes,
+            )?),
             other => {
                 return Err(Error::new(
                     crate::error::Kind::Unsupported,
@@ -369,6 +383,7 @@ impl LearnedModel {
             LearnedModel::PoleZero(p) => p.hypothesis_all_from_source(source, frames),
             LearnedModel::Wasted(p) => p.hypothesis_all_from_source(source, frames),
             LearnedModel::Reverse(p) => p.hypothesis_all_from_source(source, frames),
+            LearnedModel::Ngsa(p) => p.hypothesis_all_from_source(source, frames),
         }
     }
 
@@ -401,6 +416,7 @@ impl LearnedModel {
             LearnedModel::PoleZero(p) => p.evaluate_range(residual, frames, start, len),
             LearnedModel::Wasted(p) => p.evaluate_range(residual, frames, start, len),
             LearnedModel::Reverse(p) => p.evaluate_range(residual, frames, start, len),
+            LearnedModel::Ngsa(p) => p.evaluate_range(residual, frames, start, len),
         }
     }
 
@@ -425,6 +441,7 @@ impl LearnedModel {
             LearnedModel::PoleZero(p) => p.replay_frames(start),
             LearnedModel::Wasted(p) => p.replay_frames(start),
             LearnedModel::Reverse(p) => p.replay_frames(start),
+            LearnedModel::Ngsa(p) => p.replay_frames(start),
         }
     }
 
