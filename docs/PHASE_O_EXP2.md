@@ -156,6 +156,22 @@ truncated to 16 384 frames of 16-bit mono speech at 16 kHz. Membership and
 canonical i32 hashes are frozen in `corpus/real_manifest.json` before the court
 runs; the audio bulk is external and not committed.
 
+**Sample-domain correction (Seal S0).** Seal K loads each decoded sample as
+`i32::from(v)`, i.e. a **sign-extended 16-bit value in the low half of `i32`**.
+This is *not* the frozen U1 s16 ingest, which is `i32 = (i16 as i32) << 16`.
+Seal K is therefore an exact comparison over a **sign-extended-i16 experimental
+domain**; its identity, manifest and hashes are preserved unchanged. A separate
+U1-domain replay with new identities lives in
+`corpus/real_manifest_u1.json` and court `learned-real-corpus-u1` (Seal S0).
+This also means FLAC's *wasted-bits* mechanism cannot explain the Seal-K result:
+the sign-extended samples have no guaranteed low zero bits.
+
+The court minimises over the **currently wired three-family real-speech
+portfolio** — a 4-tap dense ridge over the whole clip, a sparse predictor with
+up to 10 selected lags, and a 2-stage hierarchy — not the whole implemented Exp2
+profile. The precise negative is therefore: *FLAC-5 beats the wired three-family
+Exp2 real-speech portfolio on every frozen clip*.
+
 The court reports **paired** statistics (exact two-sided Wilcoxon signed-rank
 and a deterministic bootstrap 95% median-ratio CI), not aggregate bytes:
 
@@ -182,6 +198,12 @@ representation selection, never a generalization claim.
   RLGR family but is not bit-compatible with Malvar's RLGR1.
 * Sparse and long-term prediction are mono-first in this build; multichannel
   structure is handled by the dedicated reversible-lifting family (Seal F).
+* Seal K uses a **sign-extended-i16 experimental domain**, not the frozen U1 s16
+  mapping; this is recorded rather than rewritten. The U1-domain replay (court
+  `learned-real-corpus-u1`) shows VOLE loses about 3× to FLAC there because FLAC
+  strips the 16 low zero bits through wasted bits while the learned portfolio
+  does not yet exploit them. See `docs/OPTIMIZATION.md` (Seal S0) for the
+  diagnosis and the speech campaign it opens.
 * The WavPack baseline is an external row (verified to round-trip exactly) and
   has no VOLE semantic authority; SRLA and MPEG-4 ALS are recorded as
   unavailable (no reproducible implementation on this host).

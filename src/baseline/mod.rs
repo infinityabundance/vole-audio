@@ -16,6 +16,7 @@
 //! the same information-preservation problem.
 
 pub mod flac;
+pub mod flac_trace;
 pub mod reference;
 pub mod wavpack;
 
@@ -23,6 +24,7 @@ pub use flac::{
     B1_LEVEL_CONTROLS, B1_LEVEL_PRIMARY, FLAC_MAX_CHANNELS, FlacArtifact, FlacEncoding, b1_flac,
     b1_flac_artifact, b1_level_label,
 };
+pub use flac_trace::{FlacTrace, FrameTrace, SubframeKind, SubframeTrace, trace_flac};
 pub use reference::{ReferenceFlac, reference_flac};
 
 /// B0 — literal PCM: the canonical interleaved i32 bytes, uncompressed.

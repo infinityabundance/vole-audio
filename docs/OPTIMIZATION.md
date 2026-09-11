@@ -58,10 +58,64 @@ bytes:
 | max | 1 299 311 ns | 591 782 ns | **2.20×** |
 | mean | 20 769 ns | 10 087 ns | **2.06×** |
 
+## Report 3 — real-speech campaign (Seal S0 …)
+
+FLAC-5 beats the wired three-family Exp2 real-speech portfolio by ~3.6–4.6 %.
+This campaign attributes that gap with evidence before changing any codec.
+
+### Seal S0 — diagnostic (no codec change)
+
+Two new courts, both diagnostic:
+
+* `learned-speech-trace` parses the **actual** frozen B1 FLAC-5 artifact bit for
+  bit (`baseline::flac_trace`): frame-header CRC-8, frame-footer CRC-16, and a
+  full sample reconstruction that must equal the encoder's round trip. It
+  classifies every subframe and records its order, coefficient precision,
+  prediction shift, warmup/coefficient bits, residual partition order and
+  residual payload bits, beside the VOLE complete-byte waterfall.
+* `learned-real-corpus-u1` replays the portfolio under the **frozen U1 s16
+  ingest** (`i32 = i16 << 16`) with new identities/hashes in
+  `corpus/real_manifest_u1.json`.
+
+**What FLAC-5 actually does on the 16 clips.** All frames are LPC (order 4–8,
+dominant 8), coefficient precision 15, prediction shift 12–14, partitioned Rice
+with per-block partition orders up to 5. Constant and verbatim subframes are
+essentially never selected; fixed predictors appear only occasionally. FLAC's
+residual payload is ~98 % of its bytes; framing/metadata is ~130 B/clip.
+
+**Where VOLE's bytes go.** The wired portfolio's winning family is sparse-10 or
+hierarchy-2; the model costs 16–70 B and metadata ~110 B, so VOLE's own framing
+is *comparable to or smaller than FLAC's*. The entire gap is residual bytes:
+over `dev-clean`, FLAC's residual payload is 128 305 B against VOLE's 133 881 B
+(+4.3 %), and the totals are 130 331 B vs 135 124 B.
+
+**Conclusion.** The loss is a *prediction/residual-quality* loss, not a
+container-overhead loss. FLAC fits a local dense all-pole predictor every
+4096 samples; the wired VOLE portfolio fits whole-clip sparse/hierarchical
+models. This is exactly the model-class mismatch the campaign targets.
+
+**U1-domain surprise.** Under the true U1 mapping every sample has 16 low zero
+bits. FLAC exploits them through wasted bits (its size is unchanged), but the
+learned portfolio does not: VOLE's U1 bytes balloon to ~3× FLAC (397 283 B vs
+130 006 B over `dev-clean`). This is a real, exact, bounded gap — a
+common-factor/wasted-bits mechanism is required before the U1 domain is
+competitive on integer-scaled content.
+
+Frozen result hashes: `learned-speech-trace` `0661a292…`,
+`learned-real-corpus-u1` `d07cb3e7…`.
+
+Seal S0 also lands the **dense-LPC model vocabulary** (`learned::lpc`, model kind
+`12`, coefficients stored exactly as `i32` with a declared precision and
+arithmetic shift), with its own exact-closure and accumulator-proof unit tests.
+The fitting and portfolio wiring arrive in Seal S2; landing the vocabulary first
+keeps S2 a pure add-candidate change.
+
 ## Status
 
-Implemented and pushed: Track A, Track B (including the entropy decode table).
-The remaining tracks from the two whole-repository optimization reports
+Implemented and pushed: Track A, Track B (including the entropy decode table),
+and the Report 3 Seal S0 diagnostic courts (`learned-speech-trace`,
+`learned-real-corpus-u1`). The remaining tracks from the two whole-repository
+optimization reports
 (CPU frame-tile multicore + PartialBank vectorization, GPU work decomposition,
 CUDA/HIP graphs, entropy model p2 / compatible-model reuse, integer packing,
 lifting, page-local LZ, reciprocal rANS encode, PreparedWorld, voice coalescing,

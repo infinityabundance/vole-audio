@@ -44,6 +44,8 @@ pub enum LearnedModel {
     Adaptive(crate::learned::adaptive::AdaptivePredictor),
     /// A context-gated mixture of mono sparse experts (Exp2).
     ContextMixture(crate::learned::context_mixture::ContextMixturePredictor),
+    /// A dense short-term all-pole LPC predictor (Exp2, Seal S2).
+    Lpc(crate::learned::lpc::LpcPredictor),
 }
 
 impl LearnedModel {
@@ -62,6 +64,7 @@ impl LearnedModel {
             LearnedModel::AnalyticTransfer(_) => 9,
             LearnedModel::Adaptive(_) => 10,
             LearnedModel::ContextMixture(_) => 11,
+            LearnedModel::Lpc(_) => 12,
         }
     }
 
@@ -80,6 +83,7 @@ impl LearnedModel {
             LearnedModel::AnalyticTransfer(_) => "analytic_transfer",
             LearnedModel::Adaptive(_) => "backward_adaptive",
             LearnedModel::ContextMixture(_) => "context_mixture",
+            LearnedModel::Lpc(_) => "lpc",
         }
     }
 
@@ -98,6 +102,7 @@ impl LearnedModel {
             LearnedModel::AnalyticTransfer(p) => p.validate(),
             LearnedModel::Adaptive(p) => p.validate(),
             LearnedModel::ContextMixture(p) => p.validate(),
+            LearnedModel::Lpc(p) => p.validate(),
         }
     }
 
@@ -116,6 +121,7 @@ impl LearnedModel {
             LearnedModel::AnalyticTransfer(p) => p.channels,
             LearnedModel::Adaptive(p) => p.channels,
             LearnedModel::ContextMixture(p) => p.channels,
+            LearnedModel::Lpc(p) => p.channels,
         }
     }
 
@@ -134,6 +140,7 @@ impl LearnedModel {
             LearnedModel::AnalyticTransfer(p) => p.receptive_field(),
             LearnedModel::Adaptive(p) => p.receptive_field(),
             LearnedModel::ContextMixture(p) => p.receptive_field(),
+            LearnedModel::Lpc(p) => p.receptive_field(),
         }
     }
 
@@ -152,6 +159,7 @@ impl LearnedModel {
             LearnedModel::AnalyticTransfer(p) => p.ops_per_sample(),
             LearnedModel::Adaptive(p) => p.ops_per_sample(),
             LearnedModel::ContextMixture(p) => p.ops_per_sample(),
+            LearnedModel::Lpc(p) => p.ops_per_sample(),
         }
     }
 
@@ -170,6 +178,7 @@ impl LearnedModel {
             LearnedModel::AnalyticTransfer(p) => p.state_bytes(),
             LearnedModel::Adaptive(p) => p.state_bytes(),
             LearnedModel::ContextMixture(p) => p.state_bytes(),
+            LearnedModel::Lpc(p) => p.state_bytes(),
         }
     }
 
@@ -188,6 +197,7 @@ impl LearnedModel {
             LearnedModel::AnalyticTransfer(p) => p.checkpoint_count(),
             LearnedModel::Adaptive(p) => p.checkpoint_count(),
             LearnedModel::ContextMixture(p) => p.checkpoint_count(),
+            LearnedModel::Lpc(p) => p.checkpoint_count(),
         }
     }
 
@@ -206,6 +216,7 @@ impl LearnedModel {
             LearnedModel::AnalyticTransfer(p) => p.canonical_bytes(),
             LearnedModel::Adaptive(p) => p.canonical_bytes(),
             LearnedModel::ContextMixture(p) => p.canonical_bytes(),
+            LearnedModel::Lpc(p) => p.canonical_bytes(),
         }
     }
 
@@ -251,6 +262,9 @@ impl LearnedModel {
                     bytes,
                 )?,
             ),
+            12 => LearnedModel::Lpc(crate::learned::lpc::LpcPredictor::from_canonical_bytes(
+                bytes,
+            )?),
             other => {
                 return Err(Error::new(
                     crate::error::Kind::Unsupported,
@@ -279,6 +293,7 @@ impl LearnedModel {
             LearnedModel::AnalyticTransfer(p) => p.hypothesis_from_source(source, frames),
             LearnedModel::Adaptive(p) => p.hypothesis_all_from_source(source, frames),
             LearnedModel::ContextMixture(p) => p.hypothesis_all_from_source(source, frames),
+            LearnedModel::Lpc(p) => p.hypothesis_all_from_source(source, frames),
         }
     }
 
@@ -305,6 +320,7 @@ impl LearnedModel {
             )),
             LearnedModel::Adaptive(p) => p.evaluate_range(residual, frames, start, len),
             LearnedModel::ContextMixture(p) => p.evaluate_range(residual, frames, start, len),
+            LearnedModel::Lpc(p) => p.evaluate_range(residual, frames, start, len),
         }
     }
 
@@ -323,6 +339,7 @@ impl LearnedModel {
             LearnedModel::AnalyticTransfer(p) => p.replay_frames(start),
             LearnedModel::Adaptive(p) => p.replay_frames(start),
             LearnedModel::ContextMixture(p) => p.replay_frames(start),
+            LearnedModel::Lpc(p) => p.replay_frames(start),
         }
     }
 

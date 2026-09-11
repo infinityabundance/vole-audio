@@ -25,6 +25,35 @@ use std::path::{Path, PathBuf};
 /// The embedded frozen manifest.
 pub const MANIFEST_JSON: &str = include_str!("../../corpus/real_manifest.json");
 
+/// The embedded frozen **U1-domain** manifest (Seal S0).
+///
+/// The Seal-K court uses the sign-extended-i16 experimental domain
+/// (`i32::from(v)`); the frozen U1 s16 ingest is `i32 = i16 << 16`. This second
+/// manifest freezes the same members and truncation under the true U1 mapping,
+/// with new identities and hashes, so the two domains can be compared without
+/// rewriting the Seal-K evidence.
+pub const MANIFEST_U1_JSON: &str = include_str!("../../corpus/real_manifest_u1.json");
+
+/// The sample-domain mapping a real-corpus load applies.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SampleDomain {
+    /// `i32::from(i16)` — the Seal-K experimental domain (sign-extended in the
+    /// low 16 bits).
+    SignExtendedI16,
+    /// `i32 = (i16 as i32) << 16` — the frozen U1 s16 ingest.
+    U1S16,
+}
+
+impl SampleDomain {
+    /// The canonical mapping.
+    pub const fn map(self, v: i16) -> i32 {
+        match self {
+            SampleDomain::SignExtendedI16 => v as i32,
+            SampleDomain::U1S16 => (v as i32) << 16,
+        }
+    }
+}
+
 /// One frozen real clip identity.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RealClip {
@@ -63,9 +92,9 @@ pub fn real_root() -> PathBuf {
     PathBuf::from("corpus/real")
 }
 
-fn parse_clips(which: &str) -> Vec<RealClip> {
+fn parse_clips_from(json: &str, which: &str) -> Vec<RealClip> {
     let v: serde_json::Value =
-        serde_json::from_str(MANIFEST_JSON).expect("the embedded real manifest is valid JSON");
+        serde_json::from_str(json).expect("the embedded real manifest is valid JSON");
     v.get(which)
         .and_then(|a| a.as_array())
         .map(|a| {
@@ -90,19 +119,46 @@ fn parse_clips(which: &str) -> Vec<RealClip> {
 
 /// Effectiveness clips (`dev-clean`).
 pub fn effectiveness_clips() -> Vec<RealClip> {
-    parse_clips("effectiveness")
+    parse_clips_from(MANIFEST_JSON, "effectiveness")
 }
 
 /// Held-out Mode-C clips (`test-clean`).
 pub fn mode_c_clips() -> Vec<RealClip> {
-    parse_clips("mode_c")
+    parse_clips_from(MANIFEST_JSON, "mode_c")
+}
+
+/// U1-domain effectiveness clips (frozen U1 s16 mapping, Seal S0).
+pub fn u1_effectiveness_clips() -> Vec<RealClip> {
+    parse_clips_from(MANIFEST_U1_JSON, "effectiveness")
+}
+
+/// U1-domain held-out Mode-C clips (frozen U1 s16 mapping, Seal S0).
+pub fn u1_mode_c_clips() -> Vec<RealClip> {
+    parse_clips_from(MANIFEST_U1_JSON, "mode_c")
 }
 
 /// SHA-256 over the frozen manifest identities (the corpus identity).
 pub fn real_corpus_sha256() -> String {
+    corpus_sha256(
+        "vole.audio.learned.real_corpus.v1",
+        &effectiveness_clips(),
+        &mode_c_clips(),
+    )
+}
+
+/// SHA-256 over the frozen **U1-domain** manifest identities (Seal S0 identity).
+pub fn u1_real_corpus_sha256() -> String {
+    corpus_sha256(
+        "vole.audio.learned.real_corpus.u1.v1",
+        &u1_effectiveness_clips(),
+        &u1_mode_c_clips(),
+    )
+}
+
+fn corpus_sha256(tag: &str, effectiveness: &[RealClip], mode_c: &[RealClip]) -> String {
     let mut bytes = Vec::new();
-    bytes.extend_from_slice(b"vole.audio.learned.real_corpus.v1");
-    for clip in effectiveness_clips().iter().chain(mode_c_clips().iter()) {
+    bytes.extend_from_slice(tag.as_bytes());
+    for clip in effectiveness.iter().chain(mode_c.iter()) {
         bytes.extend_from_slice(clip.id.as_bytes());
         bytes.push(0);
         bytes.extend_from_slice(clip.split.as_bytes());
@@ -193,8 +249,13 @@ fn canonical_sha(samples: &[i32]) -> String {
     hex(&Sha256::digest(&bytes))
 }
 
-/// Load and exactly verify one frozen real clip.
+/// Load and exactly verify one frozen real clip (sign-extended domain).
 pub fn load_clip(clip: &RealClip, scratch: &Path) -> Result<Vec<i32>> {
+    load_clip_domain(clip, scratch, SampleDomain::SignExtendedI16)
+}
+
+/// Load and exactly verify one frozen real clip under an explicit sample domain.
+pub fn load_clip_domain(clip: &RealClip, scratch: &Path, domain: SampleDomain) -> Result<Vec<i32>> {
     let src = real_root().join(&clip.path);
     if !src.is_file() {
         return Err(Error::new(
@@ -242,7 +303,7 @@ pub fn load_clip(clip: &RealClip, scratch: &Path) -> Result<Vec<i32>> {
     let take = frames.min(clip.frames as usize);
     let samples: Vec<i32> = pcm[..take * per_frame]
         .iter()
-        .map(|&v| i32::from(v))
+        .map(|&v| domain.map(v))
         .collect();
     if canonical_sha(&samples) != clip.canonical_i32_sha256 {
         return Err(Error::new(
@@ -255,9 +316,19 @@ pub fn load_clip(clip: &RealClip, scratch: &Path) -> Result<Vec<i32>> {
 
 /// Load a set of clips into cases (bounded by `max`).
 pub fn load_cases(clips: &[RealClip], max: usize, scratch: &Path) -> Result<Vec<RealCase>> {
+    load_cases_domain(clips, max, scratch, SampleDomain::SignExtendedI16)
+}
+
+/// Load a set of clips under an explicit sample domain.
+pub fn load_cases_domain(
+    clips: &[RealClip],
+    max: usize,
+    scratch: &Path,
+    domain: SampleDomain,
+) -> Result<Vec<RealCase>> {
     let mut out = Vec::new();
     for clip in clips.iter().take(max) {
-        let samples = load_clip(clip, scratch)?;
+        let samples = load_clip_domain(clip, scratch, domain)?;
         out.push(RealCase {
             clip: clip.clone(),
             samples,
@@ -289,5 +360,32 @@ mod tests {
     fn corpus_identity_is_deterministic() {
         assert_eq!(real_corpus_sha256(), real_corpus_sha256());
         assert_eq!(real_corpus_sha256().len(), 64);
+    }
+
+    #[test]
+    fn u1_manifest_is_frozen_and_distinct() {
+        assert_eq!(u1_effectiveness_clips().len(), 12);
+        assert_eq!(u1_mode_c_clips().len(), 8);
+        let se = effectiveness_clips();
+        let u1 = u1_effectiveness_clips();
+        for (a, b) in se.iter().zip(u1.iter()) {
+            assert_eq!(a.id, b.id);
+            assert_eq!(a.path, b.path);
+            assert_eq!(a.frames, b.frames);
+            assert_eq!(b.canonical_i32_sha256.len(), 64);
+            // The U1 mapping (i16 << 16) must change the canonical hash.
+            assert_ne!(a.canonical_i32_sha256, b.canonical_i32_sha256);
+        }
+        assert_eq!(u1_real_corpus_sha256(), u1_real_corpus_sha256());
+        assert_ne!(real_corpus_sha256(), u1_real_corpus_sha256());
+    }
+
+    #[test]
+    fn sample_domains_map_exactly() {
+        assert_eq!(SampleDomain::SignExtendedI16.map(-1), -1);
+        assert_eq!(SampleDomain::U1S16.map(-1), -(1 << 16));
+        assert_eq!(SampleDomain::U1S16.map(1), 1 << 16);
+        assert_eq!(SampleDomain::U1S16.map(i16::MIN), i32::MIN);
+        assert_eq!(SampleDomain::U1S16.map(i16::MAX), (i16::MAX as i32) << 16);
     }
 }

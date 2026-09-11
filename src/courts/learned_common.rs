@@ -599,6 +599,94 @@ pub fn projection_hash(bytes: &[u8]) -> String {
     hex(&Sha256::digest(bytes))
 }
 
+/// Deterministic splitmix64 (statistics helper; never the semantic universe PRNG).
+pub fn splitmix64(state: &mut u64) -> u64 {
+    *state = state.wrapping_add(0x9E37_79B9_7F4A_7C15);
+    let mut z = *state;
+    z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    z ^ (z >> 31)
+}
+
+/// Exact two-sided Wilcoxon signed-rank over paired differences.
+///
+/// Ranks are average-free (deterministic by index) and zero differences are
+/// dropped. The null distribution of the positive-rank sum is computed exactly
+/// by dynamic programming. Returns `(w_plus, w_minus, p_two_sided_ppm)`.
+pub fn wilcoxon_exact(diffs: &[i64]) -> (u64, u64, u64) {
+    let mut items: Vec<(u64, bool)> = diffs
+        .iter()
+        .filter(|&&d| d != 0)
+        .map(|&d| (d.unsigned_abs(), d > 0))
+        .collect();
+    items.sort_unstable_by_key(|&(m, _)| m);
+    let n = items.len();
+    if n == 0 {
+        return (0, 0, 1_000_000);
+    }
+    let mut w_plus = 0u64;
+    let mut w_minus = 0u64;
+    let mut i = 0usize;
+    while i < n {
+        let mut j = i;
+        while j < n && items[j].0 == items[i].0 {
+            j += 1;
+        }
+        let rank_sum: u64 = ((i + 1) as u64..=(j as u64)).sum();
+        let group = (j - i) as u64;
+        for &(_, positive) in &items[i..j] {
+            if positive {
+                w_plus += rank_sum / group;
+            } else {
+                w_minus += rank_sum / group;
+            }
+        }
+        i = j;
+    }
+    let total: u64 = (n as u64) * (n as u64 + 1) / 2;
+    let mut dp = vec![0u64; (total + 1) as usize];
+    dp[0] = 1;
+    for r in 1..=n as u64 {
+        for s in (r..=total).rev() {
+            let add = dp[(s - r) as usize];
+            dp[s as usize] += add;
+        }
+    }
+    let outcomes: u64 = 1u64 << n;
+    let w = w_plus.min(w_minus);
+    let tail: u64 = dp[..=(w as usize)].iter().sum();
+    let p_ppm = ((2 * tail).min(outcomes) * 1_000_000 + outcomes / 2) / outcomes;
+    (w_plus, w_minus, p_ppm)
+}
+
+/// Deterministic bootstrap CI (95%) for the median paired ratio in ppm.
+pub fn bootstrap_median_ppm(nums: &[u64], dens: &[u64], seed: u64, rounds: u32) -> (u64, u64) {
+    if nums.is_empty() {
+        return (0, 0);
+    }
+    let n = nums.len();
+    let mut state = seed | 1;
+    let mut medians: Vec<u64> = Vec::with_capacity(rounds as usize);
+    let mut sample: Vec<u64> = Vec::with_capacity(n);
+    for _ in 0..rounds {
+        sample.clear();
+        for _ in 0..n {
+            let idx = (splitmix64(&mut state) % n as u64) as usize;
+            let ratio = (nums[idx] + 1)
+                .saturating_mul(1_000_000)
+                .checked_div(dens[idx] + 1)
+                .unwrap_or(u64::MAX);
+            sample.push(ratio);
+        }
+        sample.sort_unstable();
+        medians.push(sample[n / 2]);
+    }
+    medians.sort_unstable();
+    let lo = medians[(rounds as f64 * 0.025) as usize];
+    let hi = medians[((rounds as f64 * 0.975) as usize).min(rounds as usize - 1)];
+    (lo, hi)
+}
+
 /// A shared-model regime helper: one learned model reused across objects.
 #[allow(dead_code)]
 pub fn shared_regime(

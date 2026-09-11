@@ -21,6 +21,7 @@ pub mod corpus_real;
 pub mod finite_field;
 pub mod graph;
 pub mod hierarchy;
+pub mod lpc;
 pub mod ltp;
 pub mod model;
 pub mod multichannel;

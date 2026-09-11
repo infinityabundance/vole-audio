@@ -94,6 +94,8 @@ pub mod learned_quantization;
 #[cfg(feature = "std")]
 pub mod learned_random_access;
 #[cfg(feature = "std")]
+pub mod learned_real_corpus_u1;
+#[cfg(feature = "std")]
 pub mod learned_residual;
 #[cfg(feature = "std")]
 pub mod learned_residual_codec;
@@ -101,6 +103,8 @@ pub mod learned_residual_codec;
 pub mod learned_residual_codec2;
 #[cfg(feature = "std")]
 pub mod learned_shared;
+#[cfg(feature = "std")]
+pub mod learned_speech_trace;
 #[cfg(feature = "std")]
 pub mod learned_training_cost;
 #[cfg(feature = "std")]
@@ -291,6 +295,14 @@ the Exp1 baseline with exact Wilcoxon signed-rank and a deterministic bootstrap 
 reporting effectiveness and held-out Mode C separately",
     ),
     (
+        "learned-real-corpus-u1",
+        "Seal S0 U1-domain real-speech replay: the wired three-family Exp2 portfolio over the frozen U1 s16 ingest mapping (i32 = i16 << 16) with new identities, paired against FLAC-5",
+    ),
+    (
+        "learned-speech-trace",
+        "Seal S0 diagnostic: bit-for-bit trace of the frozen B1 FLAC-5 artifact (subframe kinds, orders, precision, shift, partition order, residual payload) beside the wired three-family Exp2 VOLE byte waterfall, on the real + Mode-C corpus",
+    ),
+    (
         "learned-residual-codec2",
         "Exp2 Seal B residual codec family: PartitionRice / CoreTailRice / RunLengthRice / \
 ZeroMaskRice / BytePlane / ContextRans beside the frozen Exp1 codecs, with the structural gate \
@@ -466,6 +478,8 @@ pub fn run(name: &str, receipts_root: &Path) -> crate::error::Result<Verdict> {
         "learned-exp2-baseline" => learned_exp2_baseline::run(receipts_root),
         "learned-exp2-mechanisms" => learned_exp2_mechanisms::run(receipts_root),
         "learned-exp2-real-corpus" => learned_exp2_real_corpus::run(receipts_root),
+        "learned-speech-trace" => learned_speech_trace::run(receipts_root),
+        "learned-real-corpus-u1" => learned_real_corpus_u1::run(receipts_root),
         "learned-exp2-transfer" => learned_exp2_transfer::run(receipts_root),
         "learned-residual-codec" => learned_residual_codec::run(receipts_root),
         "learned-residual-codec2" => learned_residual_codec2::run(receipts_root),

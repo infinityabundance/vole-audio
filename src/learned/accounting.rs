@@ -136,6 +136,13 @@ fn model_components(m: &LearnedModel) -> (u64, u64, u64, u64, u64, u64) {
             let bias = b.min(len - weights);
             (weights, bias, 0, 0, 0, 0)
         }
+        LearnedModel::Lpc(p) => {
+            // Every canonical coefficient is an `i32`; there is no bias. The
+            // header/precision/shift/block fields are the graph remainder.
+            let len = p.canonical_bytes().len() as u64;
+            let weights = ((p.coeffs.len() as u64) * 4).min(len);
+            (weights, 0, 0, 0, 0, 0)
+        }
         LearnedModel::Segmented(s) => {
             let mut w = 0u64;
             let mut b = 0u64;
