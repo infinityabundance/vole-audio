@@ -1,0 +1,2879 @@
+{
+  "schema": "vole.audio.evidence.v1",
+  "schema_version": 1,
+  "receipt": {
+    "schema": "vole.audio.evidence.v1",
+    "schema_version": 1,
+    "run_id": "learned-speech-trace-742746274-288282",
+    "court": "learned-speech-trace",
+    "created_unix_ms": 742746274,
+    "result": "SUPPORTED",
+    "result_detail": "Seal S0 diagnostic: 16 real clips traced bit-for-bit from the frozen B1 FLAC-5 artifact (CRC-validated, fully reconstructed) beside the wired three-family Exp2 VOLE byte waterfall; result sha256 0661a292103e2b37ab90ca790cc678b36d8e0376ddc7b39cd5eec9db9ccf53e1",
+    "environment": {
+      "os": {
+        "sysname": "Linux",
+        "release": "7.2.2-1-cachyos",
+        "version": "#1 SMP PREEMPT_DYNAMIC Fri, 28 Aug 2026 08:05:11 +0000",
+        "machine": "x86_64",
+        "nodename": "vanir",
+        "os_pretty_name": "CachyOS"
+      },
+      "cpu": {
+        "model": "AMD Ryzen 7 9800X3D 8-Core Processor",
+        "flags": [
+          "3dnowprefetch",
+          "abm",
+          "adx",
+          "aes",
+          "amd_lbr_pmc_freeze",
+          "amd_lbr_v2",
+          "aperfmperf",
+          "apic",
+          "arat",
+          "avic",
+          "avx",
+          "avx2",
+          "avx512_bf16",
+          "avx512_bitalg",
+          "avx512_vbmi2",
+          "avx512_vnni",
+          "avx512_vp2intersect",
+          "avx512_vpopcntdq",
+          "avx512bw",
+          "avx512cd",
+          "avx512dq",
+          "avx512f",
+          "avx512ifma",
+          "avx512vbmi",
+          "avx512vl",
+          "avx_vnni",
+          "bmi1",
+          "bmi2",
+          "bpext",
+          "bus_lock_detect",
+          "cat_l3",
+          "cdp_l3",
+          "clflush",
+          "clflushopt",
+          "clwb",
+          "clzero",
+          "cmov",
+          "cmp_legacy",
+          "constant_tsc",
+          "cpb",
+          "cppc",
+          "cpuid",
+          "cpuid_fault",
+          "cqm",
+          "cqm_llc",
+          "cqm_mbm_local",
+          "cqm_mbm_total",
+          "cqm_occup_llc",
+          "cr8_legacy",
+          "cx16",
+          "cx8",
+          "de",
+          "decodeassists",
+          "erms",
+          "extapic",
+          "extd_apicid",
+          "f16c",
+          "flush_l1d",
+          "flushbyasid",
+          "fma",
+          "fpu",
+          "fsgsbase",
+          "fsrm",
+          "fxsr",
+          "fxsr_opt",
+          "gfni",
+          "ht",
+          "hw_pstate",
+          "ibpb",
+          "ibrs",
+          "ibrs_enhanced",
+          "ibs",
+          "invpcid",
+          "irperf",
+          "lahf_lm",
+          "lbrv",
+          "lm",
+          "mba",
+          "mca",
+          "mce",
+          "misalignsse",
+          "mmx",
+          "mmxext",
+          "monitor",
+          "movbe",
+          "movdir64b",
+          "movdiri",
+          "msr",
+          "mtrr",
+          "mwaitx",
+          "nonstop_tsc",
+          "nopl",
+          "npt",
+          "nrip_save",
+          "nx",
+          "ospke",
+          "osvw",
+          "overflow_recov",
+          "pae",
+          "pat",
+          "pausefilter",
+          "pclmulqdq",
+          "pdpe1gb",
+          "perfctr_core",
+          "perfctr_llc",
+          "perfctr_nb",
+          "perfmon_v2",
+          "pfthreshold",
+          "pge",
+          "pku",
+          "pni",
+          "popcnt",
+          "pse",
+          "pse36",
+          "rapl",
+          "rdpid",
+          "rdpru",
+          "rdrand",
+          "rdseed",
+          "rdt_a",
+          "rdtscp",
+          "rep_good",
+          "sep",
+          "sha_ni",
+          "skinit",
+          "smap",
+          "smca",
+          "smep",
+          "ssbd",
+          "sse",
+          "sse2",
+          "sse4_1",
+          "sse4_2",
+          "sse4a",
+          "ssse3",
+          "stibp",
+          "succor",
+          "svm",
+          "svm_lock",
+          "syscall",
+          "tce",
+          "topoext",
+          "tsc",
+          "tsc_adjust",
+          "tsc_scale",
+          "umip",
+          "user_shstk",
+          "v_spec_ctrl",
+          "v_vmsave_vmload",
+          "vaes",
+          "vgif",
+          "vmcb_clean",
+          "vme",
+          "vmmcall",
+          "vnmi",
+          "vpclmulqdq",
+          "wbnoinvd",
+          "wdt",
+          "x2avic",
+          "xgetbv1",
+          "xsave",
+          "xsavec",
+          "xsaveerptr",
+          "xsaveopt",
+          "xsaves",
+          "xtopology"
+        ],
+        "has_avx2": true,
+        "has_avx512": true,
+        "has_neon": false
+      },
+      "memory": {
+        "total_bytes": 134689935360
+      },
+      "git_commit": "831cfd46891da7efdd8574d2d262e7562e9f9d82",
+      "git_dirty": false,
+      "git_branch": "main",
+      "rustc_version": "rustc 1.99.0-nightly (89c61a754 2026-07-23)",
+      "crate_version": "0.29.0",
+      "target_arch": "x86_64",
+      "target_os": "linux",
+      "cpu_governor": "performance",
+      "bios_version": "1402",
+      "git_tree_sha": "be069ddef6a0d3862906713228830c664704667b",
+      "build_git_commit": "831cfd46891da7efdd8574d2d262e7562e9f9d82",
+      "build_tree_sha": "be069ddef6a0d3862906713228830c664704667b",
+      "build_dirty": false,
+      "build_rustc": "rustc 1.99.0-nightly (89c61a754 2026-07-23)",
+      "build_profile": "release",
+      "build_target": "x86_64-unknown-linux-gnu",
+      "source_binding": "bound",
+      "seal_subject_hash": "8bc90d09d0bd0758ff524700050804841c95a044254285556ccd5aef379909f0"
+    },
+    "hardware": {
+      "pci_devices": [
+        {
+          "bdf": "0000:00:00.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14d8",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": null
+        },
+        {
+          "bdf": "0000:00:00.2",
+          "class": "0x080600",
+          "vendor": "0x1022",
+          "device": "0x14d9",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": null
+        },
+        {
+          "bdf": "0000:00:01.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "0"
+        },
+        {
+          "bdf": "0000:00:01.1",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14db",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "1"
+        },
+        {
+          "bdf": "0000:00:01.2",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14db",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "2"
+        },
+        {
+          "bdf": "0000:00:02.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "3"
+        },
+        {
+          "bdf": "0000:00:02.1",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14db",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "4"
+        },
+        {
+          "bdf": "0000:00:02.2",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14db",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "5"
+        },
+        {
+          "bdf": "0000:00:03.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "6"
+        },
+        {
+          "bdf": "0000:00:04.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "7"
+        },
+        {
+          "bdf": "0000:00:08.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "8"
+        },
+        {
+          "bdf": "0000:00:08.1",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14dd",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "9"
+        },
+        {
+          "bdf": "0000:00:08.3",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14dd",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "10"
+        },
+        {
+          "bdf": "0000:00:14.0",
+          "class": "0x0c0500",
+          "vendor": "0x1022",
+          "device": "0x790b",
+          "driver": "piix4_smbus",
+          "numa_node": -1,
+          "iommu_group": "11"
+        },
+        {
+          "bdf": "0000:00:14.3",
+          "class": "0x060100",
+          "vendor": "0x1022",
+          "device": "0x790e",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "11"
+        },
+        {
+          "bdf": "0000:00:18.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e0",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.1",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e1",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.2",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e2",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.3",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e3",
+          "driver": "k10temp",
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.4",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e4",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.5",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e5",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.6",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e6",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.7",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e7",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:01:00.0",
+          "class": "0x030000",
+          "vendor": "0x10de",
+          "device": "0x2702",
+          "driver": "nvidia",
+          "numa_node": -1,
+          "iommu_group": "13"
+        },
+        {
+          "bdf": "0000:01:00.1",
+          "class": "0x040300",
+          "vendor": "0x10de",
+          "device": "0x22bb",
+          "driver": "snd_hda_intel",
+          "numa_node": -1,
+          "iommu_group": "13"
+        },
+        {
+          "bdf": "0000:02:00.0",
+          "class": "0x010802",
+          "vendor": "0xc0a9",
+          "device": "0x542b",
+          "driver": "nvme",
+          "numa_node": -1,
+          "iommu_group": "14"
+        },
+        {
+          "bdf": "0000:03:00.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f4",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "15"
+        },
+        {
+          "bdf": "0000:04:00.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "16"
+        },
+        {
+          "bdf": "0000:04:04.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "17"
+        },
+        {
+          "bdf": "0000:04:05.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "18"
+        },
+        {
+          "bdf": "0000:04:08.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "19"
+        },
+        {
+          "bdf": "0000:04:0c.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "20"
+        },
+        {
+          "bdf": "0000:04:0d.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "21"
+        },
+        {
+          "bdf": "0000:05:00.0",
+          "class": "0x010802",
+          "vendor": "0x2646",
+          "device": "0x5019",
+          "driver": "nvme",
+          "numa_node": -1,
+          "iommu_group": "16"
+        },
+        {
+          "bdf": "0000:06:00.0",
+          "class": "0x020000",
+          "vendor": "0x10ec",
+          "device": "0x8125",
+          "driver": "r8169",
+          "numa_node": -1,
+          "iommu_group": "17"
+        },
+        {
+          "bdf": "0000:09:00.0",
+          "class": "0x0c0330",
+          "vendor": "0x1022",
+          "device": "0x43fc",
+          "driver": "xhci-pci-prom21",
+          "numa_node": -1,
+          "iommu_group": "20"
+        },
+        {
+          "bdf": "0000:0a:00.0",
+          "class": "0x010601",
+          "vendor": "0x1022",
+          "device": "0x43f6",
+          "driver": "ahci",
+          "numa_node": -1,
+          "iommu_group": "21"
+        },
+        {
+          "bdf": "0000:0b:00.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2421",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "22"
+        },
+        {
+          "bdf": "0000:0c:00.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2423",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "23"
+        },
+        {
+          "bdf": "0000:0c:01.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2423",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "24"
+        },
+        {
+          "bdf": "0000:0c:02.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2423",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "25"
+        },
+        {
+          "bdf": "0000:0c:03.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2423",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "26"
+        },
+        {
+          "bdf": "0000:71:00.0",
+          "class": "0x0c0330",
+          "vendor": "0x1b21",
+          "device": "0x2426",
+          "driver": "xhci_hcd",
+          "numa_node": -1,
+          "iommu_group": "25"
+        },
+        {
+          "bdf": "0000:72:00.0",
+          "class": "0x0c0340",
+          "vendor": "0x1b21",
+          "device": "0x2425",
+          "driver": "thunderbolt",
+          "numa_node": -1,
+          "iommu_group": "26"
+        },
+        {
+          "bdf": "0000:73:00.0",
+          "class": "0x130000",
+          "vendor": "0x1022",
+          "device": "0x14de",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "27"
+        },
+        {
+          "bdf": "0000:73:00.2",
+          "class": "0x108000",
+          "vendor": "0x1022",
+          "device": "0x1649",
+          "driver": "ccp",
+          "numa_node": -1,
+          "iommu_group": "28"
+        },
+        {
+          "bdf": "0000:73:00.3",
+          "class": "0x0c0330",
+          "vendor": "0x1022",
+          "device": "0x15b6",
+          "driver": "xhci_hcd",
+          "numa_node": -1,
+          "iommu_group": "29"
+        },
+        {
+          "bdf": "0000:73:00.4",
+          "class": "0x0c0330",
+          "vendor": "0x1022",
+          "device": "0x15b7",
+          "driver": "xhci_hcd",
+          "numa_node": -1,
+          "iommu_group": "30"
+        },
+        {
+          "bdf": "0000:73:00.6",
+          "class": "0x040300",
+          "vendor": "0x1022",
+          "device": "0x15e3",
+          "driver": "snd_hda_intel",
+          "numa_node": -1,
+          "iommu_group": "31"
+        },
+        {
+          "bdf": "0000:74:00.0",
+          "class": "0x0c0330",
+          "vendor": "0x1022",
+          "device": "0x15b8",
+          "driver": "xhci_hcd",
+          "numa_node": -1,
+          "iommu_group": "32"
+        }
+      ],
+      "gpu": {
+        "vendor": null,
+        "name": null,
+        "bdf": null,
+        "compute_capability": null,
+        "memory_bytes": null,
+        "driver_version": null,
+        "runtime_version": null
+      },
+      "audio": {
+        "card": null,
+        "device": null,
+        "name": null,
+        "subdevice": null
+      }
+    },
+    "params": {
+      "universe": "vole.audio.u1",
+      "profile": "vole.audio.learned.exp2",
+      "backend": "scalar canonical learned evaluator",
+      "sample_rate_hz": null,
+      "channels": null,
+      "voices": null,
+      "quantum_frames": null,
+      "duration_secs": null,
+      "content_kind": "Phase O learned deterministic prediction"
+    },
+    "counters": {
+      "host_pcm_staging_bytes": 0,
+      "host_pcm_copy_bytes": 0,
+      "gpu_to_host_pcm_bytes": 0,
+      "endpoint_observation_bytes": 0,
+      "device_sample_block_bytes": 0,
+      "transient_compute_words": 0,
+      "host_pcm_resident_peak_bytes": 0,
+      "host_pcm_resident_integral": 0.0,
+      "endpoint_depth_frames": 0,
+      "endpoint_depth_min_frames": 18446744073709551615,
+      "endpoint_depth_max_frames": 0,
+      "quanta_submitted": 0,
+      "events_consumed": 0,
+      "xruns": 0,
+      "kernel_launches": 0,
+      "missed_deadlines": 0
+    },
+    "timing": {
+      "total_ns": null,
+      "deadline_ns": null,
+      "warmup_runs": null,
+      "run_count": null,
+      "observation_count": null,
+      "tail": null
+    },
+    "provenance": {
+      "reference_hash": "0661a292103e2b37ab90ca790cc678b36d8e0376ddc7b39cd5eec9db9ccf53e1",
+      "backend_hash": null,
+      "endpoint_hash": null,
+      "gpu_artifact_hash": null,
+      "source_hash": null,
+      "corpus_hash": null,
+      "table_hashes": [],
+      "benchmark_order": [],
+      "exact_equality": null
+    },
+    "endpoint": {
+      "directness": null,
+      "topology": null,
+      "registered_range": null,
+      "registration_result": null,
+      "device_pointer": null,
+      "synchronization_mechanism": null,
+      "fence_sync_evidence": null,
+      "coherency_assumptions": null,
+      "hidden_staging_investigation": null,
+      "endpoint_clock": null
+    },
+    "energy": null,
+    "trace": null,
+    "limitations": [
+      "learned prediction is an experimental profile: it does not change u1/v1, the literal fallback remains mandatory, and negative learned results are preserved rather than hidden"
+    ],
+    "extras": {
+      "clips": [
+        {
+          "id": "1272-128104-0000",
+          "split": "dev-clean",
+          "speaker": "1272",
+          "frames": 16384,
+          "flac_bytes": 15670,
+          "flac_shape": {
+            "frames": 4,
+            "subframes": {
+              "constant": 0,
+              "verbatim": 0,
+              "fixed": 1,
+              "lpc": 3
+            },
+            "lpc_orders_by_count": [
+              {
+                "value": 6,
+                "count": 1
+              },
+              {
+                "value": 7,
+                "count": 1
+              },
+              {
+                "value": 8,
+                "count": 1
+              }
+            ],
+            "lpc_precision_by_count": [
+              {
+                "value": 15,
+                "count": 3
+              }
+            ],
+            "lpc_shift_by_count": [
+              {
+                "value": 13,
+                "count": 1
+              },
+              {
+                "value": 14,
+                "count": 1
+              },
+              {
+                "value": 15,
+                "count": 1
+              }
+            ],
+            "partition_orders": [
+              {
+                "order": 0,
+                "count": 1
+              },
+              {
+                "order": 1,
+                "count": 1
+              },
+              {
+                "order": 5,
+                "count": 2
+              }
+            ],
+            "bytes": {
+              "metadata": 86,
+              "frame_header": 24,
+              "frame_footer": 8,
+              "subframe_header": 4,
+              "warmup": 88,
+              "coeff": 42,
+              "residual_header": 4,
+              "residual_payload": 15410,
+              "total": 15670
+            },
+            "crc_ok": true,
+            "reconstructed_ok": true
+          },
+          "vle_best_family": "sparse10",
+          "vle_best_bytes": 16147,
+          "vle_model_bytes": 22,
+          "vle_residual_bytes": 16009,
+          "vle_residual_codec": "partition_rice",
+          "vle_residual_count": 16384,
+          "vle_residual_mean_abs": 251.96954345703125,
+          "vle_residual_median_abs": 16,
+          "vle_residual_p90_abs": 805,
+          "vle_residual_p99_abs": 2915,
+          "vle_residual_zero_fraction_ppm": 37353,
+          "vle_residual_positive": 7598,
+          "vle_residual_negative": 8174,
+          "waterfall": [
+            {
+              "family": "dense4",
+              "model_bytes": 20,
+              "residual_bytes": 16247,
+              "metadata_bytes": 84,
+              "integrity_bytes": 32,
+              "complete_bytes": 16383,
+              "residual_codec": "partition_rice",
+              "mean_abs": 230.55535888671875,
+              "median_abs": 20,
+              "p90_abs": 760,
+              "p99_abs": 2455,
+              "zero_fraction_ppm": 32653,
+              "positive": 7853,
+              "negative": 7996
+            },
+            {
+              "family": "sparse10",
+              "model_bytes": 22,
+              "residual_bytes": 16009,
+              "metadata_bytes": 84,
+              "integrity_bytes": 32,
+              "complete_bytes": 16147,
+              "residual_codec": "partition_rice",
+              "mean_abs": 251.96954345703125,
+              "median_abs": 16,
+              "p90_abs": 805,
+              "p99_abs": 2915,
+              "zero_fraction_ppm": 37353,
+              "positive": 7598,
+              "negative": 8174
+            },
+            {
+              "family": "hier2",
+              "model_bytes": 29,
+              "residual_bytes": 16042,
+              "metadata_bytes": 84,
+              "integrity_bytes": 32,
+              "complete_bytes": 16187,
+              "residual_codec": "partition_rice",
+              "mean_abs": 254.4925537109375,
+              "median_abs": 16,
+              "p90_abs": 815,
+              "p99_abs": 2891,
+              "zero_fraction_ppm": 37231,
+              "positive": 7556,
+              "negative": 8218
+            }
+          ]
+        },
+        {
+          "id": "1462-170138-0000",
+          "split": "dev-clean",
+          "speaker": "1462",
+          "frames": 16384,
+          "flac_bytes": 15517,
+          "flac_shape": {
+            "frames": 4,
+            "subframes": {
+              "constant": 0,
+              "verbatim": 0,
+              "fixed": 0,
+              "lpc": 4
+            },
+            "lpc_orders_by_count": [
+              {
+                "value": 4,
+                "count": 2
+              },
+              {
+                "value": 7,
+                "count": 1
+              },
+              {
+                "value": 8,
+                "count": 1
+              }
+            ],
+            "lpc_precision_by_count": [
+              {
+                "value": 15,
+                "count": 4
+              }
+            ],
+            "lpc_shift_by_count": [
+              {
+                "value": 12,
+                "count": 2
+              },
+              {
+                "value": 13,
+                "count": 1
+              },
+              {
+                "value": 14,
+                "count": 1
+              }
+            ],
+            "partition_orders": [
+              {
+                "order": 0,
+                "count": 1
+              },
+              {
+                "order": 4,
+                "count": 1
+              },
+              {
+                "order": 5,
+                "count": 2
+              }
+            ],
+            "bytes": {
+              "metadata": 86,
+              "frame_header": 24,
+              "frame_footer": 8,
+              "subframe_header": 4,
+              "warmup": 92,
+              "coeff": 46,
+              "residual_header": 4,
+              "residual_payload": 15249,
+              "total": 15517
+            },
+            "crc_ok": true,
+            "reconstructed_ok": true
+          },
+          "vle_best_family": "hier2",
+          "vle_best_bytes": 16498,
+          "vle_model_bytes": 43,
+          "vle_residual_bytes": 16339,
+          "vle_residual_codec": "partition_rice",
+          "vle_residual_count": 16384,
+          "vle_residual_mean_abs": 121.52471923828125,
+          "vle_residual_median_abs": 22,
+          "vle_residual_p90_abs": 352,
+          "vle_residual_p99_abs": 1177,
+          "vle_residual_zero_fraction_ppm": 21057,
+          "vle_residual_positive": 8128,
+          "vle_residual_negative": 7911,
+          "waterfall": [
+            {
+              "family": "dense4",
+              "model_bytes": 20,
+              "residual_bytes": 16844,
+              "metadata_bytes": 84,
+              "integrity_bytes": 32,
+              "complete_bytes": 16980,
+              "residual_codec": "partition_rice",
+              "mean_abs": 107.9473876953125,
+              "median_abs": 28,
+              "p90_abs": 302,
+              "p99_abs": 941,
+              "zero_fraction_ppm": 13610,
+              "positive": 8101,
+              "negative": 8060
+            },
+            {
+              "family": "sparse10",
+              "model_bytes": 16,
+              "residual_bytes": 16469,
+              "metadata_bytes": 84,
+              "integrity_bytes": 32,
+              "complete_bytes": 16601,
+              "residual_codec": "predictive_rice",
+              "mean_abs": 291.29278564453125,
+              "median_abs": 57,
+              "p90_abs": 903,
+              "p99_abs": 2121,
+              "zero_fraction_ppm": 29174,
+              "positive": 7535,
+              "negative": 8371
+            },
+            {
+              "family": "hier2",
+              "model_bytes": 43,
+              "residual_bytes": 16339,
+              "metadata_bytes": 84,
+              "integrity_bytes": 32,
+              "complete_bytes": 16498,
+              "residual_codec": "partition_rice",
+              "mean_abs": 121.52471923828125,
+              "median_abs": 22,
+              "p90_abs": 352,
+              "p99_abs": 1177,
+              "zero_fraction_ppm": 21057,
+              "positive": 8128,
+              "negative": 7911
+            }
+          ]
+        },
+        {
+          "id": "1673-143396-0000",
+          "split": "dev-clean",
+          "speaker": "1673",
+          "frames": 16384,
+          "flac_bytes": 17837,
+          "flac_shape": {
+            "frames": 4,
+            "subframes": {
+              "constant": 0,
+              "verbatim": 0,
+              "fixed": 0,
+              "lpc": 4
+            },
+            "lpc_orders_by_count": [
+              {
+                "value": 8,
+                "count": 2
+              },
+              {
+                "value": 1,
+                "count": 1
+              },
+              {
+                "value": 6,
+                "count": 1
+              }
+            ],
+            "lpc_precision_by_count": [
+              {
+                "value": 15,
+                "count": 4
+              }
+            ],
+            "lpc_shift_by_count": [
+              {
+                "value": 12,
+                "count": 2
+              },
+              {
+                "value": 13,
+                "count": 1
+              },
+              {
+                "value": 14,
+                "count": 1
+              }
+            ],
+            "partition_orders": [
+              {
+                "order": 5,
+                "count": 4
+              }
+            ],
+            "bytes": {
+              "metadata": 86,
+              "frame_header": 24,
+              "frame_footer": 8,
+              "subframe_header": 4,
+              "warmup": 92,
+              "coeff": 47,
+              "residual_header": 4,
+              "residual_payload": 17569,
+              "total": 17837
+            },
+            "crc_ok": true,
+            "reconstructed_ok": true
+          },
+          "vle_best_family": "sparse10",
+          "vle_best_bytes": 18369,
+          "vle_model_bytes": 44,
+          "vle_residual_bytes": 18209,
+          "vle_residual_codec": "partition_rice",
+          "vle_residual_count": 16384,
+          "vle_residual_mean_abs": 208.42938232421875,
+          "vle_residual_median_abs": 53,
+          "vle_residual_p90_abs": 613,
+          "vle_residual_p99_abs": 1603,
+          "vle_residual_zero_fraction_ppm": 12268,
+          "vle_residual_positive": 8046,
+          "vle_residual_negative": 8137,
+          "waterfall": [
+            {
+              "family": "dense4",
+              "model_bytes": 20,
+              "residual_bytes": 18421,
+              "metadata_bytes": 84,
+              "integrity_bytes": 32,
+              "complete_bytes": 18557,
+              "residual_codec": "partition_rice",
+              "mean_abs": 245.3062744140625,
+              "median_abs": 64,
+              "p90_abs": 744,
+              "p99_abs": 1815,
+              "zero_fraction_ppm": 14892,
+              "positive": 7903,
+              "negative": 8237
+            },
+            {
+              "family": "sparse10",
+              "model_bytes": 44,
+              "residual_bytes": 18209,
+              "metadata_bytes": 84,
+              "integrity_bytes": 32,
+              "complete_bytes": 18369,
+              "residual_codec": "partition_rice",
+              "mean_abs": 208.42938232421875,
+              "median_abs": 53,
+              "p90_abs": 613,
+              "p99_abs": 1603,
+              "zero_fraction_ppm": 12268,
+              "positive": 8046,
+              "negative": 8137
+            },
+            {
+              "family": "hier2",
+              "model_bytes": 59,
+              "residual_bytes": 18232,
+              "metadata_bytes": 84,
+              "integrity_bytes": 32,
+              "complete_bytes": 18407,
+              "residual_codec": "partition_rice",
+              "mean_abs": 220.34674072265625,
+              "median_abs": 56,
+              "p90_abs": 666,
+              "p99_abs": 1660,
+              "zero_fraction_ppm": 13793,
+              "positive": 7998,
+              "negative": 8160
+            }
+          ]
+        },
+        {
+          "id": "174-168635-0000",
+          "split": "dev-clean",
+          "speaker": "174",
+          "frames": 16384,
+          "flac_bytes": 15555,
+          "flac_shape": {
+            "frames": 4,
+            "subframes": {
+              "constant": 0,
+              "verbatim": 0,
+              "fixed": 0,
+              "lpc": 4
+            },
+            "lpc_orders_by_count": [
+              {
+                "value": 2,
+                "count": 2
+              },
+              {
+                "value": 7,
+                "count": 1
+              },
+              {
+                "value": 8,
+                "count": 1
+              }
+            ],
+            "lpc_precision_by_count": [
+              {
+                "value": 15,
+                "count": 4
+              }
+            ],
+            "lpc_shift_by_count": [
+              {
+                "value": 13,
+                "count": 3
+              },
+              {
+                "value": 12,
+                "count": 1
+              }
+            ],
+            "partition_orders": [
+              {
+                "order": 3,
+                "count": 2
+              },
+              {
+                "order": 4,
+                "count": 1
+              },
+              {
+                "order": 5,
+                "count": 1
+              }
+            ],
+            "bytes": {
+              "metadata": 86,
+              "frame_header": 24,
+              "frame_footer": 8,
+              "subframe_header": 4,
+              "warmup": 76,
+              "coeff": 38,
+              "residual_header": 4,
+              "residual_payload": 15309,
+              "total": 15555
+            },
+            "crc_ok": true,
+            "reconstructed_ok": true
+          },
+          "vle_best_family": "hier2",
+          "vle_best_bytes": 15997,
+          "vle_model_bytes": 64,
+          "vle_residual_bytes": 15817,
+          "vle_residual_codec": "partition_rice",
+          "vle_residual_count": 16384,
+          "vle_residual_mean_abs": 135.9827880859375,
+          "vle_residual_median_abs": 14,
+          "vle_residual_p90_abs": 416,
+          "vle_residual_p99_abs": 1165,
+          "vle_residual_zero_fraction_ppm": 30029,
+          "vle_residual_positive": 7856,
+          "vle_residual_negative": 8036,
+          "waterfall": [
+            {
+              "family": "dense4",
+              "model_bytes": 20,
+              "residual_bytes": 15991,
+              "metadata_bytes": 84,
+              "integrity_bytes": 32,
+              "complete_bytes": 16127,
+              "residual_codec": "partition_rice",
+              "mean_abs": 140.55303955078125,
+              "median_abs": 15,
+              "p90_abs": 428,
+              "p99_abs": 1248,
+              "zero_fraction_ppm": 28991,
+              "positive": 7881,
+              "negative": 8028
+            },
+            {
+              "family": "sparse10",
+              "model_bytes": 23,
+              "residual_bytes": 15875,
+              "metadata_bytes": 84,
+              "integrity_bytes": 32,
+              "complete_bytes": 16014,
+              "residual_codec": "partition_rice",
+              "mean_abs": 147.74542236328125,
+              "median_abs": 13,
+              "p90_abs": 444,
+              "p99_abs": 1425,
+              "zero_fraction_ppm": 34545,
+              "positive": 7942,
+              "negative": 7876
+            },
+            {
+              "family": "hier2",
+              "model_bytes": 64,
+              "residual_bytes": 15817,
+              "metadata_bytes": 84,
+              "integrity_bytes": 32,
+              "complete_bytes": 15997,
+              "residual_codec": "partition_rice",
+              "mean_abs": 135.9827880859375,
+              "median_abs": 14,
+              "p90_abs": 416,
+              "p99_abs": 1165,
+              "zero_fraction_ppm": 30029,
+              "positive": 7856,
+              "negative": 8036
+            }
+          ]
+        },
+        {
+          "id": "1919-142785-0000",
+          "split": "dev-clean",
+          "speaker": "1919",
+          "frames": 16384,
+          "flac_bytes": 18579,
+          "flac_shape": {
+            "frames": 4,
+            "subframes": {
+              "constant": 0,
+              "verbatim": 0,
+              "fixed": 1,
+              "lpc": 3
+            },
+            "lpc_orders_by_count": [
+              {
+                "value": 5,
+                "count": 1
+              },
+              {
+                "value": 6,
+                "count": 1
+              },
+              {
+                "value": 7,
+                "count": 1
+              }
+            ],
+            "lpc_precision_by_count": [
+              {
+                "value": 15,
+                "count": 3
+              }
+            ],
+            "lpc_shift_by_count": [
+              {
+                "value": 13,
+                "count": 3
+              }
+            ],
+            "partition_orders": [
+              {
+                "order": 0,
+                "count": 1
+              },
+              {
+                "order": 3,
+                "count": 1
+              },
+              {
+                "order": 4,
+                "count": 1
+              },
+              {
+                "order": 5,
+                "count": 1
+              }
+            ],
+            "bytes": {
+              "metadata": 86,
+              "frame_header": 24,
+              "frame_footer": 8,
+              "subframe_header": 4,
+              "warmup": 76,
+              "coeff": 36,
+              "residual_header": 4,
+              "residual_payload": 18337,
+              "total": 18579
+            },
+            "crc_ok": true,
+            "reconstructed_ok": true
+          },
+          "vle_best_family": "sparse10",
+          "vle_best_bytes": 19268,
+          "vle_model_bytes": 16,
+          "vle_residual_bytes": 19136,
+          "vle_residual_codec": "predictive_rice",
+          "vle_residual_count": 16384,
+          "vle_residual_mean_abs": 1057.5672607421875,
+          "vle_residual_median_abs": 43,
+          "vle_residual_p90_abs": 3511,
+          "vle_residual_p99_abs": 8832,
+          "vle_residual_zero_fraction_ppm": 10253,
+          "vle_residual_positive": 8275,
+          "vle_residual_negative": 7941,
+          "waterfall": [
+            {
+              "family": "dense4",
+              "model_bytes": 20,
+              "residual_bytes": 19485,
+              "metadata_bytes": 84,
+              "integrity_bytes": 32,
+              "complete_bytes": 19621,
+              "residual_codec": "predictive_rice",
+              "mean_abs": 766.2296142578125,
+              "median_abs": 37,
+              "p90_abs": 2468,
+              "p99_abs": 7206,
+              "zero_fraction_ppm": 10925,
+              "positive": 8279,
+              "negative": 7926
+            },
+            {
+              "family": "sparse10",
+              "model_bytes": 16,
+              "residual_bytes": 19136,
+              "metadata_bytes": 84,
+              "integrity_bytes": 32,
+              "complete_bytes": 19268,
+              "residual_codec": "predictive_rice",
+              "mean_abs": 1057.5672607421875,
+              "median_abs": 43,
+              "p90_abs": 3511,
+              "p99_abs": 8832,
+              "zero_fraction_ppm": 10253,
+              "positive": 8275,
+              "negative": 7941
+            },
+            {
+              "family": "hier2",
+              "model_bytes": 23,
+              "residual_bytes": 19136,
+              "metadata_bytes": 84,
+              "integrity_bytes": 32,
+              "complete_bytes": 19275,
+              "residual_codec": "predictive_rice",
+              "mean_abs": 1057.5672607421875,
+              "median_abs": 43,
+              "p90_abs": 3511,
+              "p99_abs": 8832,
+              "zero_fraction_ppm": 10253,
+              "positive": 8275,
+              "negative": 7941
+            }
+          ]
+        },
+        {
+          "id": "1988-147956-0000",
+          "split": "dev-clean",
+          "speaker": "1988",
+          "frames": 16384,
+          "flac_bytes": 13646,
+          "flac_shape": {
+            "frames": 4,
+            "subframes": {
+              "constant": 0,
+              "verbatim": 0,
+              "fixed": 2,
+              "lpc": 2
+            },
+            "lpc_orders_by_count": [
+              {
+                "value": 4,
+                "count": 1
+              },
+              {
+                "value": 5,
+                "count": 1
+              }
+            ],
+            "lpc_precision_by_count": [
+              {
+                "value": 15,
+                "count": 2
+              }
+            ],
+            "lpc_shift_by_count": [
+              {
+                "value": 13,
+                "count": 2
+              }
+            ],
+            "partition_orders": [
+              {
+                "order": 0,
+                "count": 1
+              },
+              {
+                "order": 1,
+                "count": 1
+              },
+              {
+                "order": 5,
+                "count": 2
+              }
+            ],
+            "bytes": {
+              "metadata": 86,
+              "frame_header": 24,
+              "frame_footer": 8,
+              "subframe_header": 4,
+              "warmup": 48,
+              "coeff": 18,
+              "residual_header": 4,
+              "residual_payload": 13450,
+              "total": 13646
+            },
+            "crc_ok": true,
+            "reconstructed_ok": true
+          },
+          "vle_best_family": "sparse10",
+          "vle_best_bytes": 13995,
+          "vle_model_bytes": 16,
+          "vle_residual_bytes": 13863,
+          "vle_residual_codec": "predictive_rice",
+          "vle_residual_count": 16384,
+          "vle_residual_mean_abs": 263.31353759765625,
+          "vle_residual_median_abs": 164,
+          "vle_residual_p90_abs": 445,
+          "vle_residual_p99_abs": 2656,
+          "vle_residual_zero_fraction_ppm": 1403,
+          "vle_residual_positive": 13995,
+          "vle_residual_negative": 2366,
+          "waterfall": [
+            {
+              "family": "dense4",
+              "model_bytes": 20,
+              "residual_bytes": 14400,
+              "metadata_bytes": 84,
+              "integrity_bytes": 32,
+              "complete_bytes": 14536,
+              "residual_codec": "predictive_rice",
+              "mean_abs": 101.7314453125,
+              "median_abs": 27,
+              "p90_abs": 306,
+              "p99_abs": 1098,
+              "zero_fraction_ppm": 11657,
+              "positive": 8205,
+              "negative": 7988
+            },
+            {
+              "family": "sparse10",
+              "model_bytes": 16,
+              "residual_bytes": 13863,
+              "metadata_bytes": 84,
+              "integrity_bytes": 32,
+              "complete_bytes": 13995,
+              "residual_codec": "predictive_rice",
+              "mean_abs": 263.31353759765625,
+              "median_abs": 164,
+              "p90_abs": 445,
+              "p99_abs": 2656,
+              "zero_fraction_ppm": 1403,
+              "positive": 13995,
+              "negative": 2366
+            },
+            {
+              "family": "hier2",
+              "model_bytes": 23,
+              "residual_bytes": 13863,
+              "metadata_bytes": 84,
+              "integrity_bytes": 32,
+              "complete_bytes": 14002,
+              "residual_codec": "predictive_rice",
+              "mean_abs": 263.31353759765625,
+              "median_abs": 164,
+              "p90_abs": 445,
+              "p99_abs": 2656,
+              "zero_fraction_ppm": 1403,
+              "positive": 13995,
+              "negative": 2366
+            }
+          ]
+        },
+        {
+          "id": "1993-147149-0000",
+          "split": "dev-clean",
+          "speaker": "1993",
+          "frames": 16384,
+          "flac_bytes": 12284,
+          "flac_shape": {
+            "frames": 4,
+            "subframes": {
+              "constant": 0,
+              "verbatim": 0,
+              "fixed": 1,
+              "lpc": 3
+            },
+            "lpc_orders_by_count": [
+              {
+                "value": 4,
+                "count": 2
+              },
+              {
+                "value": 8,
+                "count": 1
+              }
+            ],
+            "lpc_precision_by_count": [
+              {
+                "value": 15,
+                "count": 3
+              }
+            ],
+            "lpc_shift_by_count": [
+              {
+                "value": 12,
+                "count": 1
+              },
+              {
+                "value": 13,
+                "count": 1
+              },
+              {
+                "value": 14,
+                "count": 1
+              }
+            ],
+            "partition_orders": [
+              {
+                "order": 0,
+                "count": 1
+              },
+              {
+                "order": 5,
+                "count": 3
+              }
+            ],
+            "bytes": {
+              "metadata": 86,
+              "frame_header": 24,
+              "frame_footer": 8,
+              "subframe_header": 4,
+              "warmup": 68,
+              "coeff": 32,
+              "residual_header": 4,
+              "residual_payload": 12054,
+              "total": 12284
+            },
+            "crc_ok": true,
+            "reconstructed_ok": true
+          },
+          "vle_best_family": "hier2",
+          "vle_best_bytes": 12854,
+          "vle_model_bytes": 40,
+          "vle_residual_bytes": 12698,
+          "vle_residual_codec": "partition_rice",
+          "vle_residual_count": 16384,
+          "vle_residual_mean_abs": 23.53851318359375,
+          "vle_residual_median_abs": 7,
+          "vle_residual_p90_abs": 71,
+          "vle_residual_p99_abs": 201,
+          "vle_residual_zero_fraction_ppm": 48095,
+          "vle_residual_positive": 7714,
+          "vle_residual_negative": 7882,
+          "waterfall": [
+            {
+              "family": "dense4",
+              "model_bytes": 20,
+              "residual_bytes": 12983,
+              "metadata_bytes": 84,
+              "integrity_bytes": 32,
+              "complete_bytes": 13119,
+              "residual_codec": "partition_rice",
+              "mean_abs": 25.7119140625,
+              "median_abs": 7,
+              "p90_abs": 76,
+              "p99_abs": 200,
+              "zero_fraction_ppm": 45532,
+              "positive": 7717,
+              "negative": 7921
+            },
+            {
+              "family": "sparse10",
+              "model_bytes": 43,
+              "residual_bytes": 12706,
+              "metadata_bytes": 84,
+              "integrity_bytes": 32,
+              "complete_bytes": 12865,
+              "residual_codec": "partition_rice",
+              "mean_abs": 23.21240234375,
+              "median_abs": 6,
+              "p90_abs": 70,
+              "p99_abs": 196,
+              "zero_fraction_ppm": 44982,
+              "positive": 7702,
+              "negative": 7945
+            },
+            {
+              "family": "hier2",
+              "model_bytes": 40,
+              "residual_bytes": 12698,
+              "metadata_bytes": 84,
+              "integrity_bytes": 32,
+              "complete_bytes": 12854,
+              "residual_codec": "partition_rice",
+              "mean_abs": 23.53851318359375,
+              "median_abs": 7,
+              "p90_abs": 71,
+              "p99_abs": 201,
+              "zero_fraction_ppm": 48095,
+              "positive": 7714,
+              "negative": 7882
+            }
+          ]
+        },
+        {
+          "id": "2035-147960-0000",
+          "split": "dev-clean",
+          "speaker": "2035",
+          "frames": 16384,
+          "flac_bytes": 21243,
+          "flac_shape": {
+            "frames": 4,
+            "subframes": {
+              "constant": 0,
+              "verbatim": 0,
+              "fixed": 0,
+              "lpc": 4
+            },
+            "lpc_orders_by_count": [
+              {
+                "value": 8,
+                "count": 3
+              },
+              {
+                "value": 7,
+                "count": 1
+              }
+            ],
+            "lpc_precision_by_count": [
+              {
+                "value": 15,
+                "count": 4
+              }
+            ],
+            "lpc_shift_by_count": [
+              {
+                "value": 13,
+                "count": 2
+              },
+              {
+                "value": 12,
+                "count": 1
+              },
+              {
+                "value": 14,
+                "count": 1
+              }
+            ],
+            "partition_orders": [
+              {
+                "order": 2,
+                "count": 1
+              },
+              {
+                "order": 3,
+                "count": 1
+              },
+              {
+                "order": 5,
+                "count": 2
+              }
+            ],
+            "bytes": {
+              "metadata": 86,
+              "frame_header": 24,
+              "frame_footer": 8,
+              "subframe_header": 4,
+              "warmup": 124,
+              "coeff": 62,
+              "residual_header": 4,
+              "residual_payload": 20927,
+              "total": 21243
+            },
+            "crc_ok": true,
+            "reconstructed_ok": true
+          },
+          "vle_best_family": "hier2",
+          "vle_best_bytes": 21996,
+          "vle_model_bytes": 70,
+          "vle_residual_bytes": 21810,
+          "vle_residual_codec": "partition_rice",
+          "vle_residual_count": 16384,
+          "vle_residual_mean_abs": 403.69244384765625,
+          "vle_residual_median_abs": 190,
+          "vle_residual_p90_abs": 1074,
+          "vle_residual_p99_abs": 2329,
+          "vle_residual_zero_fraction_ppm": 2075,
+          "vle_residual_positive": 8265,
+          "vle_residual_negative": 8085,
+          "waterfall": [
+            {
+              "family": "dense4",
+              "model_bytes": 20,
+              "residual_bytes": 22049,
+              "metadata_bytes": 84,
+              "integrity_bytes": 32,
+              "complete_bytes": 22185,
+              "residual_codec": "partition_rice",
+              "mean_abs": 509.7313232421875,
+              "median_abs": 254,
+              "p90_abs": 1319,
+              "p99_abs": 2998,
+              "zero_fraction_ppm": 3173,
+              "positive": 7783,
+              "negative": 8549
+            },
+            {
+              "family": "sparse10",
+              "model_bytes": 42,
+              "residual_bytes": 21853,
+              "metadata_bytes": 84,
+              "integrity_bytes": 32,
+              "complete_bytes": 22011,
+              "residual_codec": "partition_rice",
+              "mean_abs": 425.54876708984375,
+              "median_abs": 210,
+              "p90_abs": 1112,
+              "p99_abs": 2449,
+              "zero_fraction_ppm": 2380,
+              "positive": 8100,
+              "negative": 8245
+            },
+            {
+              "family": "hier2",
+              "model_bytes": 70,
+              "residual_bytes": 21810,
+              "metadata_bytes": 84,
+              "integrity_bytes": 32,
+              "complete_bytes": 21996,
+              "residual_codec": "partition_rice",
+              "mean_abs": 403.69244384765625,
+              "median_abs": 190,
+              "p90_abs": 1074,
+              "p99_abs": 2329,
+              "zero_fraction_ppm": 2075,
+              "positive": 8265,
+              "negative": 8085
+            }
+          ]
+        },
+        {
+          "id": "1089-134686-0000",
+          "split": "test-clean",
+          "speaker": "1089",
+          "frames": 16384,
+          "flac_bytes": 15428,
+          "flac_shape": {
+            "frames": 4,
+            "subframes": {
+              "constant": 0,
+              "verbatim": 0,
+              "fixed": 1,
+              "lpc": 3
+            },
+            "lpc_orders_by_count": [
+              {
+                "value": 7,
+                "count": 2
+              },
+              {
+                "value": 8,
+                "count": 1
+              }
+            ],
+            "lpc_precision_by_count": [
+              {
+                "value": 15,
+                "count": 3
+              }
+            ],
+            "lpc_shift_by_count": [
+              {
+                "value": 13,
+                "count": 2
+              },
+              {
+                "value": 12,
+                "count": 1
+              }
+            ],
+            "partition_orders": [
+              {
+                "order": 0,
+                "count": 1
+              },
+              {
+                "order": 3,
+                "count": 1
+              },
+              {
+                "order": 5,
+                "count": 2
+              }
+            ],
+            "bytes": {
+              "metadata": 86,
+              "frame_header": 24,
+              "frame_footer": 8,
+              "subframe_header": 4,
+              "warmup": 96,
+              "coeff": 44,
+              "residual_header": 4,
+              "residual_payload": 15158,
+              "total": 15428
+            },
+            "crc_ok": true,
+            "reconstructed_ok": true
+          },
+          "vle_best_family": "sparse10",
+          "vle_best_bytes": 15959,
+          "vle_model_bytes": 20,
+          "vle_residual_bytes": 15823,
+          "vle_residual_codec": "partition_rice",
+          "vle_residual_count": 16384,
+          "vle_residual_mean_abs": 120.67059326171875,
+          "vle_residual_median_abs": 17,
+          "vle_residual_p90_abs": 315,
+          "vle_residual_p99_abs": 1517,
+          "vle_residual_zero_fraction_ppm": 25024,
+          "vle_residual_positive": 7850,
+          "vle_residual_negative": 8124,
+          "waterfall": [
+            {
+              "family": "dense4",
+              "model_bytes": 20,
+              "residual_bytes": 16163,
+              "metadata_bytes": 84,
+              "integrity_bytes": 32,
+              "complete_bytes": 16299,
+              "residual_codec": "block_rice",
+              "mean_abs": 99.5283203125,
+              "median_abs": 19,
+              "p90_abs": 287,
+              "p99_abs": 1091,
+              "zero_fraction_ppm": 16845,
+              "positive": 7934,
+              "negative": 8174
+            },
+            {
+              "family": "sparse10",
+              "model_bytes": 20,
+              "residual_bytes": 15823,
+              "metadata_bytes": 84,
+              "integrity_bytes": 32,
+              "complete_bytes": 15959,
+              "residual_codec": "partition_rice",
+              "mean_abs": 120.67059326171875,
+              "median_abs": 17,
+              "p90_abs": 315,
+              "p99_abs": 1517,
+              "zero_fraction_ppm": 25024,
+              "positive": 7850,
+              "negative": 8124
+            },
+            {
+              "family": "hier2",
+              "model_bytes": 27,
+              "residual_bytes": 15823,
+              "metadata_bytes": 84,
+              "integrity_bytes": 32,
+              "complete_bytes": 15966,
+              "residual_codec": "partition_rice",
+              "mean_abs": 120.67059326171875,
+              "median_abs": 17,
+              "p90_abs": 315,
+              "p99_abs": 1517,
+              "zero_fraction_ppm": 25024,
+              "positive": 7850,
+              "negative": 8124
+            }
+          ]
+        },
+        {
+          "id": "1188-133604-0000",
+          "split": "test-clean",
+          "speaker": "1188",
+          "frames": 16384,
+          "flac_bytes": 13547,
+          "flac_shape": {
+            "frames": 4,
+            "subframes": {
+              "constant": 0,
+              "verbatim": 0,
+              "fixed": 1,
+              "lpc": 3
+            },
+            "lpc_orders_by_count": [
+              {
+                "value": 6,
+                "count": 1
+              },
+              {
+                "value": 7,
+                "count": 1
+              },
+              {
+                "value": 8,
+                "count": 1
+              }
+            ],
+            "lpc_precision_by_count": [
+              {
+                "value": 15,
+                "count": 3
+              }
+            ],
+            "lpc_shift_by_count": [
+              {
+                "value": 13,
+                "count": 2
+              },
+              {
+                "value": 12,
+                "count": 1
+              }
+            ],
+            "partition_orders": [
+              {
+                "order": 3,
+                "count": 1
+              },
+              {
+                "order": 4,
+                "count": 1
+              },
+              {
+                "order": 5,
+                "count": 2
+              }
+            ],
+            "bytes": {
+              "metadata": 86,
+              "frame_header": 24,
+              "frame_footer": 8,
+              "subframe_header": 4,
+              "warmup": 92,
+              "coeff": 42,
+              "residual_header": 4,
+              "residual_payload": 13284,
+              "total": 13547
+            },
+            "crc_ok": true,
+            "reconstructed_ok": true
+          },
+          "vle_best_family": "sparse10",
+          "vle_best_bytes": 13770,
+          "vle_model_bytes": 35,
+          "vle_residual_bytes": 13619,
+          "vle_residual_codec": "partition_rice",
+          "vle_residual_count": 16384,
+          "vle_residual_mean_abs": 52.34075927734375,
+          "vle_residual_median_abs": 7,
+          "vle_residual_p90_abs": 153,
+          "vle_residual_p99_abs": 559,
+          "vle_residual_zero_fraction_ppm": 46325,
+          "vle_residual_positive": 7518,
+          "vle_residual_negative": 8107,
+          "waterfall": [
+            {
+              "family": "dense4",
+              "model_bytes": 20,
+              "residual_bytes": 13819,
+              "metadata_bytes": 84,
+              "integrity_bytes": 32,
+              "complete_bytes": 13955,
+              "residual_codec": "block_rice",
+              "mean_abs": 53.8555908203125,
+              "median_abs": 7,
+              "p90_abs": 159,
+              "p99_abs": 536,
+              "zero_fraction_ppm": 45715,
+              "positive": 7735,
+              "negative": 7900
+            },
+            {
+              "family": "sparse10",
+              "model_bytes": 35,
+              "residual_bytes": 13619,
+              "metadata_bytes": 84,
+              "integrity_bytes": 32,
+              "complete_bytes": 13770,
+              "residual_codec": "partition_rice",
+              "mean_abs": 52.34075927734375,
+              "median_abs": 7,
+              "p90_abs": 153,
+              "p99_abs": 559,
+              "zero_fraction_ppm": 46325,
+              "positive": 7518,
+              "negative": 8107
+            },
+            {
+              "family": "hier2",
+              "model_bytes": 36,
+              "residual_bytes": 13694,
+              "metadata_bytes": 84,
+              "integrity_bytes": 32,
+              "complete_bytes": 13846,
+              "residual_codec": "block_rice",
+              "mean_abs": 52.8367919921875,
+              "median_abs": 7,
+              "p90_abs": 156,
+              "p99_abs": 555,
+              "zero_fraction_ppm": 47790,
+              "positive": 7512,
+              "negative": 8089
+            }
+          ]
+        },
+        {
+          "id": "121-121726-0000",
+          "split": "test-clean",
+          "speaker": "121",
+          "frames": 16384,
+          "flac_bytes": 19529,
+          "flac_shape": {
+            "frames": 4,
+            "subframes": {
+              "constant": 0,
+              "verbatim": 0,
+              "fixed": 1,
+              "lpc": 3
+            },
+            "lpc_orders_by_count": [
+              {
+                "value": 8,
+                "count": 3
+              }
+            ],
+            "lpc_precision_by_count": [
+              {
+                "value": 15,
+                "count": 3
+              }
+            ],
+            "lpc_shift_by_count": [
+              {
+                "value": 13,
+                "count": 2
+              },
+              {
+                "value": 14,
+                "count": 1
+              }
+            ],
+            "partition_orders": [
+              {
+                "order": 4,
+                "count": 2
+              },
+              {
+                "order": 5,
+                "count": 2
+              }
+            ],
+            "bytes": {
+              "metadata": 86,
+              "frame_header": 24,
+              "frame_footer": 8,
+              "subframe_header": 4,
+              "warmup": 104,
+              "coeff": 48,
+              "residual_header": 4,
+              "residual_payload": 19247,
+              "total": 19529
+            },
+            "crc_ok": true,
+            "reconstructed_ok": true
+          },
+          "vle_best_family": "hier2",
+          "vle_best_bytes": 20322,
+          "vle_model_bytes": 37,
+          "vle_residual_bytes": 20169,
+          "vle_residual_codec": "predictive_rice",
+          "vle_residual_count": 16384,
+          "vle_residual_mean_abs": 759.6808471679688,
+          "vle_residual_median_abs": 443,
+          "vle_residual_p90_abs": 1909,
+          "vle_residual_p99_abs": 4733,
+          "vle_residual_zero_fraction_ppm": 181213,
+          "vle_residual_positive": 6703,
+          "vle_residual_negative": 6712,
+          "waterfall": [
+            {
+              "family": "dense4",
+              "model_bytes": 20,
+              "residual_bytes": 20548,
+              "metadata_bytes": 84,
+              "integrity_bytes": 32,
+              "complete_bytes": 20684,
+              "residual_codec": "predictive_rice",
+              "mean_abs": 789.4862670898438,
+              "median_abs": 431,
+              "p90_abs": 1970,
+              "p99_abs": 5677,
+              "zero_fraction_ppm": 183654,
+              "positive": 7141,
+              "negative": 6234
+            },
+            {
+              "family": "sparse10",
+              "model_bytes": 43,
+              "residual_bytes": 20201,
+              "metadata_bytes": 84,
+              "integrity_bytes": 32,
+              "complete_bytes": 20360,
+              "residual_codec": "predictive_rice",
+              "mean_abs": 790.2240600585938,
+              "median_abs": 472,
+              "p90_abs": 2017,
+              "p99_abs": 4586,
+              "zero_fraction_ppm": 180297,
+              "positive": 6615,
+              "negative": 6815
+            },
+            {
+              "family": "hier2",
+              "model_bytes": 37,
+              "residual_bytes": 20169,
+              "metadata_bytes": 84,
+              "integrity_bytes": 32,
+              "complete_bytes": 20322,
+              "residual_codec": "predictive_rice",
+              "mean_abs": 759.6808471679688,
+              "median_abs": 443,
+              "p90_abs": 1909,
+              "p99_abs": 4733,
+              "zero_fraction_ppm": 181213,
+              "positive": 6703,
+              "negative": 6712
+            }
+          ]
+        },
+        {
+          "id": "1221-135766-0000",
+          "split": "test-clean",
+          "speaker": "1221",
+          "frames": 16384,
+          "flac_bytes": 21409,
+          "flac_shape": {
+            "frames": 4,
+            "subframes": {
+              "constant": 0,
+              "verbatim": 0,
+              "fixed": 1,
+              "lpc": 3
+            },
+            "lpc_orders_by_count": [
+              {
+                "value": 8,
+                "count": 2
+              },
+              {
+                "value": 6,
+                "count": 1
+              }
+            ],
+            "lpc_precision_by_count": [
+              {
+                "value": 15,
+                "count": 3
+              }
+            ],
+            "lpc_shift_by_count": [
+              {
+                "value": 13,
+                "count": 1
+              },
+              {
+                "value": 14,
+                "count": 1
+              },
+              {
+                "value": 15,
+                "count": 1
+              }
+            ],
+            "partition_orders": [
+              {
+                "order": 5,
+                "count": 4
+              }
+            ],
+            "bytes": {
+              "metadata": 86,
+              "frame_header": 24,
+              "frame_footer": 8,
+              "subframe_header": 4,
+              "warmup": 92,
+              "coeff": 44,
+              "residual_header": 4,
+              "residual_payload": 21143,
+              "total": 21409
+            },
+            "crc_ok": true,
+            "reconstructed_ok": true
+          },
+          "vle_best_family": "sparse10",
+          "vle_best_bytes": 21815,
+          "vle_model_bytes": 22,
+          "vle_residual_bytes": 21677,
+          "vle_residual_codec": "predictive_rice",
+          "vle_residual_count": 16384,
+          "vle_residual_mean_abs": 716.6314086914062,
+          "vle_residual_median_abs": 263,
+          "vle_residual_p90_abs": 2016,
+          "vle_residual_p99_abs": 4180,
+          "vle_residual_zero_fraction_ppm": 1647,
+          "vle_residual_positive": 7916,
+          "vle_residual_negative": 8441,
+          "waterfall": [
+            {
+              "family": "dense4",
+              "model_bytes": 20,
+              "residual_bytes": 21871,
+              "metadata_bytes": 84,
+              "integrity_bytes": 32,
+              "complete_bytes": 22007,
+              "residual_codec": "predictive_rice",
+              "mean_abs": 583.8589477539062,
+              "median_abs": 201,
+              "p90_abs": 1594,
+              "p99_abs": 4325,
+              "zero_fraction_ppm": 2807,
+              "positive": 8148,
+              "negative": 8190
+            },
+            {
+              "family": "sparse10",
+              "model_bytes": 22,
+              "residual_bytes": 21677,
+              "metadata_bytes": 84,
+              "integrity_bytes": 32,
+              "complete_bytes": 21815,
+              "residual_codec": "predictive_rice",
+              "mean_abs": 716.6314086914062,
+              "median_abs": 263,
+              "p90_abs": 2016,
+              "p99_abs": 4180,
+              "zero_fraction_ppm": 1647,
+              "positive": 7916,
+              "negative": 8441
+            },
+            {
+              "family": "hier2",
+              "model_bytes": 23,
+              "residual_bytes": 21682,
+              "metadata_bytes": 84,
+              "integrity_bytes": 32,
+              "complete_bytes": 21821,
+              "residual_codec": "predictive_rice",
+              "mean_abs": 729.1144409179688,
+              "median_abs": 268,
+              "p90_abs": 2061,
+              "p99_abs": 4177,
+              "zero_fraction_ppm": 1098,
+              "positive": 7949,
+              "negative": 8417
+            }
+          ]
+        },
+        {
+          "id": "1284-1180-0000",
+          "split": "test-clean",
+          "speaker": "1284",
+          "frames": 16384,
+          "flac_bytes": 17526,
+          "flac_shape": {
+            "frames": 4,
+            "subframes": {
+              "constant": 0,
+              "verbatim": 0,
+              "fixed": 1,
+              "lpc": 3
+            },
+            "lpc_orders_by_count": [
+              {
+                "value": 7,
+                "count": 2
+              },
+              {
+                "value": 8,
+                "count": 1
+              }
+            ],
+            "lpc_precision_by_count": [
+              {
+                "value": 15,
+                "count": 3
+              }
+            ],
+            "lpc_shift_by_count": [
+              {
+                "value": 13,
+                "count": 2
+              },
+              {
+                "value": 12,
+                "count": 1
+              }
+            ],
+            "partition_orders": [
+              {
+                "order": 4,
+                "count": 1
+              },
+              {
+                "order": 5,
+                "count": 3
+              }
+            ],
+            "bytes": {
+              "metadata": 86,
+              "frame_header": 24,
+              "frame_footer": 8,
+              "subframe_header": 4,
+              "warmup": 92,
+              "coeff": 44,
+              "residual_header": 4,
+              "residual_payload": 17260,
+              "total": 17526
+            },
+            "crc_ok": true,
+            "reconstructed_ok": true
+          },
+          "vle_best_family": "hier2",
+          "vle_best_bytes": 18161,
+          "vle_model_bytes": 66,
+          "vle_residual_bytes": 17979,
+          "vle_residual_codec": "predictive_rice",
+          "vle_residual_count": 16384,
+          "vle_residual_mean_abs": 230.9132080078125,
+          "vle_residual_median_abs": 111,
+          "vle_residual_p90_abs": 609,
+          "vle_residual_p99_abs": 1616,
+          "vle_residual_zero_fraction_ppm": 15502,
+          "vle_residual_positive": 7687,
+          "vle_residual_negative": 8443,
+          "waterfall": [
+            {
+              "family": "dense4",
+              "model_bytes": 20,
+              "residual_bytes": 18409,
+              "metadata_bytes": 84,
+              "integrity_bytes": 32,
+              "complete_bytes": 18545,
+              "residual_codec": "predictive_rice",
+              "mean_abs": 251.05743408203125,
+              "median_abs": 102,
+              "p90_abs": 660,
+              "p99_abs": 2082,
+              "zero_fraction_ppm": 17883,
+              "positive": 7786,
+              "negative": 8305
+            },
+            {
+              "family": "sparse10",
+              "model_bytes": 25,
+              "residual_bytes": 18039,
+              "metadata_bytes": 84,
+              "integrity_bytes": 32,
+              "complete_bytes": 18180,
+              "residual_codec": "predictive_rice",
+              "mean_abs": 302.446533203125,
+              "median_abs": 148,
+              "p90_abs": 795,
+              "p99_abs": 1914,
+              "zero_fraction_ppm": 12817,
+              "positive": 7719,
+              "negative": 8455
+            },
+            {
+              "family": "hier2",
+              "model_bytes": 66,
+              "residual_bytes": 17979,
+              "metadata_bytes": 84,
+              "integrity_bytes": 32,
+              "complete_bytes": 18161,
+              "residual_codec": "predictive_rice",
+              "mean_abs": 230.9132080078125,
+              "median_abs": 111,
+              "p90_abs": 609,
+              "p99_abs": 1616,
+              "zero_fraction_ppm": 15502,
+              "positive": 7687,
+              "negative": 8443
+            }
+          ]
+        },
+        {
+          "id": "1320-122612-0000",
+          "split": "test-clean",
+          "speaker": "1320",
+          "frames": 16384,
+          "flac_bytes": 21047,
+          "flac_shape": {
+            "frames": 4,
+            "subframes": {
+              "constant": 0,
+              "verbatim": 0,
+              "fixed": 2,
+              "lpc": 2
+            },
+            "lpc_orders_by_count": [
+              {
+                "value": 6,
+                "count": 1
+              },
+              {
+                "value": 8,
+                "count": 1
+              }
+            ],
+            "lpc_precision_by_count": [
+              {
+                "value": 15,
+                "count": 2
+              }
+            ],
+            "lpc_shift_by_count": [
+              {
+                "value": 12,
+                "count": 1
+              },
+              {
+                "value": 14,
+                "count": 1
+              }
+            ],
+            "partition_orders": [
+              {
+                "order": 4,
+                "count": 1
+              },
+              {
+                "order": 5,
+                "count": 3
+              }
+            ],
+            "bytes": {
+              "metadata": 86,
+              "frame_header": 24,
+              "frame_footer": 8,
+              "subframe_header": 4,
+              "warmup": 60,
+              "coeff": 28,
+              "residual_header": 4,
+              "residual_payload": 20830,
+              "total": 21047
+            },
+            "crc_ok": true,
+            "reconstructed_ok": true
+          },
+          "vle_best_family": "sparse10",
+          "vle_best_bytes": 21229,
+          "vle_model_bytes": 22,
+          "vle_residual_bytes": 21091,
+          "vle_residual_codec": "predictive_rice",
+          "vle_residual_count": 16384,
+          "vle_residual_mean_abs": 949.9092407226562,
+          "vle_residual_median_abs": 218,
+          "vle_residual_p90_abs": 3016,
+          "vle_residual_p99_abs": 6154,
+          "vle_residual_zero_fraction_ppm": 1525,
+          "vle_residual_positive": 6109,
+          "vle_residual_negative": 10250,
+          "waterfall": [
+            {
+              "family": "dense4",
+              "model_bytes": 20,
+              "residual_bytes": 21350,
+              "metadata_bytes": 84,
+              "integrity_bytes": 32,
+              "complete_bytes": 21486,
+              "residual_codec": "predictive_rice",
+              "mean_abs": 647.30078125,
+              "median_abs": 198,
+              "p90_abs": 1900,
+              "p99_abs": 4815,
+              "zero_fraction_ppm": 5615,
+              "positive": 8316,
+              "negative": 7976
+            },
+            {
+              "family": "sparse10",
+              "model_bytes": 22,
+              "residual_bytes": 21091,
+              "metadata_bytes": 84,
+              "integrity_bytes": 32,
+              "complete_bytes": 21229,
+              "residual_codec": "predictive_rice",
+              "mean_abs": 949.9092407226562,
+              "median_abs": 218,
+              "p90_abs": 3016,
+              "p99_abs": 6154,
+              "zero_fraction_ppm": 1525,
+              "positive": 6109,
+              "negative": 10250
+            },
+            {
+              "family": "hier2",
+              "model_bytes": 49,
+              "residual_bytes": 21107,
+              "metadata_bytes": 84,
+              "integrity_bytes": 32,
+              "complete_bytes": 21272,
+              "residual_codec": "predictive_rice",
+              "mean_abs": 814.3526000976562,
+              "median_abs": 209,
+              "p90_abs": 2558,
+              "p99_abs": 5678,
+              "zero_fraction_ppm": 3356,
+              "positive": 7248,
+              "negative": 9081
+            }
+          ]
+        },
+        {
+          "id": "1580-141083-0000",
+          "split": "test-clean",
+          "speaker": "1580",
+          "frames": 16384,
+          "flac_bytes": 19617,
+          "flac_shape": {
+            "frames": 4,
+            "subframes": {
+              "constant": 0,
+              "verbatim": 0,
+              "fixed": 0,
+              "lpc": 4
+            },
+            "lpc_orders_by_count": [
+              {
+                "value": 8,
+                "count": 3
+              },
+              {
+                "value": 6,
+                "count": 1
+              }
+            ],
+            "lpc_precision_by_count": [
+              {
+                "value": 15,
+                "count": 4
+              }
+            ],
+            "lpc_shift_by_count": [
+              {
+                "value": 14,
+                "count": 2
+              },
+              {
+                "value": 11,
+                "count": 1
+              },
+              {
+                "value": 13,
+                "count": 1
+              }
+            ],
+            "partition_orders": [
+              {
+                "order": 4,
+                "count": 1
+              },
+              {
+                "order": 5,
+                "count": 3
+              }
+            ],
+            "bytes": {
+              "metadata": 86,
+              "frame_header": 24,
+              "frame_footer": 8,
+              "subframe_header": 4,
+              "warmup": 120,
+              "coeff": 60,
+              "residual_header": 4,
+              "residual_payload": 19308,
+              "total": 19617
+            },
+            "crc_ok": true,
+            "reconstructed_ok": true
+          },
+          "vle_best_family": "sparse10",
+          "vle_best_bytes": 20022,
+          "vle_model_bytes": 39,
+          "vle_residual_bytes": 19867,
+          "vle_residual_codec": "block_rice",
+          "vle_residual_count": 16384,
+          "vle_residual_mean_abs": 312.84210205078125,
+          "vle_residual_median_abs": 91,
+          "vle_residual_p90_abs": 858,
+          "vle_residual_p99_abs": 2893,
+          "vle_residual_zero_fraction_ppm": 6713,
+          "vle_residual_positive": 8371,
+          "vle_residual_negative": 7903,
+          "waterfall": [
+            {
+              "family": "dense4",
+              "model_bytes": 20,
+              "residual_bytes": 20041,
+              "metadata_bytes": 84,
+              "integrity_bytes": 32,
+              "complete_bytes": 20177,
+              "residual_codec": "partition_rice",
+              "mean_abs": 342.50933837890625,
+              "median_abs": 101,
+              "p90_abs": 931,
+              "p99_abs": 3061,
+              "zero_fraction_ppm": 6530,
+              "positive": 8644,
+              "negative": 7633
+            },
+            {
+              "family": "sparse10",
+              "model_bytes": 39,
+              "residual_bytes": 19867,
+              "metadata_bytes": 84,
+              "integrity_bytes": 32,
+              "complete_bytes": 20022,
+              "residual_codec": "block_rice",
+              "mean_abs": 312.84210205078125,
+              "median_abs": 91,
+              "p90_abs": 858,
+              "p99_abs": 2893,
+              "zero_fraction_ppm": 6713,
+              "positive": 8371,
+              "negative": 7903
+            },
+            {
+              "family": "hier2",
+              "model_bytes": 34,
+              "residual_bytes": 19988,
+              "metadata_bytes": 84,
+              "integrity_bytes": 32,
+              "complete_bytes": 20138,
+              "residual_codec": "partition_rice",
+              "mean_abs": 341.4239501953125,
+              "median_abs": 95,
+              "p90_abs": 941,
+              "p99_abs": 3247,
+              "zero_fraction_ppm": 7324,
+              "positive": 8620,
+              "negative": 7644
+            }
+          ]
+        },
+        {
+          "id": "1995-1826-0000",
+          "split": "test-clean",
+          "speaker": "1995",
+          "frames": 16384,
+          "flac_bytes": 16042,
+          "flac_shape": {
+            "frames": 4,
+            "subframes": {
+              "constant": 0,
+              "verbatim": 0,
+              "fixed": 3,
+              "lpc": 1
+            },
+            "lpc_orders_by_count": [
+              {
+                "value": 8,
+                "count": 1
+              }
+            ],
+            "lpc_precision_by_count": [
+              {
+                "value": 15,
+                "count": 1
+              }
+            ],
+            "lpc_shift_by_count": [
+              {
+                "value": 13,
+                "count": 1
+              }
+            ],
+            "partition_orders": [
+              {
+                "order": 5,
+                "count": 4
+              }
+            ],
+            "bytes": {
+              "metadata": 86,
+              "frame_header": 24,
+              "frame_footer": 8,
+              "subframe_header": 4,
+              "warmup": 52,
+              "coeff": 16,
+              "residual_header": 4,
+              "residual_payload": 15845,
+              "total": 16042
+            },
+            "crc_ok": true,
+            "reconstructed_ok": true
+          },
+          "vle_best_family": "hier2",
+          "vle_best_bytes": 16259,
+          "vle_model_bytes": 38,
+          "vle_residual_bytes": 16105,
+          "vle_residual_codec": "partition_rice",
+          "vle_residual_count": 16384,
+          "vle_residual_mean_abs": 113.14752197265625,
+          "vle_residual_median_abs": 36,
+          "vle_residual_p90_abs": 305,
+          "vle_residual_p99_abs": 1017,
+          "vle_residual_zero_fraction_ppm": 54199,
+          "vle_residual_positive": 8200,
+          "vle_residual_negative": 7296,
+          "waterfall": [
+            {
+              "family": "dense4",
+              "model_bytes": 20,
+              "residual_bytes": 16411,
+              "metadata_bytes": 84,
+              "integrity_bytes": 32,
+              "complete_bytes": 16547,
+              "residual_codec": "partition_rice",
+              "mean_abs": 129.212646484375,
+              "median_abs": 43,
+              "p90_abs": 341,
+              "p99_abs": 1139,
+              "zero_fraction_ppm": 47973,
+              "positive": 8044,
+              "negative": 7554
+            },
+            {
+              "family": "sparse10",
+              "model_bytes": 40,
+              "residual_bytes": 16142,
+              "metadata_bytes": 84,
+              "integrity_bytes": 32,
+              "complete_bytes": 16298,
+              "residual_codec": "partition_rice",
+              "mean_abs": 109.6920166015625,
+              "median_abs": 37,
+              "p90_abs": 290,
+              "p99_abs": 975,
+              "zero_fraction_ppm": 50537,
+              "positive": 8248,
+              "negative": 7308
+            },
+            {
+              "family": "hier2",
+              "model_bytes": 38,
+              "residual_bytes": 16105,
+              "metadata_bytes": 84,
+              "integrity_bytes": 32,
+              "complete_bytes": 16259,
+              "residual_codec": "partition_rice",
+              "mean_abs": 113.14752197265625,
+              "median_abs": 36,
+              "p90_abs": 305,
+              "p99_abs": 1017,
+              "zero_fraction_ppm": 54199,
+              "positive": 8200,
+              "negative": 7296
+            }
+          ]
+        }
+      ],
+      "limitations": [
+        "diagnostic only: no codec, profile, container or residual byte changes",
+        "the sample domain is the sign-extended-i16 experimental domain, not U1; a separate U1-mapped real-corpus court with new identities is required",
+        "object-specific fitting is representation selection, never a generalization claim"
+      ],
+      "method": {
+        "flac_source": "the actual in-process B1 artifact bytes (libflac-rs pinned =0.143.1), parsed and reconstructed sample for sample",
+        "flac_validation": "frame-header CRC-8 and frame-footer CRC-16 verified; every subframe reconstructed and compared to the encoder round trip; STREAMINFO sample count checked",
+        "vle_portfolio": "the currently wired three-family Exp2 real-speech portfolio (4-tap dense ridge whole-clip, sparse <=10 lags, 2-stage hierarchy); this is deliberately NOT the whole Exp2 profile",
+        "sample_domain": "sign-extended i16 in i32 (the Seal-K experimental domain); this is NOT the frozen U1 s16 mapping (x << 16)"
+      },
+      "protocol": {
+        "protocol_schema": "vole.audio.learned.protocol.v1",
+        "schema": "vole.audio.learned.exp2.evidence.v1",
+        "profile": "vole.audio.learned.exp2",
+        "version": 1,
+        "semantic_authority": "none: a learned hypothesis is a candidate family, never truth; scalar exact closure decides acceptance"
+      }
+    }
+  },
+  "receipt_sha256": "12f3714836e391a50780d41d3287121525cff9da1c2bc145fc35689dd908d665"
+}
