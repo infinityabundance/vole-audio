@@ -29,13 +29,14 @@ use crate::learned::train::linear::fit_linear_object_exp2;
 use crate::learned::train::lpc::{
     fit_lattice_object, fit_lpc_bidir_object, fit_lpc_object, fit_pz_object,
 };
+use crate::learned::train::ngsa::fit_ngsa_object;
 use crate::learned::train::sparse::fit_sparse_object;
 use crate::status::Verdict;
 use std::path::Path;
 
 /// Frozen static-result hash (empty means "not yet frozen").
 pub const LEARNED_SPEECH_SHA256: &str =
-    "aedcd974a12e3a51f61d88144b22722923a8c1ba9edf3a3b53b3789008617732";
+    "c1d62d07651d21f6f07c64b4169c1d7e72c557639a4fbd09c2b879c18a366d9a";
 
 pub(crate) const CLIPS_PER_SPLIT: usize = 8;
 
@@ -49,6 +50,7 @@ pub const ACTIVE_FAMILIES: &[&str] = &[
     "lpc_bidir",
     "lattice",
     "polezero",
+    "ngsa",
 ];
 
 fn bytes(o: &LearnedObject) -> Option<u64> {
@@ -148,6 +150,21 @@ pub(crate) fn portfolio(
     }
     if let Some(o) = best_pz {
         raw.push(("polezero", o));
+    }
+    // Seal A0: natural-gradient backward-adaptive predictor over a tap ladder.
+    let mut best_ngsa: Option<LearnedObject> = None;
+    let mut best_ngsa_bytes = u64::MAX;
+    for taps in [8u16, 16] {
+        if let Ok((o, _)) = fit_ngsa_object(&case.samples, frames, rate, taps, budget)
+            && let Some(b) = bytes(&o)
+            && b < best_ngsa_bytes
+        {
+            best_ngsa_bytes = b;
+            best_ngsa = Some(o);
+        }
+    }
+    if let Some(o) = best_ngsa {
+        raw.push(("ngsa", o));
     }
     // Re-encode every Exp2 candidate under Exp3 so the Seal S4 residual codecs
     // (general Golomb, centered Golomb) are selectable.
