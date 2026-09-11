@@ -97,6 +97,8 @@ pub enum ResidualCodecV2 {
     SignedFsmLag = 18,
     /// PAQ-light logistic mixture of six context experts (Seal E4).
     SignedFsmMix = 19,
+    /// Full RCM research mode: mixer followed by an ISSE stage (Seal E5).
+    SignedFsmRcm = 20,
 }
 
 impl ResidualCodecV2 {
@@ -136,8 +138,8 @@ impl ResidualCodecV2 {
         ResidualCodecV2::ContextRans,
     ];
 
-    /// The Exp3 additions (Seal S4, E1..E4), in canonical tie order.
-    pub const ALL_V3: [ResidualCodecV2; 20] = [
+    /// The Exp3 additions (Seal S4, E1..E5), in canonical tie order.
+    pub const ALL_V3: [ResidualCodecV2; 21] = [
         ResidualCodecV2::DenseI32,
         ResidualCodecV2::SparseDelta,
         ResidualCodecV2::ZigZagVarint,
@@ -158,6 +160,7 @@ impl ResidualCodecV2 {
         ResidualCodecV2::SignedFsmSse,
         ResidualCodecV2::SignedFsmLag,
         ResidualCodecV2::SignedFsmMix,
+        ResidualCodecV2::SignedFsmRcm,
     ];
 
     /// Canonical codec identifier byte.
@@ -188,6 +191,7 @@ impl ResidualCodecV2 {
             ResidualCodecV2::SignedFsmSse => "signed_fsm_sse",
             ResidualCodecV2::SignedFsmLag => "signed_fsm_lag",
             ResidualCodecV2::SignedFsmMix => "signed_fsm_mix",
+            ResidualCodecV2::SignedFsmRcm => "signed_fsm_rcm",
         }
     }
 
@@ -214,6 +218,7 @@ impl ResidualCodecV2 {
             17 => Some(ResidualCodecV2::SignedFsmSse),
             18 => Some(ResidualCodecV2::SignedFsmLag),
             19 => Some(ResidualCodecV2::SignedFsmMix),
+            20 => Some(ResidualCodecV2::SignedFsmRcm),
             _ => None,
         }
     }
@@ -271,6 +276,7 @@ impl ResidualCodecV2 {
             ResidualCodecV2::SignedFsmSse => encode_signed_fsm_sse(residual),
             ResidualCodecV2::SignedFsmLag => encode_signed_fsm_lag(residual),
             ResidualCodecV2::SignedFsmMix => encode_signed_fsm_mix(residual),
+            ResidualCodecV2::SignedFsmRcm => encode_signed_fsm_rcm(residual),
         }
     }
 
@@ -302,6 +308,7 @@ impl ResidualCodecV2 {
             ResidualCodecV2::SignedFsmSse => decode_signed_fsm_sse(bytes, len),
             ResidualCodecV2::SignedFsmLag => decode_signed_fsm_lag(bytes, len),
             ResidualCodecV2::SignedFsmMix => decode_signed_fsm_mix(bytes, len),
+            ResidualCodecV2::SignedFsmRcm => decode_signed_fsm_rcm(bytes, len),
         }
     }
 }
@@ -2940,6 +2947,191 @@ fn decode_signed_fsm_mix(bytes: &[u8], len: usize) -> Result<Vec<i32>> {
     Ok(out)
 }
 
+// ---------------------------------------------------------------------------
+// Full RCM research mode: mixer + ISSE (fourth-pass Seal E5)
+//
+// The Seal E4 mixture is followed by an indirect secondary symbol estimator: an
+// expanded context (phase × token position × previous magnitude × FSM state)
+// selects a bit-history state, and that state (not the context directly) indexes
+// an adaptive probability map that corrects the mixed probability. The two
+// levels are updated independently, so a sparse expanded context cannot wreck
+// the base estimate.
+// ---------------------------------------------------------------------------
+
+/// Indirect-context count of the ISSE stage.
+const RCM_CTX: usize = 3 * 32 * RC_BUCKETS * RC_FSM_STATES;
+/// Bit-history state count of the ISSE stage.
+const RCM_STATES: usize = 256;
+
+#[inline]
+fn rcm_ctx(phase: usize, tpos: usize, pb: usize, prev_state: usize) -> usize {
+    ((phase * 32 + tpos.min(31)) * RC_BUCKETS + pb) * RC_FSM_STATES + prev_state
+}
+
+/// 4+4 bit-history discriminator: counts of recent zeros and ones per context.
+#[inline]
+fn rcm_next_state(s: u8, bit: u32) -> u8 {
+    let mut n0 = s >> 4;
+    let mut n1 = s & 15;
+    if bit == 0 {
+        n0 = (n0 + 1).min(15);
+        if n0 == 15 {
+            n1 = 0;
+        }
+    } else {
+        n1 = (n1 + 1).min(15);
+        if n1 == 15 {
+            n0 = 0;
+        }
+    }
+    (n0 << 4) | n1
+}
+
+fn encode_signed_fsm_rcm(residual: &[i32]) -> Vec<u8> {
+    let lag = choose_lag(residual);
+    let mut out = Vec::new();
+    out.push(lag as u8);
+    let mut enc = RangeEncoder::new();
+    let mut probs = vec![RC_INIT; MIX_TOTAL];
+    let mut w = [65536 / MIX_EXPERTS as i32; MIX_EXPERTS];
+    let mut isse = Apm::new(RCM_STATES);
+    let mut state = vec![0u8; RCM_CTX];
+    let mut prev_m: u64 = 0;
+    let mut prev_state = 0usize;
+    let mut prev_neg = 0usize;
+    for (t, &r) in residual.iter().enumerate() {
+        let neg = u32::from(r < 0);
+        let m = u64::from(r.unsigned_abs());
+        let pb = rc_bucket(prev_m);
+        let ls = lag_state_for(residual, t, lag);
+        // Sign.
+        let idxs = mix_indices(0, 0, pb, prev_neg, prev_state, 0, ls);
+        let c = rcm_ctx(0, 0, pb, prev_state);
+        let s = usize::from(state[c]);
+        let (p0, sts) = mix_predict(&probs, &w, &idxs);
+        let p = isse.pp(p0, s);
+        enc.encode_bit(p, neg);
+        mix_update(&mut probs, &mut w, &idxs, &sts, p0, neg);
+        isse.update(neg);
+        state[c] = rcm_next_state(s as u8, neg);
+        // Length.
+        let v = m + 1;
+        let n = (64 - v.leading_zeros()) as usize;
+        for i in 0..n {
+            let bit = u32::from(i + 1 == n);
+            let idxs = mix_indices(1, i, pb, prev_neg, prev_state, 0, ls);
+            let c = rcm_ctx(1, i, pb, prev_state);
+            let s = usize::from(state[c]);
+            let (p0, sts) = mix_predict(&probs, &w, &idxs);
+            let p = isse.pp(p0, s);
+            enc.encode_bit(p, bit);
+            mix_update(&mut probs, &mut w, &idxs, &sts, p0, bit);
+            isse.update(bit);
+            state[c] = rcm_next_state(s as u8, bit);
+        }
+        // Value.
+        let mut prefix = 0usize;
+        for j in 0..n - 1 {
+            let bit = ((v >> (n - 2 - j)) & 1) as u32;
+            let idxs = mix_indices(2, j, pb, prev_neg, prev_state, prefix, ls);
+            let c = rcm_ctx(2, j, pb, prev_state);
+            let s = usize::from(state[c]);
+            let (p0, sts) = mix_predict(&probs, &w, &idxs);
+            let p = isse.pp(p0, s);
+            enc.encode_bit(p, bit);
+            mix_update(&mut probs, &mut w, &idxs, &sts, p0, bit);
+            isse.update(bit);
+            state[c] = rcm_next_state(s as u8, bit);
+            prefix = ((prefix << 1) | bit as usize) & 3;
+        }
+        prev_m = m;
+        prev_state = rc_fsm_state(m);
+        prev_neg = neg as usize;
+    }
+    out.extend_from_slice(&enc.finish());
+    out
+}
+
+#[allow(clippy::too_many_lines)]
+fn decode_signed_fsm_rcm(bytes: &[u8], len: usize) -> Result<Vec<i32>> {
+    let (&lag, rest) = bytes
+        .split_first()
+        .ok_or_else(|| Error::malformed("signed/fsm rcm stream has no lag header"))?;
+    let lag = u32::from(lag);
+    let mut dec = RangeDecoder::new(rest)?;
+    let mut probs = vec![RC_INIT; MIX_TOTAL];
+    let mut w = [65536 / MIX_EXPERTS as i32; MIX_EXPERTS];
+    let mut isse = Apm::new(RCM_STATES);
+    let mut state = vec![0u8; RCM_CTX];
+    let mut out = Vec::with_capacity(len);
+    let mut prev_m: u64 = 0;
+    let mut prev_state = 0usize;
+    let mut prev_neg = 0usize;
+    for t in 0..len {
+        let pb = rc_bucket(prev_m);
+        let ls = lag_state_for(&out, t, lag);
+        // Sign.
+        let idxs = mix_indices(0, 0, pb, prev_neg, prev_state, 0, ls);
+        let c = rcm_ctx(0, 0, pb, prev_state);
+        let s = usize::from(state[c]);
+        let (p0, sts) = mix_predict(&probs, &w, &idxs);
+        let p = isse.pp(p0, s);
+        let bit = dec.decode_bit(p)?;
+        mix_update(&mut probs, &mut w, &idxs, &sts, p0, bit);
+        isse.update(bit);
+        state[c] = rcm_next_state(s as u8, bit);
+        let neg = bit != 0;
+        // Length.
+        let mut z = 0usize;
+        loop {
+            let idxs = mix_indices(1, z, pb, prev_neg, prev_state, 0, ls);
+            let c = rcm_ctx(1, z, pb, prev_state);
+            let s = usize::from(state[c]);
+            let (p0, sts) = mix_predict(&probs, &w, &idxs);
+            let p = isse.pp(p0, s);
+            let bit = dec.decode_bit(p)?;
+            mix_update(&mut probs, &mut w, &idxs, &sts, p0, bit);
+            isse.update(bit);
+            state[c] = rcm_next_state(s as u8, bit);
+            if bit == 1 {
+                break;
+            }
+            z += 1;
+            if z > 32 {
+                return Err(Error::malformed("signed/fsm rcm unary length out of range"));
+            }
+        }
+        // Value.
+        let mut v: u64 = 1;
+        let mut prefix = 0usize;
+        for j in 0..z {
+            let idxs = mix_indices(2, j, pb, prev_neg, prev_state, prefix, ls);
+            let c = rcm_ctx(2, j, pb, prev_state);
+            let s = usize::from(state[c]);
+            let (p0, sts) = mix_predict(&probs, &w, &idxs);
+            let p = isse.pp(p0, s);
+            let bit = dec.decode_bit(p)?;
+            mix_update(&mut probs, &mut w, &idxs, &sts, p0, bit);
+            isse.update(bit);
+            state[c] = rcm_next_state(s as u8, bit);
+            v = (v << 1) | u64::from(bit);
+            prefix = ((prefix << 1) | bit as usize) & 3;
+        }
+        let m = v - 1;
+        if m > (1u64 << 31) {
+            return Err(Error::malformed(
+                "signed/fsm rcm magnitude exceeds i32 range",
+            ));
+        }
+        let value = if neg { -(m as i64) } else { m as i64 };
+        out.push(value as i32);
+        prev_m = m;
+        prev_state = rc_fsm_state(m);
+        prev_neg = usize::from(neg);
+    }
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3103,6 +3295,23 @@ mod tests {
             let back = c
                 .decode(&payload, residual.len())
                 .unwrap_or_else(|e| panic!("signed_fsm_mix: {e}"));
+            assert_eq!(back, residual);
+        }
+        let extreme = vec![i32::MIN, i32::MAX, -1, 0, 1, 2, -2, 1 << 30, -(1 << 30)];
+        let payload = c.encode(&extreme);
+        assert_eq!(c.decode(&payload, extreme.len()).unwrap(), extreme);
+    }
+
+    #[test]
+    fn signed_fsm_rcm_round_trips_exactly() {
+        let c = ResidualCodecV2::SignedFsmRcm;
+        assert_eq!(c.name(), "signed_fsm_rcm");
+        assert_eq!(ResidualCodecV2::from_id(20), Some(c));
+        for residual in sample_residuals() {
+            let payload = c.encode(&residual);
+            let back = c
+                .decode(&payload, residual.len())
+                .unwrap_or_else(|e| panic!("signed_fsm_rcm: {e}"));
             assert_eq!(back, residual);
         }
         let extreme = vec![i32::MIN, i32::MAX, -1, 0, 1, 2, -2, 1 << 30, -(1 << 30)];

@@ -45,7 +45,7 @@ use std::path::{Path, PathBuf};
 
 /// Frozen static-result hash (empty means "not yet frozen").
 pub const LEARNED_RESIDUAL_ENTROPY_SHA256: &str =
-    "5a247c914b66251bdf790b55972ea3b879c0a976feaf864fa01f37a4edcb8944";
+    "bfa2b7b684e5947e4e1e260e7154cf47a7ebb5e47b3a68f3df77c0d9057c49a6";
 
 /// Maximum representative Phase-M objects (one per distinct class tuple).
 const MAX_PHASE_M_OBJECTS: usize = 12;
@@ -192,11 +192,12 @@ fn phase_m_codecs() -> Vec<ResidualCodecV2> {
 }
 
 /// The fourth-pass E-ladder codecs measured against the pre-existing family.
-const E_CODECS: [ResidualCodecV2; 4] = [
+const E_CODECS: [ResidualCodecV2; 5] = [
     ResidualCodecV2::SignedFsm,
     ResidualCodecV2::SignedFsmSse,
     ResidualCodecV2::SignedFsmLag,
     ResidualCodecV2::SignedFsmMix,
+    ResidualCodecV2::SignedFsmRcm,
 ];
 
 /// Evaluate the ladder over one population with an explicit codec set.
@@ -412,6 +413,7 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
                         "signed_fsm_sse (id 17)",
                         "signed_fsm_lag (id 18)",
                         "signed_fsm_mix (id 19)",
+                        "signed_fsm_rcm (id 20)",
                         "with_e minimum",
                     ],
                     "e1_codec": "forward carry-less binary range coder (LZMA arithmetic coder) with \
@@ -431,6 +433,11 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
                                  magnitude×lag) are combined by an integer logistic mixer whose \
                                  weights are trained online to minimize -log P(bit), then the \
                                  mixed probability drives the same range coder",
+                    "e5_codec": "full RCM research mode: the E4 mixture is followed by an ISSE \
+                                 stage whose expanded context (phase × token position × previous \
+                                 magnitude × FSM state) selects a 4+4 bit-history state that \
+                                 indexes an adaptive probability map correcting the mixed \
+                                 probability",
                     "binarization": "sign bit, then Exp-Golomb(0) of |r| (identical to Seal E0)",
                     "profile": crate::learned::profile::LEARNED_EXP3_PROFILE,
                     "mode_c": "deliberately not measured (held out from architecture tuning)",

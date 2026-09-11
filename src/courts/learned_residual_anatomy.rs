@@ -55,7 +55,7 @@ use std::path::{Path, PathBuf};
 
 /// Frozen static-result hash (empty means "not yet frozen").
 pub const LEARNED_RESIDUAL_ANATOMY_SHA256: &str =
-    "a7966958c786314ecf0319a96825b3b2c9d264a29cd776772e1ba919de46488e";
+    "f1890430ba288f105b2fc687f5b33b33c4d9e511ed833ef4ab2391011c6b7b80";
 
 /// Maximum representative Phase-M objects (one per distinct class tuple).
 const MAX_PHASE_M_OBJECTS: usize = 12;
