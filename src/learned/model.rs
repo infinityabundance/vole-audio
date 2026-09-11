@@ -42,6 +42,8 @@ pub enum LearnedModel {
     AnalyticTransfer(crate::learned::analytical::AnalyticTransfer),
     /// A backward-adaptive predictor updated from reconstructed samples (Exp2).
     Adaptive(crate::learned::adaptive::AdaptivePredictor),
+    /// A context-gated mixture of mono sparse experts (Exp2).
+    ContextMixture(crate::learned::context_mixture::ContextMixturePredictor),
 }
 
 impl LearnedModel {
@@ -59,6 +61,7 @@ impl LearnedModel {
             LearnedModel::Hierarchical(_) => 8,
             LearnedModel::AnalyticTransfer(_) => 9,
             LearnedModel::Adaptive(_) => 10,
+            LearnedModel::ContextMixture(_) => 11,
         }
     }
 
@@ -76,6 +79,7 @@ impl LearnedModel {
             LearnedModel::Hierarchical(_) => "hierarchical",
             LearnedModel::AnalyticTransfer(_) => "analytic_transfer",
             LearnedModel::Adaptive(_) => "backward_adaptive",
+            LearnedModel::ContextMixture(_) => "context_mixture",
         }
     }
 
@@ -93,6 +97,7 @@ impl LearnedModel {
             LearnedModel::Hierarchical(p) => p.validate(),
             LearnedModel::AnalyticTransfer(p) => p.validate(),
             LearnedModel::Adaptive(p) => p.validate(),
+            LearnedModel::ContextMixture(p) => p.validate(),
         }
     }
 
@@ -110,6 +115,7 @@ impl LearnedModel {
             LearnedModel::Hierarchical(p) => p.channels,
             LearnedModel::AnalyticTransfer(p) => p.channels,
             LearnedModel::Adaptive(p) => p.channels,
+            LearnedModel::ContextMixture(p) => p.channels,
         }
     }
 
@@ -127,6 +133,7 @@ impl LearnedModel {
             LearnedModel::Hierarchical(p) => p.receptive_field(),
             LearnedModel::AnalyticTransfer(p) => p.receptive_field(),
             LearnedModel::Adaptive(p) => p.receptive_field(),
+            LearnedModel::ContextMixture(p) => p.receptive_field(),
         }
     }
 
@@ -144,6 +151,7 @@ impl LearnedModel {
             LearnedModel::Hierarchical(p) => p.ops_per_sample(),
             LearnedModel::AnalyticTransfer(p) => p.ops_per_sample(),
             LearnedModel::Adaptive(p) => p.ops_per_sample(),
+            LearnedModel::ContextMixture(p) => p.ops_per_sample(),
         }
     }
 
@@ -161,6 +169,7 @@ impl LearnedModel {
             LearnedModel::Hierarchical(p) => p.state_bytes(),
             LearnedModel::AnalyticTransfer(p) => p.state_bytes(),
             LearnedModel::Adaptive(p) => p.state_bytes(),
+            LearnedModel::ContextMixture(p) => p.state_bytes(),
         }
     }
 
@@ -178,6 +187,7 @@ impl LearnedModel {
             LearnedModel::Hierarchical(p) => p.checkpoint_count(),
             LearnedModel::AnalyticTransfer(p) => p.checkpoint_count(),
             LearnedModel::Adaptive(p) => p.checkpoint_count(),
+            LearnedModel::ContextMixture(p) => p.checkpoint_count(),
         }
     }
 
@@ -195,6 +205,7 @@ impl LearnedModel {
             LearnedModel::Hierarchical(p) => p.canonical_bytes(),
             LearnedModel::AnalyticTransfer(p) => p.canonical_bytes(),
             LearnedModel::Adaptive(p) => p.canonical_bytes(),
+            LearnedModel::ContextMixture(p) => p.canonical_bytes(),
         }
     }
 
@@ -235,6 +246,11 @@ impl LearnedModel {
             10 => LearnedModel::Adaptive(
                 crate::learned::adaptive::AdaptivePredictor::from_canonical_bytes(bytes)?,
             ),
+            11 => LearnedModel::ContextMixture(
+                crate::learned::context_mixture::ContextMixturePredictor::from_canonical_bytes(
+                    bytes,
+                )?,
+            ),
             other => {
                 return Err(Error::new(
                     crate::error::Kind::Unsupported,
@@ -262,6 +278,7 @@ impl LearnedModel {
             LearnedModel::Hierarchical(p) => p.hypothesis_all_from_source(source, frames),
             LearnedModel::AnalyticTransfer(p) => p.hypothesis_from_source(source, frames),
             LearnedModel::Adaptive(p) => p.hypothesis_all_from_source(source, frames),
+            LearnedModel::ContextMixture(p) => p.hypothesis_all_from_source(source, frames),
         }
     }
 
@@ -287,6 +304,7 @@ impl LearnedModel {
                 "analytic transfer requires its source samples",
             )),
             LearnedModel::Adaptive(p) => p.evaluate_range(residual, frames, start, len),
+            LearnedModel::ContextMixture(p) => p.evaluate_range(residual, frames, start, len),
         }
     }
 
@@ -304,6 +322,7 @@ impl LearnedModel {
             LearnedModel::Hierarchical(p) => p.replay_frames(start),
             LearnedModel::AnalyticTransfer(p) => p.replay_frames(start),
             LearnedModel::Adaptive(p) => p.replay_frames(start),
+            LearnedModel::ContextMixture(p) => p.replay_frames(start),
         }
     }
 

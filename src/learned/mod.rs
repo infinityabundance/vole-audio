@@ -15,6 +15,7 @@ pub mod accounting;
 pub mod adaptive;
 pub mod analytical;
 pub mod arithmetic;
+pub mod context_mixture;
 pub mod corpus;
 pub mod finite_field;
 pub mod graph;

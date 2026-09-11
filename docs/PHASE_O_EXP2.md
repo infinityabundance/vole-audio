@@ -51,7 +51,7 @@ cells; doing so would be benchmark gaming.
 | E | Long-term / pitch prediction | `learned::ltp`, `learned::train::ltp` | `learned-exp2-mechanisms` | **implemented** |
 | F | Multichannel prediction / lifting | `learned::multichannel`, `learned::train::multichannel` | `learned-exp2-mechanisms` | **implemented** |
 | G | Optimizer v2 (multiscale + beam + memo) | `learned::train::optimizer2` | `learned-exp2-mechanisms` | **implemented** |
-| H | Context mixture + backward adaptation | `learned::adaptive`, `learned::train::adaptive` (backward-adaptive); context mixture pending | `learned-exp2-mechanisms` | **partial** |
+| H | Context mixture + backward adaptation | `learned::context_mixture`, `learned::train::context_mixture`, `learned::adaptive`, `learned::train::adaptive` | `learned-exp2-mechanisms` | **implemented** |
 | I | Hierarchical residual prediction | `learned::hierarchy`, `learned::train::hierarchy` | `learned-exp2-mechanisms` | **implemented** |
 | J | Transfer v2 (analytic-first) | `learned::analytical`, `courts::learned_exp2_transfer` | `learned-exp2-transfer` | **implemented** |
 | K | Real + held-out Mode-C corpus | — | — | pending |
@@ -81,7 +81,7 @@ unit tests.
 | ----- | ------------- |
 | `learned-exp2-baseline` | `3bd61665b214a0bb85e3eee311bf598cbcb7f76e94cc646c057406897682f111` |
 | `learned-residual-codec2` | `e134f0c3457a9593e8ab56d071e142c2d3c03a60280c9434e62eca0c433cbcf2` |
-| `learned-exp2-mechanisms` | `293a2c14611344e8663ed1b3e68ae6a67bb5f386e4ca34ddfe3c3a32e8af3a7c` |
+| `learned-exp2-mechanisms` | `9ef1b8b5ae79b6ed0a2f42532e8ce4d19107675d4de010b788cf7c5704a53ba9` |
 | `learned-exp2-transfer` | `a43ec91fbb31efd9e585e6cfaaa3fefe3bc6e8381aec7049f508cc3d212d265a` |
 
 The frozen Exp1 court `learned-residual-codec` still reproduces its sealed hash
@@ -141,16 +141,22 @@ amortizes model-description cost over *long* recordings, and a 4096-frame
 window is too short for its slow sign-sign convergence to pay off. The negative
 is recorded rather than hidden, and the portfolio minimum is unaffected.
 
+The context-mixture family (model kind 11) is likewise an honest near-negative
+here: on the stationary synthetic cases it costs essentially the same as sparse
+(4 071 B vs 4 064 B on `sine-440`, 846 B vs 839 B on `triangle-220`) because the
+gate adds framing without changing the local regime. It is expected to pay only
+where the residual regime genuinely changes within a window.
+
 ## Honest limitations (recorded, not hidden)
 
-* Seals C, D, E, F, G, I and J are fully implemented and covered by the
-  `learned-exp2-mechanisms` / `learned-exp2-transfer` courts. Seal H is partial:
-  the backward-adaptive family is implemented and exact (an honest negative on
-  the short corpus), while the context-mixture half is not yet implemented.
+* Seals C, D, E, F, G, H, I and J are fully implemented and covered by the
+  `learned-exp2-mechanisms` / `learned-exp2-transfer` courts.
 * No new `seal verify` receipt matrix has been written yet: the Phase M/N
   batteries were not re-run in this change set.
 * Seal K (real + held-out Mode-C corpus) is **not implemented**; it remains the
-  declared remainder of the Exp2 sequence.
+  declared remainder of the Exp2 sequence, and the real-recording stratum stays
+  `VACANT_DECLARED` as in Phase M (no rights-clean source audio is present on
+  this host).
 * `RunLengthRice` is a VOLE-native adaptive run-length/Rice design; it is in the
   RLGR family but is not bit-compatible with Malvar's RLGR1.
 * Sparse and long-term prediction are mono-first in this build; multichannel
