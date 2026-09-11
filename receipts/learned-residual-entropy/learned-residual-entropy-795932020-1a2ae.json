@@ -1,0 +1,2178 @@
+{
+  "schema": "vole.audio.evidence.v1",
+  "schema_version": 1,
+  "receipt": {
+    "schema": "vole.audio.evidence.v1",
+    "schema_version": 1,
+    "run_id": "learned-residual-entropy-795932020-1a2ae",
+    "court": "learned-residual-entropy",
+    "created_unix_ms": 795932020,
+    "result": "SUPPORTED",
+    "result_detail": "attributable residual-codec ladder over the fixed S8 winner residual (8 effectiveness clips) and 42 representative Phase-M channel streams: pre-E family vs the Seal E1 signed/FSM adaptive range coder (id 16), the Seal E2 SSE/APM-corrected variant (id 17) and the Seal E3 matched-lag variant (id 18), with the selected minimum reported; result sha256 b0213f61247b100087c0dc0e928e282f1e02ba683f2802f5d202465deaa3cd4d",
+    "environment": {
+      "os": {
+        "sysname": "Linux",
+        "release": "7.2.2-1-cachyos",
+        "version": "#1 SMP PREEMPT_DYNAMIC Fri, 28 Aug 2026 08:05:11 +0000",
+        "machine": "x86_64",
+        "nodename": "vanir",
+        "os_pretty_name": "CachyOS"
+      },
+      "cpu": {
+        "model": "AMD Ryzen 7 9800X3D 8-Core Processor",
+        "flags": [
+          "3dnowprefetch",
+          "abm",
+          "adx",
+          "aes",
+          "amd_lbr_pmc_freeze",
+          "amd_lbr_v2",
+          "aperfmperf",
+          "apic",
+          "arat",
+          "avic",
+          "avx",
+          "avx2",
+          "avx512_bf16",
+          "avx512_bitalg",
+          "avx512_vbmi2",
+          "avx512_vnni",
+          "avx512_vp2intersect",
+          "avx512_vpopcntdq",
+          "avx512bw",
+          "avx512cd",
+          "avx512dq",
+          "avx512f",
+          "avx512ifma",
+          "avx512vbmi",
+          "avx512vl",
+          "avx_vnni",
+          "bmi1",
+          "bmi2",
+          "bpext",
+          "bus_lock_detect",
+          "cat_l3",
+          "cdp_l3",
+          "clflush",
+          "clflushopt",
+          "clwb",
+          "clzero",
+          "cmov",
+          "cmp_legacy",
+          "constant_tsc",
+          "cpb",
+          "cppc",
+          "cpuid",
+          "cpuid_fault",
+          "cqm",
+          "cqm_llc",
+          "cqm_mbm_local",
+          "cqm_mbm_total",
+          "cqm_occup_llc",
+          "cr8_legacy",
+          "cx16",
+          "cx8",
+          "de",
+          "decodeassists",
+          "erms",
+          "extapic",
+          "extd_apicid",
+          "f16c",
+          "flush_l1d",
+          "flushbyasid",
+          "fma",
+          "fpu",
+          "fsgsbase",
+          "fsrm",
+          "fxsr",
+          "fxsr_opt",
+          "gfni",
+          "ht",
+          "hw_pstate",
+          "ibpb",
+          "ibrs",
+          "ibrs_enhanced",
+          "ibs",
+          "invpcid",
+          "irperf",
+          "lahf_lm",
+          "lbrv",
+          "lm",
+          "mba",
+          "mca",
+          "mce",
+          "misalignsse",
+          "mmx",
+          "mmxext",
+          "monitor",
+          "movbe",
+          "movdir64b",
+          "movdiri",
+          "msr",
+          "mtrr",
+          "mwaitx",
+          "nonstop_tsc",
+          "nopl",
+          "npt",
+          "nrip_save",
+          "nx",
+          "ospke",
+          "osvw",
+          "overflow_recov",
+          "pae",
+          "pat",
+          "pausefilter",
+          "pclmulqdq",
+          "pdpe1gb",
+          "perfctr_core",
+          "perfctr_llc",
+          "perfctr_nb",
+          "perfmon_v2",
+          "pfthreshold",
+          "pge",
+          "pku",
+          "pni",
+          "popcnt",
+          "pse",
+          "pse36",
+          "rapl",
+          "rdpid",
+          "rdpru",
+          "rdrand",
+          "rdseed",
+          "rdt_a",
+          "rdtscp",
+          "rep_good",
+          "sep",
+          "sha_ni",
+          "skinit",
+          "smap",
+          "smca",
+          "smep",
+          "ssbd",
+          "sse",
+          "sse2",
+          "sse4_1",
+          "sse4_2",
+          "sse4a",
+          "ssse3",
+          "stibp",
+          "succor",
+          "svm",
+          "svm_lock",
+          "syscall",
+          "tce",
+          "topoext",
+          "tsc",
+          "tsc_adjust",
+          "tsc_scale",
+          "umip",
+          "user_shstk",
+          "v_spec_ctrl",
+          "v_vmsave_vmload",
+          "vaes",
+          "vgif",
+          "vmcb_clean",
+          "vme",
+          "vmmcall",
+          "vnmi",
+          "vpclmulqdq",
+          "wbnoinvd",
+          "wdt",
+          "x2avic",
+          "xgetbv1",
+          "xsave",
+          "xsavec",
+          "xsaveerptr",
+          "xsaveopt",
+          "xsaves",
+          "xtopology"
+        ],
+        "has_avx2": true,
+        "has_avx512": true,
+        "has_neon": false
+      },
+      "memory": {
+        "total_bytes": 134689935360
+      },
+      "git_commit": "06d0f6c774a4b96bfb8a568562ae2832714f7969",
+      "git_dirty": false,
+      "git_branch": "main",
+      "rustc_version": "rustc 1.99.0-nightly (89c61a754 2026-07-23)",
+      "crate_version": "0.49.0",
+      "target_arch": "x86_64",
+      "target_os": "linux",
+      "cpu_governor": "performance",
+      "bios_version": "1402",
+      "git_tree_sha": "b7e92aa8a629cb819d6834c5d7066339bef33846",
+      "build_git_commit": "06d0f6c774a4b96bfb8a568562ae2832714f7969",
+      "build_tree_sha": "b7e92aa8a629cb819d6834c5d7066339bef33846",
+      "build_dirty": false,
+      "build_rustc": "rustc 1.99.0-nightly (89c61a754 2026-07-23)",
+      "build_profile": "release",
+      "build_target": "x86_64-unknown-linux-gnu",
+      "source_binding": "bound",
+      "seal_subject_hash": "4296a3858acf11e8132316cdbb4fa69bf06c6640a1e5cd5b53a265963ae2de62"
+    },
+    "hardware": {
+      "pci_devices": [
+        {
+          "bdf": "0000:00:00.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14d8",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": null
+        },
+        {
+          "bdf": "0000:00:00.2",
+          "class": "0x080600",
+          "vendor": "0x1022",
+          "device": "0x14d9",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": null
+        },
+        {
+          "bdf": "0000:00:01.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "0"
+        },
+        {
+          "bdf": "0000:00:01.1",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14db",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "1"
+        },
+        {
+          "bdf": "0000:00:01.2",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14db",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "2"
+        },
+        {
+          "bdf": "0000:00:02.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "3"
+        },
+        {
+          "bdf": "0000:00:02.1",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14db",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "4"
+        },
+        {
+          "bdf": "0000:00:02.2",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14db",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "5"
+        },
+        {
+          "bdf": "0000:00:03.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "6"
+        },
+        {
+          "bdf": "0000:00:04.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "7"
+        },
+        {
+          "bdf": "0000:00:08.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "8"
+        },
+        {
+          "bdf": "0000:00:08.1",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14dd",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "9"
+        },
+        {
+          "bdf": "0000:00:08.3",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14dd",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "10"
+        },
+        {
+          "bdf": "0000:00:14.0",
+          "class": "0x0c0500",
+          "vendor": "0x1022",
+          "device": "0x790b",
+          "driver": "piix4_smbus",
+          "numa_node": -1,
+          "iommu_group": "11"
+        },
+        {
+          "bdf": "0000:00:14.3",
+          "class": "0x060100",
+          "vendor": "0x1022",
+          "device": "0x790e",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "11"
+        },
+        {
+          "bdf": "0000:00:18.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e0",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.1",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e1",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.2",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e2",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.3",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e3",
+          "driver": "k10temp",
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.4",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e4",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.5",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e5",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.6",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e6",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.7",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e7",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:01:00.0",
+          "class": "0x030000",
+          "vendor": "0x10de",
+          "device": "0x2702",
+          "driver": "nvidia",
+          "numa_node": -1,
+          "iommu_group": "13"
+        },
+        {
+          "bdf": "0000:01:00.1",
+          "class": "0x040300",
+          "vendor": "0x10de",
+          "device": "0x22bb",
+          "driver": "snd_hda_intel",
+          "numa_node": -1,
+          "iommu_group": "13"
+        },
+        {
+          "bdf": "0000:02:00.0",
+          "class": "0x010802",
+          "vendor": "0xc0a9",
+          "device": "0x542b",
+          "driver": "nvme",
+          "numa_node": -1,
+          "iommu_group": "14"
+        },
+        {
+          "bdf": "0000:03:00.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f4",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "15"
+        },
+        {
+          "bdf": "0000:04:00.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "16"
+        },
+        {
+          "bdf": "0000:04:04.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "17"
+        },
+        {
+          "bdf": "0000:04:05.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "18"
+        },
+        {
+          "bdf": "0000:04:08.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "19"
+        },
+        {
+          "bdf": "0000:04:0c.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "20"
+        },
+        {
+          "bdf": "0000:04:0d.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "21"
+        },
+        {
+          "bdf": "0000:05:00.0",
+          "class": "0x010802",
+          "vendor": "0x2646",
+          "device": "0x5019",
+          "driver": "nvme",
+          "numa_node": -1,
+          "iommu_group": "16"
+        },
+        {
+          "bdf": "0000:06:00.0",
+          "class": "0x020000",
+          "vendor": "0x10ec",
+          "device": "0x8125",
+          "driver": "r8169",
+          "numa_node": -1,
+          "iommu_group": "17"
+        },
+        {
+          "bdf": "0000:09:00.0",
+          "class": "0x0c0330",
+          "vendor": "0x1022",
+          "device": "0x43fc",
+          "driver": "xhci-pci-prom21",
+          "numa_node": -1,
+          "iommu_group": "20"
+        },
+        {
+          "bdf": "0000:0a:00.0",
+          "class": "0x010601",
+          "vendor": "0x1022",
+          "device": "0x43f6",
+          "driver": "ahci",
+          "numa_node": -1,
+          "iommu_group": "21"
+        },
+        {
+          "bdf": "0000:0b:00.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2421",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "22"
+        },
+        {
+          "bdf": "0000:0c:00.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2423",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "23"
+        },
+        {
+          "bdf": "0000:0c:01.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2423",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "24"
+        },
+        {
+          "bdf": "0000:0c:02.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2423",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "25"
+        },
+        {
+          "bdf": "0000:0c:03.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2423",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "26"
+        },
+        {
+          "bdf": "0000:71:00.0",
+          "class": "0x0c0330",
+          "vendor": "0x1b21",
+          "device": "0x2426",
+          "driver": "xhci_hcd",
+          "numa_node": -1,
+          "iommu_group": "25"
+        },
+        {
+          "bdf": "0000:72:00.0",
+          "class": "0x0c0340",
+          "vendor": "0x1b21",
+          "device": "0x2425",
+          "driver": "thunderbolt",
+          "numa_node": -1,
+          "iommu_group": "26"
+        },
+        {
+          "bdf": "0000:73:00.0",
+          "class": "0x130000",
+          "vendor": "0x1022",
+          "device": "0x14de",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "27"
+        },
+        {
+          "bdf": "0000:73:00.2",
+          "class": "0x108000",
+          "vendor": "0x1022",
+          "device": "0x1649",
+          "driver": "ccp",
+          "numa_node": -1,
+          "iommu_group": "28"
+        },
+        {
+          "bdf": "0000:73:00.3",
+          "class": "0x0c0330",
+          "vendor": "0x1022",
+          "device": "0x15b6",
+          "driver": "xhci_hcd",
+          "numa_node": -1,
+          "iommu_group": "29"
+        },
+        {
+          "bdf": "0000:73:00.4",
+          "class": "0x0c0330",
+          "vendor": "0x1022",
+          "device": "0x15b7",
+          "driver": "xhci_hcd",
+          "numa_node": -1,
+          "iommu_group": "30"
+        },
+        {
+          "bdf": "0000:73:00.6",
+          "class": "0x040300",
+          "vendor": "0x1022",
+          "device": "0x15e3",
+          "driver": "snd_hda_intel",
+          "numa_node": -1,
+          "iommu_group": "31"
+        },
+        {
+          "bdf": "0000:74:00.0",
+          "class": "0x0c0330",
+          "vendor": "0x1022",
+          "device": "0x15b8",
+          "driver": "xhci_hcd",
+          "numa_node": -1,
+          "iommu_group": "32"
+        }
+      ],
+      "gpu": {
+        "vendor": null,
+        "name": null,
+        "bdf": null,
+        "compute_capability": null,
+        "memory_bytes": null,
+        "driver_version": null,
+        "runtime_version": null
+      },
+      "audio": {
+        "card": null,
+        "device": null,
+        "name": null,
+        "subdevice": null
+      }
+    },
+    "params": {
+      "universe": "vole.audio.u1",
+      "profile": "vole.audio.learned.exp3",
+      "backend": "scalar canonical learned evaluator",
+      "sample_rate_hz": null,
+      "channels": null,
+      "voices": null,
+      "quantum_frames": null,
+      "duration_secs": null,
+      "content_kind": "Phase O learned deterministic prediction"
+    },
+    "counters": {
+      "host_pcm_staging_bytes": 0,
+      "host_pcm_copy_bytes": 0,
+      "gpu_to_host_pcm_bytes": 0,
+      "endpoint_observation_bytes": 0,
+      "device_sample_block_bytes": 0,
+      "transient_compute_words": 0,
+      "host_pcm_resident_peak_bytes": 0,
+      "host_pcm_resident_integral": 0.0,
+      "endpoint_depth_frames": 0,
+      "endpoint_depth_min_frames": 18446744073709551615,
+      "endpoint_depth_max_frames": 0,
+      "quanta_submitted": 0,
+      "events_consumed": 0,
+      "xruns": 0,
+      "kernel_launches": 0,
+      "missed_deadlines": 0
+    },
+    "timing": {
+      "total_ns": null,
+      "deadline_ns": null,
+      "warmup_runs": null,
+      "run_count": null,
+      "observation_count": null,
+      "tail": null
+    },
+    "provenance": {
+      "reference_hash": "b0213f61247b100087c0dc0e928e282f1e02ba683f2802f5d202465deaa3cd4d",
+      "backend_hash": null,
+      "endpoint_hash": null,
+      "gpu_artifact_hash": null,
+      "source_hash": null,
+      "corpus_hash": null,
+      "table_hashes": [],
+      "benchmark_order": [],
+      "exact_equality": null
+    },
+    "endpoint": {
+      "directness": null,
+      "topology": null,
+      "registered_range": null,
+      "registration_result": null,
+      "device_pointer": null,
+      "synchronization_mechanism": null,
+      "fence_sync_evidence": null,
+      "coherency_assumptions": null,
+      "hidden_staging_investigation": null,
+      "endpoint_clock": null
+    },
+    "energy": null,
+    "trace": null,
+    "limitations": [
+      "learned prediction is an experimental profile: it does not change u1/v1, the literal fallback remains mandatory, and negative learned results are preserved rather than hidden"
+    ],
+    "extras": {
+      "limitations": [
+        "attribution is codec-only because the dense residual is held fixed; the portfolio-wide effect appears in the `learned-speech` and `learned-u1-wasted` courts",
+        "the Phase-M population uses a cheaper predictor than voice does and exists only to test whether the coder generalizes beyond speech",
+        "wall-clock per-sample timings are recorded as extras and are never hashed"
+      ],
+      "method": {
+        "fixed_predictor": "the S8 portfolio winner per effectiveness clip and a cheap exact fixed-difference closure per Phase-M channel; the dense residual is identical for every codec",
+        "ladder": [
+          "pre_e (ids 0..=15)",
+          "signed_fsm (id 16)",
+          "signed_fsm_sse (id 17)",
+          "signed_fsm_lag (id 18)",
+          "signed_fsm_mix (id 19)",
+          "signed_fsm_rcm (id 20)",
+          "bgmc (id 21)",
+          "with_e minimum"
+        ],
+        "e1_codec": "forward carry-less binary range coder (LZMA arithmetic coder) with online 12-bit adaptive probabilities over the residual-event FSM state, previous magnitude bucket, previous sign, unary-length position and decoded value prefix",
+        "e2_codec": "the same base coder with an SSE/APM stage: the base 12-bit probability is quantized in the integer stretch domain into 33 interpolation points and adaptively corrected under a phase × magnitude-bucket context, then interpolated",
+        "e3_codec": "the SSE/APM coder with a matched-lag context: the encoder stores a decoder-visible lag (0..=128, or 0 for none) chosen from the residual's own autocorrelation, and the lagged residual magnitude bucket widens the SSE context; the lag never alters a value",
+        "e4_codec": "a PAQ-light residual context mixer: six context experts (position, previous magnitude, previous sign, FSM state, prefix×lag, magnitude×lag) are combined by an integer logistic mixer whose weights are trained online to minimize -log P(bit), then the mixed probability drives the same range coder",
+        "e5_codec": "full RCM research mode: the E4 mixture is followed by an ISSE stage whose expanded context (phase × token position × previous magnitude × FSM state) selects a 4+4 bit-history state that indexes an adaptive probability map correcting the mixed probability",
+        "binarization": "sign bit, then Exp-Golomb(0) of |r| (identical to Seal E0)",
+        "profile": "vole.audio.learned.exp3",
+        "mode_c": "deliberately not measured (held out from architecture tuning)"
+      },
+      "phase_m_representative": {
+        "population": "phase_m_representative",
+        "objects": 42,
+        "residual_samples": 1056896,
+        "all_exact": true,
+        "active_codecs": [
+          "dense_i32",
+          "sparse_delta",
+          "zigzag_varint",
+          "block_rice",
+          "predictive_rice",
+          "literal_residual",
+          "partition_rice",
+          "core_tail_rice",
+          "run_length_rice",
+          "zero_mask_rice",
+          "byte_plane",
+          "context_rans",
+          "factor_shift",
+          "elias_fano",
+          "signed_fsm",
+          "signed_fsm_sse",
+          "signed_fsm_lag",
+          "signed_fsm_mix",
+          "signed_fsm_rcm",
+          "bgmc"
+        ],
+        "e_ladder": [
+          "signed_fsm",
+          "signed_fsm_sse",
+          "signed_fsm_lag",
+          "signed_fsm_mix",
+          "signed_fsm_rcm",
+          "bgmc"
+        ],
+        "pre_e_best_bytes": 1356924,
+        "e_ladder_bytes": {
+          "signed_fsm": 1419463,
+          "signed_fsm_sse": 1409121,
+          "signed_fsm_lag": 1393275,
+          "signed_fsm_mix": 1362110,
+          "signed_fsm_rcm": 1366586,
+          "bgmc": 1443574
+        },
+        "with_e_best_bytes": 1314199,
+        "ladder_gain_bytes": 42725,
+        "codec_totals_bytes": {
+          "dense_i32": 4227626,
+          "sparse_delta": 2629878,
+          "zigzag_varint": 1966061,
+          "block_rice": 1510794,
+          "predictive_rice": 1592549,
+          "literal_residual": 10320822,
+          "partition_rice": 1466317,
+          "core_tail_rice": 1404661,
+          "run_length_rice": 3753136,
+          "zero_mask_rice": 1481371,
+          "byte_plane": 2147058,
+          "context_rans": 1361828,
+          "factor_shift": 1357424,
+          "elias_fano": 1559637,
+          "signed_fsm": 1419463,
+          "signed_fsm_sse": 1409121,
+          "signed_fsm_lag": 1393275,
+          "signed_fsm_mix": 1362110,
+          "signed_fsm_rcm": 1366586,
+          "bgmc": 1443574
+        },
+        "timing": {
+          "per_codec": {
+            "signed_fsm": {
+              "encode_ns_per_sample": 63.228561750635826,
+              "decode_ns_per_sample": 86.36514661802107
+            },
+            "signed_fsm_sse": {
+              "encode_ns_per_sample": 116.76998209852246,
+              "decode_ns_per_sample": 162.50728737737677
+            },
+            "signed_fsm_lag": {
+              "encode_ns_per_sample": 117.41318634946106,
+              "decode_ns_per_sample": 162.56659027945986
+            },
+            "signed_fsm_mix": {
+              "encode_ns_per_sample": 302.5352428242703,
+              "decode_ns_per_sample": 322.881784016592
+            },
+            "signed_fsm_rcm": {
+              "encode_ns_per_sample": 327.85481542176336,
+              "decode_ns_per_sample": 375.05519275311855
+            },
+            "bgmc": {
+              "encode_ns_per_sample": 141.54390971297082,
+              "decode_ns_per_sample": 33.465941776674335
+            }
+          },
+          "repetitions": 3,
+          "note": "wall-clock, never hashed"
+        },
+        "objects_detail": [
+          {
+            "id": "silence-48000hz-1ch-full_i32-mono#ch0",
+            "population": "phase_m_representative",
+            "family": "fixed_diff",
+            "class": {
+              "source_structure": "literal",
+              "entropy": "highly_predictable",
+              "temporal": "stationary"
+            },
+            "samples": 32768,
+            "pre_codec": "run_length_rice",
+            "pre_bytes": 13,
+            "e_ladder_bytes": {
+              "signed_fsm": 102,
+              "signed_fsm_sse": 59,
+              "signed_fsm_lag": 60,
+              "signed_fsm_mix": 53,
+              "signed_fsm_rcm": 37,
+              "bgmc": 103
+            },
+            "with_codec": "run_length_rice",
+            "with_bytes": 13,
+            "ladder_gain_bytes": 0
+          },
+          {
+            "id": "osc-1k-48000hz-1ch-low_byte-mono#ch0",
+            "population": "phase_m_representative",
+            "family": "fixed_diff",
+            "class": {
+              "source_structure": "oscillator",
+              "entropy": "highly_predictable",
+              "temporal": "stationary"
+            },
+            "samples": 32768,
+            "pre_codec": "core_tail_rice",
+            "pre_bytes": 11706,
+            "e_ladder_bytes": {
+              "signed_fsm": 9043,
+              "signed_fsm_sse": 8775,
+              "signed_fsm_lag": 3639,
+              "signed_fsm_mix": 7966,
+              "signed_fsm_rcm": 5493,
+              "bgmc": 11424
+            },
+            "with_codec": "signed_fsm_lag",
+            "with_bytes": 3639,
+            "ladder_gain_bytes": 8067
+          },
+          {
+            "id": "harmonic-220-48000hz-1ch-low_byte-mono#ch0",
+            "population": "phase_m_representative",
+            "family": "fixed_diff",
+            "class": {
+              "source_structure": "oscillator",
+              "entropy": "locally_predictable",
+              "temporal": "stationary"
+            },
+            "samples": 32768,
+            "pre_codec": "core_tail_rice",
+            "pre_bytes": 7972,
+            "e_ladder_bytes": {
+              "signed_fsm": 8569,
+              "signed_fsm_sse": 8504,
+              "signed_fsm_lag": 8505,
+              "signed_fsm_mix": 8619,
+              "signed_fsm_rcm": 8486,
+              "bgmc": 8588
+            },
+            "with_codec": "core_tail_rice",
+            "with_bytes": 7972,
+            "ladder_gain_bytes": 0
+          },
+          {
+            "id": "wavetable-saw-1k-48000hz-1ch-low_byte-mono#ch0",
+            "population": "phase_m_representative",
+            "family": "fixed_diff",
+            "class": {
+              "source_structure": "wavetable",
+              "entropy": "globally_periodic",
+              "temporal": "stationary"
+            },
+            "samples": 32768,
+            "pre_codec": "context_rans",
+            "pre_bytes": 6465,
+            "e_ladder_bytes": {
+              "signed_fsm": 3969,
+              "signed_fsm_sse": 3771,
+              "signed_fsm_lag": 449,
+              "signed_fsm_mix": 2470,
+              "signed_fsm_rcm": 819,
+              "bgmc": 5990
+            },
+            "with_codec": "signed_fsm_lag",
+            "with_bytes": 449,
+            "ladder_gain_bytes": 6016
+          },
+          {
+            "id": "repeat-1000-saw-48000hz-1ch-s24_like-mono#ch0",
+            "population": "phase_m_representative",
+            "family": "fixed_diff",
+            "class": {
+              "source_structure": "exact_repetition",
+              "entropy": "globally_periodic",
+              "temporal": "loop"
+            },
+            "samples": 32768,
+            "pre_codec": "context_rans",
+            "pre_bytes": 5404,
+            "e_ladder_bytes": {
+              "signed_fsm": 4457,
+              "signed_fsm_sse": 4038,
+              "signed_fsm_lag": 4042,
+              "signed_fsm_mix": 6261,
+              "signed_fsm_rcm": 1947,
+              "bgmc": 49430
+            },
+            "with_codec": "signed_fsm_rcm",
+            "with_bytes": 1947,
+            "ladder_gain_bytes": 3457
+          },
+          {
+            "id": "poly-6-48000hz-6ch-s16_like-multichannel#ch0",
+            "population": "phase_m_representative",
+            "family": "fixed_diff",
+            "class": {
+              "source_structure": "compound",
+              "entropy": "locally_predictable",
+              "temporal": "stationary"
+            },
+            "samples": 32768,
+            "pre_codec": "context_rans",
+            "pre_bytes": 25909,
+            "e_ladder_bytes": {
+              "signed_fsm": 24556,
+              "signed_fsm_sse": 24510,
+              "signed_fsm_lag": 24310,
+              "signed_fsm_mix": 25718,
+              "signed_fsm_rcm": 25631,
+              "bgmc": 24811
+            },
+            "with_codec": "signed_fsm_lag",
+            "with_bytes": 24310,
+            "ladder_gain_bytes": 1599
+          },
+          {
+            "id": "poly-6-48000hz-6ch-s16_like-multichannel#ch1",
+            "population": "phase_m_representative",
+            "family": "fixed_diff",
+            "class": {
+              "source_structure": "compound",
+              "entropy": "locally_predictable",
+              "temporal": "stationary"
+            },
+            "samples": 32768,
+            "pre_codec": "core_tail_rice",
+            "pre_bytes": 24432,
+            "e_ladder_bytes": {
+              "signed_fsm": 23710,
+              "signed_fsm_sse": 23674,
+              "signed_fsm_lag": 23619,
+              "signed_fsm_mix": 24306,
+              "signed_fsm_rcm": 24313,
+              "bgmc": 23780
+            },
+            "with_codec": "signed_fsm_lag",
+            "with_bytes": 23619,
+            "ladder_gain_bytes": 813
+          },
+          {
+            "id": "poly-6-48000hz-6ch-s16_like-multichannel#ch2",
+            "population": "phase_m_representative",
+            "family": "fixed_diff",
+            "class": {
+              "source_structure": "compound",
+              "entropy": "locally_predictable",
+              "temporal": "stationary"
+            },
+            "samples": 32768,
+            "pre_codec": "core_tail_rice",
+            "pre_bytes": 24512,
+            "e_ladder_bytes": {
+              "signed_fsm": 23622,
+              "signed_fsm_sse": 23600,
+              "signed_fsm_lag": 23289,
+              "signed_fsm_mix": 24240,
+              "signed_fsm_rcm": 24288,
+              "bgmc": 23689
+            },
+            "with_codec": "signed_fsm_lag",
+            "with_bytes": 23289,
+            "ladder_gain_bytes": 1223
+          },
+          {
+            "id": "poly-6-48000hz-6ch-s16_like-multichannel#ch3",
+            "population": "phase_m_representative",
+            "family": "fixed_diff",
+            "class": {
+              "source_structure": "compound",
+              "entropy": "locally_predictable",
+              "temporal": "stationary"
+            },
+            "samples": 32768,
+            "pre_codec": "context_rans",
+            "pre_bytes": 25920,
+            "e_ladder_bytes": {
+              "signed_fsm": 24646,
+              "signed_fsm_sse": 24617,
+              "signed_fsm_lag": 24091,
+              "signed_fsm_mix": 25756,
+              "signed_fsm_rcm": 25777,
+              "bgmc": 24905
+            },
+            "with_codec": "signed_fsm_lag",
+            "with_bytes": 24091,
+            "ladder_gain_bytes": 1829
+          },
+          {
+            "id": "poly-6-48000hz-6ch-s16_like-multichannel#ch4",
+            "population": "phase_m_representative",
+            "family": "fixed_diff",
+            "class": {
+              "source_structure": "compound",
+              "entropy": "locally_predictable",
+              "temporal": "stationary"
+            },
+            "samples": 32768,
+            "pre_codec": "context_rans",
+            "pre_bytes": 23159,
+            "e_ladder_bytes": {
+              "signed_fsm": 22686,
+              "signed_fsm_sse": 22651,
+              "signed_fsm_lag": 22496,
+              "signed_fsm_mix": 23042,
+              "signed_fsm_rcm": 23124,
+              "bgmc": 22793
+            },
+            "with_codec": "signed_fsm_lag",
+            "with_bytes": 22496,
+            "ladder_gain_bytes": 663
+          },
+          {
+            "id": "poly-6-48000hz-6ch-s16_like-multichannel#ch5",
+            "population": "phase_m_representative",
+            "family": "fixed_diff",
+            "class": {
+              "source_structure": "compound",
+              "entropy": "locally_predictable",
+              "temporal": "stationary"
+            },
+            "samples": 32768,
+            "pre_codec": "core_tail_rice",
+            "pre_bytes": 26054,
+            "e_ladder_bytes": {
+              "signed_fsm": 24829,
+              "signed_fsm_sse": 24795,
+              "signed_fsm_lag": 24422,
+              "signed_fsm_mix": 25794,
+              "signed_fsm_rcm": 25844,
+              "bgmc": 24957
+            },
+            "with_codec": "signed_fsm_lag",
+            "with_bytes": 24422,
+            "ladder_gain_bytes": 1632
+          },
+          {
+            "id": "voice-8-48000hz-8ch-s16_like-multichannel#ch0",
+            "population": "phase_m_representative",
+            "family": "fixed_diff",
+            "class": {
+              "source_structure": "residual",
+              "entropy": "sparse_residual",
+              "temporal": "slowly_varying"
+            },
+            "samples": 32768,
+            "pre_codec": "context_rans",
+            "pre_bytes": 26015,
+            "e_ladder_bytes": {
+              "signed_fsm": 24678,
+              "signed_fsm_sse": 24650,
+              "signed_fsm_lag": 23961,
+              "signed_fsm_mix": 25082,
+              "signed_fsm_rcm": 24895,
+              "bgmc": 24657
+            },
+            "with_codec": "signed_fsm_lag",
+            "with_bytes": 23961,
+            "ladder_gain_bytes": 2054
+          },
+          {
+            "id": "voice-8-48000hz-8ch-s16_like-multichannel#ch1",
+            "population": "phase_m_representative",
+            "family": "fixed_diff",
+            "class": {
+              "source_structure": "residual",
+              "entropy": "sparse_residual",
+              "temporal": "slowly_varying"
+            },
+            "samples": 32768,
+            "pre_codec": "context_rans",
+            "pre_bytes": 26177,
+            "e_ladder_bytes": {
+              "signed_fsm": 24936,
+              "signed_fsm_sse": 24905,
+              "signed_fsm_lag": 24143,
+              "signed_fsm_mix": 25205,
+              "signed_fsm_rcm": 25080,
+              "bgmc": 24746
+            },
+            "with_codec": "signed_fsm_lag",
+            "with_bytes": 24143,
+            "ladder_gain_bytes": 2034
+          },
+          {
+            "id": "voice-8-48000hz-8ch-s16_like-multichannel#ch2",
+            "population": "phase_m_representative",
+            "family": "fixed_diff",
+            "class": {
+              "source_structure": "residual",
+              "entropy": "sparse_residual",
+              "temporal": "slowly_varying"
+            },
+            "samples": 32768,
+            "pre_codec": "context_rans",
+            "pre_bytes": 25870,
+            "e_ladder_bytes": {
+              "signed_fsm": 24674,
+              "signed_fsm_sse": 24657,
+              "signed_fsm_lag": 23952,
+              "signed_fsm_mix": 25159,
+              "signed_fsm_rcm": 24997,
+              "bgmc": 24721
+            },
+            "with_codec": "signed_fsm_lag",
+            "with_bytes": 23952,
+            "ladder_gain_bytes": 1918
+          },
+          {
+            "id": "voice-8-48000hz-8ch-s16_like-multichannel#ch3",
+            "population": "phase_m_representative",
+            "family": "fixed_diff",
+            "class": {
+              "source_structure": "residual",
+              "entropy": "sparse_residual",
+              "temporal": "slowly_varying"
+            },
+            "samples": 32768,
+            "pre_codec": "context_rans",
+            "pre_bytes": 25968,
+            "e_ladder_bytes": {
+              "signed_fsm": 24789,
+              "signed_fsm_sse": 24774,
+              "signed_fsm_lag": 24011,
+              "signed_fsm_mix": 25089,
+              "signed_fsm_rcm": 24950,
+              "bgmc": 24653
+            },
+            "with_codec": "signed_fsm_lag",
+            "with_bytes": 24011,
+            "ladder_gain_bytes": 1957
+          },
+          {
+            "id": "voice-8-48000hz-8ch-s16_like-multichannel#ch4",
+            "population": "phase_m_representative",
+            "family": "fixed_diff",
+            "class": {
+              "source_structure": "residual",
+              "entropy": "sparse_residual",
+              "temporal": "slowly_varying"
+            },
+            "samples": 32768,
+            "pre_codec": "context_rans",
+            "pre_bytes": 25986,
+            "e_ladder_bytes": {
+              "signed_fsm": 24674,
+              "signed_fsm_sse": 24646,
+              "signed_fsm_lag": 23961,
+              "signed_fsm_mix": 25104,
+              "signed_fsm_rcm": 24883,
+              "bgmc": 24645
+            },
+            "with_codec": "signed_fsm_lag",
+            "with_bytes": 23961,
+            "ladder_gain_bytes": 2025
+          },
+          {
+            "id": "voice-8-48000hz-8ch-s16_like-multichannel#ch5",
+            "population": "phase_m_representative",
+            "family": "fixed_diff",
+            "class": {
+              "source_structure": "residual",
+              "entropy": "sparse_residual",
+              "temporal": "slowly_varying"
+            },
+            "samples": 32768,
+            "pre_codec": "context_rans",
+            "pre_bytes": 26150,
+            "e_ladder_bytes": {
+              "signed_fsm": 24929,
+              "signed_fsm_sse": 24892,
+              "signed_fsm_lag": 24145,
+              "signed_fsm_mix": 25196,
+              "signed_fsm_rcm": 25065,
+              "bgmc": 24729
+            },
+            "with_codec": "signed_fsm_lag",
+            "with_bytes": 24145,
+            "ladder_gain_bytes": 2005
+          },
+          {
+            "id": "voice-8-48000hz-8ch-s16_like-multichannel#ch6",
+            "population": "phase_m_representative",
+            "family": "fixed_diff",
+            "class": {
+              "source_structure": "residual",
+              "entropy": "sparse_residual",
+              "temporal": "slowly_varying"
+            },
+            "samples": 32768,
+            "pre_codec": "context_rans",
+            "pre_bytes": 25835,
+            "e_ladder_bytes": {
+              "signed_fsm": 24656,
+              "signed_fsm_sse": 24640,
+              "signed_fsm_lag": 23938,
+              "signed_fsm_mix": 25125,
+              "signed_fsm_rcm": 25005,
+              "bgmc": 24706
+            },
+            "with_codec": "signed_fsm_lag",
+            "with_bytes": 23938,
+            "ladder_gain_bytes": 1897
+          },
+          {
+            "id": "voice-8-48000hz-8ch-s16_like-multichannel#ch7",
+            "population": "phase_m_representative",
+            "family": "fixed_diff",
+            "class": {
+              "source_structure": "residual",
+              "entropy": "sparse_residual",
+              "temporal": "slowly_varying"
+            },
+            "samples": 32768,
+            "pre_codec": "context_rans",
+            "pre_bytes": 26006,
+            "e_ladder_bytes": {
+              "signed_fsm": 24823,
+              "signed_fsm_sse": 24804,
+              "signed_fsm_lag": 24025,
+              "signed_fsm_mix": 25100,
+              "signed_fsm_rcm": 24991,
+              "bgmc": 24647
+            },
+            "with_codec": "signed_fsm_lag",
+            "with_bytes": 24025,
+            "ladder_gain_bytes": 1981
+          },
+          {
+            "id": "noise-s16-8-48000hz-8ch-s16_like-multichannel#ch0",
+            "population": "phase_m_representative",
+            "family": "fixed_diff",
+            "class": {
+              "source_structure": "noise",
+              "entropy": "spectrally_structured",
+              "temporal": "stationary"
+            },
+            "samples": 24000,
+            "pre_codec": "context_rans",
+            "pre_bytes": 48285,
+            "e_ladder_bytes": {
+              "signed_fsm": 49235,
+              "signed_fsm_sse": 49514,
+              "signed_fsm_lag": 49511,
+              "signed_fsm_mix": 48993,
+              "signed_fsm_rcm": 49501,
+              "bgmc": 48116
+            },
+            "with_codec": "bgmc",
+            "with_bytes": 48116,
+            "ladder_gain_bytes": 169
+          },
+          {
+            "id": "noise-s16-8-48000hz-8ch-s16_like-multichannel#ch1",
+            "population": "phase_m_representative",
+            "family": "fixed_diff",
+            "class": {
+              "source_structure": "noise",
+              "entropy": "spectrally_structured",
+              "temporal": "stationary"
+            },
+            "samples": 24000,
+            "pre_codec": "context_rans",
+            "pre_bytes": 48284,
+            "e_ladder_bytes": {
+              "signed_fsm": 49268,
+              "signed_fsm_sse": 49531,
+              "signed_fsm_lag": 49548,
+              "signed_fsm_mix": 48994,
+              "signed_fsm_rcm": 49513,
+              "bgmc": 48075
+            },
+            "with_codec": "bgmc",
+            "with_bytes": 48075,
+            "ladder_gain_bytes": 209
+          },
+          {
+            "id": "noise-s16-8-48000hz-8ch-s16_like-multichannel#ch2",
+            "population": "phase_m_representative",
+            "family": "fixed_diff",
+            "class": {
+              "source_structure": "noise",
+              "entropy": "spectrally_structured",
+              "temporal": "stationary"
+            },
+            "samples": 24000,
+            "pre_codec": "context_rans",
+            "pre_bytes": 48284,
+            "e_ladder_bytes": {
+              "signed_fsm": 49252,
+              "signed_fsm_sse": 49542,
+              "signed_fsm_lag": 49554,
+              "signed_fsm_mix": 48993,
+              "signed_fsm_rcm": 49510,
+              "bgmc": 48075
+            },
+            "with_codec": "bgmc",
+            "with_bytes": 48075,
+            "ladder_gain_bytes": 209
+          },
+          {
+            "id": "noise-s16-8-48000hz-8ch-s16_like-multichannel#ch3",
+            "population": "phase_m_representative",
+            "family": "fixed_diff",
+            "class": {
+              "source_structure": "noise",
+              "entropy": "spectrally_structured",
+              "temporal": "stationary"
+            },
+            "samples": 24000,
+            "pre_codec": "context_rans",
+            "pre_bytes": 48285,
+            "e_ladder_bytes": {
+              "signed_fsm": 49244,
+              "signed_fsm_sse": 49536,
+              "signed_fsm_lag": 49520,
+              "signed_fsm_mix": 48999,
+              "signed_fsm_rcm": 49505,
+              "bgmc": 48114
+            },
+            "with_codec": "bgmc",
+            "with_bytes": 48114,
+            "ladder_gain_bytes": 171
+          },
+          {
+            "id": "noise-s16-8-48000hz-8ch-s16_like-multichannel#ch4",
+            "population": "phase_m_representative",
+            "family": "fixed_diff",
+            "class": {
+              "source_structure": "noise",
+              "entropy": "spectrally_structured",
+              "temporal": "stationary"
+            },
+            "samples": 24000,
+            "pre_codec": "context_rans",
+            "pre_bytes": 48284,
+            "e_ladder_bytes": {
+              "signed_fsm": 49240,
+              "signed_fsm_sse": 49523,
+              "signed_fsm_lag": 49519,
+              "signed_fsm_mix": 48994,
+              "signed_fsm_rcm": 49505,
+              "bgmc": 48112
+            },
+            "with_codec": "bgmc",
+            "with_bytes": 48112,
+            "ladder_gain_bytes": 172
+          },
+          {
+            "id": "noise-s16-8-48000hz-8ch-s16_like-multichannel#ch5",
+            "population": "phase_m_representative",
+            "family": "fixed_diff",
+            "class": {
+              "source_structure": "noise",
+              "entropy": "spectrally_structured",
+              "temporal": "stationary"
+            },
+            "samples": 24000,
+            "pre_codec": "context_rans",
+            "pre_bytes": 48286,
+            "e_ladder_bytes": {
+              "signed_fsm": 49256,
+              "signed_fsm_sse": 49522,
+              "signed_fsm_lag": 49524,
+              "signed_fsm_mix": 48985,
+              "signed_fsm_rcm": 49485,
+              "bgmc": 48112
+            },
+            "with_codec": "bgmc",
+            "with_bytes": 48112,
+            "ladder_gain_bytes": 174
+          },
+          {
+            "id": "noise-s16-8-48000hz-8ch-s16_like-multichannel#ch6",
+            "population": "phase_m_representative",
+            "family": "fixed_diff",
+            "class": {
+              "source_structure": "noise",
+              "entropy": "spectrally_structured",
+              "temporal": "stationary"
+            },
+            "samples": 24000,
+            "pre_codec": "context_rans",
+            "pre_bytes": 48285,
+            "e_ladder_bytes": {
+              "signed_fsm": 49250,
+              "signed_fsm_sse": 49523,
+              "signed_fsm_lag": 49543,
+              "signed_fsm_mix": 49010,
+              "signed_fsm_rcm": 49497,
+              "bgmc": 48076
+            },
+            "with_codec": "bgmc",
+            "with_bytes": 48076,
+            "ladder_gain_bytes": 209
+          },
+          {
+            "id": "noise-s16-8-48000hz-8ch-s16_like-multichannel#ch7",
+            "population": "phase_m_representative",
+            "family": "fixed_diff",
+            "class": {
+              "source_structure": "noise",
+              "entropy": "spectrally_structured",
+              "temporal": "stationary"
+            },
+            "samples": 24000,
+            "pre_codec": "context_rans",
+            "pre_bytes": 48285,
+            "e_ladder_bytes": {
+              "signed_fsm": 49239,
+              "signed_fsm_sse": 49537,
+              "signed_fsm_lag": 49532,
+              "signed_fsm_mix": 48981,
+              "signed_fsm_rcm": 49505,
+              "bgmc": 48112
+            },
+            "with_codec": "bgmc",
+            "with_bytes": 48112,
+            "ladder_gain_bytes": 173
+          },
+          {
+            "id": "noise-stress-48000hz-12ch-full_i32-multichannel#ch0",
+            "population": "phase_m_representative",
+            "family": "fixed_diff",
+            "class": {
+              "source_structure": "noise",
+              "entropy": "full_width_random",
+              "temporal": "stationary"
+            },
+            "samples": 12000,
+            "pre_codec": "dense_i32",
+            "pre_bytes": 48001,
+            "e_ladder_bytes": {
+              "signed_fsm": 54286,
+              "signed_fsm_sse": 53378,
+              "signed_fsm_lag": 53380,
+              "signed_fsm_mix": 49102,
+              "signed_fsm_rcm": 49964,
+              "bgmc": 48294
+            },
+            "with_codec": "dense_i32",
+            "with_bytes": 48001,
+            "ladder_gain_bytes": 0
+          },
+          {
+            "id": "noise-stress-48000hz-12ch-full_i32-multichannel#ch1",
+            "population": "phase_m_representative",
+            "family": "fixed_diff",
+            "class": {
+              "source_structure": "noise",
+              "entropy": "full_width_random",
+              "temporal": "stationary"
+            },
+            "samples": 12000,
+            "pre_codec": "dense_i32",
+            "pre_bytes": 48001,
+            "e_ladder_bytes": {
+              "signed_fsm": 54302,
+              "signed_fsm_sse": 53398,
+              "signed_fsm_lag": 53400,
+              "signed_fsm_mix": 49099,
+              "signed_fsm_rcm": 49967,
+              "bgmc": 48278
+            },
+            "with_codec": "dense_i32",
+            "with_bytes": 48001,
+            "ladder_gain_bytes": 0
+          },
+          {
+            "id": "noise-stress-48000hz-12ch-full_i32-multichannel#ch2",
+            "population": "phase_m_representative",
+            "family": "fixed_diff",
+            "class": {
+              "source_structure": "noise",
+              "entropy": "full_width_random",
+              "temporal": "stationary"
+            },
+            "samples": 12000,
+            "pre_codec": "dense_i32",
+            "pre_bytes": 48001,
+            "e_ladder_bytes": {
+              "signed_fsm": 54277,
+              "signed_fsm_sse": 53357,
+              "signed_fsm_lag": 53359,
+              "signed_fsm_mix": 49082,
+              "signed_fsm_rcm": 49960,
+              "bgmc": 48273
+            },
+            "with_codec": "dense_i32",
+            "with_bytes": 48001,
+            "ladder_gain_bytes": 0
+          },
+          {
+            "id": "noise-stress-48000hz-12ch-full_i32-multichannel#ch3",
+            "population": "phase_m_representative",
+            "family": "fixed_diff",
+            "class": {
+              "source_structure": "noise",
+              "entropy": "full_width_random",
+              "temporal": "stationary"
+            },
+            "samples": 12000,
+            "pre_codec": "dense_i32",
+            "pre_bytes": 48001,
+            "e_ladder_bytes": {
+              "signed_fsm": 54293,
+              "signed_fsm_sse": 53391,
+              "signed_fsm_lag": 53393,
+              "signed_fsm_mix": 49106,
+              "signed_fsm_rcm": 49958,
+              "bgmc": 48276
+            },
+            "with_codec": "dense_i32",
+            "with_bytes": 48001,
+            "ladder_gain_bytes": 0
+          },
+          {
+            "id": "noise-stress-48000hz-12ch-full_i32-multichannel#ch4",
+            "population": "phase_m_representative",
+            "family": "fixed_diff",
+            "class": {
+              "source_structure": "noise",
+              "entropy": "full_width_random",
+              "temporal": "stationary"
+            },
+            "samples": 12000,
+            "pre_codec": "dense_i32",
+            "pre_bytes": 48001,
+            "e_ladder_bytes": {
+              "signed_fsm": 54284,
+              "signed_fsm_sse": 53379,
+              "signed_fsm_lag": 53381,
+              "signed_fsm_mix": 49105,
+              "signed_fsm_rcm": 49973,
+              "bgmc": 48288
+            },
+            "with_codec": "dense_i32",
+            "with_bytes": 48001,
+            "ladder_gain_bytes": 0
+          },
+          {
+            "id": "noise-stress-48000hz-12ch-full_i32-multichannel#ch5",
+            "population": "phase_m_representative",
+            "family": "fixed_diff",
+            "class": {
+              "source_structure": "noise",
+              "entropy": "full_width_random",
+              "temporal": "stationary"
+            },
+            "samples": 12000,
+            "pre_codec": "dense_i32",
+            "pre_bytes": 48001,
+            "e_ladder_bytes": {
+              "signed_fsm": 54268,
+              "signed_fsm_sse": 53377,
+              "signed_fsm_lag": 53381,
+              "signed_fsm_mix": 49114,
+              "signed_fsm_rcm": 49973,
+              "bgmc": 48287
+            },
+            "with_codec": "dense_i32",
+            "with_bytes": 48001,
+            "ladder_gain_bytes": 0
+          },
+          {
+            "id": "noise-stress-48000hz-12ch-full_i32-multichannel#ch6",
+            "population": "phase_m_representative",
+            "family": "fixed_diff",
+            "class": {
+              "source_structure": "noise",
+              "entropy": "full_width_random",
+              "temporal": "stationary"
+            },
+            "samples": 12000,
+            "pre_codec": "dense_i32",
+            "pre_bytes": 48001,
+            "e_ladder_bytes": {
+              "signed_fsm": 54281,
+              "signed_fsm_sse": 53366,
+              "signed_fsm_lag": 53368,
+              "signed_fsm_mix": 49103,
+              "signed_fsm_rcm": 49970,
+              "bgmc": 48277
+            },
+            "with_codec": "dense_i32",
+            "with_bytes": 48001,
+            "ladder_gain_bytes": 0
+          },
+          {
+            "id": "noise-stress-48000hz-12ch-full_i32-multichannel#ch7",
+            "population": "phase_m_representative",
+            "family": "fixed_diff",
+            "class": {
+              "source_structure": "noise",
+              "entropy": "full_width_random",
+              "temporal": "stationary"
+            },
+            "samples": 12000,
+            "pre_codec": "dense_i32",
+            "pre_bytes": 48001,
+            "e_ladder_bytes": {
+              "signed_fsm": 54306,
+              "signed_fsm_sse": 53397,
+              "signed_fsm_lag": 53398,
+              "signed_fsm_mix": 49100,
+              "signed_fsm_rcm": 49964,
+              "bgmc": 48283
+            },
+            "with_codec": "dense_i32",
+            "with_bytes": 48001,
+            "ladder_gain_bytes": 0
+          },
+          {
+            "id": "noise-stress-48000hz-12ch-full_i32-multichannel#ch8",
+            "population": "phase_m_representative",
+            "family": "fixed_diff",
+            "class": {
+              "source_structure": "noise",
+              "entropy": "full_width_random",
+              "temporal": "stationary"
+            },
+            "samples": 12000,
+            "pre_codec": "dense_i32",
+            "pre_bytes": 48001,
+            "e_ladder_bytes": {
+              "signed_fsm": 54297,
+              "signed_fsm_sse": 53388,
+              "signed_fsm_lag": 53390,
+              "signed_fsm_mix": 49117,
+              "signed_fsm_rcm": 49973,
+              "bgmc": 48299
+            },
+            "with_codec": "dense_i32",
+            "with_bytes": 48001,
+            "ladder_gain_bytes": 0
+          },
+          {
+            "id": "noise-stress-48000hz-12ch-full_i32-multichannel#ch9",
+            "population": "phase_m_representative",
+            "family": "fixed_diff",
+            "class": {
+              "source_structure": "noise",
+              "entropy": "full_width_random",
+              "temporal": "stationary"
+            },
+            "samples": 12000,
+            "pre_codec": "dense_i32",
+            "pre_bytes": 48001,
+            "e_ladder_bytes": {
+              "signed_fsm": 54272,
+              "signed_fsm_sse": 53361,
+              "signed_fsm_lag": 53363,
+              "signed_fsm_mix": 49115,
+              "signed_fsm_rcm": 49967,
+              "bgmc": 48284
+            },
+            "with_codec": "dense_i32",
+            "with_bytes": 48001,
+            "ladder_gain_bytes": 0
+          },
+          {
+            "id": "noise-stress-48000hz-12ch-full_i32-multichannel#ch10",
+            "population": "phase_m_representative",
+            "family": "fixed_diff",
+            "class": {
+              "source_structure": "noise",
+              "entropy": "full_width_random",
+              "temporal": "stationary"
+            },
+            "samples": 12000,
+            "pre_codec": "dense_i32",
+            "pre_bytes": 48001,
+            "e_ladder_bytes": {
+              "signed_fsm": 54308,
+              "signed_fsm_sse": 53406,
+              "signed_fsm_lag": 53407,
+              "signed_fsm_mix": 49108,
+              "signed_fsm_rcm": 49969,
+              "bgmc": 48297
+            },
+            "with_codec": "dense_i32",
+            "with_bytes": 48001,
+            "ladder_gain_bytes": 0
+          },
+          {
+            "id": "noise-stress-48000hz-12ch-full_i32-multichannel#ch11",
+            "population": "phase_m_representative",
+            "family": "fixed_diff",
+            "class": {
+              "source_structure": "noise",
+              "entropy": "full_width_random",
+              "temporal": "stationary"
+            },
+            "samples": 12000,
+            "pre_codec": "dense_i32",
+            "pre_bytes": 48001,
+            "e_ladder_bytes": {
+              "signed_fsm": 54297,
+              "signed_fsm_sse": 53389,
+              "signed_fsm_lag": 53394,
+              "signed_fsm_mix": 49097,
+              "signed_fsm_rcm": 49975,
+              "bgmc": 48265
+            },
+            "with_codec": "dense_i32",
+            "with_bytes": 48001,
+            "ladder_gain_bytes": 0
+          },
+          {
+            "id": "perc-8-48000hz-1ch-s16_like-mono#ch0",
+            "population": "phase_m_representative",
+            "family": "fixed_diff",
+            "class": {
+              "source_structure": "compound",
+              "entropy": "sparse_residual",
+              "temporal": "one_shot"
+            },
+            "samples": 32768,
+            "pre_codec": "zero_mask_rice",
+            "pre_bytes": 150,
+            "e_ladder_bytes": {
+              "signed_fsm": 281,
+              "signed_fsm_sse": 342,
+              "signed_fsm_lag": 343,
+              "signed_fsm_mix": 263,
+              "signed_fsm_rcm": 299,
+              "bgmc": 276
+            },
+            "with_codec": "zero_mask_rice",
+            "with_bytes": 150,
+            "ladder_gain_bytes": 0
+          },
+          {
+            "id": "perc-64-48000hz-1ch-s16_like-mono#ch0",
+            "population": "phase_m_representative",
+            "family": "fixed_diff",
+            "class": {
+              "source_structure": "compound",
+              "entropy": "sparse_residual",
+              "temporal": "transient"
+            },
+            "samples": 32768,
+            "pre_codec": "zero_mask_rice",
+            "pre_bytes": 1019,
+            "e_ladder_bytes": {
+              "signed_fsm": 1122,
+              "signed_fsm_sse": 1159,
+              "signed_fsm_lag": 1165,
+              "signed_fsm_mix": 1092,
+              "signed_fsm_rcm": 1093,
+              "bgmc": 9144
+            },
+            "with_codec": "zero_mask_rice",
+            "with_bytes": 1019,
+            "ladder_gain_bytes": 0
+          },
+          {
+            "id": "impulses-256-48000hz-1ch-s24_like-mono#ch0",
+            "population": "phase_m_representative",
+            "family": "fixed_diff",
+            "class": {
+              "source_structure": "residual",
+              "entropy": "sparse_residual",
+              "temporal": "transient"
+            },
+            "samples": 32768,
+            "pre_codec": "elias_fano",
+            "pre_bytes": 3912,
+            "e_ladder_bytes": {
+              "signed_fsm": 4257,
+              "signed_fsm_sse": 3843,
+              "signed_fsm_lag": 3844,
+              "signed_fsm_mix": 4273,
+              "signed_fsm_rcm": 3935,
+              "bgmc": 51987
+            },
+            "with_codec": "signed_fsm_sse",
+            "with_bytes": 3843,
+            "ladder_gain_bytes": 69
+          }
+        ]
+      },
+      "protocol": {
+        "protocol_schema": "vole.audio.learned.protocol.v1",
+        "schema": "vole.audio.learned.exp3.evidence.v1",
+        "profile": "vole.audio.learned.exp3",
+        "version": 1,
+        "semantic_authority": "none: a learned hypothesis is a candidate family, never truth; scalar exact closure decides acceptance"
+      },
+      "speech_effectiveness": {
+        "population": "speech_effectiveness",
+        "objects": 8,
+        "residual_samples": 131072,
+        "all_exact": true,
+        "active_codecs": [
+          "dense_i32",
+          "sparse_delta",
+          "zigzag_varint",
+          "block_rice",
+          "predictive_rice",
+          "literal_residual",
+          "partition_rice",
+          "core_tail_rice",
+          "run_length_rice",
+          "zero_mask_rice",
+          "byte_plane",
+          "context_rans",
+          "golomb",
+          "centered_golomb",
+          "factor_shift",
+          "elias_fano",
+          "signed_fsm",
+          "signed_fsm_sse",
+          "signed_fsm_lag",
+          "signed_fsm_mix",
+          "signed_fsm_rcm",
+          "bgmc"
+        ],
+        "e_ladder": [
+          "signed_fsm",
+          "signed_fsm_sse",
+          "signed_fsm_lag",
+          "signed_fsm_mix",
+          "signed_fsm_rcm",
+          "bgmc"
+        ],
+        "pre_e_best_bytes": 126507,
+        "e_ladder_bytes": {
+          "signed_fsm": 128398,
+          "signed_fsm_sse": 128163,
+          "signed_fsm_lag": 128194,
+          "signed_fsm_mix": 127017,
+          "signed_fsm_rcm": 127310,
+          "bgmc": 126779
+        },
+        "with_e_best_bytes": 125984,
+        "ladder_gain_bytes": 523,
+        "codec_totals_bytes": {
+          "dense_i32": 524296,
+          "sparse_delta": 300398,
+          "zigzag_varint": 177494,
+          "block_rice": 128911,
+          "predictive_rice": 135377,
+          "literal_residual": 1523224,
+          "partition_rice": 128215,
+          "core_tail_rice": 153109,
+          "run_length_rice": 145472,
+          "zero_mask_rice": 157383,
+          "byte_plane": 231492,
+          "context_rans": 136145,
+          "golomb": 126527,
+          "centered_golomb": 126592,
+          "factor_shift": 128220,
+          "elias_fano": 158391,
+          "signed_fsm": 128398,
+          "signed_fsm_sse": 128163,
+          "signed_fsm_lag": 128194,
+          "signed_fsm_mix": 127017,
+          "signed_fsm_rcm": 127310,
+          "bgmc": 126779
+        },
+        "timing": {
+          "per_codec": {
+            "signed_fsm": {
+              "encode_ns_per_sample": 44.76513671875,
+              "decode_ns_per_sample": 61.474632263183594
+            },
+            "signed_fsm_sse": {
+              "encode_ns_per_sample": 79.50306701660156,
+              "decode_ns_per_sample": 108.44831085205078
+            },
+            "signed_fsm_lag": {
+              "encode_ns_per_sample": 84.03897094726562,
+              "decode_ns_per_sample": 108.77283477783203
+            },
+            "signed_fsm_mix": {
+              "encode_ns_per_sample": 190.15901947021484,
+              "decode_ns_per_sample": 205.52100372314453
+            },
+            "signed_fsm_rcm": {
+              "encode_ns_per_sample": 209.6262664794922,
+              "decode_ns_per_sample": 248.97490692138672
+            },
+            "bgmc": {
+              "encode_ns_per_sample": 95.47364807128906,
+              "decode_ns_per_sample": 24.779266357421875
+            }
+          },
+          "repetitions": 3,
+          "note": "wall-clock, never hashed"
+        },
+        "objects_detail": [
+          {
+            "id": "1272-128104-0000",
+            "population": "speech_effectiveness",
+            "family": "lpc",
+            "class": {
+              "split": "dev-clean"
+            },
+            "samples": 16384,
+            "pre_codec": "golomb",
+            "pre_bytes": 15281,
+            "e_ladder_bytes": {
+              "signed_fsm": 15588,
+              "signed_fsm_sse": 15551,
+              "signed_fsm_lag": 15555,
+              "signed_fsm_mix": 15305,
+              "signed_fsm_rcm": 15344,
+              "bgmc": 15676
+            },
+            "with_codec": "golomb",
+            "with_bytes": 15281,
+            "ladder_gain_bytes": 0
+          },
+          {
+            "id": "1462-170138-0000",
+            "population": "speech_effectiveness",
+            "family": "polezero",
+            "class": {
+              "split": "dev-clean"
+            },
+            "samples": 16384,
+            "pre_codec": "golomb",
+            "pre_bytes": 15372,
+            "e_ladder_bytes": {
+              "signed_fsm": 15667,
+              "signed_fsm_sse": 15626,
+              "signed_fsm_lag": 15635,
+              "signed_fsm_mix": 15473,
+              "signed_fsm_rcm": 15506,
+              "bgmc": 15350
+            },
+            "with_codec": "bgmc",
+            "with_bytes": 15350,
+            "ladder_gain_bytes": 22
+          },
+          {
+            "id": "1673-143396-0000",
+            "population": "speech_effectiveness",
+            "family": "lpc",
+            "class": {
+              "split": "dev-clean"
+            },
+            "samples": 16384,
+            "pre_codec": "golomb",
+            "pre_bytes": 17159,
+            "e_ladder_bytes": {
+              "signed_fsm": 17496,
+              "signed_fsm_sse": 17479,
+              "signed_fsm_lag": 17481,
+              "signed_fsm_mix": 17277,
+              "signed_fsm_rcm": 17325,
+              "bgmc": 17193
+            },
+            "with_codec": "golomb",
+            "with_bytes": 17159,
+            "ladder_gain_bytes": 0
+          },
+          {
+            "id": "174-168635-0000",
+            "population": "speech_effectiveness",
+            "family": "lpc",
+            "class": {
+              "split": "dev-clean"
+            },
+            "samples": 16384,
+            "pre_codec": "golomb",
+            "pre_bytes": 15038,
+            "e_ladder_bytes": {
+              "signed_fsm": 15382,
+              "signed_fsm_sse": 15329,
+              "signed_fsm_lag": 15347,
+              "signed_fsm_mix": 15198,
+              "signed_fsm_rcm": 15228,
+              "bgmc": 15137
+            },
+            "with_codec": "golomb",
+            "with_bytes": 15038,
+            "ladder_gain_bytes": 0
+          },
+          {
+            "id": "1919-142785-0000",
+            "population": "speech_effectiveness",
+            "family": "lpc",
+            "class": {
+              "split": "dev-clean"
+            },
+            "samples": 16384,
+            "pre_codec": "golomb",
+            "pre_bytes": 17892,
+            "e_ladder_bytes": {
+              "signed_fsm": 18270,
+              "signed_fsm_sse": 18242,
+              "signed_fsm_lag": 18247,
+              "signed_fsm_mix": 18098,
+              "signed_fsm_rcm": 18171,
+              "bgmc": 18159
+            },
+            "with_codec": "golomb",
+            "with_bytes": 17892,
+            "ladder_gain_bytes": 0
+          },
+          {
+            "id": "1988-147956-0000",
+            "population": "speech_effectiveness",
+            "family": "lattice",
+            "class": {
+              "split": "dev-clean"
+            },
+            "samples": 16384,
+            "pre_codec": "centered_golomb",
+            "pre_bytes": 13754,
+            "e_ladder_bytes": {
+              "signed_fsm": 13521,
+              "signed_fsm_sse": 13486,
+              "signed_fsm_lag": 13483,
+              "signed_fsm_mix": 13443,
+              "signed_fsm_rcm": 13438,
+              "bgmc": 13403
+            },
+            "with_codec": "bgmc",
+            "with_bytes": 13403,
+            "ladder_gain_bytes": 351
+          },
+          {
+            "id": "1993-147149-0000",
+            "population": "speech_effectiveness",
+            "family": "lpc",
+            "class": {
+              "split": "dev-clean"
+            },
+            "samples": 16384,
+            "pre_codec": "golomb",
+            "pre_bytes": 11776,
+            "e_ladder_bytes": {
+              "signed_fsm": 11867,
+              "signed_fsm_sse": 11844,
+              "signed_fsm_lag": 11843,
+              "signed_fsm_mix": 11804,
+              "signed_fsm_rcm": 11801,
+              "bgmc": 11704
+            },
+            "with_codec": "bgmc",
+            "with_bytes": 11704,
+            "ladder_gain_bytes": 72
+          },
+          {
+            "id": "2035-147960-0000",
+            "population": "speech_effectiveness",
+            "family": "lpc",
+            "class": {
+              "split": "dev-clean"
+            },
+            "samples": 16384,
+            "pre_codec": "golomb",
+            "pre_bytes": 20235,
+            "e_ladder_bytes": {
+              "signed_fsm": 20607,
+              "signed_fsm_sse": 20606,
+              "signed_fsm_lag": 20603,
+              "signed_fsm_mix": 20419,
+              "signed_fsm_rcm": 20497,
+              "bgmc": 20157
+            },
+            "with_codec": "bgmc",
+            "with_bytes": 20157,
+            "ladder_gain_bytes": 78
+          }
+        ]
+      }
+    }
+  },
+  "receipt_sha256": "8f5571a6e989a3aa8b8394c2ce32106c5041bd34eff8c74ff845a209f5d12017"
+}
