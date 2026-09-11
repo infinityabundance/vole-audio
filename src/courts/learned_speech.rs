@@ -26,22 +26,26 @@ use crate::learned::train::TrainBudget;
 use crate::learned::train::fixed::fit_fixed_diff_sweep;
 use crate::learned::train::hierarchy::fit_hierarchy_object;
 use crate::learned::train::linear::fit_linear_object_exp2;
-use crate::learned::train::lpc::fit_lpc_object;
+use crate::learned::train::lpc::{fit_lattice_object, fit_lpc_object};
 use crate::learned::train::sparse::fit_sparse_object;
 use crate::status::Verdict;
 use std::path::Path;
 
 /// Frozen static-result hash (empty means "not yet frozen").
-/// Frozen static-result hash (empty means "not yet frozen").
-/// Frozen static-result hash (empty means "not yet frozen").
-/// Frozen static-result hash (empty means "not yet frozen").
 pub const LEARNED_SPEECH_SHA256: &str =
-    "f8cb4fec2429b501f94a460b61e3d85c8c3bbdacaeea53953ae9416249a2cc9c";
+    "d155764d7fec74d1693d7dbf2fddc10c2ad9046767a7167b4b09163dde06215f";
 
 const CLIPS_PER_SPLIT: usize = 8;
 
 /// The active candidate families (grown one seal at a time).
-pub const ACTIVE_FAMILIES: &[&str] = &["dense4", "sparse10", "hier2", "fixed_diff", "lpc"];
+pub const ACTIVE_FAMILIES: &[&str] = &[
+    "dense4",
+    "sparse10",
+    "hier2",
+    "fixed_diff",
+    "lpc",
+    "lattice",
+];
 
 fn bytes(o: &LearnedObject) -> Option<u64> {
     LearnedCost::of(o).ok().map(|c| c.complete_bytes)
@@ -92,6 +96,21 @@ fn portfolio(case: &RealCase, budget: &TrainBudget) -> Result<Vec<(&'static str,
     }
     if let Some(o) = best_lpc {
         raw.push(("lpc", o));
+    }
+    // Seal S7: lattice/PARCOR realisation over a frozen block ladder.
+    let mut best_lat: Option<LearnedObject> = None;
+    let mut best_lat_bytes = u64::MAX;
+    for block in [4096u32, 2048] {
+        if let Ok((o, _)) = fit_lattice_object(&case.samples, frames, rate, block, 12, budget)
+            && let Some(b) = bytes(&o)
+            && b < best_lat_bytes
+        {
+            best_lat_bytes = b;
+            best_lat = Some(o);
+        }
+    }
+    if let Some(o) = best_lat {
+        raw.push(("lattice", o));
     }
     // Re-encode every Exp2 candidate under Exp3 so the Seal S4 residual codecs
     // (general Golomb, centered Golomb) are selectable.

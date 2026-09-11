@@ -149,6 +149,12 @@ fn model_components(m: &LearnedModel) -> (u64, u64, u64, u64, u64, u64) {
             let _ = p;
             (0, 0, 0, 0, 0, 0)
         }
+        LearnedModel::Lattice(p) => {
+            // Reflection coefficients are stored as `i16`.
+            let len = p.canonical_bytes().len() as u64;
+            let weights = ((p.reflection.len() as u64) * 2).min(len);
+            (weights, 0, 0, 0, 0, 0)
+        }
         LearnedModel::Segmented(s) => {
             let mut w = 0u64;
             let mut b = 0u64;

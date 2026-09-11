@@ -22,6 +22,7 @@ pub mod finite_field;
 pub mod fixed;
 pub mod graph;
 pub mod hierarchy;
+pub mod lattice;
 pub mod lpc;
 pub mod ltp;
 pub mod model;

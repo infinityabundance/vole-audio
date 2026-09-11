@@ -1,6 +1,6 @@
 [package]
 name = "vole-audio"
-version = "0.35.0"
+version = "0.36.0"
 edition = "2024"
 # Verified MSRV: the full host test suite (all-features; 280+ tests incl.
 # the AVX-512 kernels, which need `stdarch_x86_avx512` stabilized in 1.89)

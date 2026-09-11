@@ -232,14 +232,30 @@ Measured (court `learned-speech`, result `f8cb4fec…`): effectiveness
 (1.7 % smaller, **7/8 wins**, Wilcoxon 39 063 ppm) and FLAC-8 142 714 (0.7 %
 smaller). Higher order still repays its coefficient bytes on this corpus.
 
+### Seal S7 — lattice/PARCOR realisation (honest near-negative)
+
+New family `learned::lattice` (model kind `14`): the predictor is stored as
+quantised **reflection (PARCOR) coefficients** (`|k| < 1`, Q14) and the direct
+predictor is reconstructed by a deterministic fixed-point
+Levinson-from-reflection recurrence before the usual integer prediction. The
+reflections come from Levinson and Burg (both already expose the reflection
+sequence).
+
+Measured (court `learned-speech`, result `d155764d…`): the lattice family is
+essentially never selected on this speech corpus — effectiveness is unchanged
+at 129 652 B and Mode C improves by 2 B (141 706 → 141 704). This is the honest
+shape the report anticipated for a coefficient-geometry change: at Q14 the
+lattice does not beat the direct-form predictor's quantisation on these blocks.
+The family stays in the portfolio as a non-regressing candidate.
+
 ## Status
 
 Implemented and pushed: Track A, Track B (including the entropy decode table),
 and the Report 3 Seal S0 diagnostic courts (`learned-speech-trace`,
 `learned-real-corpus-u1`), Seal S1 fixed differences, Seal S2 dense local LPC,
 Seal S3 precision/shift/error-feedback, Seal S4 general Golomb residual
-coding, Seal S5 estimator diversity and Seal S6 higher dense-LPC orders (court
-`learned-speech`).
+coding, Seal S5 estimator diversity, Seal S6 higher dense-LPC orders and Seal
+S7 lattice/PARCOR realisation (court `learned-speech`).
 The remaining tracks from the two whole-repository
 optimization reports
 (CPU frame-tile multicore + PartialBank vectorization, GPU work decomposition,

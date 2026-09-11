@@ -335,6 +335,177 @@ fn solve_linear(mut m: Vec<Vec<f64>>, mut b: Vec<f64>) -> Option<Vec<f64>> {
 /// The estimator that proposed a coefficient set (evidence only).
 pub const ESTIMATORS: [&str; 3] = ["autocorrelation_levinson", "burg", "covariance_lsq"];
 
+/// Levinson reflection (PARCOR) coefficients `k_1..k_max_order`.
+pub fn levinson_reflections(r: &[f64], max_order: usize) -> Vec<f64> {
+    let mut out = Vec::new();
+    if r.is_empty() || r[0] <= 0.0 || !r[0].is_finite() {
+        return out;
+    }
+    let mut a = vec![0.0f64; max_order + 1];
+    let mut e = r[0];
+    for i in 1..=max_order {
+        let mut acc = r[i];
+        for j in 1..i {
+            acc -= a[j] * r[i - j];
+        }
+        let k = acc / e;
+        if !k.is_finite() {
+            break;
+        }
+        out.push(k);
+        let old = a.clone();
+        for j in 1..i {
+            a[j] = old[j] - k * old[i - j];
+        }
+        a[i] = k;
+        e *= 1.0 - k * k;
+        if e <= 0.0 || !e.is_finite() {
+            break;
+        }
+    }
+    out
+}
+
+/// Burg reflection (PARCOR) coefficients `k_1..k_max_order`.
+pub fn burg_reflections(block: &[i32], max_order: usize) -> Vec<f64> {
+    let n = block.len();
+    let mut out = Vec::new();
+    if n == 0 || max_order == 0 || n <= max_order + 1 {
+        return out;
+    }
+    let x: Vec<f64> = block.iter().map(|&v| f64::from(v)).collect();
+    let mut f = x.clone();
+    let mut b = x.clone();
+    for m in 1..=max_order {
+        let mut num = 0.0f64;
+        let mut den = 0.0f64;
+        for i in m..n {
+            num += f[i] * b[i - 1];
+            den += f[i] * f[i] + b[i - 1] * b[i - 1];
+        }
+        if den <= 0.0 {
+            break;
+        }
+        let k = 2.0 * num / den;
+        out.push(k);
+        for i in (m..n).rev() {
+            let fi = f[i];
+            let bi = b[i - 1];
+            f[i] = fi - k * bi;
+            b[i] = bi - k * fi;
+        }
+    }
+    out
+}
+
+/// Quantise reflection coefficients to `Q(shift)`, keeping `|k| < 1`.
+pub fn quantize_reflections(ks: &[f64], shift: u8) -> Vec<i32> {
+    let limit = 1i64 << shift;
+    ks.iter()
+        .map(|&k| {
+            let q = round_half_away(k * f64::from(1u32 << shift));
+            q.clamp(-(limit - 1), limit - 1) as i32
+        })
+        .collect()
+}
+
+/// Build the lattice object for one block with the given order, or `None`.
+fn lattice_object(
+    block: &[i32],
+    order: usize,
+    reflection: &[f64],
+    shift: u8,
+) -> Option<(Vec<i32>, i32)> {
+    if reflection.len() < order {
+        return None;
+    }
+    let ks = quantize_reflections(&reflection[..order], shift);
+    let p = crate::learned::lattice::LatticePredictor {
+        channels: 1,
+        order: order as u16,
+        shift,
+        reflection: ks,
+        block_frames: None,
+    };
+    if p.validate().is_err() {
+        return None;
+    }
+    let h = p.hypothesis_all_from_source(block, block.len()).ok()?;
+    let residual: Vec<i32> = block
+        .iter()
+        .zip(&h)
+        .map(|(&x, &hh)| x.wrapping_sub(hh))
+        .collect();
+    Some((residual, order as i32))
+}
+
+/// Fit a per-block lattice object over the frozen order ladder.
+pub fn fit_lattice_object(
+    source: &[i32],
+    frames: u64,
+    sample_rate_hz: u32,
+    block_frames: u32,
+    max_order: u16,
+    budget: &TrainBudget,
+) -> Result<(LearnedObject, TrainStats)> {
+    budget.validate()?;
+    if source.len() != frames as usize {
+        return Err(Error::malformed(
+            "lattice fit is mono-only and expects one sample per frame",
+        ));
+    }
+    if block_frames == 0 {
+        return Err(Error::malformed("lattice block size must be positive"));
+    }
+    let max_order = max_order.min(crate::learned::lattice::MAX_LATTICE_ORDER) as usize;
+    let shift = crate::learned::lattice::LATTICE_SHIFT;
+    let sw = Stopwatch::start();
+    let mut stats = TrainStats::default();
+    let ranges = block_ranges(frames as usize, block_frames as usize);
+    let mut segments = Vec::with_capacity(ranges.len());
+    for (from, to) in ranges {
+        stats.candidates += 1;
+        let block = &source[from..to];
+        let r = autocorrelation(block, max_order, 0.5);
+        let lev = levinson_reflections(&r, max_order);
+        let burg = burg_reflections(block, max_order);
+        let mut best: Option<(i32, Vec<i32>, u64)> = None;
+        for order in 1..=max_order {
+            for refl in [&lev, &burg] {
+                let Some((residual, _)) = lattice_object(block, order, refl, shift) else {
+                    continue;
+                };
+                let model_bits = (order as u64) * 16 + 16;
+                let cost = model_bits + rice_cost_bits(&residual);
+                if best.as_ref().is_none_or(|(_, _, c)| cost < *c) {
+                    let ks = quantize_reflections(&refl[..order], shift);
+                    let order_i = order as i32;
+                    best = Some((order_i, ks, cost));
+                }
+            }
+        }
+        let (order, ks, _) = best.unwrap_or((1, vec![0], u64::MAX));
+        let p = crate::learned::lattice::LatticePredictor {
+            channels: 1,
+            order: order as u16,
+            shift,
+            reflection: ks,
+            block_frames: None,
+        };
+        p.validate()?;
+        segments.push(Segment {
+            frames: (to - from) as u32,
+            model: Box::new(LearnedModel::Lattice(p)),
+        });
+    }
+    let o = build_segmented(source, frames, sample_rate_hz, segments)?;
+    if !o.verify(source) {
+        return Err(Error::internal("lattice candidate did not close exactly"));
+    }
+    stats.fit_ns = sw.elapsed_ns().max(0) as u64;
+    Ok((o, stats))
+}
+
 /// All estimator proposals for one order, in deterministic order.
 fn estimator_proposals(
     block: &[i32],

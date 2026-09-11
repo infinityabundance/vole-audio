@@ -48,6 +48,8 @@ pub enum LearnedModel {
     Lpc(crate::learned::lpc::LpcPredictor),
     /// A coefficient-free finite-difference predictor (Exp2, Seal S1).
     Fixed(crate::learned::fixed::FixedDifferencePredictor),
+    /// A lattice/PARCOR all-pole predictor (Exp3, Seal S7).
+    Lattice(crate::learned::lattice::LatticePredictor),
 }
 
 impl LearnedModel {
@@ -68,6 +70,7 @@ impl LearnedModel {
             LearnedModel::ContextMixture(_) => 11,
             LearnedModel::Lpc(_) => 12,
             LearnedModel::Fixed(_) => 13,
+            LearnedModel::Lattice(_) => 14,
         }
     }
 
@@ -88,6 +91,7 @@ impl LearnedModel {
             LearnedModel::ContextMixture(_) => "context_mixture",
             LearnedModel::Lpc(_) => "lpc",
             LearnedModel::Fixed(_) => "fixed_difference",
+            LearnedModel::Lattice(_) => "lattice",
         }
     }
 
@@ -108,6 +112,7 @@ impl LearnedModel {
             LearnedModel::ContextMixture(p) => p.validate(),
             LearnedModel::Lpc(p) => p.validate(),
             LearnedModel::Fixed(p) => p.validate(),
+            LearnedModel::Lattice(p) => p.validate(),
         }
     }
 
@@ -128,6 +133,7 @@ impl LearnedModel {
             LearnedModel::ContextMixture(p) => p.channels,
             LearnedModel::Lpc(p) => p.channels,
             LearnedModel::Fixed(p) => p.channels,
+            LearnedModel::Lattice(p) => p.channels,
         }
     }
 
@@ -148,6 +154,7 @@ impl LearnedModel {
             LearnedModel::ContextMixture(p) => p.receptive_field(),
             LearnedModel::Lpc(p) => p.receptive_field(),
             LearnedModel::Fixed(p) => p.receptive_field(),
+            LearnedModel::Lattice(p) => p.receptive_field(),
         }
     }
 
@@ -168,6 +175,7 @@ impl LearnedModel {
             LearnedModel::ContextMixture(p) => p.ops_per_sample(),
             LearnedModel::Lpc(p) => p.ops_per_sample(),
             LearnedModel::Fixed(p) => p.ops_per_sample(),
+            LearnedModel::Lattice(p) => p.ops_per_sample(),
         }
     }
 
@@ -188,6 +196,7 @@ impl LearnedModel {
             LearnedModel::ContextMixture(p) => p.state_bytes(),
             LearnedModel::Lpc(p) => p.state_bytes(),
             LearnedModel::Fixed(p) => p.state_bytes(),
+            LearnedModel::Lattice(p) => p.state_bytes(),
         }
     }
 
@@ -208,6 +217,7 @@ impl LearnedModel {
             LearnedModel::ContextMixture(p) => p.checkpoint_count(),
             LearnedModel::Lpc(p) => p.checkpoint_count(),
             LearnedModel::Fixed(p) => p.checkpoint_count(),
+            LearnedModel::Lattice(p) => p.checkpoint_count(),
         }
     }
 
@@ -228,6 +238,7 @@ impl LearnedModel {
             LearnedModel::ContextMixture(p) => p.canonical_bytes(),
             LearnedModel::Lpc(p) => p.canonical_bytes(),
             LearnedModel::Fixed(p) => p.canonical_bytes(),
+            LearnedModel::Lattice(p) => p.canonical_bytes(),
         }
     }
 
@@ -279,6 +290,9 @@ impl LearnedModel {
             13 => LearnedModel::Fixed(
                 crate::learned::fixed::FixedDifferencePredictor::from_canonical_bytes(bytes)?,
             ),
+            14 => LearnedModel::Lattice(
+                crate::learned::lattice::LatticePredictor::from_canonical_bytes(bytes)?,
+            ),
             other => {
                 return Err(Error::new(
                     crate::error::Kind::Unsupported,
@@ -309,6 +323,7 @@ impl LearnedModel {
             LearnedModel::ContextMixture(p) => p.hypothesis_all_from_source(source, frames),
             LearnedModel::Lpc(p) => p.hypothesis_all_from_source(source, frames),
             LearnedModel::Fixed(p) => p.hypothesis_all_from_source(source, frames),
+            LearnedModel::Lattice(p) => p.hypothesis_all_from_source(source, frames),
         }
     }
 
@@ -337,6 +352,7 @@ impl LearnedModel {
             LearnedModel::ContextMixture(p) => p.evaluate_range(residual, frames, start, len),
             LearnedModel::Lpc(p) => p.evaluate_range(residual, frames, start, len),
             LearnedModel::Fixed(p) => p.evaluate_range(residual, frames, start, len),
+            LearnedModel::Lattice(p) => p.evaluate_range(residual, frames, start, len),
         }
     }
 
@@ -357,6 +373,7 @@ impl LearnedModel {
             LearnedModel::ContextMixture(p) => p.replay_frames(start),
             LearnedModel::Lpc(p) => p.replay_frames(start),
             LearnedModel::Fixed(p) => p.replay_frames(start),
+            LearnedModel::Lattice(p) => p.replay_frames(start),
         }
     }
 
