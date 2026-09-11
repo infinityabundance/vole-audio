@@ -45,7 +45,7 @@ use std::path::{Path, PathBuf};
 
 /// Frozen static-result hash (empty means "not yet frozen").
 pub const LEARNED_RESIDUAL_ENTROPY_SHA256: &str =
-    "1366036a4a561e6eac2a36a842b8c4fd568b1d2bda1e3f84b137bbd8f9bac02e";
+    "00599665b2d9d006ccb40ab53624f8bbaf3c198a543979dab9c151c2e2252493";
 
 /// Maximum representative Phase-M objects (one per distinct class tuple).
 const MAX_PHASE_M_OBJECTS: usize = 12;
@@ -192,7 +192,11 @@ fn phase_m_codecs() -> Vec<ResidualCodecV2> {
 }
 
 /// The fourth-pass E-ladder codecs measured against the pre-existing family.
-const E_CODECS: [ResidualCodecV2; 2] = [ResidualCodecV2::SignedFsm, ResidualCodecV2::SignedFsmSse];
+const E_CODECS: [ResidualCodecV2; 3] = [
+    ResidualCodecV2::SignedFsm,
+    ResidualCodecV2::SignedFsmSse,
+    ResidualCodecV2::SignedFsmLag,
+];
 
 /// Evaluate the ladder over one population with an explicit codec set.
 fn evaluate(
@@ -386,8 +390,9 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
         format!(
             "attributable residual-codec ladder over the fixed S8 winner residual ({} effectiveness \
              clips) and {} representative Phase-M channel streams: pre-E family vs the Seal E1 \
-             signed/FSM adaptive range coder (id 16) and the Seal E2 SSE/APM-corrected variant \
-             (id 17), with the selected minimum reported",
+             signed/FSM adaptive range coder (id 16), the Seal E2 SSE/APM-corrected variant \
+             (id 17) and the Seal E3 matched-lag variant (id 18), with the selected minimum \
+             reported",
             speech_cases.len(),
             phase_m.len()
         ),
@@ -404,6 +409,7 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
                         "pre_e (ids 0..=15)",
                         "signed_fsm (id 16)",
                         "signed_fsm_sse (id 17)",
+                        "signed_fsm_lag (id 18)",
                         "with_e minimum",
                     ],
                     "e1_codec": "forward carry-less binary range coder (LZMA arithmetic coder) with \
@@ -414,6 +420,10 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
                                  probability is quantized in the integer stretch domain into 33 \
                                  interpolation points and adaptively corrected under a \
                                  phase × magnitude-bucket context, then interpolated",
+                    "e3_codec": "the SSE/APM coder with a matched-lag context: the encoder stores a \
+                                 decoder-visible lag (0..=128, or 0 for none) chosen from the \
+                                 residual's own autocorrelation, and the lagged residual magnitude \
+                                 bucket widens the SSE context; the lag never alters a value",
                     "binarization": "sign bit, then Exp-Golomb(0) of |r| (identical to Seal E0)",
                     "profile": crate::learned::profile::LEARNED_EXP3_PROFILE,
                     "mode_c": "deliberately not measured (held out from architecture tuning)",

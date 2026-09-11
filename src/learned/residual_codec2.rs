@@ -93,6 +93,8 @@ pub enum ResidualCodecV2 {
     SignedFsm = 16,
     /// Signed/FSM range coding with an SSE/APM probability correction (Seal E2).
     SignedFsmSse = 17,
+    /// SSE/APM coding with a decoder-visible matched-lag context (Seal E3).
+    SignedFsmLag = 18,
 }
 
 impl ResidualCodecV2 {
@@ -132,8 +134,8 @@ impl ResidualCodecV2 {
         ResidualCodecV2::ContextRans,
     ];
 
-    /// The Exp3 additions (Seal S4, E1, E2), in canonical tie order.
-    pub const ALL_V3: [ResidualCodecV2; 18] = [
+    /// The Exp3 additions (Seal S4, E1, E2, E3), in canonical tie order.
+    pub const ALL_V3: [ResidualCodecV2; 19] = [
         ResidualCodecV2::DenseI32,
         ResidualCodecV2::SparseDelta,
         ResidualCodecV2::ZigZagVarint,
@@ -152,6 +154,7 @@ impl ResidualCodecV2 {
         ResidualCodecV2::EliasFano,
         ResidualCodecV2::SignedFsm,
         ResidualCodecV2::SignedFsmSse,
+        ResidualCodecV2::SignedFsmLag,
     ];
 
     /// Canonical codec identifier byte.
@@ -180,6 +183,7 @@ impl ResidualCodecV2 {
             ResidualCodecV2::EliasFano => "elias_fano",
             ResidualCodecV2::SignedFsm => "signed_fsm",
             ResidualCodecV2::SignedFsmSse => "signed_fsm_sse",
+            ResidualCodecV2::SignedFsmLag => "signed_fsm_lag",
         }
     }
 
@@ -204,6 +208,7 @@ impl ResidualCodecV2 {
             15 => Some(ResidualCodecV2::EliasFano),
             16 => Some(ResidualCodecV2::SignedFsm),
             17 => Some(ResidualCodecV2::SignedFsmSse),
+            18 => Some(ResidualCodecV2::SignedFsmLag),
             _ => None,
         }
     }
@@ -259,6 +264,7 @@ impl ResidualCodecV2 {
             ResidualCodecV2::EliasFano => encode_elias_fano(residual),
             ResidualCodecV2::SignedFsm => encode_signed_fsm(residual),
             ResidualCodecV2::SignedFsmSse => encode_signed_fsm_sse(residual),
+            ResidualCodecV2::SignedFsmLag => encode_signed_fsm_lag(residual),
         }
     }
 
@@ -288,6 +294,7 @@ impl ResidualCodecV2 {
             ResidualCodecV2::EliasFano => decode_elias_fano(bytes, len),
             ResidualCodecV2::SignedFsm => decode_signed_fsm(bytes, len),
             ResidualCodecV2::SignedFsmSse => decode_signed_fsm_sse(bytes, len),
+            ResidualCodecV2::SignedFsmLag => decode_signed_fsm_lag(bytes, len),
         }
     }
 }
@@ -2494,38 +2501,137 @@ fn rc_code_dec(
 }
 
 fn encode_signed_fsm(residual: &[i32]) -> Vec<u8> {
-    encode_signed_fsm_impl(residual, false)
+    encode_signed_fsm_impl(residual, Ecoder::Base)
 }
 
 fn encode_signed_fsm_sse(residual: &[i32]) -> Vec<u8> {
-    encode_signed_fsm_impl(residual, true)
+    encode_signed_fsm_impl(residual, Ecoder::Sse)
 }
 
-fn encode_signed_fsm_impl(residual: &[i32], sse: bool) -> Vec<u8> {
+fn encode_signed_fsm_lag(residual: &[i32]) -> Vec<u8> {
+    let lag = choose_lag(residual);
+    let mut out = Vec::new();
+    out.push(lag as u8);
+    out.extend_from_slice(&encode_signed_fsm_impl(residual, Ecoder::Lag(lag)));
+    out
+}
+
+/// E-coder modes: base, SSE/APM, and SSE/APM with a matched-lag context.
+#[derive(Clone, Copy)]
+enum Ecoder {
+    Base,
+    Sse,
+    Lag(u32),
+}
+
+/// Matched-lag SSE states: "no lag" plus one per magnitude bucket.
+const LAG_STATES: usize = RC_BUCKETS + 1;
+/// SSE context count of the matched-lag mode (3 phases × 16 buckets × 17 lag states).
+const LAG_CONTEXTS: usize = 3 * RC_BUCKETS * LAG_STATES;
+
+/// Choose a decoder-visible matched lag `0..=128` from the residual's own
+/// autocorrelation, or `0` when no positive lag stands out. The lag is stored in
+/// the payload; it only ever selects a probability context, never a value.
+fn choose_lag(residual: &[i32]) -> u32 {
+    let n = residual.len();
+    if n < 256 {
+        return 0;
+    }
+    let max_lag = 128usize.min(n / 4).max(1);
+    let sample = n.min(8192);
+    let mut best_l = 0u32;
+    let mut best = 0i128;
+    for l in 1..=max_lag {
+        let mut acc: i128 = 0;
+        let mut cnt = 0u64;
+        let mut t = l;
+        while t < sample {
+            acc += i128::from(residual[t]) * i128::from(residual[t - l]);
+            cnt += 1;
+            t += 1;
+        }
+        if cnt == 0 {
+            continue;
+        }
+        let norm = acc / i128::from(cnt);
+        if norm > best {
+            best = norm;
+            best_l = l as u32;
+        }
+    }
+    best_l
+}
+
+#[inline]
+fn lag_state_for(history: &[i32], t: usize, lag: u32) -> usize {
+    if lag == 0 || t < lag as usize {
+        0
+    } else {
+        1 + rc_bucket(u64::from(history[t - lag as usize].unsigned_abs()))
+    }
+}
+
+#[inline]
+fn sse_context(kind: Ecoder, phase: usize, pb: usize, lag_state: usize) -> usize {
+    match kind {
+        Ecoder::Base => 0,
+        Ecoder::Sse => phase * RC_BUCKETS + pb,
+        Ecoder::Lag(_) => (phase * RC_BUCKETS + pb) * LAG_STATES + lag_state,
+    }
+}
+
+#[inline]
+fn apm_contexts(kind: Ecoder) -> usize {
+    match kind {
+        Ecoder::Base => 0,
+        Ecoder::Sse => APM_CONTEXTS,
+        Ecoder::Lag(_) => LAG_CONTEXTS,
+    }
+}
+
+fn encode_signed_fsm_impl(residual: &[i32], kind: Ecoder) -> Vec<u8> {
     let mut enc = RangeEncoder::new();
     let mut probs = vec![RC_INIT; RC_TOTAL_SLOTS];
-    let mut apm = if sse {
-        Some(Apm::new(APM_CONTEXTS))
-    } else {
-        None
+    let mut apm = match kind {
+        Ecoder::Base => None,
+        _ => Some(Apm::new(apm_contexts(kind))),
+    };
+    let lag = match kind {
+        Ecoder::Lag(l) => l,
+        _ => 0,
     };
     let mut prev_m: u64 = 0;
     let mut prev_state = 0usize;
     let mut prev_neg = 0usize;
-    for &r in residual {
+    for (t, &r) in residual.iter().enumerate() {
         let neg = u32::from(r < 0);
         let m = u64::from(r.unsigned_abs());
         let pb = rc_bucket(prev_m);
+        let ls = lag_state_for(residual, t, lag);
         // Sign bit.
         let sign_ctx = (prev_neg * RC_FSM_STATES + prev_state) * RC_BUCKETS + pb;
-        rc_code_enc(&mut enc, &mut probs, &mut apm, sign_ctx, pb, neg);
+        rc_code_enc(
+            &mut enc,
+            &mut probs,
+            &mut apm,
+            sign_ctx,
+            sse_context(kind, 0, pb, ls),
+            neg,
+        );
         // Unary length: `n-1` zeros then the terminating one.
         let v = m + 1;
         let n = (64 - v.leading_zeros()) as usize;
         for i in 0..n {
             let bit = u32::from(i + 1 == n);
             let idx = RC_SIGN_LEN + (i.min(15) * RC_FSM_STATES + prev_state) * RC_BUCKETS + pb;
-            rc_code_enc(&mut enc, &mut probs, &mut apm, idx, RC_BUCKETS + pb, bit);
+            rc_code_enc(
+                &mut enc,
+                &mut probs,
+                &mut apm,
+                idx,
+                sse_context(kind, 1, pb, ls),
+                bit,
+            );
         }
         // The `n-1` low bits of `v`, most significant first.
         let mut prefix = 0usize;
@@ -2537,7 +2643,7 @@ fn encode_signed_fsm_impl(residual: &[i32], sse: bool) -> Vec<u8> {
                 &mut probs,
                 &mut apm,
                 idx,
-                2 * RC_BUCKETS + pb,
+                sse_context(kind, 2, pb, ls),
                 bit,
             );
             prefix = ((prefix << 1) | bit as usize) & 3;
@@ -2550,34 +2656,58 @@ fn encode_signed_fsm_impl(residual: &[i32], sse: bool) -> Vec<u8> {
 }
 
 fn decode_signed_fsm(bytes: &[u8], len: usize) -> Result<Vec<i32>> {
-    decode_signed_fsm_impl(bytes, len, false)
+    decode_signed_fsm_impl(bytes, len, Ecoder::Base)
 }
 
 fn decode_signed_fsm_sse(bytes: &[u8], len: usize) -> Result<Vec<i32>> {
-    decode_signed_fsm_impl(bytes, len, true)
+    decode_signed_fsm_impl(bytes, len, Ecoder::Sse)
 }
 
-fn decode_signed_fsm_impl(bytes: &[u8], len: usize, sse: bool) -> Result<Vec<i32>> {
+fn decode_signed_fsm_lag(bytes: &[u8], len: usize) -> Result<Vec<i32>> {
+    let (&lag, rest) = bytes
+        .split_first()
+        .ok_or_else(|| Error::malformed("signed/fsm lag stream has no lag header"))?;
+    decode_signed_fsm_impl(rest, len, Ecoder::Lag(u32::from(lag)))
+}
+
+fn decode_signed_fsm_impl(bytes: &[u8], len: usize, kind: Ecoder) -> Result<Vec<i32>> {
     let mut dec = RangeDecoder::new(bytes)?;
     let mut probs = vec![RC_INIT; RC_TOTAL_SLOTS];
-    let mut apm = if sse {
-        Some(Apm::new(APM_CONTEXTS))
-    } else {
-        None
+    let mut apm = match kind {
+        Ecoder::Base => None,
+        _ => Some(Apm::new(apm_contexts(kind))),
+    };
+    let lag = match kind {
+        Ecoder::Lag(l) => l,
+        _ => 0,
     };
     let mut out = Vec::with_capacity(len);
     let mut prev_m: u64 = 0;
     let mut prev_state = 0usize;
     let mut prev_neg = 0usize;
-    for _ in 0..len {
+    for t in 0..len {
         let pb = rc_bucket(prev_m);
+        let ls = lag_state_for(&out, t, lag);
         let sign_ctx = (prev_neg * RC_FSM_STATES + prev_state) * RC_BUCKETS + pb;
-        let neg = rc_code_dec(&mut dec, &mut probs, &mut apm, sign_ctx, pb)? != 0;
+        let neg = rc_code_dec(
+            &mut dec,
+            &mut probs,
+            &mut apm,
+            sign_ctx,
+            sse_context(kind, 0, pb, ls),
+        )? != 0;
         // Unary length.
         let mut z = 0usize;
         loop {
             let idx = RC_SIGN_LEN + (z.min(15) * RC_FSM_STATES + prev_state) * RC_BUCKETS + pb;
-            if rc_code_dec(&mut dec, &mut probs, &mut apm, idx, RC_BUCKETS + pb)? == 1 {
+            if rc_code_dec(
+                &mut dec,
+                &mut probs,
+                &mut apm,
+                idx,
+                sse_context(kind, 1, pb, ls),
+            )? == 1
+            {
                 break;
             }
             z += 1;
@@ -2590,7 +2720,13 @@ fn decode_signed_fsm_impl(bytes: &[u8], len: usize, sse: bool) -> Result<Vec<i32
         let mut prefix = 0usize;
         for j in 0..z {
             let idx = RC_SIGN_LEN + RC_LEN_LEN + (j.min(15) * 4 + prefix) * RC_BUCKETS + pb;
-            let bit = rc_code_dec(&mut dec, &mut probs, &mut apm, idx, 2 * RC_BUCKETS + pb)?;
+            let bit = rc_code_dec(
+                &mut dec,
+                &mut probs,
+                &mut apm,
+                idx,
+                sse_context(kind, 2, pb, ls),
+            )?;
             v = (v << 1) | u64::from(bit);
             prefix = ((prefix << 1) | bit as usize) & 3;
         }
@@ -2741,6 +2877,45 @@ mod tests {
             ResidualCodecV2::SignedFsm.encode(&residual),
             c.encode(&residual)
         );
+    }
+
+    #[test]
+    fn signed_fsm_lag_round_trips_exactly() {
+        let c = ResidualCodecV2::SignedFsmLag;
+        assert_eq!(c.name(), "signed_fsm_lag");
+        assert_eq!(ResidualCodecV2::from_id(18), Some(c));
+        for residual in sample_residuals() {
+            let payload = c.encode(&residual);
+            let back = c
+                .decode(&payload, residual.len())
+                .unwrap_or_else(|e| panic!("signed_fsm_lag: {e}"));
+            assert_eq!(back, residual);
+        }
+        let extreme = vec![i32::MIN, i32::MAX, -1, 0, 1, 2, -2, 1 << 30, -(1 << 30)];
+        let payload = c.encode(&extreme);
+        assert_eq!(c.decode(&payload, extreme.len()).unwrap(), extreme);
+    }
+
+    #[test]
+    fn v3_codecs_never_panic_on_truncation_or_garbage() {
+        for codec in ResidualCodecV2::ALL_V3 {
+            for bytes in [
+                vec![0u8; 1],
+                vec![0xFF; 1],
+                vec![0x80; 8],
+                vec![0u8; 64],
+                vec![0xFF; 64],
+            ] {
+                for len in [0usize, 1, 7, 300] {
+                    let _ = codec.decode(&bytes, len);
+                }
+            }
+            let residual: Vec<i32> = (0..500).map(|i| ((i * 37) % 101) - 50).collect();
+            let payload = codec.encode(&residual);
+            for cut in 1..payload.len().min(48) {
+                let _ = codec.decode(&payload[..payload.len() - cut], residual.len());
+            }
+        }
     }
 
     #[test]
