@@ -116,6 +116,12 @@ fn model_components(m: &LearnedModel) -> (u64, u64, u64, u64, u64, u64) {
             let bias = b.min(len - weights);
             (weights, bias, 0, 0, 0, 0)
         }
+        LearnedModel::Adaptive(p) => {
+            let len = p.canonical_bytes().len() as u64;
+            let weights = ((p.init_weights.len() as u64) * 2).min(len);
+            let bias = 4u64.min(len - weights);
+            (weights, bias, 0, 0, 0, 0)
+        }
         LearnedModel::Segmented(s) => {
             let mut w = 0u64;
             let mut b = 0u64;

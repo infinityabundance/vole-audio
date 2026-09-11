@@ -40,6 +40,8 @@ pub enum LearnedModel {
     Hierarchical(crate::learned::hierarchy::HierarchicalPredictor),
     /// An analytic source transform plus an optional learned correction (Exp2).
     AnalyticTransfer(crate::learned::analytical::AnalyticTransfer),
+    /// A backward-adaptive predictor updated from reconstructed samples (Exp2).
+    Adaptive(crate::learned::adaptive::AdaptivePredictor),
 }
 
 impl LearnedModel {
@@ -56,6 +58,7 @@ impl LearnedModel {
             LearnedModel::Multichannel(_) => 7,
             LearnedModel::Hierarchical(_) => 8,
             LearnedModel::AnalyticTransfer(_) => 9,
+            LearnedModel::Adaptive(_) => 10,
         }
     }
 
@@ -72,6 +75,7 @@ impl LearnedModel {
             LearnedModel::Multichannel(_) => "multichannel",
             LearnedModel::Hierarchical(_) => "hierarchical",
             LearnedModel::AnalyticTransfer(_) => "analytic_transfer",
+            LearnedModel::Adaptive(_) => "backward_adaptive",
         }
     }
 
@@ -88,6 +92,7 @@ impl LearnedModel {
             LearnedModel::Multichannel(p) => p.validate(),
             LearnedModel::Hierarchical(p) => p.validate(),
             LearnedModel::AnalyticTransfer(p) => p.validate(),
+            LearnedModel::Adaptive(p) => p.validate(),
         }
     }
 
@@ -104,6 +109,7 @@ impl LearnedModel {
             LearnedModel::Multichannel(p) => p.channels,
             LearnedModel::Hierarchical(p) => p.channels,
             LearnedModel::AnalyticTransfer(p) => p.channels,
+            LearnedModel::Adaptive(p) => p.channels,
         }
     }
 
@@ -120,6 +126,7 @@ impl LearnedModel {
             LearnedModel::Multichannel(p) => p.receptive_field(),
             LearnedModel::Hierarchical(p) => p.receptive_field(),
             LearnedModel::AnalyticTransfer(p) => p.receptive_field(),
+            LearnedModel::Adaptive(p) => p.receptive_field(),
         }
     }
 
@@ -136,6 +143,7 @@ impl LearnedModel {
             LearnedModel::Multichannel(p) => p.ops_per_sample(),
             LearnedModel::Hierarchical(p) => p.ops_per_sample(),
             LearnedModel::AnalyticTransfer(p) => p.ops_per_sample(),
+            LearnedModel::Adaptive(p) => p.ops_per_sample(),
         }
     }
 
@@ -152,6 +160,7 @@ impl LearnedModel {
             LearnedModel::Multichannel(p) => p.state_bytes(),
             LearnedModel::Hierarchical(p) => p.state_bytes(),
             LearnedModel::AnalyticTransfer(p) => p.state_bytes(),
+            LearnedModel::Adaptive(p) => p.state_bytes(),
         }
     }
 
@@ -168,6 +177,7 @@ impl LearnedModel {
             LearnedModel::Multichannel(p) => p.checkpoint_count(),
             LearnedModel::Hierarchical(p) => p.checkpoint_count(),
             LearnedModel::AnalyticTransfer(p) => p.checkpoint_count(),
+            LearnedModel::Adaptive(p) => p.checkpoint_count(),
         }
     }
 
@@ -184,6 +194,7 @@ impl LearnedModel {
             LearnedModel::Multichannel(p) => p.canonical_bytes(),
             LearnedModel::Hierarchical(p) => p.canonical_bytes(),
             LearnedModel::AnalyticTransfer(p) => p.canonical_bytes(),
+            LearnedModel::Adaptive(p) => p.canonical_bytes(),
         }
     }
 
@@ -221,6 +232,9 @@ impl LearnedModel {
             9 => LearnedModel::AnalyticTransfer(
                 crate::learned::analytical::AnalyticTransfer::from_canonical_bytes(bytes)?,
             ),
+            10 => LearnedModel::Adaptive(
+                crate::learned::adaptive::AdaptivePredictor::from_canonical_bytes(bytes)?,
+            ),
             other => {
                 return Err(Error::new(
                     crate::error::Kind::Unsupported,
@@ -247,6 +261,7 @@ impl LearnedModel {
             LearnedModel::Multichannel(p) => p.hypothesis_all_from_source(source, frames),
             LearnedModel::Hierarchical(p) => p.hypothesis_all_from_source(source, frames),
             LearnedModel::AnalyticTransfer(p) => p.hypothesis_from_source(source, frames),
+            LearnedModel::Adaptive(p) => p.hypothesis_all_from_source(source, frames),
         }
     }
 
@@ -271,6 +286,7 @@ impl LearnedModel {
             LearnedModel::AnalyticTransfer(_) => Err(Error::dependency(
                 "analytic transfer requires its source samples",
             )),
+            LearnedModel::Adaptive(p) => p.evaluate_range(residual, frames, start, len),
         }
     }
 
@@ -287,6 +303,7 @@ impl LearnedModel {
             LearnedModel::Multichannel(p) => p.replay_frames(start),
             LearnedModel::Hierarchical(p) => p.replay_frames(start),
             LearnedModel::AnalyticTransfer(p) => p.replay_frames(start),
+            LearnedModel::Adaptive(p) => p.replay_frames(start),
         }
     }
 

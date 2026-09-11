@@ -9,6 +9,7 @@
 //! (ridge/least squares, coordinate descent, bounded search, hand-written
 //! passes) is used instead, and only for the vocabulary that already has courts.
 
+pub mod adaptive;
 pub mod finite_field;
 pub mod hierarchy;
 pub mod linear;

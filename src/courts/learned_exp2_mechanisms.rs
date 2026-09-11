@@ -19,6 +19,7 @@ use crate::error::Result;
 use crate::learned::corpus::{intrinsic_cases, intrinsic_corpus_hex};
 use crate::learned::object::LearnedObject;
 use crate::learned::segmentation::{DEFAULT_BOUNDARY_GRID, build_segmented_with_regions};
+use crate::learned::train::adaptive::fit_adaptive_object;
 use crate::learned::train::hierarchy::fit_hierarchy_object;
 use crate::learned::train::linear::{fit_linear_object, fit_linear_object_exp2};
 use crate::learned::train::ltp::fit_ltp_object;
@@ -29,7 +30,7 @@ use std::path::Path;
 
 /// Frozen static-result hash (empty means "not yet frozen").
 pub const LEARNED_EXP2_MECHANISMS_SHA256: &str =
-    "4166a0c141bf6d926a7e5ddac1907ba6a87292d4dd54c342536bb9c6be53ea4f";
+    "293a2c14611344e8663ed1b3e68ae6a67bb5f386e4ca34ddfe3c3a32e8af3a7c";
 
 fn bytes(o: &LearnedObject) -> Option<u64> {
     crate::learned::accounting::LearnedCost::of(o)
@@ -140,6 +141,18 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
             None
         };
 
+        // Backward-adaptive deterministic prediction (mono).
+        let adaptive_bytes = if mono {
+            fit_adaptive_object(&case.samples, frames, case.sample_rate_hz, 8, &budget)
+                .ok()
+                .map(|(o, _)| {
+                    all_exact &= o.verify(&case.samples);
+                    bytes(&o).unwrap_or(u64::MAX)
+                })
+        } else {
+            None
+        };
+
         // Hierarchical residual prediction (mono).
         let hierarchy_bytes = if mono {
             fit_hierarchy_object(&case.samples, frames, case.sample_rate_hz, 3, &budget)
@@ -180,6 +193,7 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
             segmented_bytes,
             multichannel_bytes,
             hierarchy_bytes,
+            adaptive_bytes,
         ];
         let best_exp2 = candidates.iter().filter_map(|b| *b).min();
         if let (Some(b2), Some(l2)) = (best_exp2, exp2_bytes) {
@@ -197,6 +211,7 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
             segmented_bytes.unwrap_or(u64::MAX),
             multichannel_bytes.unwrap_or(u64::MAX),
             hierarchy_bytes.unwrap_or(u64::MAX),
+            adaptive_bytes.unwrap_or(u64::MAX),
         ] {
             common::push_u64(&mut projection, v);
         }
@@ -211,6 +226,7 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
             "segmented_bytes": segmented_bytes,
             "multichannel_bytes": multichannel_bytes,
             "hierarchy_bytes": hierarchy_bytes,
+            "adaptive_bytes": adaptive_bytes,
             "best_exp2_bytes": best_exp2,
             "best_nonlearned_bytes": if best_nonlearned == u64::MAX { None } else { Some(best_nonlearned) },
         }));

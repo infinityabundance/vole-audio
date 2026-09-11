@@ -51,7 +51,7 @@ cells; doing so would be benchmark gaming.
 | E | Long-term / pitch prediction | `learned::ltp`, `learned::train::ltp` | `learned-exp2-mechanisms` | **implemented** |
 | F | Multichannel prediction / lifting | `learned::multichannel`, `learned::train::multichannel` | `learned-exp2-mechanisms` | **implemented** |
 | G | Optimizer v2 (multiscale + beam + memo) | `learned::train::optimizer2` | `learned-exp2-mechanisms` | **implemented** |
-| H | Context mixture + backward adaptation | — | — | pending |
+| H | Context mixture + backward adaptation | `learned::adaptive`, `learned::train::adaptive` (backward-adaptive); context mixture pending | `learned-exp2-mechanisms` | **partial** |
 | I | Hierarchical residual prediction | `learned::hierarchy`, `learned::train::hierarchy` | `learned-exp2-mechanisms` | **implemented** |
 | J | Transfer v2 (analytic-first) | `learned::analytical`, `courts::learned_exp2_transfer` | `learned-exp2-transfer` | **implemented** |
 | K | Real + held-out Mode-C corpus | — | — | pending |
@@ -81,7 +81,7 @@ unit tests.
 | ----- | ------------- |
 | `learned-exp2-baseline` | `3bd61665b214a0bb85e3eee311bf598cbcb7f76e94cc646c057406897682f111` |
 | `learned-residual-codec2` | `e134f0c3457a9593e8ab56d071e142c2d3c03a60280c9434e62eca0c433cbcf2` |
-| `learned-exp2-mechanisms` | `4166a0c141bf6d926a7e5ddac1907ba6a87292d4dd54c342536bb9c6be53ea4f` |
+| `learned-exp2-mechanisms` | `293a2c14611344e8663ed1b3e68ae6a67bb5f386e4ca34ddfe3c3a32e8af3a7c` |
 | `learned-exp2-transfer` | `a43ec91fbb31efd9e585e6cfaaa3fefe3bc6e8381aec7049f508cc3d212d265a` |
 
 The frozen Exp1 court `learned-residual-codec` still reproduces its sealed hash
@@ -128,17 +128,28 @@ spectrum (court `learned-exp2-transfer`):
 | `procedural-to-sampled` | procedural manifestation | 9 448 B | **6 016 B** | correction |
 
 Trivial relations deliberately stay analytic (the learned correction is larger
-and is rejected); complex deterministic relations earn a learned correction.
+correctly rejected); complex deterministic relations earn a learned correction.
 This is the intended separation between analytic syntax and learning.
+
+## Backward adaptation is an honest negative on the short corpus
+
+The backward-adaptive family (frozen integer sign-sign LMS, decoder-visible
+state only) is implemented and exact, but it **loses** on the 4096-frame
+intrinsic corpus: 7 816–8 475 B against 839–4 342 B for the sparse / hierarchical
+families. This is the expected shape of the mechanism — backward adaptation
+amortizes model-description cost over *long* recordings, and a 4096-frame
+window is too short for its slow sign-sign convergence to pay off. The negative
+is recorded rather than hidden, and the portfolio minimum is unaffected.
 
 ## Honest limitations (recorded, not hidden)
 
-* Seals C, D, E, F, G, I and J are implemented with unit tests and covered by
-  the `learned-exp2-mechanisms` / `learned-exp2-transfer` courts, but no new
-  `seal verify` receipt matrix has been written yet: the Phase M/N batteries
-  were not re-run in this change set.
-* Seal H (context mixture + backward adaptation) and Seal K (real + held-out
-  Mode-C corpus) are **not implemented** in this change set; they remain the
+* Seals C, D, E, F, G, I and J are fully implemented and covered by the
+  `learned-exp2-mechanisms` / `learned-exp2-transfer` courts. Seal H is partial:
+  the backward-adaptive family is implemented and exact (an honest negative on
+  the short corpus), while the context-mixture half is not yet implemented.
+* No new `seal verify` receipt matrix has been written yet: the Phase M/N
+  batteries were not re-run in this change set.
+* Seal K (real + held-out Mode-C corpus) is **not implemented**; it remains the
   declared remainder of the Exp2 sequence.
 * `RunLengthRice` is a VOLE-native adaptive run-length/Rice design; it is in the
   RLGR family but is not bit-compatible with Malvar's RLGR1.
