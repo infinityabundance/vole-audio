@@ -143,6 +143,11 @@ fn model_components(m: &LearnedModel) -> (u64, u64, u64, u64, u64, u64) {
             let weights = ((p.coeffs.len() as u64) * 4).min(len);
             (weights, 0, 0, 0, 0, 0)
         }
+        LearnedModel::Fixed(p) => {
+            // Coefficient-free: the whole model is header metadata.
+            let _ = p;
+            (0, 0, 0, 0, 0, 0)
+        }
         LearnedModel::Segmented(s) => {
             let mut w = 0u64;
             let mut b = 0u64;

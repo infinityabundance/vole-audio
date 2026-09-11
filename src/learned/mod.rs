@@ -19,6 +19,7 @@ pub mod context_mixture;
 pub mod corpus;
 pub mod corpus_real;
 pub mod finite_field;
+pub mod fixed;
 pub mod graph;
 pub mod hierarchy;
 pub mod lpc;

@@ -104,6 +104,8 @@ pub mod learned_residual_codec2;
 #[cfg(feature = "std")]
 pub mod learned_shared;
 #[cfg(feature = "std")]
+pub mod learned_speech;
+#[cfg(feature = "std")]
 pub mod learned_speech_trace;
 #[cfg(feature = "std")]
 pub mod learned_training_cost;
@@ -299,6 +301,12 @@ reporting effectiveness and held-out Mode C separately",
         "Seal S0 U1-domain real-speech replay: the wired three-family Exp2 portfolio over the frozen U1 s16 ingest mapping (i32 = i16 << 16) with new identities, paired against FLAC-5",
     ),
     (
+        "learned-speech",
+        "Report 3 real-speech portfolio: the growing exact candidate set (baseline dense/sparse/\
+hierarchy + fixed finite differences, then LPC …) over the real + Mode-C corpus, paired against \
+FLAC-5 with per-family attribution",
+    ),
+    (
         "learned-speech-trace",
         "Seal S0 diagnostic: bit-for-bit trace of the frozen B1 FLAC-5 artifact (subframe kinds, orders, precision, shift, partition order, residual payload) beside the wired three-family Exp2 VOLE byte waterfall, on the real + Mode-C corpus",
     ),
@@ -479,6 +487,7 @@ pub fn run(name: &str, receipts_root: &Path) -> crate::error::Result<Verdict> {
         "learned-exp2-mechanisms" => learned_exp2_mechanisms::run(receipts_root),
         "learned-exp2-real-corpus" => learned_exp2_real_corpus::run(receipts_root),
         "learned-speech-trace" => learned_speech_trace::run(receipts_root),
+        "learned-speech" => learned_speech::run(receipts_root),
         "learned-real-corpus-u1" => learned_real_corpus_u1::run(receipts_root),
         "learned-exp2-transfer" => learned_exp2_transfer::run(receipts_root),
         "learned-residual-codec" => learned_residual_codec::run(receipts_root),

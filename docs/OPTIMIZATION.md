@@ -110,11 +110,28 @@ arithmetic shift), with its own exact-closure and accumulator-proof unit tests.
 The fitting and portfolio wiring arrive in Seal S2; landing the vocabulary first
 keeps S2 a pure add-candidate change.
 
+### Seal S1 — coefficient-free fixed finite-difference predictors
+
+New family `learned::fixed` (model kind `13`): orders 0–4 with the frozen
+finite-difference coefficients, **no stored coefficient bytes**, optional
+block-local reset over a frozen ladder `{whole-clip, 4096, 2048, 1024, 512}`.
+The accumulating court `learned-speech` runs the baseline plus this family and
+records per-family standalone bytes for every clip.
+
+Measured (court `learned-speech`, result `c92c64ed…`): the fixed family wins on
+**1 of 16** clips (`1221-135766`, 21 810 B vs baseline 21 815 B) and is dominated
+elsewhere; the portfolio totals are unchanged on effectiveness (135 124 B vs FLAC
+130 331 B) and improve by 5 B on Mode C (147 532 B vs 147 537 B). This is the
+honest, small shape the literature predicts: fixed differences are nearly free
+but rarely beat a fitted model on speech. FLAC's own LPC selection confirms it —
+its fixed subframes appear only occasionally (Seal S0 trace).
+
 ## Status
 
 Implemented and pushed: Track A, Track B (including the entropy decode table),
 and the Report 3 Seal S0 diagnostic courts (`learned-speech-trace`,
-`learned-real-corpus-u1`). The remaining tracks from the two whole-repository
+`learned-real-corpus-u1`) and Seal S1 fixed differences (court `learned-speech`).
+The remaining tracks from the two whole-repository
 optimization reports
 (CPU frame-tile multicore + PartialBank vectorization, GPU work decomposition,
 CUDA/HIP graphs, entropy model p2 / compatible-model reuse, integer packing,

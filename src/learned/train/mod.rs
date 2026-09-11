@@ -12,6 +12,7 @@
 pub mod adaptive;
 pub mod context_mixture;
 pub mod finite_field;
+pub mod fixed;
 pub mod hierarchy;
 pub mod linear;
 pub mod ltp;
