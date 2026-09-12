@@ -4,6 +4,7 @@
 
 pub mod archive;
 pub mod manifest;
+pub mod solid;
 pub mod wav;
 
 pub use wav::{DecodedWav, PcmFormat};
