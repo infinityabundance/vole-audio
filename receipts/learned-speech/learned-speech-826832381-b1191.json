@@ -1,0 +1,2257 @@
+{
+  "schema": "vole.audio.evidence.v1",
+  "schema_version": 1,
+  "receipt": {
+    "schema": "vole.audio.evidence.v1",
+    "schema_version": 1,
+    "run_id": "learned-speech-826832381-b1191",
+    "court": "learned-speech",
+    "created_unix_ms": 826832381,
+    "result": "SUPPORTED",
+    "result_detail": "real-speech portfolio (families: dense4, sparse10, hier2, fixed_diff, lpc, lpc_bidir, lattice, polezero, ngsa) over 8 effectiveness + 8 held-out Mode-C clips, paired against FLAC-5 with exact Wilcoxon signed-rank and a deterministic bootstrap median CI; result sha256 fd0ef25e27a2247eaaacfafbee828049c0cdc218e9908bf780c00df4bec494e6",
+    "environment": {
+      "os": {
+        "sysname": "Linux",
+        "release": "7.2.2-1-cachyos",
+        "version": "#1 SMP PREEMPT_DYNAMIC Fri, 28 Aug 2026 08:05:11 +0000",
+        "machine": "x86_64",
+        "nodename": "vanir",
+        "os_pretty_name": "CachyOS"
+      },
+      "cpu": {
+        "model": "AMD Ryzen 7 9800X3D 8-Core Processor",
+        "flags": [
+          "3dnowprefetch",
+          "abm",
+          "adx",
+          "aes",
+          "amd_lbr_pmc_freeze",
+          "amd_lbr_v2",
+          "aperfmperf",
+          "apic",
+          "arat",
+          "avic",
+          "avx",
+          "avx2",
+          "avx512_bf16",
+          "avx512_bitalg",
+          "avx512_vbmi2",
+          "avx512_vnni",
+          "avx512_vp2intersect",
+          "avx512_vpopcntdq",
+          "avx512bw",
+          "avx512cd",
+          "avx512dq",
+          "avx512f",
+          "avx512ifma",
+          "avx512vbmi",
+          "avx512vl",
+          "avx_vnni",
+          "bmi1",
+          "bmi2",
+          "bpext",
+          "bus_lock_detect",
+          "cat_l3",
+          "cdp_l3",
+          "clflush",
+          "clflushopt",
+          "clwb",
+          "clzero",
+          "cmov",
+          "cmp_legacy",
+          "constant_tsc",
+          "cpb",
+          "cppc",
+          "cpuid",
+          "cpuid_fault",
+          "cqm",
+          "cqm_llc",
+          "cqm_mbm_local",
+          "cqm_mbm_total",
+          "cqm_occup_llc",
+          "cr8_legacy",
+          "cx16",
+          "cx8",
+          "de",
+          "decodeassists",
+          "erms",
+          "extapic",
+          "extd_apicid",
+          "f16c",
+          "flush_l1d",
+          "flushbyasid",
+          "fma",
+          "fpu",
+          "fsgsbase",
+          "fsrm",
+          "fxsr",
+          "fxsr_opt",
+          "gfni",
+          "ht",
+          "hw_pstate",
+          "ibpb",
+          "ibrs",
+          "ibrs_enhanced",
+          "ibs",
+          "invpcid",
+          "irperf",
+          "lahf_lm",
+          "lbrv",
+          "lm",
+          "mba",
+          "mca",
+          "mce",
+          "misalignsse",
+          "mmx",
+          "mmxext",
+          "monitor",
+          "movbe",
+          "movdir64b",
+          "movdiri",
+          "msr",
+          "mtrr",
+          "mwaitx",
+          "nonstop_tsc",
+          "nopl",
+          "npt",
+          "nrip_save",
+          "nx",
+          "ospke",
+          "osvw",
+          "overflow_recov",
+          "pae",
+          "pat",
+          "pausefilter",
+          "pclmulqdq",
+          "pdpe1gb",
+          "perfctr_core",
+          "perfctr_llc",
+          "perfctr_nb",
+          "perfmon_v2",
+          "pfthreshold",
+          "pge",
+          "pku",
+          "pni",
+          "popcnt",
+          "pse",
+          "pse36",
+          "rapl",
+          "rdpid",
+          "rdpru",
+          "rdrand",
+          "rdseed",
+          "rdt_a",
+          "rdtscp",
+          "rep_good",
+          "sep",
+          "sha_ni",
+          "skinit",
+          "smap",
+          "smca",
+          "smep",
+          "ssbd",
+          "sse",
+          "sse2",
+          "sse4_1",
+          "sse4_2",
+          "sse4a",
+          "ssse3",
+          "stibp",
+          "succor",
+          "svm",
+          "svm_lock",
+          "syscall",
+          "tce",
+          "topoext",
+          "tsc",
+          "tsc_adjust",
+          "tsc_scale",
+          "umip",
+          "user_shstk",
+          "v_spec_ctrl",
+          "v_vmsave_vmload",
+          "vaes",
+          "vgif",
+          "vmcb_clean",
+          "vme",
+          "vmmcall",
+          "vnmi",
+          "vpclmulqdq",
+          "wbnoinvd",
+          "wdt",
+          "x2avic",
+          "xgetbv1",
+          "xsave",
+          "xsavec",
+          "xsaveerptr",
+          "xsaveopt",
+          "xsaves",
+          "xtopology"
+        ],
+        "has_avx2": true,
+        "has_avx512": true,
+        "has_neon": false
+      },
+      "memory": {
+        "total_bytes": 134689935360
+      },
+      "git_commit": "b8e323772a47fd6080f0f71418c53a38a4472a36",
+      "git_dirty": false,
+      "git_branch": "main",
+      "rustc_version": "rustc 1.99.0-nightly (89c61a754 2026-07-23)",
+      "crate_version": "0.55.0",
+      "target_arch": "x86_64",
+      "target_os": "linux",
+      "cpu_governor": "performance",
+      "bios_version": "1402",
+      "git_tree_sha": "715268f26ca50005b766e857dad445cbf26d516b",
+      "build_git_commit": "b8e323772a47fd6080f0f71418c53a38a4472a36",
+      "build_tree_sha": "715268f26ca50005b766e857dad445cbf26d516b",
+      "build_dirty": false,
+      "build_rustc": "rustc 1.99.0-nightly (89c61a754 2026-07-23)",
+      "build_profile": "release",
+      "build_target": "x86_64-unknown-linux-gnu",
+      "source_binding": "bound",
+      "seal_subject_hash": "95d0acdd95d8f797ce0035372b6bb15a32ebf85e7a5b646f922c12584f4782cd"
+    },
+    "hardware": {
+      "pci_devices": [
+        {
+          "bdf": "0000:00:00.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14d8",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": null
+        },
+        {
+          "bdf": "0000:00:00.2",
+          "class": "0x080600",
+          "vendor": "0x1022",
+          "device": "0x14d9",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": null
+        },
+        {
+          "bdf": "0000:00:01.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "0"
+        },
+        {
+          "bdf": "0000:00:01.1",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14db",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "1"
+        },
+        {
+          "bdf": "0000:00:01.2",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14db",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "2"
+        },
+        {
+          "bdf": "0000:00:02.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "3"
+        },
+        {
+          "bdf": "0000:00:02.1",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14db",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "4"
+        },
+        {
+          "bdf": "0000:00:02.2",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14db",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "5"
+        },
+        {
+          "bdf": "0000:00:03.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "6"
+        },
+        {
+          "bdf": "0000:00:04.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "7"
+        },
+        {
+          "bdf": "0000:00:08.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "8"
+        },
+        {
+          "bdf": "0000:00:08.1",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14dd",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "9"
+        },
+        {
+          "bdf": "0000:00:08.3",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14dd",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "10"
+        },
+        {
+          "bdf": "0000:00:14.0",
+          "class": "0x0c0500",
+          "vendor": "0x1022",
+          "device": "0x790b",
+          "driver": "piix4_smbus",
+          "numa_node": -1,
+          "iommu_group": "11"
+        },
+        {
+          "bdf": "0000:00:14.3",
+          "class": "0x060100",
+          "vendor": "0x1022",
+          "device": "0x790e",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "11"
+        },
+        {
+          "bdf": "0000:00:18.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e0",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.1",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e1",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.2",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e2",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.3",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e3",
+          "driver": "k10temp",
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.4",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e4",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.5",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e5",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.6",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e6",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.7",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e7",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:01:00.0",
+          "class": "0x030000",
+          "vendor": "0x10de",
+          "device": "0x2702",
+          "driver": "nvidia",
+          "numa_node": -1,
+          "iommu_group": "13"
+        },
+        {
+          "bdf": "0000:01:00.1",
+          "class": "0x040300",
+          "vendor": "0x10de",
+          "device": "0x22bb",
+          "driver": "snd_hda_intel",
+          "numa_node": -1,
+          "iommu_group": "13"
+        },
+        {
+          "bdf": "0000:02:00.0",
+          "class": "0x010802",
+          "vendor": "0xc0a9",
+          "device": "0x542b",
+          "driver": "nvme",
+          "numa_node": -1,
+          "iommu_group": "14"
+        },
+        {
+          "bdf": "0000:03:00.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f4",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "15"
+        },
+        {
+          "bdf": "0000:04:00.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "16"
+        },
+        {
+          "bdf": "0000:04:04.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "17"
+        },
+        {
+          "bdf": "0000:04:05.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "18"
+        },
+        {
+          "bdf": "0000:04:08.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "19"
+        },
+        {
+          "bdf": "0000:04:0c.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "20"
+        },
+        {
+          "bdf": "0000:04:0d.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "21"
+        },
+        {
+          "bdf": "0000:05:00.0",
+          "class": "0x010802",
+          "vendor": "0x2646",
+          "device": "0x5019",
+          "driver": "nvme",
+          "numa_node": -1,
+          "iommu_group": "16"
+        },
+        {
+          "bdf": "0000:06:00.0",
+          "class": "0x020000",
+          "vendor": "0x10ec",
+          "device": "0x8125",
+          "driver": "r8169",
+          "numa_node": -1,
+          "iommu_group": "17"
+        },
+        {
+          "bdf": "0000:09:00.0",
+          "class": "0x0c0330",
+          "vendor": "0x1022",
+          "device": "0x43fc",
+          "driver": "xhci-pci-prom21",
+          "numa_node": -1,
+          "iommu_group": "20"
+        },
+        {
+          "bdf": "0000:0a:00.0",
+          "class": "0x010601",
+          "vendor": "0x1022",
+          "device": "0x43f6",
+          "driver": "ahci",
+          "numa_node": -1,
+          "iommu_group": "21"
+        },
+        {
+          "bdf": "0000:0b:00.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2421",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "22"
+        },
+        {
+          "bdf": "0000:0c:00.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2423",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "23"
+        },
+        {
+          "bdf": "0000:0c:01.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2423",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "24"
+        },
+        {
+          "bdf": "0000:0c:02.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2423",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "25"
+        },
+        {
+          "bdf": "0000:0c:03.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2423",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "26"
+        },
+        {
+          "bdf": "0000:71:00.0",
+          "class": "0x0c0330",
+          "vendor": "0x1b21",
+          "device": "0x2426",
+          "driver": "xhci_hcd",
+          "numa_node": -1,
+          "iommu_group": "25"
+        },
+        {
+          "bdf": "0000:72:00.0",
+          "class": "0x0c0340",
+          "vendor": "0x1b21",
+          "device": "0x2425",
+          "driver": "thunderbolt",
+          "numa_node": -1,
+          "iommu_group": "26"
+        },
+        {
+          "bdf": "0000:73:00.0",
+          "class": "0x130000",
+          "vendor": "0x1022",
+          "device": "0x14de",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "27"
+        },
+        {
+          "bdf": "0000:73:00.2",
+          "class": "0x108000",
+          "vendor": "0x1022",
+          "device": "0x1649",
+          "driver": "ccp",
+          "numa_node": -1,
+          "iommu_group": "28"
+        },
+        {
+          "bdf": "0000:73:00.3",
+          "class": "0x0c0330",
+          "vendor": "0x1022",
+          "device": "0x15b6",
+          "driver": "xhci_hcd",
+          "numa_node": -1,
+          "iommu_group": "29"
+        },
+        {
+          "bdf": "0000:73:00.4",
+          "class": "0x0c0330",
+          "vendor": "0x1022",
+          "device": "0x15b7",
+          "driver": "xhci_hcd",
+          "numa_node": -1,
+          "iommu_group": "30"
+        },
+        {
+          "bdf": "0000:73:00.6",
+          "class": "0x040300",
+          "vendor": "0x1022",
+          "device": "0x15e3",
+          "driver": "snd_hda_intel",
+          "numa_node": -1,
+          "iommu_group": "31"
+        },
+        {
+          "bdf": "0000:74:00.0",
+          "class": "0x0c0330",
+          "vendor": "0x1022",
+          "device": "0x15b8",
+          "driver": "xhci_hcd",
+          "numa_node": -1,
+          "iommu_group": "32"
+        }
+      ],
+      "gpu": {
+        "vendor": null,
+        "name": null,
+        "bdf": null,
+        "compute_capability": null,
+        "memory_bytes": null,
+        "driver_version": null,
+        "runtime_version": null
+      },
+      "audio": {
+        "card": null,
+        "device": null,
+        "name": null,
+        "subdevice": null
+      }
+    },
+    "params": {
+      "universe": "vole.audio.u1",
+      "profile": "vole.audio.learned.exp3",
+      "backend": "scalar canonical learned evaluator",
+      "sample_rate_hz": null,
+      "channels": null,
+      "voices": null,
+      "quantum_frames": null,
+      "duration_secs": null,
+      "content_kind": "Phase O learned deterministic prediction"
+    },
+    "counters": {
+      "host_pcm_staging_bytes": 0,
+      "host_pcm_copy_bytes": 0,
+      "gpu_to_host_pcm_bytes": 0,
+      "endpoint_observation_bytes": 0,
+      "device_sample_block_bytes": 0,
+      "transient_compute_words": 0,
+      "host_pcm_resident_peak_bytes": 0,
+      "host_pcm_resident_integral": 0.0,
+      "endpoint_depth_frames": 0,
+      "endpoint_depth_min_frames": 18446744073709551615,
+      "endpoint_depth_max_frames": 0,
+      "quanta_submitted": 0,
+      "events_consumed": 0,
+      "xruns": 0,
+      "kernel_launches": 0,
+      "missed_deadlines": 0
+    },
+    "timing": {
+      "total_ns": null,
+      "deadline_ns": null,
+      "warmup_runs": null,
+      "run_count": null,
+      "observation_count": null,
+      "tail": null
+    },
+    "provenance": {
+      "reference_hash": "fd0ef25e27a2247eaaacfafbee828049c0cdc218e9908bf780c00df4bec494e6",
+      "backend_hash": null,
+      "endpoint_hash": null,
+      "gpu_artifact_hash": null,
+      "source_hash": null,
+      "corpus_hash": null,
+      "table_hashes": [],
+      "benchmark_order": [],
+      "exact_equality": null
+    },
+    "endpoint": {
+      "directness": null,
+      "topology": null,
+      "registered_range": null,
+      "registration_result": null,
+      "device_pointer": null,
+      "synchronization_mechanism": null,
+      "fence_sync_evidence": null,
+      "coherency_assumptions": null,
+      "hidden_staging_investigation": null,
+      "endpoint_clock": null
+    },
+    "energy": null,
+    "trace": null,
+    "limitations": [
+      "learned prediction is an experimental profile: it does not change u1/v1, the literal fallback remains mandatory, and negative learned results are preserved rather than hidden"
+    ],
+    "extras": {
+      "effectiveness": {
+        "split": "effectiveness (dev-clean)",
+        "clips": 8,
+        "total_portfolio_bytes": 126899,
+        "total_flac_bytes": 130331,
+        "total_baseline_bytes": 132940,
+        "wins_vs_flac": 7,
+        "losses_vs_flac": 1,
+        "wilcoxon_flac": {
+          "w_plus": 35,
+          "w_minus": 1,
+          "p_two_sided_ppm": 15625
+        },
+        "wins_vs_baseline": 8,
+        "losses_vs_baseline": 0,
+        "wilcoxon_baseline": {
+          "w_plus": 36,
+          "w_minus": 0,
+          "p_two_sided_ppm": 7813
+        },
+        "bootstrap_median_flac_over_portfolio_ppm": {
+          "lo": 1015368,
+          "hi": 1040484
+        },
+        "flac8_secondary": {
+          "total_bytes": 129713,
+          "wins": 7,
+          "losses": 1,
+          "wilcoxon_p_two_sided_ppm": 23438
+        }
+      },
+      "effectiveness_clips": [
+        {
+          "id": "1272-128104-0000",
+          "split": "dev-clean",
+          "speaker": "1272",
+          "frames": 16384,
+          "winner": "ngsa",
+          "portfolio_bytes": 15230,
+          "baseline_bytes": 16115,
+          "flac_bytes": 15670,
+          "flac8_bytes": 15590,
+          "ratio_flac_over_portfolio": 1.0288903479973737,
+          "families": {
+            "dense4": 16336,
+            "sparse10": 16115,
+            "hier2": 16140,
+            "fixed_diff": 16147,
+            "lpc": 15700,
+            "lpc_bidir": 15722,
+            "lattice": 15774,
+            "polezero": 15868,
+            "ngsa": 15230
+          },
+          "family_detail": {
+            "dense4": {
+              "bytes": 16336,
+              "model_bytes": 20,
+              "residual_bytes": 16200,
+              "residual_codec": "signed_fsm_mix",
+              "residual_mean_abs": 230.55535888671875
+            },
+            "sparse10": {
+              "bytes": 16115,
+              "model_bytes": 22,
+              "residual_bytes": 15977,
+              "residual_codec": "signed_fsm_mix",
+              "residual_mean_abs": 251.96954345703125
+            },
+            "hier2": {
+              "bytes": 16140,
+              "model_bytes": 29,
+              "residual_bytes": 15995,
+              "residual_codec": "signed_fsm_mix",
+              "residual_mean_abs": 254.4925537109375
+            },
+            "fixed_diff": {
+              "bytes": 16147,
+              "model_bytes": 7,
+              "residual_bytes": 16024,
+              "residual_codec": "signed_fsm_mix",
+              "residual_mean_abs": 277.49267578125
+            },
+            "lpc": {
+              "bytes": 15700,
+              "model_bytes": 303,
+              "residual_bytes": 15281,
+              "residual_codec": "golomb",
+              "residual_mean_abs": 177.63262939453125
+            },
+            "lpc_bidir": {
+              "bytes": 15722,
+              "model_bytes": 317,
+              "residual_bytes": 15289,
+              "residual_codec": "golomb",
+              "residual_mean_abs": 180.68231201171875
+            },
+            "lattice": {
+              "bytes": 15774,
+              "model_bytes": 158,
+              "residual_bytes": 15500,
+              "residual_codec": "signed_fsm_mix",
+              "residual_mean_abs": 202.68756103515625
+            },
+            "polezero": {
+              "bytes": 15868,
+              "model_bytes": 150,
+              "residual_bytes": 15602,
+              "residual_codec": "signed_fsm_mix",
+              "residual_mean_abs": 211.044189453125
+            },
+            "ngsa": {
+              "bytes": 15230,
+              "model_bytes": 47,
+              "residual_bytes": 15067,
+              "residual_codec": "golomb",
+              "residual_mean_abs": 166.39410400390625
+            }
+          }
+        },
+        {
+          "id": "1462-170138-0000",
+          "split": "dev-clean",
+          "speaker": "1462",
+          "frames": 16384,
+          "winner": "ngsa",
+          "portfolio_bytes": 15250,
+          "baseline_bytes": 16059,
+          "flac_bytes": 15517,
+          "flac8_bytes": 15536,
+          "ratio_flac_over_portfolio": 1.0175081967213115,
+          "families": {
+            "dense4": 16281,
+            "sparse10": 16570,
+            "hier2": 16059,
+            "fixed_diff": 16426,
+            "lpc": 15648,
+            "lpc_bidir": 15674,
+            "lattice": 15654,
+            "polezero": 15621,
+            "ngsa": 15250
+          },
+          "family_detail": {
+            "dense4": {
+              "bytes": 16281,
+              "model_bytes": 20,
+              "residual_bytes": 16145,
+              "residual_codec": "bgmc_sse",
+              "residual_mean_abs": 107.9473876953125
+            },
+            "sparse10": {
+              "bytes": 16570,
+              "model_bytes": 16,
+              "residual_bytes": 16438,
+              "residual_codec": "signed_fsm",
+              "residual_mean_abs": 291.29278564453125
+            },
+            "hier2": {
+              "bytes": 16059,
+              "model_bytes": 43,
+              "residual_bytes": 15900,
+              "residual_codec": "bgmc_sse",
+              "residual_mean_abs": 121.52471923828125
+            },
+            "fixed_diff": {
+              "bytes": 16426,
+              "model_bytes": 7,
+              "residual_bytes": 16303,
+              "residual_codec": "signed_fsm",
+              "residual_mean_abs": 256.8197021484375
+            },
+            "lpc": {
+              "bytes": 15648,
+              "model_bytes": 565,
+              "residual_bytes": 14967,
+              "residual_codec": "bgmc_sse",
+              "residual_mean_abs": 83.74493408203125
+            },
+            "lpc_bidir": {
+              "bytes": 15674,
+              "model_bytes": 334,
+              "residual_bytes": 15224,
+              "residual_codec": "golomb",
+              "residual_mean_abs": 87.6787109375
+            },
+            "lattice": {
+              "bytes": 15654,
+              "model_bytes": 286,
+              "residual_bytes": 15252,
+              "residual_codec": "bgmc_sse",
+              "residual_mean_abs": 94.18841552734375
+            },
+            "polezero": {
+              "bytes": 15621,
+              "model_bytes": 158,
+              "residual_bytes": 15347,
+              "residual_codec": "bgmc_sse",
+              "residual_mean_abs": 99.66436767578125
+            },
+            "ngsa": {
+              "bytes": 15250,
+              "model_bytes": 47,
+              "residual_bytes": 15087,
+              "residual_codec": "bgmc_sse",
+              "residual_mean_abs": 92.2828369140625
+            }
+          }
+        },
+        {
+          "id": "1673-143396-0000",
+          "split": "dev-clean",
+          "speaker": "1673",
+          "frames": 16384,
+          "winner": "ngsa",
+          "portfolio_bytes": 17567,
+          "baseline_bytes": 17993,
+          "flac_bytes": 17837,
+          "flac8_bytes": 17706,
+          "ratio_flac_over_portfolio": 1.0153697273296522,
+          "families": {
+            "dense4": 18065,
+            "sparse10": 17993,
+            "hier2": 17994,
+            "fixed_diff": 18625,
+            "lpc": 17573,
+            "lpc_bidir": 17582,
+            "lattice": 17643,
+            "polezero": 17806,
+            "ngsa": 17567
+          },
+          "family_detail": {
+            "dense4": {
+              "bytes": 18065,
+              "model_bytes": 20,
+              "residual_bytes": 17929,
+              "residual_codec": "bgmc_sse",
+              "residual_mean_abs": 245.3062744140625
+            },
+            "sparse10": {
+              "bytes": 17993,
+              "model_bytes": 44,
+              "residual_bytes": 17833,
+              "residual_codec": "bgmc",
+              "residual_mean_abs": 208.42938232421875
+            },
+            "hier2": {
+              "bytes": 17994,
+              "model_bytes": 59,
+              "residual_bytes": 17819,
+              "residual_codec": "bgmc",
+              "residual_mean_abs": 220.34674072265625
+            },
+            "fixed_diff": {
+              "bytes": 18625,
+              "model_bytes": 7,
+              "residual_bytes": 18502,
+              "residual_codec": "golomb",
+              "residual_mean_abs": 298.571044921875
+            },
+            "lpc": {
+              "bytes": 17573,
+              "model_bytes": 298,
+              "residual_bytes": 17159,
+              "residual_codec": "golomb",
+              "residual_mean_abs": 167.4930419921875
+            },
+            "lpc_bidir": {
+              "bytes": 17582,
+              "model_bytes": 350,
+              "residual_bytes": 17116,
+              "residual_codec": "golomb",
+              "residual_mean_abs": 164.8511962890625
+            },
+            "lattice": {
+              "bytes": 17643,
+              "model_bytes": 272,
+              "residual_bytes": 17255,
+              "residual_codec": "golomb",
+              "residual_mean_abs": 178.03826904296875
+            },
+            "polezero": {
+              "bytes": 17806,
+              "model_bytes": 310,
+              "residual_bytes": 17380,
+              "residual_codec": "golomb",
+              "residual_mean_abs": 192.42926025390625
+            },
+            "ngsa": {
+              "bytes": 17567,
+              "model_bytes": 31,
+              "residual_bytes": 17420,
+              "residual_codec": "bgmc",
+              "residual_mean_abs": 205.16546630859375
+            }
+          }
+        },
+        {
+          "id": "174-168635-0000",
+          "split": "dev-clean",
+          "speaker": "174",
+          "frames": 16384,
+          "winner": "ngsa",
+          "portfolio_bytes": 15059,
+          "baseline_bytes": 15745,
+          "flac_bytes": 15555,
+          "flac8_bytes": 15463,
+          "ratio_flac_over_portfolio": 1.032937114018195,
+          "families": {
+            "dense4": 15905,
+            "sparse10": 15745,
+            "hier2": 15818,
+            "fixed_diff": 16127,
+            "lpc": 15449,
+            "lpc_bidir": 15536,
+            "lattice": 15485,
+            "polezero": 15573,
+            "ngsa": 15059
+          },
+          "family_detail": {
+            "dense4": {
+              "bytes": 15905,
+              "model_bytes": 20,
+              "residual_bytes": 15769,
+              "residual_codec": "golomb",
+              "residual_mean_abs": 140.55303955078125
+            },
+            "sparse10": {
+              "bytes": 15745,
+              "model_bytes": 23,
+              "residual_bytes": 15606,
+              "residual_codec": "golomb",
+              "residual_mean_abs": 147.74542236328125
+            },
+            "hier2": {
+              "bytes": 15818,
+              "model_bytes": 64,
+              "residual_bytes": 15638,
+              "residual_codec": "golomb",
+              "residual_mean_abs": 135.9827880859375
+            },
+            "fixed_diff": {
+              "bytes": 16127,
+              "model_bytes": 7,
+              "residual_bytes": 16004,
+              "residual_codec": "predictive_rice",
+              "residual_mean_abs": 581.9971923828125
+            },
+            "lpc": {
+              "bytes": 15449,
+              "model_bytes": 295,
+              "residual_bytes": 15038,
+              "residual_codec": "golomb",
+              "residual_mean_abs": 113.891845703125
+            },
+            "lpc_bidir": {
+              "bytes": 15536,
+              "model_bytes": 335,
+              "residual_bytes": 15085,
+              "residual_codec": "golomb",
+              "residual_mean_abs": 113.99664306640625
+            },
+            "lattice": {
+              "bytes": 15485,
+              "model_bytes": 308,
+              "residual_bytes": 15061,
+              "residual_codec": "golomb",
+              "residual_mean_abs": 116.42303466796875
+            },
+            "polezero": {
+              "bytes": 15573,
+              "model_bytes": 328,
+              "residual_bytes": 15129,
+              "residual_codec": "golomb",
+              "residual_mean_abs": 121.465087890625
+            },
+            "ngsa": {
+              "bytes": 15059,
+              "model_bytes": 47,
+              "residual_bytes": 14896,
+              "residual_codec": "golomb",
+              "residual_mean_abs": 106.55181884765625
+            }
+          }
+        },
+        {
+          "id": "1919-142785-0000",
+          "split": "dev-clean",
+          "speaker": "1919",
+          "frames": 16384,
+          "winner": "ngsa",
+          "portfolio_bytes": 17874,
+          "baseline_bytes": 19268,
+          "flac_bytes": 18579,
+          "flac8_bytes": 18536,
+          "ratio_flac_over_portfolio": 1.0394427660288688,
+          "families": {
+            "dense4": 19504,
+            "sparse10": 19268,
+            "hier2": 19275,
+            "fixed_diff": 19156,
+            "lpc": 18324,
+            "lpc_bidir": 18329,
+            "lattice": 18420,
+            "polezero": 18515,
+            "ngsa": 17874
+          },
+          "family_detail": {
+            "dense4": {
+              "bytes": 19504,
+              "model_bytes": 20,
+              "residual_bytes": 19368,
+              "residual_codec": "golomb",
+              "residual_mean_abs": 766.2296142578125
+            },
+            "sparse10": {
+              "bytes": 19268,
+              "model_bytes": 16,
+              "residual_bytes": 19136,
+              "residual_codec": "predictive_rice",
+              "residual_mean_abs": 1057.5672607421875
+            },
+            "hier2": {
+              "bytes": 19275,
+              "model_bytes": 23,
+              "residual_bytes": 19136,
+              "residual_codec": "predictive_rice",
+              "residual_mean_abs": 1057.5672607421875
+            },
+            "fixed_diff": {
+              "bytes": 19156,
+              "model_bytes": 7,
+              "residual_bytes": 19033,
+              "residual_codec": "golomb",
+              "residual_mean_abs": 806.7532958984375
+            },
+            "lpc": {
+              "bytes": 18324,
+              "model_bytes": 316,
+              "residual_bytes": 17892,
+              "residual_codec": "golomb",
+              "residual_mean_abs": 421.1097412109375
+            },
+            "lpc_bidir": {
+              "bytes": 18329,
+              "model_bytes": 326,
+              "residual_bytes": 17887,
+              "residual_codec": "golomb",
+              "residual_mean_abs": 417.56781005859375
+            },
+            "lattice": {
+              "bytes": 18420,
+              "model_bytes": 314,
+              "residual_bytes": 17990,
+              "residual_codec": "golomb",
+              "residual_mean_abs": 456.094482421875
+            },
+            "polezero": {
+              "bytes": 18515,
+              "model_bytes": 316,
+              "residual_bytes": 18083,
+              "residual_codec": "golomb",
+              "residual_mean_abs": 512.216552734375
+            },
+            "ngsa": {
+              "bytes": 17874,
+              "model_bytes": 47,
+              "residual_bytes": 17711,
+              "residual_codec": "golomb",
+              "residual_mean_abs": 352.88946533203125
+            }
+          }
+        },
+        {
+          "id": "1988-147956-0000",
+          "split": "dev-clean",
+          "speaker": "1988",
+          "frames": 16384,
+          "winner": "lattice",
+          "portfolio_bytes": 13776,
+          "baseline_bytes": 13995,
+          "flac_bytes": 13646,
+          "flac8_bytes": 13634,
+          "ratio_flac_over_portfolio": 0.9905632984901278,
+          "families": {
+            "dense4": 14536,
+            "sparse10": 13995,
+            "hier2": 14002,
+            "fixed_diff": 13784,
+            "lpc": 13819,
+            "lpc_bidir": 13814,
+            "lattice": 13776,
+            "polezero": 13786,
+            "ngsa": 14023
+          },
+          "family_detail": {
+            "dense4": {
+              "bytes": 14536,
+              "model_bytes": 20,
+              "residual_bytes": 14400,
+              "residual_codec": "predictive_rice",
+              "residual_mean_abs": 101.7314453125
+            },
+            "sparse10": {
+              "bytes": 13995,
+              "model_bytes": 16,
+              "residual_bytes": 13863,
+              "residual_codec": "predictive_rice",
+              "residual_mean_abs": 263.31353759765625
+            },
+            "hier2": {
+              "bytes": 14002,
+              "model_bytes": 23,
+              "residual_bytes": 13863,
+              "residual_codec": "predictive_rice",
+              "residual_mean_abs": 263.31353759765625
+            },
+            "fixed_diff": {
+              "bytes": 13784,
+              "model_bytes": 7,
+              "residual_bytes": 13661,
+              "residual_codec": "bgmc_sse",
+              "residual_mean_abs": 112.17706298828125
+            },
+            "lpc": {
+              "bytes": 13819,
+              "model_bytes": 475,
+              "residual_bytes": 13228,
+              "residual_codec": "bgmc_sse",
+              "residual_mean_abs": 63.03424072265625
+            },
+            "lpc_bidir": {
+              "bytes": 13814,
+              "model_bytes": 339,
+              "residual_bytes": 13359,
+              "residual_codec": "bgmc_sse",
+              "residual_mean_abs": 66.50811767578125
+            },
+            "lattice": {
+              "bytes": 13776,
+              "model_bytes": 276,
+              "residual_bytes": 13384,
+              "residual_codec": "bgmc_sse",
+              "residual_mean_abs": 67.5919189453125
+            },
+            "polezero": {
+              "bytes": 13786,
+              "model_bytes": 296,
+              "residual_bytes": 13374,
+              "residual_codec": "bgmc_sse",
+              "residual_mean_abs": 69.1290283203125
+            },
+            "ngsa": {
+              "bytes": 14023,
+              "model_bytes": 47,
+              "residual_bytes": 13860,
+              "residual_codec": "bgmc_sse",
+              "residual_mean_abs": 72.33636474609375
+            }
+          }
+        },
+        {
+          "id": "1993-147149-0000",
+          "split": "dev-clean",
+          "speaker": "1993",
+          "frames": 16384,
+          "winner": "ngsa",
+          "portfolio_bytes": 11806,
+          "baseline_bytes": 12384,
+          "flac_bytes": 12284,
+          "flac8_bytes": 12176,
+          "ratio_flac_over_portfolio": 1.040487887514823,
+          "families": {
+            "dense4": 12537,
+            "sparse10": 12384,
+            "hier2": 12405,
+            "fixed_diff": 12732,
+            "lpc": 12145,
+            "lpc_bidir": 12164,
+            "lattice": 12162,
+            "polezero": 12239,
+            "ngsa": 11806
+          },
+          "family_detail": {
+            "dense4": {
+              "bytes": 12537,
+              "model_bytes": 20,
+              "residual_bytes": 12401,
+              "residual_codec": "bgmc_sse",
+              "residual_mean_abs": 25.7119140625
+            },
+            "sparse10": {
+              "bytes": 12384,
+              "model_bytes": 43,
+              "residual_bytes": 12225,
+              "residual_codec": "bgmc_sse",
+              "residual_mean_abs": 23.21240234375
+            },
+            "hier2": {
+              "bytes": 12405,
+              "model_bytes": 40,
+              "residual_bytes": 12249,
+              "residual_codec": "bgmc_sse",
+              "residual_mean_abs": 23.53851318359375
+            },
+            "fixed_diff": {
+              "bytes": 12732,
+              "model_bytes": 7,
+              "residual_bytes": 12609,
+              "residual_codec": "bgmc_sse",
+              "residual_mean_abs": 34.84991455078125
+            },
+            "lpc": {
+              "bytes": 12145,
+              "model_bytes": 325,
+              "residual_bytes": 11704,
+              "residual_codec": "bgmc",
+              "residual_mean_abs": 18.1505126953125
+            },
+            "lpc_bidir": {
+              "bytes": 12164,
+              "model_bytes": 335,
+              "residual_bytes": 11713,
+              "residual_codec": "bgmc_sse",
+              "residual_mean_abs": 18.1207275390625
+            },
+            "lattice": {
+              "bytes": 12162,
+              "model_bytes": 324,
+              "residual_bytes": 11722,
+              "residual_codec": "bgmc",
+              "residual_mean_abs": 18.51409912109375
+            },
+            "polezero": {
+              "bytes": 12239,
+              "model_bytes": 322,
+              "residual_bytes": 11801,
+              "residual_codec": "bgmc_sse",
+              "residual_mean_abs": 19.65020751953125
+            },
+            "ngsa": {
+              "bytes": 11806,
+              "model_bytes": 47,
+              "residual_bytes": 11643,
+              "residual_codec": "bgmc",
+              "residual_mean_abs": 18.91705322265625
+            }
+          }
+        },
+        {
+          "id": "2035-147960-0000",
+          "split": "dev-clean",
+          "speaker": "2035",
+          "frames": 16384,
+          "winner": "ngsa",
+          "portfolio_bytes": 20337,
+          "baseline_bytes": 21381,
+          "flac_bytes": 21243,
+          "flac8_bytes": 21072,
+          "ratio_flac_over_portfolio": 1.0445493435609972,
+          "families": {
+            "dense4": 21635,
+            "sparse10": 21460,
+            "hier2": 21381,
+            "fixed_diff": 22321,
+            "lpc": 20629,
+            "lpc_bidir": 20681,
+            "lattice": 20689,
+            "polezero": 20800,
+            "ngsa": 20337
+          },
+          "family_detail": {
+            "dense4": {
+              "bytes": 21635,
+              "model_bytes": 20,
+              "residual_bytes": 21499,
+              "residual_codec": "bgmc_sse",
+              "residual_mean_abs": 509.7313232421875
+            },
+            "sparse10": {
+              "bytes": 21460,
+              "model_bytes": 42,
+              "residual_bytes": 21302,
+              "residual_codec": "bgmc_sse",
+              "residual_mean_abs": 425.54876708984375
+            },
+            "hier2": {
+              "bytes": 21381,
+              "model_bytes": 70,
+              "residual_bytes": 21195,
+              "residual_codec": "bgmc_sse",
+              "residual_mean_abs": 403.69244384765625
+            },
+            "fixed_diff": {
+              "bytes": 22321,
+              "model_bytes": 7,
+              "residual_bytes": 22198,
+              "residual_codec": "bgmc_sse",
+              "residual_mean_abs": 653.3352661132812
+            },
+            "lpc": {
+              "bytes": 20629,
+              "model_bytes": 357,
+              "residual_bytes": 20156,
+              "residual_codec": "bgmc_sse",
+              "residual_mean_abs": 240.6678466796875
+            },
+            "lpc_bidir": {
+              "bytes": 20681,
+              "model_bytes": 395,
+              "residual_bytes": 20170,
+              "residual_codec": "bgmc_sse",
+              "residual_mean_abs": 239.36749267578125
+            },
+            "lattice": {
+              "bytes": 20689,
+              "model_bytes": 334,
+              "residual_bytes": 20239,
+              "residual_codec": "bgmc",
+              "residual_mean_abs": 250.36248779296875
+            },
+            "polezero": {
+              "bytes": 20800,
+              "model_bytes": 322,
+              "residual_bytes": 20362,
+              "residual_codec": "bgmc",
+              "residual_mean_abs": 272.06854248046875
+            },
+            "ngsa": {
+              "bytes": 20337,
+              "model_bytes": 31,
+              "residual_bytes": 20190,
+              "residual_codec": "bgmc",
+              "residual_mean_abs": 258.78179931640625
+            }
+          }
+        }
+      ],
+      "limitations": [
+        "object-specific fitting is representation selection, never a generalization claim",
+        "the portfolio grows one seal at a time; this receipt names its active set"
+      ],
+      "method": {
+        "active_families": [
+          "dense4",
+          "sparse10",
+          "hier2",
+          "fixed_diff",
+          "lpc",
+          "lpc_bidir",
+          "lattice",
+          "polezero",
+          "ngsa"
+        ],
+        "profile": "vole.audio.learned.exp3",
+        "sample_domain": "sign-extended i16 in i32 (the Seal-K experimental domain)",
+        "baseline": "the wired three-family Exp2 real-speech portfolio",
+        "attribution": "per-family standalone bytes are reported for every clip"
+      },
+      "mode_c": {
+        "split": "mode-c held-out (test-clean)",
+        "clips": 8,
+        "total_portfolio_bytes": 137362,
+        "total_flac_bytes": 144145,
+        "total_baseline_bytes": 145904,
+        "wins_vs_flac": 8,
+        "losses_vs_flac": 0,
+        "wilcoxon_flac": {
+          "w_plus": 36,
+          "w_minus": 0,
+          "p_two_sided_ppm": 7813
+        },
+        "wins_vs_baseline": 8,
+        "losses_vs_baseline": 0,
+        "wilcoxon_baseline": {
+          "w_plus": 36,
+          "w_minus": 0,
+          "p_two_sided_ppm": 7813
+        },
+        "bootstrap_median_flac_over_portfolio_ppm": {
+          "lo": 1037922,
+          "hi": 1070110
+        },
+        "flac8_secondary": {
+          "total_bytes": 142714,
+          "wins": 8,
+          "losses": 0,
+          "wilcoxon_p_two_sided_ppm": 7813
+        }
+      },
+      "mode_c_clips": [
+        {
+          "id": "1089-134686-0000",
+          "split": "test-clean",
+          "speaker": "1089",
+          "frames": 16384,
+          "winner": "ngsa",
+          "portfolio_bytes": 14814,
+          "baseline_bytes": 15691,
+          "flac_bytes": 15428,
+          "flac8_bytes": 15362,
+          "ratio_flac_over_portfolio": 1.041447279600378,
+          "families": {
+            "dense4": 15819,
+            "sparse10": 15691,
+            "hier2": 15698,
+            "fixed_diff": 15971,
+            "lpc": 15276,
+            "lpc_bidir": 15324,
+            "lattice": 15371,
+            "polezero": 15415,
+            "ngsa": 14814
+          },
+          "family_detail": {
+            "dense4": {
+              "bytes": 15819,
+              "model_bytes": 20,
+              "residual_bytes": 15683,
+              "residual_codec": "bgmc_sse",
+              "residual_mean_abs": 99.5283203125
+            },
+            "sparse10": {
+              "bytes": 15691,
+              "model_bytes": 20,
+              "residual_bytes": 15555,
+              "residual_codec": "bgmc",
+              "residual_mean_abs": 120.67059326171875
+            },
+            "hier2": {
+              "bytes": 15698,
+              "model_bytes": 27,
+              "residual_bytes": 15555,
+              "residual_codec": "bgmc",
+              "residual_mean_abs": 120.67059326171875
+            },
+            "fixed_diff": {
+              "bytes": 15971,
+              "model_bytes": 7,
+              "residual_bytes": 15848,
+              "residual_codec": "bgmc_sse",
+              "residual_mean_abs": 187.61962890625
+            },
+            "lpc": {
+              "bytes": 15276,
+              "model_bytes": 320,
+              "residual_bytes": 14840,
+              "residual_codec": "bgmc_sse",
+              "residual_mean_abs": 71.46307373046875
+            },
+            "lpc_bidir": {
+              "bytes": 15324,
+              "model_bytes": 366,
+              "residual_bytes": 14842,
+              "residual_codec": "bgmc_sse",
+              "residual_mean_abs": 68.51806640625
+            },
+            "lattice": {
+              "bytes": 15371,
+              "model_bytes": 308,
+              "residual_bytes": 14947,
+              "residual_codec": "bgmc_sse",
+              "residual_mean_abs": 76.0045166015625
+            },
+            "polezero": {
+              "bytes": 15415,
+              "model_bytes": 306,
+              "residual_bytes": 14993,
+              "residual_codec": "bgmc_sse",
+              "residual_mean_abs": 79.892578125
+            },
+            "ngsa": {
+              "bytes": 14814,
+              "model_bytes": 47,
+              "residual_bytes": 14651,
+              "residual_codec": "bgmc_sse",
+              "residual_mean_abs": 70.15460205078125
+            }
+          }
+        },
+        {
+          "id": "1188-133604-0000",
+          "split": "test-clean",
+          "speaker": "1188",
+          "frames": 16384,
+          "winner": "ngsa",
+          "portfolio_bytes": 13052,
+          "baseline_bytes": 13465,
+          "flac_bytes": 13547,
+          "flac8_bytes": 13340,
+          "ratio_flac_over_portfolio": 1.0379252221881703,
+          "families": {
+            "dense4": 13563,
+            "sparse10": 13465,
+            "hier2": 13482,
+            "fixed_diff": 13972,
+            "lpc": 13490,
+            "lpc_bidir": 13489,
+            "lattice": 13479,
+            "polezero": 13594,
+            "ngsa": 13052
+          },
+          "family_detail": {
+            "dense4": {
+              "bytes": 13563,
+              "model_bytes": 20,
+              "residual_bytes": 13427,
+              "residual_codec": "bgmc",
+              "residual_mean_abs": 53.8555908203125
+            },
+            "sparse10": {
+              "bytes": 13465,
+              "model_bytes": 35,
+              "residual_bytes": 13314,
+              "residual_codec": "bgmc_sse",
+              "residual_mean_abs": 52.34075927734375
+            },
+            "hier2": {
+              "bytes": 13482,
+              "model_bytes": 36,
+              "residual_bytes": 13330,
+              "residual_codec": "bgmc",
+              "residual_mean_abs": 52.8367919921875
+            },
+            "fixed_diff": {
+              "bytes": 13972,
+              "model_bytes": 7,
+              "residual_bytes": 13849,
+              "residual_codec": "predictive_rice",
+              "residual_mean_abs": 107.2664794921875
+            },
+            "lpc": {
+              "bytes": 13490,
+              "model_bytes": 283,
+              "residual_bytes": 13091,
+              "residual_codec": "bgmc_sse",
+              "residual_mean_abs": 41.1595458984375
+            },
+            "lpc_bidir": {
+              "bytes": 13489,
+              "model_bytes": 300,
+              "residual_bytes": 13073,
+              "residual_codec": "bgmc_sse",
+              "residual_mean_abs": 40.98089599609375
+            },
+            "lattice": {
+              "bytes": 13479,
+              "model_bytes": 282,
+              "residual_bytes": 13081,
+              "residual_codec": "bgmc_sse",
+              "residual_mean_abs": 41.372314453125
+            },
+            "polezero": {
+              "bytes": 13594,
+              "model_bytes": 318,
+              "residual_bytes": 13160,
+              "residual_codec": "bgmc_sse",
+              "residual_mean_abs": 45.195068359375
+            },
+            "ngsa": {
+              "bytes": 13052,
+              "model_bytes": 31,
+              "residual_bytes": 12905,
+              "residual_codec": "bgmc",
+              "residual_mean_abs": 39.5079345703125
+            }
+          }
+        },
+        {
+          "id": "121-121726-0000",
+          "split": "test-clean",
+          "speaker": "121",
+          "frames": 16384,
+          "winner": "ngsa",
+          "portfolio_bytes": 18234,
+          "baseline_bytes": 20060,
+          "flac_bytes": 19529,
+          "flac8_bytes": 19316,
+          "ratio_flac_over_portfolio": 1.071021169244269,
+          "families": {
+            "dense4": 20214,
+            "sparse10": 20134,
+            "hier2": 20060,
+            "fixed_diff": 20664,
+            "lpc": 18605,
+            "lpc_bidir": 18803,
+            "lattice": 19024,
+            "polezero": 19236,
+            "ngsa": 18234
+          },
+          "family_detail": {
+            "dense4": {
+              "bytes": 20214,
+              "model_bytes": 20,
+              "residual_bytes": 20078,
+              "residual_codec": "signed_fsm_lag",
+              "residual_mean_abs": 789.4862670898438
+            },
+            "sparse10": {
+              "bytes": 20134,
+              "model_bytes": 43,
+              "residual_bytes": 19975,
+              "residual_codec": "signed_fsm_lag",
+              "residual_mean_abs": 790.2240600585938
+            },
+            "hier2": {
+              "bytes": 20060,
+              "model_bytes": 37,
+              "residual_bytes": 19907,
+              "residual_codec": "signed_fsm_lag",
+              "residual_mean_abs": 759.6808471679688
+            },
+            "fixed_diff": {
+              "bytes": 20664,
+              "model_bytes": 7,
+              "residual_bytes": 20541,
+              "residual_codec": "predictive_rice",
+              "residual_mean_abs": 1631.7227172851562
+            },
+            "lpc": {
+              "bytes": 18605,
+              "model_bytes": 640,
+              "residual_bytes": 17849,
+              "residual_codec": "signed_fsm_mix",
+              "residual_mean_abs": 276.85357666015625
+            },
+            "lpc_bidir": {
+              "bytes": 18803,
+              "model_bytes": 350,
+              "residual_bytes": 18337,
+              "residual_codec": "signed_fsm_mix",
+              "residual_mean_abs": 341.80352783203125
+            },
+            "lattice": {
+              "bytes": 19024,
+              "model_bytes": 340,
+              "residual_bytes": 18568,
+              "residual_codec": "signed_fsm_mix",
+              "residual_mean_abs": 374.3109130859375
+            },
+            "polezero": {
+              "bytes": 19236,
+              "model_bytes": 332,
+              "residual_bytes": 18788,
+              "residual_codec": "signed_fsm_mix",
+              "residual_mean_abs": 420.346435546875
+            },
+            "ngsa": {
+              "bytes": 18234,
+              "model_bytes": 47,
+              "residual_bytes": 18071,
+              "residual_codec": "signed_fsm_mix",
+              "residual_mean_abs": 305.09747314453125
+            }
+          }
+        },
+        {
+          "id": "1221-135766-0000",
+          "split": "test-clean",
+          "speaker": "1221",
+          "frames": 16384,
+          "winner": "ngsa",
+          "portfolio_bytes": 20224,
+          "baseline_bytes": 21492,
+          "flac_bytes": 21409,
+          "flac8_bytes": 21362,
+          "ratio_flac_over_portfolio": 1.05859375,
+          "families": {
+            "dense4": 21492,
+            "sparse10": 21815,
+            "hier2": 21821,
+            "fixed_diff": 21810,
+            "lpc": 20827,
+            "lpc_bidir": 21018,
+            "lattice": 21047,
+            "polezero": 21216,
+            "ngsa": 20224
+          },
+          "family_detail": {
+            "dense4": {
+              "bytes": 21492,
+              "model_bytes": 20,
+              "residual_bytes": 21356,
+              "residual_codec": "bgmc_sse",
+              "residual_mean_abs": 583.8589477539062
+            },
+            "sparse10": {
+              "bytes": 21815,
+              "model_bytes": 22,
+              "residual_bytes": 21677,
+              "residual_codec": "predictive_rice",
+              "residual_mean_abs": 716.6314086914062
+            },
+            "hier2": {
+              "bytes": 21821,
+              "model_bytes": 23,
+              "residual_bytes": 21682,
+              "residual_codec": "predictive_rice",
+              "residual_mean_abs": 729.1144409179688
+            },
+            "fixed_diff": {
+              "bytes": 21810,
+              "model_bytes": 7,
+              "residual_bytes": 21687,
+              "residual_codec": "predictive_rice",
+              "residual_mean_abs": 759.7824096679688
+            },
+            "lpc": {
+              "bytes": 20827,
+              "model_bytes": 608,
+              "residual_bytes": 20103,
+              "residual_codec": "bgmc",
+              "residual_mean_abs": 276.12158203125
+            },
+            "lpc_bidir": {
+              "bytes": 21018,
+              "model_bytes": 363,
+              "residual_bytes": 20539,
+              "residual_codec": "bgmc_sse",
+              "residual_mean_abs": 354.3671875
+            },
+            "lattice": {
+              "bytes": 21047,
+              "model_bytes": 320,
+              "residual_bytes": 20611,
+              "residual_codec": "bgmc_sse",
+              "residual_mean_abs": 377.37646484375
+            },
+            "polezero": {
+              "bytes": 21216,
+              "model_bytes": 332,
+              "residual_bytes": 20768,
+              "residual_codec": "bgmc_sse",
+              "residual_mean_abs": 419.6905517578125
+            },
+            "ngsa": {
+              "bytes": 20224,
+              "model_bytes": 31,
+              "residual_bytes": 20077,
+              "residual_codec": "bgmc",
+              "residual_mean_abs": 287.171630859375
+            }
+          }
+        },
+        {
+          "id": "1284-1180-0000",
+          "split": "test-clean",
+          "speaker": "1284",
+          "frames": 16384,
+          "winner": "ngsa",
+          "portfolio_bytes": 16629,
+          "baseline_bytes": 18161,
+          "flac_bytes": 17526,
+          "flac8_bytes": 17350,
+          "ratio_flac_over_portfolio": 1.053941908713693,
+          "families": {
+            "dense4": 18285,
+            "sparse10": 18180,
+            "hier2": 18161,
+            "fixed_diff": 18302,
+            "lpc": 17108,
+            "lpc_bidir": 17171,
+            "lattice": 17241,
+            "polezero": 17256,
+            "ngsa": 16629
+          },
+          "family_detail": {
+            "dense4": {
+              "bytes": 18285,
+              "model_bytes": 20,
+              "residual_bytes": 18149,
+              "residual_codec": "bgmc_sse",
+              "residual_mean_abs": 251.05743408203125
+            },
+            "sparse10": {
+              "bytes": 18180,
+              "model_bytes": 25,
+              "residual_bytes": 18039,
+              "residual_codec": "predictive_rice",
+              "residual_mean_abs": 302.446533203125
+            },
+            "hier2": {
+              "bytes": 18161,
+              "model_bytes": 66,
+              "residual_bytes": 17979,
+              "residual_codec": "predictive_rice",
+              "residual_mean_abs": 230.9132080078125
+            },
+            "fixed_diff": {
+              "bytes": 18302,
+              "model_bytes": 7,
+              "residual_bytes": 18179,
+              "residual_codec": "signed_fsm_mix",
+              "residual_mean_abs": 344.2156982421875
+            },
+            "lpc": {
+              "bytes": 17108,
+              "model_bytes": 330,
+              "residual_bytes": 16662,
+              "residual_codec": "signed_fsm_mix",
+              "residual_mean_abs": 147.38653564453125
+            },
+            "lpc_bidir": {
+              "bytes": 17171,
+              "model_bytes": 370,
+              "residual_bytes": 16685,
+              "residual_codec": "golomb",
+              "residual_mean_abs": 143.17364501953125
+            },
+            "lattice": {
+              "bytes": 17241,
+              "model_bytes": 320,
+              "residual_bytes": 16805,
+              "residual_codec": "golomb",
+              "residual_mean_abs": 154.90093994140625
+            },
+            "polezero": {
+              "bytes": 17256,
+              "model_bytes": 320,
+              "residual_bytes": 16820,
+              "residual_codec": "signed_fsm_mix",
+              "residual_mean_abs": 167.47344970703125
+            },
+            "ngsa": {
+              "bytes": 16629,
+              "model_bytes": 31,
+              "residual_bytes": 16482,
+              "residual_codec": "golomb",
+              "residual_mean_abs": 117.388916015625
+            }
+          }
+        },
+        {
+          "id": "1320-122612-0000",
+          "split": "test-clean",
+          "speaker": "1320",
+          "frames": 16384,
+          "winner": "ngsa",
+          "portfolio_bytes": 19668,
+          "baseline_bytes": 21229,
+          "flac_bytes": 21047,
+          "flac8_bytes": 20615,
+          "ratio_flac_over_portfolio": 1.0701138905836893,
+          "families": {
+            "dense4": 21313,
+            "sparse10": 21229,
+            "hier2": 21272,
+            "fixed_diff": 21497,
+            "lpc": 20396,
+            "lpc_bidir": 20389,
+            "lattice": 20315,
+            "polezero": 20486,
+            "ngsa": 19668
+          },
+          "family_detail": {
+            "dense4": {
+              "bytes": 21313,
+              "model_bytes": 20,
+              "residual_bytes": 21177,
+              "residual_codec": "bgmc_sse",
+              "residual_mean_abs": 647.30078125
+            },
+            "sparse10": {
+              "bytes": 21229,
+              "model_bytes": 22,
+              "residual_bytes": 21091,
+              "residual_codec": "predictive_rice",
+              "residual_mean_abs": 949.9092407226562
+            },
+            "hier2": {
+              "bytes": 21272,
+              "model_bytes": 49,
+              "residual_bytes": 21107,
+              "residual_codec": "predictive_rice",
+              "residual_mean_abs": 814.3526000976562
+            },
+            "fixed_diff": {
+              "bytes": 21497,
+              "model_bytes": 7,
+              "residual_bytes": 21374,
+              "residual_codec": "predictive_rice",
+              "residual_mean_abs": 1467.7603149414062
+            },
+            "lpc": {
+              "bytes": 20396,
+              "model_bytes": 564,
+              "residual_bytes": 19716,
+              "residual_codec": "bgmc",
+              "residual_mean_abs": 285.98577880859375
+            },
+            "lpc_bidir": {
+              "bytes": 20389,
+              "model_bytes": 371,
+              "residual_bytes": 19902,
+              "residual_codec": "bgmc",
+              "residual_mean_abs": 320.488037109375
+            },
+            "lattice": {
+              "bytes": 20315,
+              "model_bytes": 322,
+              "residual_bytes": 19877,
+              "residual_codec": "bgmc",
+              "residual_mean_abs": 327.54937744140625
+            },
+            "polezero": {
+              "bytes": 20486,
+              "model_bytes": 320,
+              "residual_bytes": 20050,
+              "residual_codec": "bgmc",
+              "residual_mean_abs": 357.18804931640625
+            },
+            "ngsa": {
+              "bytes": 19668,
+              "model_bytes": 31,
+              "residual_bytes": 19521,
+              "residual_codec": "bgmc",
+              "residual_mean_abs": 276.23321533203125
+            }
+          }
+        },
+        {
+          "id": "1580-141083-0000",
+          "split": "test-clean",
+          "speaker": "1580",
+          "frames": 16384,
+          "winner": "ngsa",
+          "portfolio_bytes": 18889,
+          "baseline_bytes": 19654,
+          "flac_bytes": 19617,
+          "flac8_bytes": 19416,
+          "ratio_flac_over_portfolio": 1.0385409497591191,
+          "families": {
+            "dense4": 19732,
+            "sparse10": 19654,
+            "hier2": 19746,
+            "fixed_diff": 20731,
+            "lpc": 19255,
+            "lpc_bidir": 19233,
+            "lattice": 19345,
+            "polezero": 19552,
+            "ngsa": 18889
+          },
+          "family_detail": {
+            "dense4": {
+              "bytes": 19732,
+              "model_bytes": 20,
+              "residual_bytes": 19596,
+              "residual_codec": "bgmc_sse",
+              "residual_mean_abs": 342.50933837890625
+            },
+            "sparse10": {
+              "bytes": 19654,
+              "model_bytes": 39,
+              "residual_bytes": 19499,
+              "residual_codec": "bgmc",
+              "residual_mean_abs": 312.84210205078125
+            },
+            "hier2": {
+              "bytes": 19746,
+              "model_bytes": 34,
+              "residual_bytes": 19596,
+              "residual_codec": "bgmc_sse",
+              "residual_mean_abs": 341.4239501953125
+            },
+            "fixed_diff": {
+              "bytes": 20731,
+              "model_bytes": 7,
+              "residual_bytes": 20608,
+              "residual_codec": "predictive_rice",
+              "residual_mean_abs": 926.2896118164062
+            },
+            "lpc": {
+              "bytes": 19255,
+              "model_bytes": 631,
+              "residual_bytes": 18508,
+              "residual_codec": "bgmc",
+              "residual_mean_abs": 188.80963134765625
+            },
+            "lpc_bidir": {
+              "bytes": 19233,
+              "model_bytes": 356,
+              "residual_bytes": 18761,
+              "residual_codec": "bgmc",
+              "residual_mean_abs": 222.6357421875
+            },
+            "lattice": {
+              "bytes": 19345,
+              "model_bytes": 348,
+              "residual_bytes": 18881,
+              "residual_codec": "bgmc",
+              "residual_mean_abs": 239.71038818359375
+            },
+            "polezero": {
+              "bytes": 19552,
+              "model_bytes": 328,
+              "residual_bytes": 19108,
+              "residual_codec": "bgmc",
+              "residual_mean_abs": 268.05731201171875
+            },
+            "ngsa": {
+              "bytes": 18889,
+              "model_bytes": 47,
+              "residual_bytes": 18726,
+              "residual_codec": "bgmc",
+              "residual_mean_abs": 244.120849609375
+            }
+          }
+        },
+        {
+          "id": "1995-1826-0000",
+          "split": "test-clean",
+          "speaker": "1995",
+          "frames": 16384,
+          "winner": "ngsa",
+          "portfolio_bytes": 15852,
+          "baseline_bytes": 16152,
+          "flac_bytes": 16042,
+          "flac8_bytes": 15953,
+          "ratio_flac_over_portfolio": 1.0119858692909411,
+          "families": {
+            "dense4": 16417,
+            "sparse10": 16154,
+            "hier2": 16152,
+            "fixed_diff": 16579,
+            "lpc": 16141,
+            "lpc_bidir": 16189,
+            "lattice": 16213,
+            "polezero": 16341,
+            "ngsa": 15852
+          },
+          "family_detail": {
+            "dense4": {
+              "bytes": 16417,
+              "model_bytes": 20,
+              "residual_bytes": 16281,
+              "residual_codec": "signed_fsm_mix",
+              "residual_mean_abs": 129.212646484375
+            },
+            "sparse10": {
+              "bytes": 16154,
+              "model_bytes": 40,
+              "residual_bytes": 15998,
+              "residual_codec": "signed_fsm_mix",
+              "residual_mean_abs": 109.6920166015625
+            },
+            "hier2": {
+              "bytes": 16152,
+              "model_bytes": 38,
+              "residual_bytes": 15998,
+              "residual_codec": "signed_fsm_mix",
+              "residual_mean_abs": 113.14752197265625
+            },
+            "fixed_diff": {
+              "bytes": 16579,
+              "model_bytes": 7,
+              "residual_bytes": 16456,
+              "residual_codec": "signed_fsm_mix",
+              "residual_mean_abs": 133.5264892578125
+            },
+            "lpc": {
+              "bytes": 16141,
+              "model_bytes": 165,
+              "residual_bytes": 15860,
+              "residual_codec": "signed_fsm_mix",
+              "residual_mean_abs": 103.96343994140625
+            },
+            "lpc_bidir": {
+              "bytes": 16189,
+              "model_bytes": 185,
+              "residual_bytes": 15888,
+              "residual_codec": "signed_fsm_mix",
+              "residual_mean_abs": 104.04827880859375
+            },
+            "lattice": {
+              "bytes": 16213,
+              "model_bytes": 164,
+              "residual_bytes": 15933,
+              "residual_codec": "signed_fsm_mix",
+              "residual_mean_abs": 110.3392333984375
+            },
+            "polezero": {
+              "bytes": 16341,
+              "model_bytes": 154,
+              "residual_bytes": 16071,
+              "residual_codec": "signed_fsm_mix",
+              "residual_mean_abs": 118.25054931640625
+            },
+            "ngsa": {
+              "bytes": 15852,
+              "model_bytes": 31,
+              "residual_bytes": 15705,
+              "residual_codec": "signed_fsm_mix",
+              "residual_mean_abs": 96.99774169921875
+            }
+          }
+        }
+      ],
+      "protocol": {
+        "protocol_schema": "vole.audio.learned.protocol.v1",
+        "schema": "vole.audio.learned.exp3.evidence.v1",
+        "profile": "vole.audio.learned.exp3",
+        "version": 1,
+        "semantic_authority": "none: a learned hypothesis is a candidate family, never truth; scalar exact closure decides acceptance"
+      }
+    }
+  },
+  "receipt_sha256": "1439aa292afc920b760cf3f5962acc1d2dfb28af6c73b214676abeaac98263bd"
+}
