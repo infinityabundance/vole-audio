@@ -88,6 +88,8 @@ pub mod learned_intrinsic;
 #[cfg(feature = "std")]
 pub mod learned_inverse;
 #[cfg(feature = "std")]
+pub mod learned_iterative_reprice;
+#[cfg(feature = "std")]
 pub mod learned_linear;
 #[cfg(feature = "std")]
 pub mod learned_ngsa;
@@ -366,6 +368,14 @@ isolated against the identical parse coded as a plain segmented model, over synt
 intrinsic and real speech-effectiveness surfaces; held-out Mode C untouched",
     ),
     (
+        "learned-iterative-reprice",
+        "Phase 6 mechanism 2 (`IterativeReprice`): coordinate descent between the stateful parse and
+the order-0 empirical magnitude entropy prices induced by that parse (P0 -> Parse0 -> P1 ->
+Parse1 -> ...), stopping when the exact assembled bytes stop shrinking, the parse repeats, or a
+frozen iteration ceiling is reached; iteration 0 is always retained so the result cannot exceed
+the single-pass parse; format unchanged; held-out Mode C untouched",
+    ),
+    (
         "learned-speech-trace",
         "Seal S0 diagnostic: bit-for-bit trace of the frozen B1 FLAC-5 artifact (subframe kinds, orders, precision, shift, partition order, residual payload) beside the wired three-family Exp2 VOLE byte waterfall, on the real + Mode-C corpus",
     ),
@@ -555,6 +565,7 @@ pub fn run(name: &str, receipts_root: &Path) -> crate::error::Result<Verdict> {
         "learned-ngsa" => learned_ngsa::run(receipts_root),
         "learned-residual-fusion" => learned_residual_fusion::run(receipts_root),
         "learned-stateful-parse" => learned_stateful_parse::run(receipts_root),
+        "learned-iterative-reprice" => learned_iterative_reprice::run(receipts_root),
         "learned-exp2-transfer" => learned_exp2_transfer::run(receipts_root),
         "learned-residual-codec" => learned_residual_codec::run(receipts_root),
         "learned-residual-codec2" => learned_residual_codec2::run(receipts_root),

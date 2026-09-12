@@ -34,6 +34,7 @@ pub mod object;
 pub mod polezero;
 pub mod profile;
 pub mod quantize;
+pub mod reprice;
 pub mod residual_codec;
 pub mod residual_codec2;
 pub mod reverse;

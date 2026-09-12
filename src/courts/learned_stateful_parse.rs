@@ -53,14 +53,14 @@ pub const LEARNED_STATEFUL_PARSE_SHA256: &str =
     "fe903ac63f40482bb620cdcffcb826f22c52a770ac70f4bd5e32185b111b6854";
 
 /// Synthetic boundary grid (frames, coarsest first).
-const SYNTH_GRID: [usize; 2] = [512, 256];
+pub(crate) const SYNTH_GRID: [usize; 2] = [512, 256];
 /// Real/intrinsic boundary grid. Chosen coarse enough that the node count stays
 /// small (and the per-region fitting budget bounded) on full-length clips.
-const FIT_GRID: [usize; 2] = [4096, 2048];
+pub(crate) const FIT_GRID: [usize; 2] = [4096, 2048];
 /// Beam widths measured against exhaustive enumeration.
 const SYNTH_BEAMS: [usize; 5] = [1, 2, 4, 8, 16];
 /// Production beam width for the fitted surfaces.
-const FIT_BEAM: usize = 8;
+pub(crate) const FIT_BEAM: usize = 8;
 
 fn bytes(o: &LearnedObject) -> Option<u64> {
     LearnedCost::of(o).ok().map(|c| c.complete_bytes)
@@ -111,7 +111,7 @@ fn fixed_model(order: u8) -> LearnedModel {
     })
 }
 
-fn synthetic_bank() -> Vec<LearnedModel> {
+pub(crate) fn synthetic_bank() -> Vec<LearnedModel> {
     vec![
         fixed_model(1),
         fixed_model(2),
@@ -124,7 +124,7 @@ fn synthetic_bank() -> Vec<LearnedModel> {
 }
 
 /// The frozen synthetic fixtures: regime sequences that force tuple reuse.
-fn synthetic_fixtures() -> Vec<(&'static str, Vec<i32>)> {
+pub(crate) fn synthetic_fixtures() -> Vec<(&'static str, Vec<i32>)> {
     let mut out = Vec::new();
     {
         let mut s = Vec::new();
@@ -173,7 +173,7 @@ struct MechRun {
 }
 
 /// Build the `StatefulSyntax` object for a chosen parse.
-fn build_stateful(
+pub(crate) fn build_stateful(
     source: &[i32],
     frames: usize,
     rate: u32,
