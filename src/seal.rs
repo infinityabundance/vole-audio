@@ -40,7 +40,7 @@
 //!   compile surface (Phase I evidence = hardware-unavailable runtime row +
 //!   a clean, bound amdgcn build — the build is not optional).
 
-use crate::error::{Error, Kind, Result};
+use crate::error::{Error, Result};
 use crate::evidence::receipt::ReceiptEnvelope;
 use serde_json::Value;
 use std::path::Path;
@@ -149,33 +149,42 @@ pub struct Row {
 
 fn newest_receipt(root: &Path, court: &str) -> Result<Option<(std::path::PathBuf, Value)>> {
     let dir = root.join(court);
-    let mut best: Option<(std::path::PathBuf, String)> = None; // (path, name)
     let entries = match std::fs::read_dir(&dir) {
         Ok(e) => e,
         Err(_) => return Ok(None),
     };
+    let prefix = format!("{court}-");
+    // Select by the receipt's recorded creation time, not by filename order: a
+    // filename sort silently depends on the run-id format and mis-orders across
+    // changes to it (and across clocks). Ties break lexicographically on name.
+    let mut best: Option<(std::path::PathBuf, String, i64, Value)> = None;
     for e in entries.flatten() {
         let name = e.file_name().to_string_lossy().into_owned();
-        if !name.starts_with(&format!("{court}-")) || !name.ends_with(".json") {
+        if !name.starts_with(&prefix) || !name.ends_with(".json") {
             continue;
         }
-        match &best {
-            None => best = Some((e.path(), name.clone())),
-            Some((_, bn)) if name > *bn => best = Some((e.path(), name)),
-            _ => {}
+        let Ok(bytes) = std::fs::read(e.path()) else {
+            continue;
+        };
+        let Ok(env) = ReceiptEnvelope::from_json_bytes(&bytes) else {
+            continue;
+        };
+        let Ok(value) = serde_json::to_value(env.receipt) else {
+            continue;
+        };
+        let created = value
+            .get("created_unix_ms")
+            .and_then(Value::as_i64)
+            .unwrap_or(i64::MIN);
+        let better = match &best {
+            None => true,
+            Some((_, bn, bt, _)) => created > *bt || (created == *bt && name > *bn),
+        };
+        if better {
+            best = Some((e.path(), name, created, value));
         }
     }
-    match best {
-        Some((path, _)) => {
-            let bytes = std::fs::read(&path)
-                .map_err(|e| Error::new(Kind::Io, format!("read {}: {e}", path.display())))?;
-            let env: ReceiptEnvelope = ReceiptEnvelope::from_json_bytes(&bytes)?;
-            let value = serde_json::to_value(env.receipt)
-                .map_err(|e| Error::new(Kind::Io, format!("serialize {}: {e}", path.display())))?;
-            Ok(Some((path, value)))
-        }
-        None => Ok(None),
-    }
+    Ok(best.map(|(path, _, _, value)| (path, value)))
 }
 
 /// Verify a seal over the newest receipts in `root` against `expectations`.
