@@ -120,6 +120,8 @@ pub mod learned_residual_entropy;
 #[cfg(feature = "std")]
 pub mod learned_residual_fusion;
 #[cfg(feature = "std")]
+pub mod learned_rle_aware_channel;
+#[cfg(feature = "std")]
 pub mod learned_shared;
 #[cfg(feature = "std")]
 pub mod learned_speech;
@@ -434,6 +436,16 @@ over integer-scaled fixtures and the real speech effectiveness residuals; every 
 round-trips exactly; held-out Mode C untouched",
     ),
     (
+        "learned-rle-aware-channel",
+        "Phase 6 mechanism 8 (`RleAwareChannelTransform`): extends the reversible stereo channel
+ladder with left/right difference lifting and orders it by downstream run/zero topology (zero
+density, zero runs, longest zero run, equal neighbours) rather than residual variance; topology
+only proposes and orders, while the exact canonical bytes of every fully fitted transform decide
+the winner; the court reports each transform's topology, variance and measured bytes per stereo
+fixture and compares the topology selector with a minimum-variance selector against the byte
+winner; every transform closes exactly; held-out Mode C untouched",
+    ),
+    (
         "learned-speech-trace",
         "Seal S0 diagnostic: bit-for-bit trace of the frozen B1 FLAC-5 artifact (subframe kinds, orders, precision, shift, partition order, residual payload) beside the wired three-family Exp2 VOLE byte waterfall, on the real + Mode-C corpus",
     ),
@@ -629,6 +641,7 @@ pub fn run(name: &str, receipts_root: &Path) -> crate::error::Result<Verdict> {
         "learned-ema-rans" => learned_ema_rans::run(receipts_root),
         "learned-decision-trace" => learned_decision_trace::run(receipts_root),
         "learned-valuation-split" => learned_valuation_split::run(receipts_root),
+        "learned-rle-aware-channel" => learned_rle_aware_channel::run(receipts_root),
         "learned-exp2-transfer" => learned_exp2_transfer::run(receipts_root),
         "learned-residual-codec" => learned_residual_codec::run(receipts_root),
         "learned-residual-codec2" => learned_residual_codec2::run(receipts_root),

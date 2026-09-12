@@ -2,11 +2,19 @@
 //!
 //! Tries each reversible channel transform and fits one mono sparse predictor
 //! per transformed component. Only the measured canonical winner is returned.
+//!
+//! Phase 6's `RleAwareChannelTransform` orders the stereo ladder by the
+//! downstream run/zero topology of the transformed components (zero density,
+//! zero runs, longest zero run, equal neighbours) rather than by residual
+//! variance. Topology only proposes and orders; the exact canonical bytes of
+//! each fully fitted candidate still decide the winner.
 
 use crate::error::{Error, Result};
 use crate::evidence::timing::Stopwatch;
 use crate::learned::model::LearnedModel;
-use crate::learned::multichannel::{MultichannelPredictor, TRANSFORM_MID_SIDE, TRANSFORM_NONE};
+use crate::learned::multichannel::{
+    MultichannelPredictor, STEREO_TRANSFORMS, TRANSFORM_NONE, channel_topology, transform_frame,
+};
 use crate::learned::object::LearnedObject;
 use crate::learned::sparse::SparseLinearPredictor;
 use crate::learned::train::sparse::fit_sparse_object;
@@ -33,25 +41,106 @@ fn split(interleaved: &[i32], channels: u8, frames: usize, transform: u8) -> Vec
     let c = usize::from(channels);
     let mut comps = vec![vec![0i32; frames]; c];
     for t in 0..frames {
-        match transform {
-            TRANSFORM_MID_SIDE => {
-                let l = interleaved[t * c];
-                let r = interleaved[t * c + 1];
-                let s = r.wrapping_sub(l);
-                comps[0][t] = l.wrapping_add(s >> 1);
-                comps[1][t] = s;
-            }
-            _ => {
-                for cc in 0..c {
-                    comps[cc][t] = interleaved[t * c + cc];
-                }
+        if c == 2 {
+            let mut frame = [0i32; 2];
+            let mut out = [0i32; 2];
+            frame[0] = interleaved[t * c];
+            frame[1] = interleaved[t * c + 1];
+            transform_frame(transform, &frame, &mut out);
+            comps[0][t] = out[0];
+            comps[1][t] = out[1];
+        } else {
+            for cc in 0..c {
+                comps[cc][t] = interleaved[t * c + cc];
             }
         }
     }
     comps
 }
 
-/// Fit a multichannel object, choosing the cheapest reversible transform.
+/// The transform ladder for a channel count, in canonical tie order.
+fn transform_ladder(channels: u8) -> Vec<u8> {
+    if channels == 2 {
+        STEREO_TRANSFORMS.to_vec()
+    } else {
+        vec![TRANSFORM_NONE]
+    }
+}
+
+/// Order the transform ladder by downstream run/zero degeneracy (descending
+/// score, ties by ascending id). Falls back to canonical order when topology
+/// cannot be measured.
+fn topology_ranked_ladder(interleaved: &[i32], channels: u8, frames: usize) -> Vec<u8> {
+    let mut ranked: Vec<(u64, u8)> = transform_ladder(channels)
+        .into_iter()
+        .map(|tf| {
+            let score = channel_topology(interleaved, channels, frames, tf)
+                .map(|t| t.rle_score())
+                .unwrap_or(0);
+            (score, tf)
+        })
+        .collect();
+    ranked.sort_by(|a, b| b.0.cmp(&a.0).then(a.1.cmp(&b.1)));
+    ranked.into_iter().map(|(_, tf)| tf).collect()
+}
+
+/// Fit, close and measure one reversible transform. `None` when the transform
+/// cannot produce a verified exact object.
+pub fn measure_multichannel_transform(
+    interleaved: &[i32],
+    channels: u8,
+    frames: u64,
+    sample_rate_hz: u32,
+    transform: u8,
+    budget: &TrainBudget,
+) -> Result<Option<(MultichannelPredictor, u64)>> {
+    let c = usize::from(channels);
+    if c == 0 || interleaved.len() != frames as usize * c {
+        return Err(Error::malformed("multichannel fit geometry mismatch"));
+    }
+    // Component fits use a smaller refinement budget: the encoder's global
+    // search is bounded, and per-component optimizer passes are the dominant
+    // cost.
+    let mut component_budget = *budget;
+    component_budget.max_iterations = component_budget.max_iterations.min(32);
+    let comps = split(interleaved, channels, frames as usize, transform);
+    let mut predictors = Vec::with_capacity(c);
+    for comp in &comps {
+        match fit_component(comp, frames, sample_rate_hz, &component_budget) {
+            Ok((p, _)) => predictors.push(p),
+            Err(_) => return Ok(None),
+        }
+    }
+    let m = MultichannelPredictor {
+        channels,
+        transform,
+        predictors,
+    };
+    if m.validate().is_err() {
+        return Ok(None);
+    }
+    let o = match LearnedObject::from_intrinsic_exp2(
+        LearnedModel::Multichannel(m.clone()),
+        channels,
+        frames,
+        sample_rate_hz,
+        Vec::new(),
+        interleaved,
+    ) {
+        Ok(o) => o,
+        Err(_) => return Ok(None),
+    };
+    if !o.verify(interleaved) {
+        return Ok(None);
+    }
+    let bytes = crate::learned::accounting::LearnedCost::of(&o)
+        .map(|c| c.complete_bytes)
+        .unwrap_or(u64::MAX);
+    Ok(Some((m, bytes)))
+}
+
+/// Fit a multichannel object, choosing the cheapest reversible transform from
+/// the topology-ordered ladder.
 pub fn fit_multichannel_object(
     interleaved: &[i32],
     channels: u8,
@@ -66,67 +155,29 @@ pub fn fit_multichannel_object(
     if c == 0 || interleaved.len() != frames as usize * c {
         return Err(Error::malformed("multichannel fit geometry mismatch"));
     }
-    let mut transforms = vec![TRANSFORM_NONE];
-    if c == 2 {
-        transforms.push(TRANSFORM_MID_SIDE);
-    }
-    // Component fits use a smaller refinement budget: the encoder's global
-    // search is bounded, and per-component optimizer passes are the dominant
-    // cost.
-    let mut component_budget = *budget;
-    component_budget.max_iterations = component_budget.max_iterations.min(32);
+    let ladder = topology_ranked_ladder(interleaved, channels, frames as usize);
     let mut best: Option<(MultichannelPredictor, u64)> = None;
-    for transform in transforms {
+    for transform in ladder {
         stats.candidates += 1;
-        let comps = split(interleaved, channels, frames as usize, transform);
-        let mut predictors = Vec::with_capacity(c);
-        let mut ok = true;
-        for comp in &comps {
-            match fit_component(comp, frames, sample_rate_hz, &component_budget) {
-                Ok((p, st)) => {
-                    stats.merge(&st);
-                    predictors.push(p);
-                }
-                Err(_) => {
-                    ok = false;
-                    break;
-                }
-            }
-        }
-        if !ok {
-            continue;
-        }
-        let m = MultichannelPredictor {
-            channels,
-            transform,
-            predictors,
-        };
-        if m.validate().is_err() {
-            continue;
-        }
-        let o = match LearnedObject::from_intrinsic_exp2(
-            LearnedModel::Multichannel(m.clone()),
+        match measure_multichannel_transform(
+            interleaved,
             channels,
             frames,
             sample_rate_hz,
-            Vec::new(),
-            interleaved,
+            transform,
+            budget,
         ) {
-            Ok(o) => o,
+            Ok(Some((m, bytes))) => {
+                if best.as_ref().is_none_or(|(_, bb)| bytes < *bb) {
+                    best = Some((m, bytes));
+                }
+            }
+            Ok(None) => {
+                stats.rejected += 1;
+            }
             Err(_) => {
                 stats.rejected += 1;
-                continue;
             }
-        };
-        if !o.verify(interleaved) {
-            stats.rejected += 1;
-            continue;
-        }
-        let bytes = crate::learned::accounting::LearnedCost::of(&o)
-            .map(|c| c.complete_bytes)
-            .unwrap_or(u64::MAX);
-        if best.as_ref().is_none_or(|(_, bb)| bytes < *bb) {
-            best = Some((m, bytes));
         }
     }
     let (model, _) =

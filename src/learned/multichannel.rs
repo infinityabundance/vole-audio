@@ -26,6 +26,151 @@ use crate::learned::sparse::SparseLinearPredictor;
 pub const TRANSFORM_NONE: u8 = 0;
 /// Stereo reversible mid/side lifting: `S = R - L`, `M = L + (S >> 1)`.
 pub const TRANSFORM_MID_SIDE: u8 = 1;
+/// Stereo left/difference lifting: `(L, R - L)`.
+pub const TRANSFORM_LEFT_DIFF: u8 = 2;
+/// Stereo right/difference lifting: `(R, L - R)`.
+pub const TRANSFORM_RIGHT_DIFF: u8 = 3;
+
+/// The frozen reversible two-channel transform ladder, in canonical tie order.
+pub const STEREO_TRANSFORMS: [u8; 4] = [
+    TRANSFORM_NONE,
+    TRANSFORM_MID_SIDE,
+    TRANSFORM_LEFT_DIFF,
+    TRANSFORM_RIGHT_DIFF,
+];
+
+/// Downstream run/zero topology of a reversible channel transform.
+///
+/// `RleAwareChannelTransform` proposes transforms by the degeneracy of their
+/// component streams — zero density, zero runs, the longest zero run and equal
+/// neighbour pairs — rather than by residual variance. The measured complete
+/// bytes still decide; this only orders and explains the proposal.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ChannelTopology {
+    /// Component samples that are exactly zero.
+    pub zeros: u64,
+    /// Maximal runs of zeros across all components.
+    pub zero_runs: u64,
+    /// Longest zero run across all components.
+    pub longest_zero_run: u64,
+    /// Adjacent equal component samples (`x[t] == x[t-1]`).
+    pub equal_pairs: u64,
+}
+
+impl ChannelTopology {
+    /// A deterministic degeneracy score (larger is more run-length friendly).
+    pub const fn rle_score(self) -> u64 {
+        self.zero_runs
+            .saturating_mul(8)
+            .saturating_add(self.zeros.saturating_mul(4))
+            .saturating_add(self.longest_zero_run.saturating_mul(16))
+            .saturating_add(self.equal_pairs)
+    }
+}
+
+/// Forward reversible transform of one interleaved frame.
+pub fn transform_frame(transform: u8, frame: &[i32], out: &mut [i32]) {
+    match transform {
+        TRANSFORM_MID_SIDE => {
+            let l = frame[0];
+            let s = frame[1].wrapping_sub(l);
+            out[0] = l.wrapping_add(s >> 1);
+            out[1] = s;
+        }
+        TRANSFORM_LEFT_DIFF => {
+            let l = frame[0];
+            out[0] = l;
+            out[1] = frame[1].wrapping_sub(l);
+        }
+        TRANSFORM_RIGHT_DIFF => {
+            let r = frame[1];
+            out[0] = r;
+            out[1] = frame[0].wrapping_sub(r);
+        }
+        _ => out.copy_from_slice(frame),
+    }
+}
+
+/// Inverse reversible transform of one component frame.
+pub fn inverse_transform_frame(transform: u8, comp: &[i32], out: &mut [i32]) {
+    match transform {
+        TRANSFORM_MID_SIDE => {
+            let l = comp[0].wrapping_sub(comp[1] >> 1);
+            out[0] = l;
+            out[1] = l.wrapping_add(comp[1]);
+        }
+        TRANSFORM_LEFT_DIFF => {
+            let l = comp[0];
+            out[0] = l;
+            out[1] = l.wrapping_add(comp[1]);
+        }
+        TRANSFORM_RIGHT_DIFF => {
+            let r = comp[0];
+            out[0] = r.wrapping_add(comp[1]);
+            out[1] = r;
+        }
+        _ => out.copy_from_slice(comp),
+    }
+}
+
+/// Measure the downstream run/zero topology of `transform` on an interleaved
+/// multichannel signal, without materializing the transformed signal.
+pub fn channel_topology(
+    interleaved: &[i32],
+    channels: u8,
+    frames: usize,
+    transform: u8,
+) -> Result<ChannelTopology> {
+    let c = usize::from(channels);
+    if c == 0 || interleaved.len() != frames * c {
+        return Err(Error::malformed("channel topology geometry mismatch"));
+    }
+    if transform != TRANSFORM_NONE && c != 2 {
+        return Err(Error::malformed(
+            "channel topology stereo transform requires two channels",
+        ));
+    }
+    if transform > TRANSFORM_RIGHT_DIFF {
+        return Err(Error::malformed("channel topology transform out of range"));
+    }
+    let mut topo = ChannelTopology {
+        zeros: 0,
+        zero_runs: 0,
+        longest_zero_run: 0,
+        equal_pairs: 0,
+    };
+    let mut in_zero = vec![false; c];
+    let mut run_len = vec![0u64; c];
+    let mut prev = vec![0i32; c];
+    let mut seen = vec![false; c];
+    let mut frame = vec![0i32; c];
+    for t in 0..frames {
+        transform_frame(transform, &interleaved[t * c..t * c + c], &mut frame);
+        for cc in 0..c {
+            let v = frame[cc];
+            if v == 0 {
+                topo.zeros += 1;
+                if in_zero[cc] {
+                    run_len[cc] += 1;
+                } else {
+                    in_zero[cc] = true;
+                    run_len[cc] = 1;
+                    topo.zero_runs += 1;
+                }
+                topo.longest_zero_run = topo.longest_zero_run.max(run_len[cc]);
+            } else {
+                in_zero[cc] = false;
+                run_len[cc] = 0;
+            }
+            if seen[cc] && v == prev[cc] {
+                topo.equal_pairs += 1;
+            }
+            prev[cc] = v;
+            seen[cc] = true;
+        }
+    }
+    Ok(topo)
+}
 
 /// Decoder work state: component history, component predictions, channel
 /// hypothesis, reconstructed frame, and the forward-transformed frame.
@@ -64,10 +209,10 @@ impl MultichannelPredictor {
         }
         match self.transform {
             TRANSFORM_NONE => {}
-            TRANSFORM_MID_SIDE => {
+            TRANSFORM_MID_SIDE | TRANSFORM_LEFT_DIFF | TRANSFORM_RIGHT_DIFF => {
                 if c != 2 {
                     return Err(Error::malformed(
-                        "mid/side transform requires exactly two channels",
+                        "stereo channel transform requires exactly two channels",
                     ));
                 }
             }
@@ -107,30 +252,12 @@ impl MultichannelPredictor {
 
     /// Forward reversible transform of one frame.
     fn forward_frame(&self, frame: &[i32], out: &mut [i32]) {
-        match self.transform {
-            TRANSFORM_MID_SIDE => {
-                let l = frame[0];
-                let r = frame[1];
-                let s = r.wrapping_sub(l);
-                out[0] = l.wrapping_add(s >> 1);
-                out[1] = s;
-            }
-            _ => out.copy_from_slice(frame),
-        }
+        transform_frame(self.transform, frame, out);
     }
 
     /// Inverse reversible transform of one frame.
     fn inverse_frame(&self, comp: &[i32], out: &mut [i32]) {
-        match self.transform {
-            TRANSFORM_MID_SIDE => {
-                let m = comp[0];
-                let s = comp[1];
-                let l = m.wrapping_sub(s >> 1);
-                out[0] = l;
-                out[1] = l.wrapping_add(s);
-            }
-            _ => out.copy_from_slice(comp),
-        }
+        inverse_transform_frame(self.transform, comp, out);
     }
 
     fn max_lag(&self) -> usize {
@@ -325,28 +452,30 @@ mod tests {
     }
 
     #[test]
-    fn mid_side_lifting_is_exactly_reversible_over_the_full_i32_domain() {
-        let m = model(TRANSFORM_MID_SIDE);
-        for (l, r) in [
-            (i32::MIN, i32::MAX),
-            (i32::MAX, i32::MIN),
-            (0, 0),
-            (-1, 1),
-            (123456789, -987654321),
-        ] {
-            let frame = [l, r];
-            let mut comp = [0i32; 2];
-            let mut back = [0i32; 2];
-            m.forward_frame(&frame, &mut comp);
-            m.inverse_frame(&comp, &mut back);
-            assert_eq!(back, frame);
+    fn stereo_lifting_is_exactly_reversible_over_the_full_i32_domain() {
+        for transform in STEREO_TRANSFORMS {
+            let m = model(transform);
+            for (l, r) in [
+                (i32::MIN, i32::MAX),
+                (i32::MAX, i32::MIN),
+                (0, 0),
+                (-1, 1),
+                (123456789, -987654321),
+            ] {
+                let frame = [l, r];
+                let mut comp = [0i32; 2];
+                let mut back = [0i32; 2];
+                m.forward_frame(&frame, &mut comp);
+                m.inverse_frame(&comp, &mut back);
+                assert_eq!(back, frame, "transform {transform}");
+            }
         }
     }
 
     #[test]
-    fn multichannel_objects_close_exactly_for_both_transforms() {
+    fn multichannel_objects_close_exactly_for_every_stereo_transform() {
         let source = stereo_source();
-        for transform in [TRANSFORM_NONE, TRANSFORM_MID_SIDE] {
+        for transform in STEREO_TRANSFORMS {
             let m = model(transform);
             let o = LearnedObject::from_intrinsic_exp2(
                 LearnedModel::Multichannel(m),
@@ -364,11 +493,40 @@ mod tests {
 
     #[test]
     fn canonical_round_trip_is_exact() {
-        for transform in [TRANSFORM_NONE, TRANSFORM_MID_SIDE] {
+        for transform in STEREO_TRANSFORMS {
             let m = model(transform);
             let b = m.canonical_bytes();
             let back = MultichannelPredictor::from_canonical_bytes(&b).unwrap();
             assert_eq!(back, m);
+        }
+    }
+
+    #[test]
+    fn topology_rewards_the_transform_that_creates_zeros() {
+        // R equals L except for sparse events: `R - L` is a long zero run, so
+        // the difference transforms must out-score `NONE` on zero topology.
+        let mut source = Vec::new();
+        for t in 0..4096i64 {
+            let l = ((t * 89) % 15013) as i32 - 7000;
+            let r = if t % 512 == 7 { l + 1000 } else { l };
+            source.push(l);
+            source.push(r);
+        }
+        let none = channel_topology(&source, 2, 4096, TRANSFORM_NONE).unwrap();
+        assert_eq!(none.zeros, 0);
+        for transform in [
+            TRANSFORM_MID_SIDE,
+            TRANSFORM_LEFT_DIFF,
+            TRANSFORM_RIGHT_DIFF,
+        ] {
+            let topo = channel_topology(&source, 2, 4096, transform).unwrap();
+            assert!(topo.zeros > 0, "transform {transform}");
+            assert!(
+                topo.rle_score() > none.rle_score(),
+                "transform {transform}: {} vs {}",
+                topo.rle_score(),
+                none.rle_score()
+            );
         }
     }
 }
