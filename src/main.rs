@@ -387,6 +387,7 @@ fn cmd_seal_verify(args: &[String]) -> Result<u8> {
                        envelope-flattened-tns=SUPPORTED,\
                        centroid-sq=SUPPORTED,\
                        pivot-side-streams=SUPPORTED,\
+                       learned-param-delta=SUPPORTED,\
                        compound=SUPPORTED,\
                        cuda=SUPPORTED,d1=SUPPORTED,h2=SUPPORTED,\
                        rocm=UNSUPPORTED_BY_HARDWARE|UNSUPPORTED_BY_API|INCONCLUSIVE,\

@@ -35,6 +35,7 @@ pub mod multichannel;
 pub mod mux;
 pub mod ngsa;
 pub mod object;
+pub mod param_delta;
 pub mod polezero;
 pub mod profile;
 pub mod quantize;

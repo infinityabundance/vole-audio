@@ -108,6 +108,8 @@ pub mod learned_linear;
 #[cfg(feature = "std")]
 pub mod learned_ngsa;
 #[cfg(feature = "std")]
+pub mod learned_param_delta;
+#[cfg(feature = "std")]
 pub mod learned_quantization;
 #[cfg(feature = "std")]
 pub mod learned_random_access;
@@ -527,6 +529,16 @@ layouts carry the same code bits and no ISA width, so this is a throughput mecha
 ratio claim",
     ),
     (
+        "learned-param-delta",
+        "Phase 2A mechanism 1: cross-block differential predictor-parameter coding (first coefficient
+vector absolute, later vectors per-position signed deltas) measured against independent and raw-i16
+parameter storage on real per-block LPC fits, plus the ALS progressive-order restart rule tested
+directly; because VOLE predictors reset with a zero-initialized closed-loop history, progressive
+order is exactly full order and the court asserts that rather than assuming it; the court also
+reports that the mechanism's premise — model overhead dominating — is measurably false for the
+current winners, whose model bytes are 0.15–0.4% of the object",
+    ),
+    (
         "learned-speech-trace",
         "Seal S0 diagnostic: bit-for-bit trace of the frozen B1 FLAC-5 artifact (subframe kinds, orders, precision, shift, partition order, residual payload) beside the wired three-family Exp2 VOLE byte waterfall, on the real + Mode-C corpus",
     ),
@@ -730,6 +742,7 @@ pub fn run(name: &str, receipts_root: &Path) -> crate::error::Result<Verdict> {
         "envelope-flattened-tns" => envelope_flattened_tns::run(receipts_root),
         "centroid-sq" => centroid_sq::run(receipts_root),
         "pivot-side-streams" => pivot_side_streams::run(receipts_root),
+        "learned-param-delta" => learned_param_delta::run(receipts_root),
         "learned-exp2-transfer" => learned_exp2_transfer::run(receipts_root),
         "learned-residual-codec" => learned_residual_codec::run(receipts_root),
         "learned-residual-codec2" => learned_residual_codec2::run(receipts_root),
