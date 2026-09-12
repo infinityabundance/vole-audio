@@ -268,7 +268,15 @@ pub struct ReceiptBuilder {
 
 impl ReceiptBuilder {
     pub fn new(court: &str) -> Self {
-        let now_ms = crate::evidence::timing::monotonic_raw_ns() / 1_000_000;
+        // Wall-clock Unix milliseconds. This must be comparable across boots:
+        // a boot-relative monotonic clock resets on reboot, which would let an
+        // older receipt outrank a newer one in the "newest per court" seal
+        // selection. Wall clock is the correct ordering key here; fine-grained
+        // durations elsewhere continue to use the monotonic clock.
+        let now_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() as i64)
+            .unwrap_or(0);
         let run_id = format!("{}-{}-{:04x}", court, now_ms, std::process::id() as u32);
         Self {
             court: court.to_string(),
