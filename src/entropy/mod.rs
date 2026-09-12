@@ -60,6 +60,8 @@ pub mod hostile;
 #[cfg(feature = "std")]
 pub mod page_batch;
 #[cfg(feature = "std")]
+pub mod pivot;
+#[cfg(feature = "std")]
 pub mod recoil;
 #[cfg(feature = "std")]
 pub mod represent;

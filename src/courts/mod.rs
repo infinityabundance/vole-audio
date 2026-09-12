@@ -154,6 +154,8 @@ pub mod page_batch_simd;
 #[cfg(feature = "std")]
 pub mod phase_n;
 #[cfg(feature = "std")]
+pub mod pivot_side_streams;
+#[cfg(feature = "std")]
 pub mod random_access;
 #[cfg(feature = "std")]
 pub mod recoil;
@@ -515,6 +517,16 @@ corpus's spectra; a profile-defined reconstruction rule with no extra bits and n
 claim",
     ),
     (
+        "pivot-side-streams",
+        "Phase 6 mechanism 15 (`PivotSideStreams`): a canonical Huffman side-stream code stored in a
+level-transposed (PivCo-style) layout — all first bits, then all still-active symbols' second bits —
+so each tree level is a flat partition pass instead of a serial pointer chase; the court builds side
+streams from the frozen fixtures, encodes each in both the serial and transposed layouts and
+requires both decoders to recover the stream exactly, reporting sizes, alphabet and code depth; the
+layouts carry the same code bits and no ISA width, so this is a throughput mechanism with no
+ratio claim",
+    ),
+    (
         "learned-speech-trace",
         "Seal S0 diagnostic: bit-for-bit trace of the frozen B1 FLAC-5 artifact (subframe kinds, orders, precision, shift, partition order, residual payload) beside the wired three-family Exp2 VOLE byte waterfall, on the real + Mode-C corpus",
     ),
@@ -717,6 +729,7 @@ pub fn run(name: &str, receipts_root: &Path) -> crate::error::Result<Verdict> {
         "page-batch-simd" => page_batch_simd::run(receipts_root),
         "envelope-flattened-tns" => envelope_flattened_tns::run(receipts_root),
         "centroid-sq" => centroid_sq::run(receipts_root),
+        "pivot-side-streams" => pivot_side_streams::run(receipts_root),
         "learned-exp2-transfer" => learned_exp2_transfer::run(receipts_root),
         "learned-residual-codec" => learned_residual_codec::run(receipts_root),
         "learned-residual-codec2" => learned_residual_codec2::run(receipts_root),
