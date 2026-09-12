@@ -119,6 +119,10 @@ pub enum ResidualCodecV2 {
     /// a function of the already-decoded symbol history (Phase 6 mechanism 6,
     /// `DecisionTraceRans`). No probability table is transmitted.
     DecisionTrace = 26,
+    /// Per-symbol trailing-zero valuation split: `|r| = odd * 2^e`, so the
+    /// exponent and odd-core streams are coded separately instead of one shared
+    /// block factor (Phase 6 mechanism 7, `ValuationSplit`).
+    ValuationSplit = 27,
 }
 
 impl ResidualCodecV2 {
@@ -158,8 +162,8 @@ impl ResidualCodecV2 {
         ResidualCodecV2::ContextRans,
     ];
 
-    /// The Exp3 additions (Seal S4, E1..E5, C0..C2, P6-3, P6-5, P6-6), in canonical tie order.
-    pub const ALL_V3: [ResidualCodecV2; 27] = [
+    /// The Exp3 additions (Seal S4, E1..E5, C0..C2, P6-3, P6-5, P6-6, P6-7), in canonical tie order.
+    pub const ALL_V3: [ResidualCodecV2; 28] = [
         ResidualCodecV2::DenseI32,
         ResidualCodecV2::SparseDelta,
         ResidualCodecV2::ZigZagVarint,
@@ -187,6 +191,7 @@ impl ResidualCodecV2 {
         ResidualCodecV2::Reblock,
         ResidualCodecV2::EmaRans,
         ResidualCodecV2::DecisionTrace,
+        ResidualCodecV2::ValuationSplit,
     ];
 
     /// Canonical codec identifier byte.
@@ -224,6 +229,7 @@ impl ResidualCodecV2 {
             ResidualCodecV2::Reblock => "reblock",
             ResidualCodecV2::EmaRans => "ema_rans",
             ResidualCodecV2::DecisionTrace => "decision_trace",
+            ResidualCodecV2::ValuationSplit => "valuation_split",
         }
     }
 
@@ -257,6 +263,7 @@ impl ResidualCodecV2 {
             24 => Some(ResidualCodecV2::Reblock),
             25 => Some(ResidualCodecV2::EmaRans),
             26 => Some(ResidualCodecV2::DecisionTrace),
+            27 => Some(ResidualCodecV2::ValuationSplit),
             _ => None,
         }
     }
@@ -321,6 +328,7 @@ impl ResidualCodecV2 {
             ResidualCodecV2::Reblock => encode_reblock(residual),
             ResidualCodecV2::EmaRans => encode_ema_rans(residual),
             ResidualCodecV2::DecisionTrace => encode_decision_trace(residual),
+            ResidualCodecV2::ValuationSplit => encode_valuation_split(residual),
         }
     }
 
@@ -359,6 +367,7 @@ impl ResidualCodecV2 {
             ResidualCodecV2::Reblock => decode_reblock(bytes, len),
             ResidualCodecV2::EmaRans => decode_ema_rans(bytes, len),
             ResidualCodecV2::DecisionTrace => decode_decision_trace(bytes, len),
+            ResidualCodecV2::ValuationSplit => decode_valuation_split(bytes, len),
         }
     }
 }
@@ -1853,6 +1862,186 @@ where
 
 fn decode_decision_trace(bytes: &[u8], len: usize) -> Result<Vec<i32>> {
     decode_trace_with(DT_CONTEXTS, dt_context, bytes, len)
+}
+
+// ---------------------------------------------------------------------------
+// id 27: ValuationSplit (Phase 6 mechanism 7, `ValuationSplit`)
+// ---------------------------------------------------------------------------
+//
+// Every nonzero magnitude factors uniquely as `|r| = odd * 2^e` with `odd` odd.
+// `FactorShift` (id 14) strips **one** common factor from the whole block, which
+// is wasted whenever a single odd sample is present. `ValuationSplit` instead
+// writes one valuation per symbol and factors the source into four streams:
+//
+// * the gaps between nonzeros (Exp-Golomb, or absent in the dense mode),
+// * the sign of each nonzero (one raw bit),
+// * the valuations `e` (the best Exp2 coder, or absent when all are zero),
+// * the odd cores `(odd - 1) / 2` (the best Exp2 coder).
+//
+// Delegating each substantive stream to the existing Exp2 family (exactly as
+// `FactorShift` delegates its quotient stream) keeps the mechanism honest: the
+// split is judged on the factorization, not on a weak inner coder. Digital
+// silence costs a zero gap stream; ordinary 16-bit residuals cost one sign bit
+// and a skipped all-zero valuation stream, so the coder degenerates toward a
+// plain magnitude coder rather than expanding; integer-scaled, synthesized or
+// DSP-produced residual material can spend most of its bits on the odd cores
+// while the valuations stay nearly free.
+
+fn encode_valuation_split(residual: &[i32]) -> Vec<u8> {
+    let n = residual.len();
+    let mut gaps: Vec<u64> = Vec::new();
+    let mut signs: Vec<bool> = Vec::new();
+    let mut exps: Vec<i32> = Vec::new();
+    let mut odds: Vec<i32> = Vec::new();
+    let mut run: u64 = 0;
+    for &r in residual {
+        let m = u64::from(r.unsigned_abs());
+        if m == 0 {
+            run += 1;
+            continue;
+        }
+        gaps.push(run);
+        run = 0;
+        signs.push(r < 0);
+        let e = m.trailing_zeros();
+        exps.push(e as i32);
+        odds.push(((m >> e) >> 1) as i32);
+    }
+    let nz = gaps.len();
+    // Dense residuals (no zeros) skip the gap stream entirely: paying one bit
+    // per sample merely to say "nonzero" would be pure overhead.
+    let zero_mode: u8 = if nz == n { 0 } else { 1 };
+    // When every nonzero magnitude is odd the valuation stream is identically
+    // zero and is skipped. Natural 16-bit residuals are overwhelmingly in this
+    // mode.
+    let exp_mode: u8 = if exps.iter().all(|&e| e == 0) { 0 } else { 1 };
+    let mut out = Vec::with_capacity(32 + n.div_ceil(8));
+    out.extend_from_slice(&(n as u64).to_le_bytes());
+    out.extend_from_slice(&(nz as u64).to_le_bytes());
+    out.push(zero_mode);
+    out.push(exp_mode);
+    if nz == 0 {
+        return out;
+    }
+    if zero_mode == 1 {
+        let mut w = BitWriter::new();
+        for &g in &gaps {
+            write_eg0(&mut w, g);
+        }
+        let gb = w.finish();
+        put_uvarint(&mut out, gb.len() as u64);
+        out.extend_from_slice(&gb);
+    }
+    let mut sign_bytes = vec![0u8; nz.div_ceil(8)];
+    for (i, &s) in signs.iter().enumerate() {
+        if s {
+            sign_bytes[i >> 3] |= 1 << (7 - (i & 7));
+        }
+    }
+    out.extend_from_slice(&sign_bytes);
+    if exp_mode == 1 {
+        let enc = encode_best_v2(&exps).bytes;
+        put_uvarint(&mut out, enc.len() as u64);
+        out.extend_from_slice(&enc);
+    }
+    let enc = encode_best_v2(&odds).bytes;
+    put_uvarint(&mut out, enc.len() as u64);
+    out.extend_from_slice(&enc);
+    out
+}
+
+fn decode_valuation_split(bytes: &[u8], len: usize) -> Result<Vec<i32>> {
+    let mut r = Reader::new(bytes);
+    let n = r.u64le()? as usize;
+    if n != len {
+        return Err(Error::malformed("valuation-split length mismatch"));
+    }
+    let nz = r.u64le()? as usize;
+    if nz > n {
+        return Err(Error::malformed(
+            "valuation-split nonzero count out of range",
+        ));
+    }
+    let zero_mode = r.u8()?;
+    if zero_mode > 1 {
+        return Err(Error::malformed("valuation-split zero mode out of range"));
+    }
+    if zero_mode == 0 && nz != n {
+        return Err(Error::malformed("valuation-split dense mode with zeros"));
+    }
+    let exp_mode = r.u8()?;
+    if exp_mode > 1 {
+        return Err(Error::malformed(
+            "valuation-split exponent mode out of range",
+        ));
+    }
+    if nz == 0 {
+        return Ok(vec![0i32; n]);
+    }
+    let gaps: Vec<u64> = if zero_mode == 1 {
+        let gl = r.uvarint()? as usize;
+        let gb = r.take(gl)?;
+        let mut br = BitReader::new(gb);
+        let mut g = Vec::with_capacity(nz);
+        for _ in 0..nz {
+            g.push(read_eg0(&mut br)?);
+        }
+        g
+    } else {
+        vec![0u64; nz]
+    };
+    let sign_bytes = r.take(nz.div_ceil(8))?;
+    let mut signs = Vec::with_capacity(nz);
+    for i in 0..nz {
+        signs.push((sign_bytes[i >> 3] >> (7 - (i & 7))) & 1 == 1);
+    }
+    let exps: Vec<i32> = if exp_mode == 1 {
+        let el = r.uvarint()? as usize;
+        let eb = r.take(el)?;
+        decode_encoding_v2(eb, nz)?.decode(nz)?
+    } else {
+        vec![0i32; nz]
+    };
+    let ol = r.uvarint()? as usize;
+    let ob = r.take(ol)?;
+    let odds = decode_encoding_v2(ob, nz)?.decode(nz)?;
+    let mut out = Vec::with_capacity(n);
+    for i in 0..nz {
+        let gap = gaps[i];
+        // `gap` zeros plus the nonzero itself must fit in the declared length.
+        if gap.saturating_add(1) > (n - out.len()) as u64 {
+            return Err(Error::malformed("valuation-split gap exceeds the length"));
+        }
+        out.resize(out.len() + gap as usize, 0);
+        let e = u32::try_from(exps[i])
+            .map_err(|_| Error::malformed("valuation-split exponent overflow"))?;
+        if e > 31 {
+            return Err(Error::malformed("valuation-split exponent out of range"));
+        }
+        let odd_core = u32::try_from(odds[i])
+            .map_err(|_| Error::malformed("valuation-split odd core is negative"))?;
+        let odd = (u128::from(odd_core) << 1) | 1;
+        let m = odd << e;
+        if m > (1u128 << 31) {
+            return Err(Error::malformed(
+                "valuation-split magnitude exceeds i32 range",
+            ));
+        }
+        let m = m as u64;
+        let neg = signs[i];
+        if m == (1u64 << 31) && !neg {
+            return Err(Error::malformed(
+                "valuation-split magnitude is not representable",
+            ));
+        }
+        let value = if neg { -(m as i64) } else { m as i64 };
+        out.push(value as i32);
+    }
+    // Trailing zeros after the last nonzero.
+    while out.len() < n {
+        out.push(0);
+    }
+    Ok(out)
 }
 
 // ---------------------------------------------------------------------------
@@ -4912,7 +5101,7 @@ mod tests {
         let c = ResidualCodecV2::Reblock;
         assert_eq!(c.name(), "reblock");
         assert_eq!(ResidualCodecV2::from_id(24), Some(c));
-        assert_eq!(ResidualCodecV2::ALL_V3.len(), 27);
+        assert_eq!(ResidualCodecV2::ALL_V3.len(), 28);
         for residual in sample_residuals() {
             let payload = c.encode(&residual);
             let back = c
@@ -4941,7 +5130,7 @@ mod tests {
         let c = ResidualCodecV2::EmaRans;
         assert_eq!(c.name(), "ema_rans");
         assert_eq!(ResidualCodecV2::from_id(25), Some(c));
-        assert_eq!(ResidualCodecV2::ALL_V3.len(), 27);
+        assert_eq!(ResidualCodecV2::ALL_V3.len(), 28);
         for residual in sample_residuals() {
             let payload = c.encode(&residual);
             let back = c
@@ -4965,7 +5154,7 @@ mod tests {
         let c = ResidualCodecV2::DecisionTrace;
         assert_eq!(c.name(), "decision_trace");
         assert_eq!(ResidualCodecV2::from_id(26), Some(c));
-        assert_eq!(ResidualCodecV2::ALL_V3.len(), 27);
+        assert_eq!(ResidualCodecV2::ALL_V3.len(), 28);
         for residual in sample_residuals() {
             let payload = c.encode(&residual);
             let back = c
@@ -5027,6 +5216,45 @@ mod tests {
         assert_eq!(a[1].1, shipped);
         // On a conditional source, context conditioning must beat order 0.
         assert!(a[1].1 < a[0].1, "shipped {} vs order0 {}", a[1].1, a[0].1);
+    }
+
+    #[test]
+    fn valuation_split_round_trips_and_beats_a_shared_factor() {
+        let c = ResidualCodecV2::ValuationSplit;
+        assert_eq!(c.name(), "valuation_split");
+        assert_eq!(ResidualCodecV2::from_id(27), Some(c));
+        assert_eq!(ResidualCodecV2::ALL_V3.len(), 28);
+        for residual in sample_residuals() {
+            let payload = c.encode(&residual);
+            let back = c
+                .decode(&payload, residual.len())
+                .unwrap_or_else(|e| panic!("valuation_split: {e}"));
+            assert_eq!(back, residual);
+        }
+        let extreme = vec![i32::MIN, i32::MAX, -1, 0, 1, 2, -2, 1 << 30, -(1 << 30)];
+        let payload = c.encode(&extreme);
+        assert_eq!(c.decode(&payload, extreme.len()).unwrap(), extreme);
+        // An integer-scaled source: every sample is `odd * 2^e` with a per-sample
+        // exponent, so a single shared block factor leaves mixed valuations
+        // behind. The per-symbol split must not be larger than FactorShift.
+        let scaled: Vec<i32> = (0..8192i32)
+            .map(|i| {
+                let e = (i % 6) as u32 + 1;
+                let odd = 2 * ((i / 6) % 4) + 1;
+                let m = odd << e;
+                if (i as usize).is_multiple_of(2) {
+                    m
+                } else {
+                    -m
+                }
+            })
+            .collect();
+        assert!(
+            c.complete_len(&scaled) <= ResidualCodecV2::FactorShift.complete_len(&scaled),
+            "valuation_split {} vs factor_shift {}",
+            c.complete_len(&scaled),
+            ResidualCodecV2::FactorShift.complete_len(&scaled)
+        );
     }
 
     impl ResidualCodecV2 {

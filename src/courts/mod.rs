@@ -134,6 +134,8 @@ pub mod learned_transfer;
 #[cfg(feature = "std")]
 pub mod learned_u1_wasted;
 #[cfg(feature = "std")]
+pub mod learned_valuation_split;
+#[cfg(feature = "std")]
 pub(crate) mod measure;
 #[cfg(feature = "std")]
 pub mod negative;
@@ -423,6 +425,15 @@ prev_band4, prev_band8, shipped band4_prev2zero, band4_band4, prev_full, prev_fu
 prev2_full); every payload round-trips exactly; held-out Mode C untouched",
     ),
     (
+        "learned-valuation-split",
+        "Phase 6 mechanism 7 (`ValuationSplit`): residual codec id 27 factors every nonzero magnitude
+as odd * 2^e and codes the zero gaps (or nothing in the dense mode), the signs, the per-symbol
+valuations and the odd cores as separate exact streams, where FactorShift (id 14) strips only one
+shared block factor; isolated against FactorShift, ZeroMaskRice and the best pre-existing codec
+over integer-scaled fixtures and the real speech effectiveness residuals; every payload
+round-trips exactly; held-out Mode C untouched",
+    ),
+    (
         "learned-speech-trace",
         "Seal S0 diagnostic: bit-for-bit trace of the frozen B1 FLAC-5 artifact (subframe kinds, orders, precision, shift, partition order, residual payload) beside the wired three-family Exp2 VOLE byte waterfall, on the real + Mode-C corpus",
     ),
@@ -617,6 +628,7 @@ pub fn run(name: &str, receipts_root: &Path) -> crate::error::Result<Verdict> {
         "learned-expert-mux" => learned_expert_mux::run(receipts_root),
         "learned-ema-rans" => learned_ema_rans::run(receipts_root),
         "learned-decision-trace" => learned_decision_trace::run(receipts_root),
+        "learned-valuation-split" => learned_valuation_split::run(receipts_root),
         "learned-exp2-transfer" => learned_exp2_transfer::run(receipts_root),
         "learned-residual-codec" => learned_residual_codec::run(receipts_root),
         "learned-residual-codec2" => learned_residual_codec2::run(receipts_root),
