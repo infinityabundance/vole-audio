@@ -50,7 +50,7 @@ use std::path::{Path, PathBuf};
 
 /// Frozen static-result hash (empty means "not yet frozen").
 pub const LEARNED_STATEFUL_PARSE_SHA256: &str =
-    "fe903ac63f40482bb620cdcffcb826f22c52a770ac70f4bd5e32185b111b6854";
+    "c6f12ce4772b664d300d2d7b9afcac117f889b8c389ccec1f8a31e9f814d850b";
 
 /// Synthetic boundary grid (frames, coarsest first).
 pub(crate) const SYNTH_GRID: [usize; 2] = [512, 256];

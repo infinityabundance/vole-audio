@@ -74,6 +74,8 @@ pub(crate) mod learned_common;
 #[cfg(feature = "std")]
 pub mod learned_determinism;
 #[cfg(feature = "std")]
+pub mod learned_entropy_reblock;
+#[cfg(feature = "std")]
 pub mod learned_exp2_baseline;
 #[cfg(feature = "std")]
 pub mod learned_exp2_mechanisms;
@@ -376,6 +378,14 @@ frozen iteration ceiling is reached; iteration 0 is always retained so the resul
 the single-pass parse; format unchanged; held-out Mode C untouched",
     ),
     (
+        "learned-entropy-reblock",
+        "Phase 6 mechanism 3 (`EntropyReblock`): residual codec id 24 re-partitions the residual for
+entropy coding alone by a shortest path over aligned boundaries, each partition selecting its
+base coder among Exp-Golomb(0), Rice, general Golomb and BGMC; isolates the mechanism against
+PartitionRice and the best pre-existing codec over synthetic heteroscedastic fixtures and the real
+speech effectiveness residuals; every payload round-trips exactly; held-out Mode C untouched",
+    ),
+    (
         "learned-speech-trace",
         "Seal S0 diagnostic: bit-for-bit trace of the frozen B1 FLAC-5 artifact (subframe kinds, orders, precision, shift, partition order, residual payload) beside the wired three-family Exp2 VOLE byte waterfall, on the real + Mode-C corpus",
     ),
@@ -566,6 +576,7 @@ pub fn run(name: &str, receipts_root: &Path) -> crate::error::Result<Verdict> {
         "learned-residual-fusion" => learned_residual_fusion::run(receipts_root),
         "learned-stateful-parse" => learned_stateful_parse::run(receipts_root),
         "learned-iterative-reprice" => learned_iterative_reprice::run(receipts_root),
+        "learned-entropy-reblock" => learned_entropy_reblock::run(receipts_root),
         "learned-exp2-transfer" => learned_exp2_transfer::run(receipts_root),
         "learned-residual-codec" => learned_residual_codec::run(receipts_root),
         "learned-residual-codec2" => learned_residual_codec2::run(receipts_root),

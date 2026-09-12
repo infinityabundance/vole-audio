@@ -105,6 +105,9 @@ pub enum ResidualCodecV2 {
     Ctw = 22,
     /// BGMC with an SSE/APM correction on its high-stage model (Seal C2).
     BgmcSse = 23,
+    /// Partitioned, per-block base-coder selection over the residual
+    /// (Phase 6 mechanism 3, `EntropyReblock`).
+    Reblock = 24,
 }
 
 impl ResidualCodecV2 {
@@ -144,8 +147,8 @@ impl ResidualCodecV2 {
         ResidualCodecV2::ContextRans,
     ];
 
-    /// The Exp3 additions (Seal S4, E1..E5, C0..C2), in canonical tie order.
-    pub const ALL_V3: [ResidualCodecV2; 24] = [
+    /// The Exp3 additions (Seal S4, E1..E5, C0..C2, P6-3), in canonical tie order.
+    pub const ALL_V3: [ResidualCodecV2; 25] = [
         ResidualCodecV2::DenseI32,
         ResidualCodecV2::SparseDelta,
         ResidualCodecV2::ZigZagVarint,
@@ -170,6 +173,7 @@ impl ResidualCodecV2 {
         ResidualCodecV2::Bgmc,
         ResidualCodecV2::Ctw,
         ResidualCodecV2::BgmcSse,
+        ResidualCodecV2::Reblock,
     ];
 
     /// Canonical codec identifier byte.
@@ -204,6 +208,7 @@ impl ResidualCodecV2 {
             ResidualCodecV2::Bgmc => "bgmc",
             ResidualCodecV2::Ctw => "ctw",
             ResidualCodecV2::BgmcSse => "bgmc_sse",
+            ResidualCodecV2::Reblock => "reblock",
         }
     }
 
@@ -234,6 +239,7 @@ impl ResidualCodecV2 {
             21 => Some(ResidualCodecV2::Bgmc),
             22 => Some(ResidualCodecV2::Ctw),
             23 => Some(ResidualCodecV2::BgmcSse),
+            24 => Some(ResidualCodecV2::Reblock),
             _ => None,
         }
     }
@@ -295,6 +301,7 @@ impl ResidualCodecV2 {
             ResidualCodecV2::Bgmc => encode_bgmc(residual),
             ResidualCodecV2::Ctw => encode_ctw(residual),
             ResidualCodecV2::BgmcSse => encode_bgmc_sse(residual),
+            ResidualCodecV2::Reblock => encode_reblock(residual),
         }
     }
 
@@ -330,6 +337,7 @@ impl ResidualCodecV2 {
             ResidualCodecV2::Bgmc => decode_bgmc(bytes, len),
             ResidualCodecV2::Ctw => decode_ctw(bytes, len),
             ResidualCodecV2::BgmcSse => decode_bgmc_sse(bytes, len),
+            ResidualCodecV2::Reblock => decode_reblock(bytes, len),
         }
     }
 }
@@ -946,6 +954,356 @@ fn decode_partition_rice(bytes: &[u8], len: usize) -> Result<Vec<i32>> {
         for u in vals {
             out.push(to_i32(u)?);
         }
+    }
+    Ok(out)
+}
+
+// ---------------------------------------------------------------------------
+// id 24: Reblock (Phase 6 mechanism 3, `EntropyReblock`)
+// ---------------------------------------------------------------------------
+//
+// The predictor is untouched. The residual is re-partitioned **for entropy
+// coding alone**, and each partition selects the base coder that actually
+// minimizes its stored bytes. This is strictly more general than
+// `PartitionRice` (id 6), which uses a fixed length ladder and only Rice
+// parameters, and it separates the entropy segmentation from the predictor
+// segmentation the residual came from.
+//
+// Per-partition base coders:
+//   0 Eg0     Exp-Golomb(0) of the zigzag-mapped magnitude
+//   1 Rice    best `k`
+//   2 Golomb  best bounded `m`
+//   3 Bgmc    the C0 high/coarse range coder at the partition's own split
+//
+// Partitioning is a shortest path over aligned boundaries minimizing
+// `sum(8 * payload_len) + 8 * table_bytes`, with a deterministic tie-break
+// toward fewer partitions. Every partition is independently byte-aligned, so
+// the framing is trivially exact and hostile input is bounded by construction.
+
+/// Alignment unit of the `Reblock` segmentation.
+const REBLOCK_UNIT: usize = 256;
+/// Length ladder of the `Reblock` segmentation (samples).
+const REBLOCK_LADDER: [usize; 6] = [256, 512, 1024, 2048, 4096, 8192];
+/// The BGMC base coder is only considered for partitions at least this long.
+const REBLOCK_BGMC_MIN: usize = 512;
+
+/// The winning base coder for one partition.
+#[derive(Clone, Copy)]
+struct ReblockChoice {
+    base: u8,
+    param: u64,
+    payload_len: u64,
+}
+
+impl ReblockChoice {
+    /// Exact stored cost of this partition in bits: the payload bytes plus the
+    /// table bytes (`samples`, base id, parameter, payload length).
+    fn cost_bits(self, samples: u64) -> u64 {
+        let table = uvarint_len(samples)
+            .saturating_add(1)
+            .saturating_add(uvarint_len(self.param))
+            .saturating_add(uvarint_len(self.payload_len));
+        self.payload_len
+            .saturating_mul(8)
+            .saturating_add(table.saturating_mul(8))
+    }
+}
+
+/// Bounded Golomb divisor search for one partition. Candidates bracket the
+/// mean magnitude; the search is bounded so the partition planner stays cheap,
+/// and any candidate that would create a pathological unary run is rejected.
+fn reblock_best_m(mapped: &[u64]) -> (u64, u64) {
+    if mapped.is_empty() {
+        return (1, 0);
+    }
+    let sum: u64 = mapped.iter().sum();
+    let mean = (sum / mapped.len() as u64).max(1);
+    let max_u = *mapped.iter().max().unwrap_or(&0);
+    let mut best_m = 1u64;
+    let mut best = u64::MAX;
+    let consider = |m: u64, best: &mut u64, best_m: &mut u64| {
+        if m == 0 || m > MAX_GOLOMB_M || max_u / m > MAX_RICE_UNARY2 {
+            return;
+        }
+        let c = golomb_cost_bits(mapped, m);
+        if c < *best {
+            *best = c;
+            *best_m = m;
+        }
+    };
+    consider(1, &mut best, &mut best_m);
+    for i in 1..=12u64 {
+        consider(mean.saturating_mul(i) / 12, &mut best, &mut best_m);
+    }
+    for factor in [2u64, 3, 4] {
+        consider(mean.saturating_mul(factor), &mut best, &mut best_m);
+    }
+    (best_m, best)
+}
+
+/// The cheapest base coder for one partition.
+fn reblock_choice(residual: &[i32]) -> ReblockChoice {
+    let mapped = zigzag_map(residual);
+    // Eg0 is the baseline every other candidate must beat.
+    let mut eg_bits = 0u64;
+    for &u in &mapped {
+        eg_bits = eg_bits.saturating_add(eg0_bits(u));
+    }
+    let mut best = ReblockChoice {
+        base: 0,
+        param: 0,
+        payload_len: eg_bits.div_ceil(8),
+    };
+    let (k, rice_bits) = best_rice_k(&mapped);
+    let rice_len = rice_bits.div_ceil(8);
+    if rice_len < best.payload_len {
+        best = ReblockChoice {
+            base: 1,
+            param: u64::from(k),
+            payload_len: rice_len,
+        };
+    }
+    let (m, golomb_bits) = reblock_best_m(&mapped);
+    let golomb_len = golomb_bits.div_ceil(8);
+    if golomb_len < best.payload_len {
+        best = ReblockChoice {
+            base: 2,
+            param: m,
+            payload_len: golomb_len,
+        };
+    }
+    if residual.len() >= REBLOCK_BGMC_MIN {
+        let payload = encode_bgmc_impl(residual, false);
+        let len = payload.len() as u64;
+        if len < best.payload_len {
+            best = ReblockChoice {
+                base: 3,
+                param: 0,
+                payload_len: len,
+            };
+        }
+    }
+    best
+}
+
+/// Analysis helper (court-only): the block count and the per-base block counts
+/// of a `Reblock` payload. Returns `None` when the table is not well formed.
+pub(crate) fn reblock_summary(bytes: &[u8]) -> Option<(usize, [u64; 4])> {
+    let mut r = Reader::new(bytes);
+    let _total = r.u64le().ok()?;
+    let count = u32::from_le_bytes(r.take(4).ok()?.try_into().unwrap()) as usize;
+    let mut per = [0u64; 4];
+    for _ in 0..count {
+        let _samples = r.uvarint().ok()?;
+        let base = r.u8().ok()? as usize;
+        if base > 3 {
+            return None;
+        }
+        let _param = r.uvarint().ok()?;
+        let _plen = r.uvarint().ok()?;
+        per[base] += 1;
+    }
+    Some((count, per))
+}
+
+fn encode_reblock(residual: &[i32]) -> Vec<u8> {
+    let n = residual.len();
+    let mut out = Vec::new();
+    out.extend_from_slice(&(n as u64).to_le_bytes());
+    if n == 0 {
+        out.extend_from_slice(&0u32.to_le_bytes());
+        return out;
+    }
+    let unit = REBLOCK_UNIT;
+    let nodes = n.div_ceil(unit);
+    let max_rung = *REBLOCK_LADDER.last().unwrap();
+    let mut dp = vec![u64::MAX; nodes + 1];
+    let mut parts = vec![u64::MAX; nodes + 1];
+    let mut choice = vec![0usize; nodes];
+    dp[nodes] = 0;
+    parts[nodes] = 0;
+    for i in (0..nodes).rev() {
+        let p = i * unit;
+        if p >= n {
+            continue;
+        }
+        let mut best_cost = u64::MAX;
+        let mut best_parts = u64::MAX;
+        let mut best_len = 0usize;
+        for rung in REBLOCK_LADDER {
+            let end = p + rung;
+            if end > n {
+                break;
+            }
+            if end != n && !end.is_multiple_of(unit) {
+                continue;
+            }
+            let next = if end == n { nodes } else { end / unit };
+            if dp[next] == u64::MAX {
+                continue;
+            }
+            let cost = reblock_choice(&residual[p..end]).cost_bits((end - p) as u64);
+            let total = cost.saturating_add(dp[next]);
+            let total_parts = parts[next].saturating_add(1);
+            if total < best_cost || (total == best_cost && total_parts < best_parts) {
+                best_cost = total;
+                best_parts = total_parts;
+                best_len = rung;
+            }
+        }
+        let tail = n - p;
+        if !tail.is_multiple_of(unit) && tail <= max_rung {
+            let cost = reblock_choice(&residual[p..n]).cost_bits(tail as u64);
+            let total = cost.saturating_add(dp[nodes]);
+            let total_parts = parts[nodes].saturating_add(1);
+            if total < best_cost || (total == best_cost && total_parts < best_parts) {
+                best_cost = total;
+                best_parts = total_parts;
+                best_len = tail;
+            }
+        }
+        dp[i] = best_cost;
+        parts[i] = best_parts;
+        choice[i] = best_len;
+    }
+    let mut partitions: Vec<(usize, usize)> = Vec::new();
+    let mut i = 0usize;
+    while i < nodes {
+        let p = i * unit;
+        let l = choice[i];
+        if l == 0 {
+            partitions.push((p, n));
+            break;
+        }
+        partitions.push((p, (p + l).min(n)));
+        if p + l >= n {
+            break;
+        }
+        i = (p + l) / unit;
+    }
+    out.extend_from_slice(&(partitions.len() as u32).to_le_bytes());
+    let mut table = Vec::new();
+    let mut payload = Vec::new();
+    for &(a, b) in &partitions {
+        let ch = reblock_choice(&residual[a..b]);
+        put_uvarint(&mut table, (b - a) as u64);
+        table.push(ch.base);
+        put_uvarint(&mut table, ch.param);
+        put_uvarint(&mut table, ch.payload_len);
+        let mapped = zigzag_map(&residual[a..b]);
+        match ch.base {
+            0 => {
+                let mut w = BitWriter::new();
+                for &u in &mapped {
+                    write_eg0(&mut w, u);
+                }
+                payload.extend_from_slice(&w.finish());
+            }
+            1 => {
+                let mut w = BitWriter::new();
+                write_rice(&mut w, &mapped, ch.param as u32);
+                payload.extend_from_slice(&w.finish());
+            }
+            2 => {
+                let mut w = BitWriter::new();
+                write_golomb_group(&mut w, &mapped, ch.param)
+                    .expect("reblock golomb divisor is bounded by construction");
+                payload.extend_from_slice(&w.finish());
+            }
+            _ => {
+                payload.extend_from_slice(&encode_bgmc_impl(&residual[a..b], false));
+            }
+        }
+    }
+    out.extend_from_slice(&table);
+    out.extend_from_slice(&payload);
+    out
+}
+
+fn decode_reblock(bytes: &[u8], len: usize) -> Result<Vec<i32>> {
+    let mut r = Reader::new(bytes);
+    let total = r.u64le()? as usize;
+    if total != len {
+        return Err(Error::malformed("reblock length mismatch"));
+    }
+    if len == 0 {
+        return Ok(Vec::new());
+    }
+    let count = u32::from_le_bytes(r.take(4)?.try_into().unwrap()) as usize;
+    if count == 0 || count > len {
+        return Err(Error::limit("reblock block count exceeds the residual"));
+    }
+    let mut table: Vec<(usize, u8, u64, usize)> = Vec::with_capacity(count);
+    let mut sum = 0usize;
+    for _ in 0..count {
+        let samples = r.uvarint()? as usize;
+        let base = r.u8()?;
+        let param = r.uvarint()?;
+        let plen = r.uvarint()? as usize;
+        if base > 3 {
+            return Err(Error::malformed("reblock base coder out of range"));
+        }
+        if samples == 0 {
+            return Err(Error::malformed("reblock has an empty block"));
+        }
+        if base == 1 && param > u64::from(MAX_RICE_K2) {
+            return Err(Error::malformed("reblock rice parameter out of range"));
+        }
+        if base == 2 && (param == 0 || param > MAX_GOLOMB_M) {
+            return Err(Error::malformed("reblock golomb divisor out of range"));
+        }
+        sum = sum
+            .checked_add(samples)
+            .ok_or_else(|| Error::limit("reblock block lengths overflow"))?;
+        if sum > len {
+            return Err(Error::malformed(
+                "reblock block lengths exceed the residual",
+            ));
+        }
+        table.push((samples, base, param, plen));
+    }
+    if sum != len {
+        return Err(Error::malformed(
+            "reblock block lengths do not sum to the residual",
+        ));
+    }
+    let payload = r.take(r.remaining())?;
+    let mut pos = 0usize;
+    let mut out = Vec::with_capacity(len);
+    for (samples, base, param, plen) in table {
+        let end = pos
+            .checked_add(plen)
+            .ok_or_else(|| Error::limit("reblock payload length overflows"))?;
+        let chunk = payload
+            .get(pos..end)
+            .ok_or_else(|| Error::malformed("reblock payload is truncated"))?;
+        pos = end;
+        match base {
+            0 => {
+                let mut br = BitReader::new(chunk);
+                for _ in 0..samples {
+                    out.push(to_i32(read_eg0(&mut br)?)?);
+                }
+            }
+            1 => {
+                let mut br = BitReader::new(chunk);
+                for u in read_rice(&mut br, samples, param as u32)? {
+                    out.push(to_i32(u)?);
+                }
+            }
+            2 => {
+                let mut br = BitReader::new(chunk);
+                for u in read_golomb_group(&mut br, samples, param)? {
+                    out.push(to_i32(u)?);
+                }
+            }
+            _ => {
+                out.extend(decode_bgmc(chunk, samples)?);
+            }
+        }
+    }
+    if out.len() != len {
+        return Err(Error::malformed("reblock decode length mismatch"));
     }
     Ok(out)
 }
@@ -4000,6 +4358,35 @@ mod tests {
         let p = ResidualCodecV2::PartitionRice.complete_len(&r);
         let fixed = ResidualCodecV2::BlockRice.complete_len(&r);
         assert!(p <= fixed, "partition {p} vs fixed {fixed}");
+    }
+
+    #[test]
+    fn reblock_round_trips_exactly_and_beats_rice_on_a_changepoint() {
+        let c = ResidualCodecV2::Reblock;
+        assert_eq!(c.name(), "reblock");
+        assert_eq!(ResidualCodecV2::from_id(24), Some(c));
+        assert_eq!(ResidualCodecV2::ALL_V3.len(), 25);
+        for residual in sample_residuals() {
+            let payload = c.encode(&residual);
+            let back = c
+                .decode(&payload, residual.len())
+                .unwrap_or_else(|e| panic!("reblock: {e}"));
+            assert_eq!(back, residual);
+        }
+        let extreme = vec![i32::MIN, i32::MAX, -1, 0, 1, 2, -2, 1 << 30, -(1 << 30)];
+        let payload = c.encode(&extreme);
+        assert_eq!(c.decode(&payload, extreme.len()).unwrap(), extreme);
+        // Heteroscedastic: a quiet half then a loud half. Per-partition base-coder
+        // selection must never be worse than the Rice-only partitioner.
+        let mut r = vec![0i32; 4096];
+        for (i, slot) in r.iter_mut().enumerate() {
+            *slot = if i < 2048 {
+                (i % 3) as i32 - 1
+            } else {
+                (i as i32) * 991
+            };
+        }
+        assert!(c.complete_len(&r) <= ResidualCodecV2::PartitionRice.complete_len(&r));
     }
 
     impl ResidualCodecV2 {

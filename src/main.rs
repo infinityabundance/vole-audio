@@ -374,6 +374,7 @@ fn cmd_seal_verify(args: &[String]) -> Result<u8> {
                        learned-residual-fusion=SUPPORTED,\
                        learned-stateful-parse=SUPPORTED,\
                        learned-iterative-reprice=SUPPORTED,\
+                       learned-entropy-reblock=SUPPORTED,\
                        compound=SUPPORTED,\
                        cuda=SUPPORTED,d1=SUPPORTED,h2=SUPPORTED,\
                        rocm=UNSUPPORTED_BY_HARDWARE|UNSUPPORTED_BY_API|INCONCLUSIVE,\
