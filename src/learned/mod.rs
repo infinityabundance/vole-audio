@@ -47,6 +47,7 @@ pub mod segmentation;
 pub mod segmented;
 pub mod serialization;
 pub mod sparse;
+pub mod srla;
 pub mod stateful;
 pub mod tns;
 pub mod train;

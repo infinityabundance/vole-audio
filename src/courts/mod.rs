@@ -138,6 +138,8 @@ pub mod learned_speech;
 #[cfg(feature = "std")]
 pub mod learned_speech_trace;
 #[cfg(feature = "std")]
+pub mod learned_srla_refine;
+#[cfg(feature = "std")]
 pub mod learned_stateful_parse;
 #[cfg(feature = "std")]
 pub mod learned_training_cost;
@@ -539,6 +541,14 @@ reports that the mechanism's premise — model overhead dominating — is measur
 current winners, whose model bytes are 0.15–0.4% of the object",
     ),
     (
+        "learned-srla-refine",
+        "Phase 2A mechanism 2 (`SRLA` code-length-shaped coefficient refinement): a deterministic ±1
+hill climb over quantized LPC coefficients against an exact minimum Rice bit length of the
+open-loop residual, with the refined candidate kept only when its exact canonical complete bytes
+improve so the code-length proxy never overrides the physical artifact; measured per clip on real
+LPC models, with the premise (that the lpc family moves the portfolio) reported honestly",
+    ),
+    (
         "learned-speech-trace",
         "Seal S0 diagnostic: bit-for-bit trace of the frozen B1 FLAC-5 artifact (subframe kinds, orders, precision, shift, partition order, residual payload) beside the wired three-family Exp2 VOLE byte waterfall, on the real + Mode-C corpus",
     ),
@@ -743,6 +753,7 @@ pub fn run(name: &str, receipts_root: &Path) -> crate::error::Result<Verdict> {
         "centroid-sq" => centroid_sq::run(receipts_root),
         "pivot-side-streams" => pivot_side_streams::run(receipts_root),
         "learned-param-delta" => learned_param_delta::run(receipts_root),
+        "learned-srla-refine" => learned_srla_refine::run(receipts_root),
         "learned-exp2-transfer" => learned_exp2_transfer::run(receipts_root),
         "learned-residual-codec" => learned_residual_codec::run(receipts_root),
         "learned-residual-codec2" => learned_residual_codec2::run(receipts_root),
