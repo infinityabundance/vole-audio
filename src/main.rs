@@ -381,6 +381,7 @@ fn cmd_seal_verify(args: &[String]) -> Result<u8> {
                        learned-valuation-split=SUPPORTED,\
                        learned-rle-aware-channel=SUPPORTED,\
                        learned-solid-object-columns=SUPPORTED,\
+                       learned-admissible-search-bounds=SUPPORTED,\
                        compound=SUPPORTED,\
                        cuda=SUPPORTED,d1=SUPPORTED,h2=SUPPORTED,\
                        rocm=UNSUPPORTED_BY_HARDWARE|UNSUPPORTED_BY_API|INCONCLUSIVE,\

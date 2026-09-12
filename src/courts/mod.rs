@@ -68,6 +68,8 @@ pub mod inverse_search;
 #[cfg(feature = "std")]
 pub mod learned;
 #[cfg(feature = "std")]
+pub mod learned_admissible_search_bounds;
+#[cfg(feature = "std")]
 pub mod learned_capacity;
 #[cfg(feature = "std")]
 pub(crate) mod learned_common;
@@ -458,6 +460,16 @@ carried adaptive order-1 byte coder, reporting the physical bytes of both; never
 audio compression result",
     ),
     (
+        "learned-admissible-search-bounds",
+        "Phase 6 mechanism 10 (`AdmissibleSearchBounds`): a provable branch-and-bound that skips any
+candidate whose admissible lower bound cannot beat the incumbent, processing candidates in
+ascending bound order and breaking equal-cost ties by ascending index so the bounded winner equals
+the exhaustive winner; integrated into the simple predictor search with the candidate's weight and
+bias bytes as the bound, and exercised against a tight-bound battery where pruning actually bites;
+the court asserts bounded == exhaustive on every fixture and reports candidates evaluated vs
+pruned; held-out Mode C untouched",
+    ),
+    (
         "learned-speech-trace",
         "Seal S0 diagnostic: bit-for-bit trace of the frozen B1 FLAC-5 artifact (subframe kinds, orders, precision, shift, partition order, residual payload) beside the wired three-family Exp2 VOLE byte waterfall, on the real + Mode-C corpus",
     ),
@@ -655,6 +667,7 @@ pub fn run(name: &str, receipts_root: &Path) -> crate::error::Result<Verdict> {
         "learned-valuation-split" => learned_valuation_split::run(receipts_root),
         "learned-rle-aware-channel" => learned_rle_aware_channel::run(receipts_root),
         "learned-solid-object-columns" => learned_solid_object_columns::run(receipts_root),
+        "learned-admissible-search-bounds" => learned_admissible_search_bounds::run(receipts_root),
         "learned-exp2-transfer" => learned_exp2_transfer::run(receipts_root),
         "learned-residual-codec" => learned_residual_codec::run(receipts_root),
         "learned-residual-codec2" => learned_residual_codec2::run(receipts_root),

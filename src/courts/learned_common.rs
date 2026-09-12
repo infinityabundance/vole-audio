@@ -184,6 +184,12 @@ pub const PERIODIC_CANDIDATES: [u16; 14] = [2, 3, 4, 5, 6, 7, 8, 12, 16, 24, 32,
 
 /// The cheapest simple predictor for a window (deterministic tie order).
 ///
+/// Uses [`crate::learned::bounds::admissible_select`] with a **provable**
+/// model-byte lower bound: a candidate's complete bytes are at least its weight
+/// and bias bytes, which are known before fitting, so a candidate whose model
+/// lower bound cannot beat the incumbent is never built. The winner is
+/// identical to exhaustive in-order evaluation.
+///
 /// Candidates whose exact residual does not fit the canonical i32 residual
 /// domain (for example full-scale toggling content) are skipped honestly; an
 /// error is returned only when *no* simple candidate can close.
@@ -193,39 +199,52 @@ pub fn best_simple(
     frames: u64,
     rate: u32,
 ) -> Result<(LearnedObject, u64)> {
-    let mut best: Option<(LearnedObject, u64)> = None;
-    for kind in [
+    let c = usize::from(channels);
+    // Exhaustive candidate order: the zero/constant/previous trio, then the
+    // frozen periodic ladder.
+    let mut plan: Vec<SimplePredictor> = vec![
         SimplePredictor::Zero,
         SimplePredictor::Constant,
         SimplePredictor::Previous,
-    ] {
-        let Ok(o) = simple_object(samples, channels, frames, rate, kind) else {
-            continue;
-        };
-        let b = learned_bytes(&o)?;
-        if best.as_ref().is_none_or(|(_, bb)| b < *bb) {
-            best = Some((o, b));
-        }
-    }
+    ];
     for p in PERIODIC_CANDIDATES {
-        if u64::from(p) >= frames {
-            continue;
-        }
-        let Ok(o) = simple_object(
-            samples,
-            channels,
-            frames,
-            rate,
-            SimplePredictor::Periodic(p),
-        ) else {
-            continue;
-        };
-        let b = learned_bytes(&o)?;
-        if best.as_ref().is_none_or(|(_, bb)| b < *bb) {
-            best = Some((o, b));
+        if u64::from(p) < frames {
+            plan.push(SimplePredictor::Periodic(p));
         }
     }
-    best.ok_or_else(|| Error::internal("no simple predictor candidate could close"))
+    // Admissible bound: `taps * C * C` i16 weights plus `C` i32 biases. The
+    // canonical model bytes always include these, so the bound is valid.
+    let lower_bound = |kind: SimplePredictor| -> u64 {
+        let taps = match kind {
+            SimplePredictor::Periodic(p) => usize::from(p).max(1),
+            _ => 1,
+        };
+        (taps * c * c * 2 + c * 4) as u64
+    };
+    let mut accounting_error: Option<Error> = None;
+    let report = crate::learned::bounds::admissible_select(
+        plan.len(),
+        |i| lower_bound(plan[i]),
+        |i| match simple_object(samples, channels, frames, rate, plan[i]) {
+            Ok(o) => match learned_bytes(&o) {
+                Ok(b) => b,
+                Err(e) => {
+                    accounting_error.get_or_insert(e);
+                    u64::MAX
+                }
+            },
+            Err(_) => u64::MAX,
+        },
+    );
+    if let Some(e) = accounting_error {
+        return Err(e);
+    }
+    let idx = report
+        .winner
+        .filter(|_| report.winner_cost != u64::MAX)
+        .ok_or_else(|| Error::internal("no simple predictor candidate could close"))?;
+    let object = simple_object(samples, channels, frames, rate, plan[idx])?;
+    Ok((object, report.winner_cost))
 }
 
 /// The cheapest simple predictor's complete bytes, or `u64::MAX` when no simple
