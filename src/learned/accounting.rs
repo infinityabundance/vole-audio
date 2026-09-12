@@ -128,6 +128,38 @@ fn model_components(m: &LearnedModel) -> (u64, u64, u64, u64, u64, u64) {
             let bias = 4u64.min(len - weights);
             (weights, bias, 0, 0, 0, 0)
         }
+        LearnedModel::StatefulSyntax(s) => {
+            // Name the inner tuple components, then reconcile with the actual
+            // canonical length. Move-to-front stores a repeated tuple once, so
+            // the summed inner components can exceed the canonical length; the
+            // excess is charged against the syntax/framing component first and
+            // then the weight component, so the named sum never exceeds `len`
+            // (the remainder is graph metadata) and the decomposition stays exact.
+            let len = s.canonical_bytes().len() as u64;
+            let (mut w, mut b, mut a, mut cp, mut td, mut st) =
+                (0u64, 0u64, 0u64, 0u64, 0u64, 0u64);
+            for seg in &s.segments {
+                let (sw, sb, sa, scp, std, sst) = model_components(&seg.model);
+                w += sw;
+                b += sb;
+                a += sa;
+                cp += scp;
+                td += std;
+                st += sst;
+            }
+            td += 6 + (s.segments.len() as u64) * 4;
+            let total = w + b + a + cp + td + st;
+            if total > len {
+                let mut over = total - len;
+                let take = td.min(over);
+                td -= take;
+                over -= take;
+                if over > 0 {
+                    w = w.saturating_sub(over);
+                }
+            }
+            (w, b, a, cp, td, st)
+        }
         LearnedModel::ContextMixture(p) => {
             let len = p.canonical_bytes().len() as u64;
             let mut w = 0u64;

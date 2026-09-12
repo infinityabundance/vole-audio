@@ -58,6 +58,9 @@ pub enum LearnedModel {
     Reverse(crate::learned::reverse::ReversePredictor),
     /// A natural-gradient backward-adaptive predictor (Seal A0, NARU-inspired).
     Ngsa(crate::learned::ngsa::NgsaPredictor),
+    /// A move-to-front carousel syntax over a sequence of model tuples
+    /// (Phase 6 mechanism 1, `StatefulSyntaxParse`).
+    StatefulSyntax(crate::learned::carousel::StatefulSyntaxModel),
 }
 
 impl LearnedModel {
@@ -83,6 +86,7 @@ impl LearnedModel {
             LearnedModel::Wasted(_) => 16,
             LearnedModel::Reverse(_) => 17,
             LearnedModel::Ngsa(_) => 18,
+            LearnedModel::StatefulSyntax(_) => 19,
         }
     }
 
@@ -108,6 +112,7 @@ impl LearnedModel {
             LearnedModel::Wasted(_) => "wasted",
             LearnedModel::Reverse(_) => "reverse",
             LearnedModel::Ngsa(_) => "natural_gradient",
+            LearnedModel::StatefulSyntax(_) => "stateful_syntax",
         }
     }
 
@@ -133,6 +138,7 @@ impl LearnedModel {
             LearnedModel::Wasted(p) => p.validate(),
             LearnedModel::Reverse(p) => p.validate(),
             LearnedModel::Ngsa(p) => p.validate(),
+            LearnedModel::StatefulSyntax(s) => s.validate(),
         }
     }
 
@@ -158,6 +164,7 @@ impl LearnedModel {
             LearnedModel::Wasted(p) => p.channels,
             LearnedModel::Reverse(p) => p.channels,
             LearnedModel::Ngsa(p) => p.channels,
+            LearnedModel::StatefulSyntax(s) => s.channels,
         }
     }
 
@@ -183,6 +190,7 @@ impl LearnedModel {
             LearnedModel::Wasted(p) => p.receptive_field(),
             LearnedModel::Reverse(p) => p.receptive_field(),
             LearnedModel::Ngsa(p) => p.receptive_field(),
+            LearnedModel::StatefulSyntax(s) => s.receptive_field(),
         }
     }
 
@@ -208,6 +216,7 @@ impl LearnedModel {
             LearnedModel::Wasted(p) => p.ops_per_sample(),
             LearnedModel::Reverse(p) => p.ops_per_sample(),
             LearnedModel::Ngsa(p) => p.ops_per_sample(),
+            LearnedModel::StatefulSyntax(s) => s.ops_per_sample(),
         }
     }
 
@@ -233,6 +242,7 @@ impl LearnedModel {
             LearnedModel::Wasted(p) => p.state_bytes(),
             LearnedModel::Reverse(p) => p.state_bytes(),
             LearnedModel::Ngsa(p) => p.state_bytes(),
+            LearnedModel::StatefulSyntax(s) => s.state_bytes(),
         }
     }
 
@@ -258,6 +268,7 @@ impl LearnedModel {
             LearnedModel::Wasted(p) => p.checkpoint_count(),
             LearnedModel::Reverse(p) => p.checkpoint_count(),
             LearnedModel::Ngsa(p) => p.checkpoint_count(),
+            LearnedModel::StatefulSyntax(s) => s.checkpoint_count(),
         }
     }
 
@@ -283,6 +294,7 @@ impl LearnedModel {
             LearnedModel::Wasted(p) => p.canonical_bytes(),
             LearnedModel::Reverse(p) => p.canonical_bytes(),
             LearnedModel::Ngsa(p) => p.canonical_bytes(),
+            LearnedModel::StatefulSyntax(s) => s.canonical_bytes(),
         }
     }
 
@@ -349,6 +361,9 @@ impl LearnedModel {
             18 => LearnedModel::Ngsa(crate::learned::ngsa::NgsaPredictor::from_canonical_bytes(
                 bytes,
             )?),
+            19 => LearnedModel::StatefulSyntax(
+                crate::learned::carousel::StatefulSyntaxModel::from_canonical_bytes(bytes)?,
+            ),
             other => {
                 return Err(Error::new(
                     crate::error::Kind::Unsupported,
@@ -384,6 +399,7 @@ impl LearnedModel {
             LearnedModel::Wasted(p) => p.hypothesis_all_from_source(source, frames),
             LearnedModel::Reverse(p) => p.hypothesis_all_from_source(source, frames),
             LearnedModel::Ngsa(p) => p.hypothesis_all_from_source(source, frames),
+            LearnedModel::StatefulSyntax(s) => s.hypothesis_from_source(source, frames),
         }
     }
 
@@ -417,6 +433,7 @@ impl LearnedModel {
             LearnedModel::Wasted(p) => p.evaluate_range(residual, frames, start, len),
             LearnedModel::Reverse(p) => p.evaluate_range(residual, frames, start, len),
             LearnedModel::Ngsa(p) => p.evaluate_range(residual, frames, start, len),
+            LearnedModel::StatefulSyntax(s) => s.evaluate_range(residual, frames, start, len),
         }
     }
 
@@ -442,6 +459,7 @@ impl LearnedModel {
             LearnedModel::Wasted(p) => p.replay_frames(start),
             LearnedModel::Reverse(p) => p.replay_frames(start),
             LearnedModel::Ngsa(p) => p.replay_frames(start),
+            LearnedModel::StatefulSyntax(s) => s.replay_frames(start),
         }
     }
 

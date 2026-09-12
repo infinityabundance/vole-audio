@@ -116,6 +116,8 @@ pub mod learned_speech;
 #[cfg(feature = "std")]
 pub mod learned_speech_trace;
 #[cfg(feature = "std")]
+pub mod learned_stateful_parse;
+#[cfg(feature = "std")]
 pub mod learned_training_cost;
 #[cfg(feature = "std")]
 pub mod learned_transfer;
@@ -356,6 +358,14 @@ exact hypothesis ensemble, measuring the upper bound before paying for a side st
 closed-loop entropy coder; held-out Mode C untouched",
     ),
     (
+        "learned-stateful-parse",
+        "Phase 6 mechanism 1 (`StatefulSyntaxParse`): a move-to-front carousel syntax over model
+tuples with a `(position, carousel)` shortest path under a deterministic bounded beam, measured
+against exhaustive enumeration on synthetic repeated-regime fixtures; the move-to-front saving is
+isolated against the identical parse coded as a plain segmented model, over synthetic, frozen
+intrinsic and real speech-effectiveness surfaces; held-out Mode C untouched",
+    ),
+    (
         "learned-speech-trace",
         "Seal S0 diagnostic: bit-for-bit trace of the frozen B1 FLAC-5 artifact (subframe kinds, orders, precision, shift, partition order, residual payload) beside the wired three-family Exp2 VOLE byte waterfall, on the real + Mode-C corpus",
     ),
@@ -544,6 +554,7 @@ pub fn run(name: &str, receipts_root: &Path) -> crate::error::Result<Verdict> {
         "learned-residual-entropy" => learned_residual_entropy::run(receipts_root),
         "learned-ngsa" => learned_ngsa::run(receipts_root),
         "learned-residual-fusion" => learned_residual_fusion::run(receipts_root),
+        "learned-stateful-parse" => learned_stateful_parse::run(receipts_root),
         "learned-exp2-transfer" => learned_exp2_transfer::run(receipts_root),
         "learned-residual-codec" => learned_residual_codec::run(receipts_root),
         "learned-residual-codec2" => learned_residual_codec2::run(receipts_root),
