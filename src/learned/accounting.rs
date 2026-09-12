@@ -160,6 +160,19 @@ fn model_components(m: &LearnedModel) -> (u64, u64, u64, u64, u64, u64) {
             }
             (w, b, a, cp, td, st)
         }
+        LearnedModel::ExpertMux(p) => {
+            // Named components are the transmitted expert weights and biases;
+            // the selectors and framing remain graph metadata (the remainder).
+            let len = p.canonical_bytes().len() as u64;
+            let weights = (p
+                .experts
+                .iter()
+                .map(|e| (e.init_weights.len() as u64) * 2)
+                .sum::<u64>())
+            .min(len);
+            let bias = ((p.experts.len() as u64) * 4).min(len - weights);
+            (weights, bias, 0, 0, 0, 0)
+        }
         LearnedModel::ContextMixture(p) => {
             let len = p.canonical_bytes().len() as u64;
             let mut w = 0u64;

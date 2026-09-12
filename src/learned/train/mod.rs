@@ -18,6 +18,7 @@ pub mod linear;
 pub mod lpc;
 pub mod ltp;
 pub mod multichannel;
+pub mod mux;
 pub mod ngsa;
 pub mod objective;
 pub mod optimizer;

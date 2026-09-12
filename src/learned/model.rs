@@ -61,6 +61,9 @@ pub enum LearnedModel {
     /// A move-to-front carousel syntax over a sequence of model tuples
     /// (Phase 6 mechanism 1, `StatefulSyntaxParse`).
     StatefulSyntax(crate::learned::carousel::StatefulSyntaxModel),
+    /// Hard per-microgroup selection over decoder-synchronized experts
+    /// (Phase 6 mechanism 4, `SampleExpertMux`).
+    ExpertMux(crate::learned::mux::ExpertMuxPredictor),
 }
 
 impl LearnedModel {
@@ -87,6 +90,7 @@ impl LearnedModel {
             LearnedModel::Reverse(_) => 17,
             LearnedModel::Ngsa(_) => 18,
             LearnedModel::StatefulSyntax(_) => 19,
+            LearnedModel::ExpertMux(_) => 20,
         }
     }
 
@@ -113,6 +117,7 @@ impl LearnedModel {
             LearnedModel::Reverse(_) => "reverse",
             LearnedModel::Ngsa(_) => "natural_gradient",
             LearnedModel::StatefulSyntax(_) => "stateful_syntax",
+            LearnedModel::ExpertMux(_) => "expert_mux",
         }
     }
 
@@ -139,6 +144,7 @@ impl LearnedModel {
             LearnedModel::Reverse(p) => p.validate(),
             LearnedModel::Ngsa(p) => p.validate(),
             LearnedModel::StatefulSyntax(s) => s.validate(),
+            LearnedModel::ExpertMux(p) => p.validate(),
         }
     }
 
@@ -165,6 +171,7 @@ impl LearnedModel {
             LearnedModel::Reverse(p) => p.channels,
             LearnedModel::Ngsa(p) => p.channels,
             LearnedModel::StatefulSyntax(s) => s.channels,
+            LearnedModel::ExpertMux(p) => p.channels,
         }
     }
 
@@ -191,6 +198,7 @@ impl LearnedModel {
             LearnedModel::Reverse(p) => p.receptive_field(),
             LearnedModel::Ngsa(p) => p.receptive_field(),
             LearnedModel::StatefulSyntax(s) => s.receptive_field(),
+            LearnedModel::ExpertMux(p) => p.receptive_field(),
         }
     }
 
@@ -217,6 +225,7 @@ impl LearnedModel {
             LearnedModel::Reverse(p) => p.ops_per_sample(),
             LearnedModel::Ngsa(p) => p.ops_per_sample(),
             LearnedModel::StatefulSyntax(s) => s.ops_per_sample(),
+            LearnedModel::ExpertMux(p) => p.ops_per_sample(),
         }
     }
 
@@ -243,6 +252,7 @@ impl LearnedModel {
             LearnedModel::Reverse(p) => p.state_bytes(),
             LearnedModel::Ngsa(p) => p.state_bytes(),
             LearnedModel::StatefulSyntax(s) => s.state_bytes(),
+            LearnedModel::ExpertMux(p) => p.state_bytes(),
         }
     }
 
@@ -269,6 +279,7 @@ impl LearnedModel {
             LearnedModel::Reverse(p) => p.checkpoint_count(),
             LearnedModel::Ngsa(p) => p.checkpoint_count(),
             LearnedModel::StatefulSyntax(s) => s.checkpoint_count(),
+            LearnedModel::ExpertMux(p) => p.checkpoint_count(),
         }
     }
 
@@ -295,6 +306,7 @@ impl LearnedModel {
             LearnedModel::Reverse(p) => p.canonical_bytes(),
             LearnedModel::Ngsa(p) => p.canonical_bytes(),
             LearnedModel::StatefulSyntax(s) => s.canonical_bytes(),
+            LearnedModel::ExpertMux(p) => p.canonical_bytes(),
         }
     }
 
@@ -364,6 +376,9 @@ impl LearnedModel {
             19 => LearnedModel::StatefulSyntax(
                 crate::learned::carousel::StatefulSyntaxModel::from_canonical_bytes(bytes)?,
             ),
+            20 => LearnedModel::ExpertMux(
+                crate::learned::mux::ExpertMuxPredictor::from_canonical_bytes(bytes)?,
+            ),
             other => {
                 return Err(Error::new(
                     crate::error::Kind::Unsupported,
@@ -400,6 +415,7 @@ impl LearnedModel {
             LearnedModel::Reverse(p) => p.hypothesis_all_from_source(source, frames),
             LearnedModel::Ngsa(p) => p.hypothesis_all_from_source(source, frames),
             LearnedModel::StatefulSyntax(s) => s.hypothesis_from_source(source, frames),
+            LearnedModel::ExpertMux(p) => p.hypothesis_from_source(source, frames),
         }
     }
 
@@ -434,6 +450,7 @@ impl LearnedModel {
             LearnedModel::Reverse(p) => p.evaluate_range(residual, frames, start, len),
             LearnedModel::Ngsa(p) => p.evaluate_range(residual, frames, start, len),
             LearnedModel::StatefulSyntax(s) => s.evaluate_range(residual, frames, start, len),
+            LearnedModel::ExpertMux(p) => p.evaluate_range(residual, frames, start, len),
         }
     }
 
@@ -460,6 +477,7 @@ impl LearnedModel {
             LearnedModel::Reverse(p) => p.replay_frames(start),
             LearnedModel::Ngsa(p) => p.replay_frames(start),
             LearnedModel::StatefulSyntax(s) => s.replay_frames(start),
+            LearnedModel::ExpertMux(p) => p.replay_frames(start),
         }
     }
 

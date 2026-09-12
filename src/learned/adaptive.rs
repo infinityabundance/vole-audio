@@ -94,7 +94,7 @@ impl AdaptivePredictor {
     }
 
     #[inline]
-    fn predict(history: &[i32], weights: &[i32], bias: i32, taps: usize) -> i32 {
+    pub(crate) fn predict(history: &[i32], weights: &[i32], bias: i32, taps: usize) -> i32 {
         let mut acc = Acc::from(bias);
         for k in 0..taps {
             acc += Acc::from(weights[k]) * Acc::from(history[k]);
@@ -103,7 +103,7 @@ impl AdaptivePredictor {
     }
 
     #[inline]
-    fn update(weights: &mut [i32], e: i32, history: &[i32], step: i16) {
+    pub(crate) fn update(weights: &mut [i32], e: i32, history: &[i32], step: i16) {
         let se = e.signum();
         if se == 0 {
             return;

@@ -84,6 +84,8 @@ pub mod learned_exp2_real_corpus;
 #[cfg(feature = "std")]
 pub mod learned_exp2_transfer;
 #[cfg(feature = "std")]
+pub mod learned_expert_mux;
+#[cfg(feature = "std")]
 pub mod learned_gpu;
 #[cfg(feature = "std")]
 pub mod learned_intrinsic;
@@ -386,6 +388,15 @@ PartitionRice and the best pre-existing codec over synthetic heteroscedastic fix
 speech effectiveness residuals; every payload round-trips exactly; held-out Mode C untouched",
     ),
     (
+        "learned-expert-mux",
+        "Phase 6 mechanism 4 (`SampleExpertMux`): model kind 20 keeps several decoder-synchronized
+backward-adaptive experts and selects exactly one per microgroup (x_hat = P_{j*}), transmitting a
+packed selector stream; every expert is stepped from the reconstructed value, so the per-group
+choice is exactly optimal for the fixed expert set; measured against the best single expert from
+the same fitted pair and the existing adaptive family over non-stationary fixtures and the real
+speech effectiveness clips; held-out Mode C untouched",
+    ),
+    (
         "learned-speech-trace",
         "Seal S0 diagnostic: bit-for-bit trace of the frozen B1 FLAC-5 artifact (subframe kinds, orders, precision, shift, partition order, residual payload) beside the wired three-family Exp2 VOLE byte waterfall, on the real + Mode-C corpus",
     ),
@@ -577,6 +588,7 @@ pub fn run(name: &str, receipts_root: &Path) -> crate::error::Result<Verdict> {
         "learned-stateful-parse" => learned_stateful_parse::run(receipts_root),
         "learned-iterative-reprice" => learned_iterative_reprice::run(receipts_root),
         "learned-entropy-reblock" => learned_entropy_reblock::run(receipts_root),
+        "learned-expert-mux" => learned_expert_mux::run(receipts_root),
         "learned-exp2-transfer" => learned_exp2_transfer::run(receipts_root),
         "learned-residual-codec" => learned_residual_codec::run(receipts_root),
         "learned-residual-codec2" => learned_residual_codec2::run(receipts_root),

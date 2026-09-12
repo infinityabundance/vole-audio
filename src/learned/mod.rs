@@ -29,6 +29,7 @@ pub mod lpc;
 pub mod ltp;
 pub mod model;
 pub mod multichannel;
+pub mod mux;
 pub mod ngsa;
 pub mod object;
 pub mod polezero;
