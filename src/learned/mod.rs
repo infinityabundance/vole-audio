@@ -18,6 +18,7 @@ pub mod anatomy;
 pub mod arithmetic;
 pub mod bounds;
 pub mod carousel;
+pub mod centroid_sq;
 pub mod context_mixture;
 pub mod corpus;
 pub mod corpus_real;

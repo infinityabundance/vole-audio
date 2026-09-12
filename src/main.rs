@@ -385,6 +385,7 @@ fn cmd_seal_verify(args: &[String]) -> Result<u8> {
                        recoil-checkpoints=SUPPORTED,\
                        page-batch-simd=SUPPORTED,\
                        envelope-flattened-tns=SUPPORTED,\
+                       centroid-sq=SUPPORTED,\
                        compound=SUPPORTED,\
                        cuda=SUPPORTED,d1=SUPPORTED,h2=SUPPORTED,\
                        rocm=UNSUPPORTED_BY_HARDWARE|UNSUPPORTED_BY_API|INCONCLUSIVE,\

@@ -18,6 +18,8 @@ pub mod archive;
 #[cfg(feature = "std")]
 pub mod authored;
 #[cfg(feature = "std")]
+pub mod centroid_sq;
+#[cfg(feature = "std")]
 pub mod compound;
 pub mod conventional;
 #[cfg(feature = "std")]
@@ -503,6 +505,16 @@ reports per-frame wins and prediction gain over transient, AM, castanet, station
 fixtures; it gates estimator well-formedness only and makes no quality or bitrate claim",
     ),
     (
+        "centroid-sq",
+        "Phase 6 mechanism 14 (`CentroidSQ`, lossy/exploratory): decision boundaries and
+reconstruction points are separable; the court keeps the symbols exactly as they are and moves
+only the reconstruction point toward the source distribution's conditional mean inside each cell
+(x_hat = sgn(q)(deadzone + (|q| - 1 + c) delta)), fitting c on synthetic spectral coefficients and
+reporting held-out mean-squared error at identical symbols against the midpoint rule over the frozen
+corpus's spectra; a profile-defined reconstruction rule with no extra bits and no codec-quality
+claim",
+    ),
+    (
         "learned-speech-trace",
         "Seal S0 diagnostic: bit-for-bit trace of the frozen B1 FLAC-5 artifact (subframe kinds, orders, precision, shift, partition order, residual payload) beside the wired three-family Exp2 VOLE byte waterfall, on the real + Mode-C corpus",
     ),
@@ -704,6 +716,7 @@ pub fn run(name: &str, receipts_root: &Path) -> crate::error::Result<Verdict> {
         "recoil-checkpoints" => recoil::run(receipts_root),
         "page-batch-simd" => page_batch_simd::run(receipts_root),
         "envelope-flattened-tns" => envelope_flattened_tns::run(receipts_root),
+        "centroid-sq" => centroid_sq::run(receipts_root),
         "learned-exp2-transfer" => learned_exp2_transfer::run(receipts_root),
         "learned-residual-codec" => learned_residual_codec::run(receipts_root),
         "learned-residual-codec2" => learned_residual_codec2::run(receipts_root),
