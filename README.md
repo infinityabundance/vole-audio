@@ -18,13 +18,16 @@ architecture, currently specified by v1.1.
 > explicit (persist the deterministic explanation, entropy-code the exact
 > residual, materialize samples only when an observation requires them), and
 > Phase H.2 of this repository implements the first concrete entropy-native
-> core of that layer. v1.0 remains the earlier broad disclosure.
+> core of that layer. Later phases extend it: Phase O adds learned deterministic
+> prediction, and the speech campaign plus the Phase-6 mechanisms push the
+> exact portfolio past FLAC-8 on the frozen speech corpus. v1.0 remains the
+> earlier broad disclosure.
 
 > One Cargo package. PCM is an **observation view**. `SampleObject` is
 > authoritative. Literal fallback exists. Everything is measured; nothing is
 > assumed.
 
-## The central idea (as of Phase H.2)
+## The central idea
 
 **Persist deterministic state and entropy-coded innovation. Materialize
 waveform samples only when an observation requires them.**
@@ -39,7 +42,15 @@ representation is always the mandatory universal fallback; it is simply **not
 universally privileged as authoritative durable state**. The strongest path
 executed in this repository renders entropy-coded objects on the GPU and
 writes the exact final sample codes directly into the registered ALSA mmap
-endpoint region (see the Phase H/H.2 summaries below).
+endpoint region (Phase H/H.2).
+
+Since Phase O the *explanation* may also be a **learned deterministic
+hypothesis** (a quantized predictor proposed by fitting and admitted only after
+exact residual closure and complete physical-byte accounting), and since the
+speech campaign the exact portfolio is measured *past FLAC-8* on a frozen
+LibriSpeech-derived corpus. The exact-residual closure contract never changes:
+the literal fallback remains mandatory, and every candidate is scored by its
+complete serialized bytes.
 
 ## What this project is
 
@@ -99,12 +110,15 @@ src/
   audio/              ALSA endpoint, directness, topology   (Phase H+)
   format/             canonical `.volea` archive + WAV ingest   (Phase E/N)
   inverse/            bounded inverse-proceduralization + search placement (K/L)
-  learned/            Phase O learned deterministic prediction (experimental profile)
+  learned/            learned deterministic prediction: Phase O (exp1), the Exp2
+                      addendum, the Exp3 speech/residual mechanisms, and the
+                      Phase-6 parsing/representation models (experimental profiles)
   transport/          deterministic framing + receiver + clock  (Phase N)
   evidence/           receipts/counters/timing/environment  (Phase A)
-  courts/             executable courts                     (Phase C+)
+  courts/             executable courts                     (Phase C+; registry in
+                      src/courts/mod.rs)
   main.rs             the vole-audio CLI                    (grows by phase)
-docs/                 spec + evidence + non-claims (repo only)
+docs/                 spec + phase charters + evidence + non-claims + CHANGELOG (repo only)
 corpus/               frozen flagship corpus, Phase M (repo only)
 receipts/             immutable evidence outputs (repo only)
 assets/u1/            frozen deterministic tables (resampler, sine)
@@ -115,155 +129,53 @@ scripts/              device build + court drivers (repo only)
 > `assets/` tables, licenses, and this README. `docs/`, `corpus/`, `receipts/`,
 > `scripts/`, and `rust-toolchain.toml` live in the GitHub repository only
 > (they are excluded from the published package to keep it lean and
-> stable-buildable). See the links under [Status](#current-status) and
+> stable-buildable). See the links under [Current status](#current-status) and
 > [Building](#building) for the repository-only material.
 
 ## Current status
 
-Phases A–L are complete: A–E the exact representation model on the scalar
-oracle, F the honest SIMD baseline (scalar == AVX2 == AVX-512), G the CUDA D0
-buffered-diagnostic backend (scalar == SIMD == CUDA bit-for-bit; semantic
-facts F01–F14 verified on the device; F15 is authority-level and
-surface-independent), H the CUDA D1 falsification court
-against the real ALSA `hw:` mmap endpoint (the first direct-endpoint
-evidence), H.2 the entropy-native core — a deterministic native rANS
-codec with canonical models, block-addressable pages and mandatory RAW
-fallback; literal + exact-residual entropy representations; optional
-EntropyFS persistence and DSFB search governance; CUDA entropy decode; the
-flagship **fused entropy -> CUDA -> D1 endpoint** court — I the ROCm
-device surface: a clean `amdgcn-amd-amdhsa` code-object build
-(`scripts/build-rocm-device.sh`, thin kernels over the same shared no_std
-semantics; byte-deterministic across isolated builds), the `backend::rocm`
-loader probe (GPU -> amdgpu -> KFD -> HIP/HSA) and `court rocm` /
-`probe rocm` evidence (two-dimensional, fail-closed; hardware-unavailable
-on this host), J the ROCm D0/D1 runtime (`backend::rocm` HIP host runtime
-with structural resource lifetimes and device affinity; `court rocm-d0`
-differential scalar == ROCm and `court rocm-d1` endpoint experiment, both
-typed to this host's missing device), and K the **inverse compiler**
-(`src/inverse/`, `court inverse`, `court flattening`) — bounded
-deterministic proposal search for the cheapest *exact* deterministic
-`SampleObject` explanation of an observed window, priced with the H.2
-complete-cost oracle and reported as a deterministic Pareto frontier
-(see
-[INVERSE.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/INVERSE.md)),
-and L the **GPU inverse search** placement of that compiler's bounded period
-scan on scalar / host-parallel / CUDA / ROCm surfaces — identical rankings on
-all surfaces, with every device-ranked proposal re-verified by the exact
-evaluator (see
-[PHASE_L.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/PHASE_L.md)).
-Executable
-evidence today:
+Phases A–N are complete. **Phase O** (learned deterministic prediction, profile
+`vole.audio.learned.exp1`) is complete; the **Exp2 addendum** imports every Exp1
+candidate and adds the v2 residual codecs and mechanism families; the
+**speech campaign** (Seals S0–S8, v0.29.0–v0.37.0) took the exact learned
+portfolio past FLAC-8 on a frozen LibriSpeech-derived corpus; the **fourth-pass
+entropy/adaptation ladder** (E0–F0, v0.42.0–v0.53.0) added the signed/FSM range
+coders, the natural-gradient predictor and BGMC; and **Phase 6** is in progress,
+sealing one mechanism per release.
 
-- `cargo run -- court semantic` — scalar oracle determinism battery
-  (reference SHA-256 `1791816f…`);
-- `cargo run -- court authored` — procedural SampleObject battery
-  (`f7e103f3…`);
-- `cargo run -- court simd` — Phase F SIMD parity: scalar == SIMD on every
-  available ISA floor (AVX-512 / AVX2 / scalar) over frozen worlds, with
-  fixture-level timing;
-- `cargo run -- court facts` — independent semantic facts (F01–F15):
-  first-principles oracles for every representation/transform, verified on
-  every host surface (F01–F14 additionally device-verified in `court cuda`;
-  F15 is authority-level and surface-independent — see
-  [SEMANTIC_FACTS.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/SEMANTIC_FACTS.md));
-- `cargo run -- court inverse` — Phase K inverse compiler: over the frozen
-  corpus window, every accepted candidate reproduces the observed samples
-  exactly through **both** its intrinsic closure and the scalar evaluator
-  (plus a bounded seek window); storage costs come from the H.2 complete-cost
-  oracle and are reduced to a deterministic Pareto frontier over static
-  objectives. On the frozen corpus 6/14 fixtures have a cheaper exact
-  non-literal explanation (silence 46 B vs literal 183 B, DC 50 B vs 327 B,
-  single-sine 574 B at an exact period of 64, quasi-periodic 15937 B,
-  am-signal 1420 B at residual period 128), while `impulse-train`,
-  `transient-heavy`, `harmonic-tone`, `fm-signal`, `stereo-correlated` and the
-  three negative controls are honestly cheapest as entropy-coded literals. The
-  explanation search, archive deduplication and a procedural-library reference
-  are reported separately;
-- `cargo run -- court flattening` — Phase K host flat-evaluator parity:
-  `flat == scalar` bit-for-bit over the frozen fixtures and an adversarial
-  battery, with residual-closure materialization and upload bytes accounted
-  rather than hidden;
-- `cargo run -- court inverse-search` — Phase L search placement: the bounded
-  period scan over 14 fixtures × 512 candidate periods on scalar,
-  16-thread parallel and CUDA surfaces, requiring identical per-period counts
-  on every surface and requiring the device-ranked proposals to reproduce
-  exactly the sequential accepted set (re-verified by the exact evaluator).
-  Measured ratios are reported as-is, with no claim that the GPU wins; the
-  ROCm row is a typed negative on this host while the `vole_period_scan` entry
-  is part of the AMDGPU compile surface;
-- `cargo run -- court cuda` — Phase G CUDA D0: `scalar == CUDA` bit-exact on
-  the frozen fixture worlds across standard / high-priority / captured-graph
-  submission, semantic facts F01–F14 re-verified on the device, a random
-  differential subset on the GPU, and fixture-level CPU vs CUDA throughput
-  cells incl. a voices × quantum crossover sweep. Needs the PTX artifact
-  (`scripts/build-cuda-device.sh`) and a CUDA device; absent hardware or
-  artifact yields an honest `UNSUPPORTED_BY_HARDWARE` / `INCONCLUSIVE`
-  receipt, never a manufactured result;
-- `cargo run -- court d1` — Phase H CUDA D1 falsification: register the
-  **actual** ALSA `hw:` mmap region (`cuMemHostRegister` DEVICEMAP + device
-  pointer), render each contiguous mmap chunk's final codes directly into
-  that region (kernel write → stream sync → in-place shadow verify vs the
-  scalar oracle — no shadow sample buffer → `snd_pcm_mmap_commit` with an
-  exact transferred-frame check), and compare against a D0-mmap baseline
-  that runs the **same 48 000-frame window** on the same endpoint shape —
-  measuring the exact materialization bytes D1 removes (D0: 384 KB DtoH +
-  384 KB host copy; D1: 0 B / 0 B — D1 is a directness/traffic result, not
-  a latency claim, in this court). Verification reads are a separately
-  named surface. Default content is silence-safe; `--emit-audio` opts into
-  an audible demo. Every candidate endpoint gets its own trial row (the
-  first registered device runs the session; the rest are probed for
-  open/mmap/format/registration with `playback_attempted: false`), and the
-  endpoint must grant the exact 48 kHz rate with validated interleaved
-  channel geometry. Requires Linux + ALSA + the PTX artifact + a CUDA
-  device; the sealed run registered the on-board HDA ring
-  (`snd_hda_intel`) and played byte-exact with zero xruns
-  (`D1_ENDPOINT_MAPPED`, `HOST_MAPPED`); devices that refuse open, mmap,
-  format, or registration stay visible as their own negative rows.
-- Phase H.2 entropy courts — `court entropy-rans` (native codec battery incl.
-  hostile corpus), `court entropy-literal` (RAW vs native rANS vs U1 vs FLAC
-  baselines), `court entropy-residual` (exact-residual entropy coding),
-  `court entropy-pages` (page-size Pareto 64..4096 + seek/corruption),
-  `court entropy-partial` (partial == full slice), `court entropy-simd`
-  (CPU page-parallel surface, exact; instruction-SIMD decode honestly
-  recorded `NOT_IMPLEMENTED`), `court entropy-cuda` (scalar == CUDA decode
-  on literal/RAW/residual jobs), `court entropyfs` / `court dsfb-entropy`
-  (optional store persistence and zero-authority search governance;
-  feature-gated, `INCONCLUSIVE` without), and `court entropy-d1` — the
-  flagship fused path: entropy-coded literal, procedural mono+residual, and
-  a high-entropy control are decoded on the GPU per bounded 512-frame window
-  (only the window's pages) and written directly into the registered ALSA
-  ring beside an equal-work D0 baseline — D1 removes 32 768 B GPU→host +
-  32 768 B host copies (literal) and 16 384 B + 32 768 B (residual) with
-  zero xruns and byte-exact ring codes; verification is separately
-  accounted. `court h2` runs the whole H.2 battery as an aggregate.
-  `court rocm` (Phase I) is two-dimensional and fails closed: the
-  `compile_surface` (artifact present + ELF-valid AMDGPU code object with the
-  required kernel entries + provenance sidecar matching the attested source
-  tree; built by `scripts/build-rocm-device.sh`, byte-deterministic across
-  isolated builds) and the `runtime_surface` (AMD GPU -> amdgpu driver ->
-  KFD -> HIP/HSA dlopen + symbols; missing userspace is `UNSUPPORTED_BY_API`,
-  never a hardware verdict). An unsatisfied compile surface is
-  `INCONCLUSIVE`; with it satisfied, this host reports
-  `UNSUPPORTED_BY_HARDWARE` with the typed cause. No kernel is executed by
-  the Phase I court; the differential scalar == ROCm battery is Phase J on
-  ROCm hardware. `vole-audio probe rocm` prints the same classification.
-  Receipts bind the binary to its source (compiled-from ==
-  executed-in-worktree) and the GPU artifacts to their provenance sidecars.
+**Measured position (as of v0.57.0).** On the frozen real-speech corpus
+(LibriSpeech, CC BY 4.0), the exact learned portfolio is:
+
+| split | VOLE portfolio | FLAC-5 | FLAC-8 | record |
+| ----- | -------------- | ------ | ------ | ------ |
+| effectiveness (dev-clean, 8 clips) | **126 620 B** | 130 331 B | 129 713 B | 7/8 wins vs both |
+| held-out Mode C (test-clean, 8 clips) | **136 852 B** | 144 145 B | 142 714 B | 8/8 wins |
+
+That is a speech-corpus result on this host — not a general-audio flagship
+claim, and not a real-time/deadline claim.
+
+Phase 6 so far: `StatefulSyntaxParse` (v0.54.0), `IterativeReprice` (v0.55.0),
+`EntropyReblock` (v0.56.0 — it moved effectiveness 126 899 → 126 620 B and
+Mode C 137 362 → 136 852 B), and `SampleExpertMux` (v0.57.0).
+
+**Executable evidence today.** `cargo run -- court <name>`. The authoritative
+court list is the registry in `src/courts/mod.rs`; the aggregate courts are
+`all` (Phase M), `h2` (Phase H.2), `phase-n` (Phase N) and `learned` (Phase O),
+and every court emits an immutable receipt under `receipts/`. The exact seal
+expectation is checked by `vole-audio seal verify --receipts receipts`
+(59 rows at v0.57.0). The full per-phase evidence narrative — the Phase H/H.2
+endpoint measurements, the Phase K/L inverse results, and every seal's numbers —
+lives in
+[CHANGELOG.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/CHANGELOG.md).
 
 The exact ledger — completed phases, evidence, blockers, and the next work
 item — is
 [PROJECT_STATE.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/PROJECT_STATE.md)
-(repository-only). The H.2 phase charter and seal ledger live in
-[PHASE_H2.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/PHASE_H2.md)
-with its normative documents (`ENTROPY_NATIVE.md`, `RANS.md`,
-`ENTROPY_ACCOUNTING.md`, `ENTROPYFS.md`, `DSFB_SEARCH.md`, ADRs 0001–0005);
-the Phase K inverse compiler and its seal ledger live in
-[INVERSE.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/INVERSE.md)
-and
-[PHASE_K.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/PHASE_K.md);
-the Phase L search placement is in
-[PHASE_L.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/PHASE_L.md).
-Fixture-level measurements are in
+(repository-only). The phase charters (`PHASE_H2.md`, `PHASE_K.md`,
+`PHASE_L.md`, `PHASE_M.md`, `PHASE_N.md`, `PHASE_O.md`, `PHASE_O_EXP2.md`) and
+the normative documents (`ENTROPY_NATIVE.md`, `RANS.md`,
+`ENTROPY_ACCOUNTING.md`, `ENTROPYFS.md`, `DSFB_SEARCH.md`, ADRs 0001–0005) live
+under `docs/`. Fixture-level measurements are in
 [PERFORMANCE.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/PERFORMANCE.md);
 the spec is
 [U1_SPEC.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/U1_SPEC.md),
@@ -307,37 +219,40 @@ probed; CPU-only machines run every non-GPU court unchanged.
 Every claim this repository makes is backed by an immutable receipt. Run
 `vole-audio probe` to see the environment capture and `vole-audio receipt show
 <file>` to verify a receipt's self-hash. Each receipt records its git commit,
-a source-tree hash, and a dirty-state that excludes receipt-output writes —
-see the
+a source-tree hash, and a dirty-state that excludes receipt-output writes; the
+**seal subject** it binds is every tracked source file except
+`receipts/`, `target/`, `scripts/out/`, `docs/` and `.git/`, so committing
+evidence or documentation cannot invalidate a seal while any code change does.
+See the
 [EVIDENCE.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/EVIDENCE.md)
-measurement-boundary notes (repository-only). Courts arrive with their phases;
-the court list is fixed in the implementation contract (semantic, authored,
-simd, facts, inverse, flattening, cuda, rocm, d1, d2, depth, conventional,
-random-access, negative, interference, all, archive, transport). `inverse`,
-`flattening` and `inverse-search` are Phases K/L; `d2`, `depth`, `conventional`,
-`random-access`, `negative`, `interference` and `all` arrive with Phase M; the
-canonical `.volea` archive and deterministic transport (`archive`, `transport`,
-`phase-n`) arrive with Phase N. The learned deterministic prediction courts
-(`learned-determinism`, `learned-residual-codec`, `learned-linear`,
-`learned-intrinsic`, `learned-transfer`, `learned-residual`,
-`learned-quantization`, `learned-capacity`, `learned-shared`,
-`learned-random-access`, `learned-gpu`, `learned-training-cost`,
-`learned-inverse`, `learned`) arrive with Phase O under the experimental
-`vole.audio.learned.exp1` profile.
+measurement-boundary notes (repository-only).
+
+The court list is not fixed in this README: the authoritative registry is
+`COURT_NAMES` in `src/courts/mod.rs`, and the newest receipt per court is what
+`seal verify` checks. Courts arrived with their phases — A–M (oracle, SIMD,
+CUDA/ROCm, inverse, conventional and runtime courts), N (`archive`,
+`transport`, `phase-n`), O (`learned-*` under `vole.audio.learned.exp1`), and
+the Exp2/Exp3/Phase-6 courts under the experimental `learned` profiles. The
+exact per-seal matrix and every frozen result hash are recorded per receipt and
+summarized in
+[CHANGELOG.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/CHANGELOG.md).
 
 ## Non-claims
 
 See
 [NON_CLAIMS.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/NON_CLAIMS.md)
-(repository-only). Notably: no *flagship* performance figure exists yet —
-fixture-level Phase F/H.2 measurements exist and are labeled as such in
-[PERFORMANCE.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/PERFORMANCE.md);
-no real-time/deadline claim is made before the Phase M courts. The entropy
-phase adds its own non-claims: rANS is never presented as a generator, the
-DAC does not "consume compressed audio", D1 is not a latency optimization in
-the Phase-H court, EntropyFS/DSFB are optional and never enter playback, and
-the GPU never owns semantic authority (scalar does). This repository is
-hostile to self-deception by design.
+(repository-only). In particular: the speech-corpus result above is exactly
+that — a frozen-speech-corpus result on this host, not a general-audio flagship
+claim, and not a real-time/deadline claim. Fixture-level measurements in
+[PERFORMANCE.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/PERFORMANCE.md)
+are labeled as fixture-level. The entropy phase adds its own non-claims: rANS is
+never presented as a generator, the DAC does not "consume compressed audio", D1
+is not a latency optimization in the Phase-H court, EntropyFS/DSFB are optional
+and never enter playback, and the GPU never owns semantic authority (scalar
+does). Learned prediction is an experimental candidate family, never truth: a
+learned object participates only after canonical quantization, exact residual
+closure and complete dependency accounting, and the literal fallback stays
+mandatory. This repository is hostile to self-deception by design.
 
 ## License
 
