@@ -146,6 +146,8 @@ pub(crate) mod measure;
 #[cfg(feature = "std")]
 pub mod negative;
 #[cfg(feature = "std")]
+pub mod page_batch_simd;
+#[cfg(feature = "std")]
 pub mod phase_n;
 #[cfg(feature = "std")]
 pub mod random_access;
@@ -481,6 +483,15 @@ reporting the index's byte cost against the stream; decoder-chosen parallelism b
 metadata, never a compression-ratio claim",
     ),
     (
+        "page-batch-simd",
+        "Phase 6 mechanism 12 (`PageBatchSIMD`): canonical rANS pages with two implicit alternating
+states decode identically sequentially and in batches of 4/8/16 lanes, because no ISA width is
+present in the format; the court splits each fixture's magnitude-bucket stream into canonical pages,
+encodes them with the two-state coder and requires the lockstep batch decode to equal the
+sequential page-by-page decode on every lane count; a throughput-equivalence mechanism with no
+compression-ratio claim",
+    ),
+    (
         "learned-speech-trace",
         "Seal S0 diagnostic: bit-for-bit trace of the frozen B1 FLAC-5 artifact (subframe kinds, orders, precision, shift, partition order, residual payload) beside the wired three-family Exp2 VOLE byte waterfall, on the real + Mode-C corpus",
     ),
@@ -680,6 +691,7 @@ pub fn run(name: &str, receipts_root: &Path) -> crate::error::Result<Verdict> {
         "learned-solid-object-columns" => learned_solid_object_columns::run(receipts_root),
         "learned-admissible-search-bounds" => learned_admissible_search_bounds::run(receipts_root),
         "recoil-checkpoints" => recoil::run(receipts_root),
+        "page-batch-simd" => page_batch_simd::run(receipts_root),
         "learned-exp2-transfer" => learned_exp2_transfer::run(receipts_root),
         "learned-residual-codec" => learned_residual_codec::run(receipts_root),
         "learned-residual-codec2" => learned_residual_codec2::run(receipts_root),
