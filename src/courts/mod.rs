@@ -72,6 +72,8 @@ pub mod learned_capacity;
 #[cfg(feature = "std")]
 pub(crate) mod learned_common;
 #[cfg(feature = "std")]
+pub mod learned_decision_trace;
+#[cfg(feature = "std")]
 pub mod learned_determinism;
 #[cfg(feature = "std")]
 pub mod learned_ema_rans;
@@ -409,6 +411,18 @@ over magnitude-skewed fixtures and the real speech effectiveness residuals; held
 untouched",
     ),
     (
+        "learned-decision-trace",
+        "Phase 6 mechanism 6 (`DecisionTraceRans`): residual codec id 26 keeps the EmaRans envelope
+(17-symbol high-part alphabet, raw sign/low bits, Exp-Golomb escape) but gives each
+decoder-visible context its own integer EMA CDF, so it is forward-adaptive and conditioned while
+still transmitting no probability table; built on the `learned::decision_trace` forward-record /
+backward-emit primitive; isolated against the best pre-existing codec, the order-0 EmaRans, the
+static ContextRans and the Reblock partitioner over conditional synthetic fixtures and the real
+speech effectiveness residuals, with an encoder-only context-function ablation (order0,
+prev_band4, prev_band8, shipped band4_prev2zero, band4_band4, prev_full, prev_full_prev2zero,
+prev2_full); every payload round-trips exactly; held-out Mode C untouched",
+    ),
+    (
         "learned-speech-trace",
         "Seal S0 diagnostic: bit-for-bit trace of the frozen B1 FLAC-5 artifact (subframe kinds, orders, precision, shift, partition order, residual payload) beside the wired three-family Exp2 VOLE byte waterfall, on the real + Mode-C corpus",
     ),
@@ -602,6 +616,7 @@ pub fn run(name: &str, receipts_root: &Path) -> crate::error::Result<Verdict> {
         "learned-entropy-reblock" => learned_entropy_reblock::run(receipts_root),
         "learned-expert-mux" => learned_expert_mux::run(receipts_root),
         "learned-ema-rans" => learned_ema_rans::run(receipts_root),
+        "learned-decision-trace" => learned_decision_trace::run(receipts_root),
         "learned-exp2-transfer" => learned_exp2_transfer::run(receipts_root),
         "learned-residual-codec" => learned_residual_codec::run(receipts_root),
         "learned-residual-codec2" => learned_residual_codec2::run(receipts_root),

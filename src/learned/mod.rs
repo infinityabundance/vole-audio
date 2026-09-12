@@ -20,6 +20,7 @@ pub mod carousel;
 pub mod context_mixture;
 pub mod corpus;
 pub mod corpus_real;
+pub mod decision_trace;
 pub mod finite_field;
 pub mod fixed;
 pub mod graph;

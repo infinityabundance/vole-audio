@@ -31,6 +31,9 @@ use crate::entropy::rans::{
     enc_flush, enc_put, encode_capacity,
 };
 use crate::error::{Error, Kind, Result};
+use crate::learned::decision_trace::{
+    AdaptiveCategorical, decode_chunk as trace_decode_chunk, encode_chunk as trace_encode_chunk,
+};
 
 /// Frozen partition ladder for `PartitionRice`.
 pub const PARTITION_LADDER: [usize; 7] = [16, 32, 64, 128, 256, 512, 1024];
@@ -112,6 +115,10 @@ pub enum ResidualCodecV2 {
     /// Forward-adaptive categorical EMA rANS over a 17-symbol alphabet
     /// (Phase 6 mechanism 5, `EmaRans17`).
     EmaRans = 25,
+    /// Forward-adaptive, context-conditioned categorical rANS whose context is
+    /// a function of the already-decoded symbol history (Phase 6 mechanism 6,
+    /// `DecisionTraceRans`). No probability table is transmitted.
+    DecisionTrace = 26,
 }
 
 impl ResidualCodecV2 {
@@ -151,8 +158,8 @@ impl ResidualCodecV2 {
         ResidualCodecV2::ContextRans,
     ];
 
-    /// The Exp3 additions (Seal S4, E1..E5, C0..C2, P6-3, P6-5), in canonical tie order.
-    pub const ALL_V3: [ResidualCodecV2; 26] = [
+    /// The Exp3 additions (Seal S4, E1..E5, C0..C2, P6-3, P6-5, P6-6), in canonical tie order.
+    pub const ALL_V3: [ResidualCodecV2; 27] = [
         ResidualCodecV2::DenseI32,
         ResidualCodecV2::SparseDelta,
         ResidualCodecV2::ZigZagVarint,
@@ -179,6 +186,7 @@ impl ResidualCodecV2 {
         ResidualCodecV2::BgmcSse,
         ResidualCodecV2::Reblock,
         ResidualCodecV2::EmaRans,
+        ResidualCodecV2::DecisionTrace,
     ];
 
     /// Canonical codec identifier byte.
@@ -215,6 +223,7 @@ impl ResidualCodecV2 {
             ResidualCodecV2::BgmcSse => "bgmc_sse",
             ResidualCodecV2::Reblock => "reblock",
             ResidualCodecV2::EmaRans => "ema_rans",
+            ResidualCodecV2::DecisionTrace => "decision_trace",
         }
     }
 
@@ -247,6 +256,7 @@ impl ResidualCodecV2 {
             23 => Some(ResidualCodecV2::BgmcSse),
             24 => Some(ResidualCodecV2::Reblock),
             25 => Some(ResidualCodecV2::EmaRans),
+            26 => Some(ResidualCodecV2::DecisionTrace),
             _ => None,
         }
     }
@@ -310,6 +320,7 @@ impl ResidualCodecV2 {
             ResidualCodecV2::BgmcSse => encode_bgmc_sse(residual),
             ResidualCodecV2::Reblock => encode_reblock(residual),
             ResidualCodecV2::EmaRans => encode_ema_rans(residual),
+            ResidualCodecV2::DecisionTrace => encode_decision_trace(residual),
         }
     }
 
@@ -347,6 +358,7 @@ impl ResidualCodecV2 {
             ResidualCodecV2::BgmcSse => decode_bgmc_sse(bytes, len),
             ResidualCodecV2::Reblock => decode_reblock(bytes, len),
             ResidualCodecV2::EmaRans => decode_ema_rans(bytes, len),
+            ResidualCodecV2::DecisionTrace => decode_decision_trace(bytes, len),
         }
     }
 }
@@ -1348,17 +1360,23 @@ const EMA_CHUNK: usize = 4096;
 struct EmaModel {
     /// `EMA_K + 1` cumulative frequencies; `cdf[0] = 0`, `cdf[EMA_K] = total`.
     cdf: [u32; EMA_K + 1],
+    /// Adaptation shift, `CDF += (target - CDF) >> rate`.
+    rate: u32,
 }
 
 impl EmaModel {
     fn new() -> Self {
+        Self::with_rate(EMA_RATE)
+    }
+
+    fn with_rate(rate: u32) -> Self {
         let mut cdf = [0u32; EMA_K + 1];
         for (i, slot) in cdf.iter_mut().enumerate() {
             *slot = (i as u32 * MODEL_TOTAL) / EMA_K as u32;
         }
         cdf[0] = 0;
         cdf[EMA_K] = MODEL_TOTAL;
-        Self { cdf }
+        Self { cdf, rate }
     }
 
     #[inline]
@@ -1375,16 +1393,17 @@ impl EmaModel {
         s
     }
 
-    /// `CDF[s] += (Target(s) - CDF[s]) >> EMA_RATE` with `Target(s) = 1` for
+    /// `CDF[s] += (Target(s) - CDF[s]) >> rate` with `Target(s) = 1` for
     /// `s >= sym`, then deterministic validity clamps so the table stays
     /// nondecreasing with every frequency at least one. Encoder and decoder
     /// run exactly this, so the clamp only needs determinism.
     fn update(&mut self, sym: usize) {
         let total = i64::from(MODEL_TOTAL);
+        let rate = self.rate;
         for i in 1..EMA_K {
             let target = if i <= sym { 0 } else { total };
             let c = i64::from(self.cdf[i]);
-            self.cdf[i] = (c + ((target - c) >> EMA_RATE)).clamp(0, total) as u32;
+            self.cdf[i] = (c + ((target - c) >> rate)).clamp(0, total) as u32;
         }
         for i in (1..EMA_K).rev() {
             let ub = MODEL_TOTAL - (EMA_K - i) as u32;
@@ -1542,6 +1561,298 @@ fn decode_ema_rans(bytes: &[u8], len: usize) -> Result<Vec<i32>> {
         }
     }
     Ok(out)
+}
+
+// ---------------------------------------------------------------------------
+// id 26: DecisionTrace (Phase 6 mechanism 6, `DecisionTraceRans`)
+// ---------------------------------------------------------------------------
+//
+// The same high-part/raw-low-bit factorization as `EmaRans`, but the adaptive
+// categorical model is **conditioned**: each context keeps its own EMA CDF, and
+// the context is a deterministic function of the already-decoded high-part
+// symbols. No table is transmitted — the decoder rebuilds every context from
+// the symbols it has already reconstructed, exactly as `EmaRans` rebuilds its
+// single table.
+//
+// This is the codec that distinguishes "forward-adaptive categorical" from
+// "forward-adaptive **context** categorical": where `EmaRans` pays one global
+// model, `DecisionTrace` lets the previous high-part magnitude band shift the
+// distribution the next symbol is coded under. It is built directly on
+// `learned::decision_trace`'s forward-record/backward-emit primitive, so the
+// rANS stack ordering is handled by construction.
+
+/// Alphabet size of the `DecisionTrace` high-part model (matches `EmaRans`).
+const DT_K: usize = EMA_K;
+/// Highest high part coded by a dedicated symbol (16 is the escape).
+const DT_NON_ESCAPE_MAX: u64 = (DT_K as u64) - 2;
+/// Contexts shipped by the codec: `context_of(previous high part)`, i.e. four
+/// magnitude bands. Chosen from the ablation in `court learned-decision-trace`
+/// as the context variant with the smallest complete cost on the frozen
+/// effectiveness set; richer contexts win more on conditional sources but lose
+/// more on the whitened speech residual.
+const DT_CONTEXTS: usize = 4;
+/// EMA adaptation shift (`CDF += (target - CDF) >> DT_RATE`).
+const DT_RATE: u32 = 5;
+/// Trace chunk length (bounds encoder working memory).
+const DT_CHUNK: usize = 4096;
+
+/// A bank of EMA categorical tables sharing the `EmaRans` alphabet. The context
+/// count is dynamic so the court can ablate the context function without a
+/// second codec: the shipped codec uses [`DT_CONTEXTS`] tables.
+#[derive(Clone)]
+struct TraceModel {
+    tables: Vec<EmaModel>,
+}
+
+impl TraceModel {
+    fn new(contexts: usize) -> Self {
+        Self {
+            tables: vec![EmaModel::with_rate(DT_RATE); contexts.max(1)],
+        }
+    }
+}
+
+impl AdaptiveCategorical for TraceModel {
+    fn contexts(&self) -> usize {
+        self.tables.len()
+    }
+
+    fn alphabet(&self) -> usize {
+        DT_K
+    }
+
+    fn interval(&self, ctx: usize, sym: usize) -> (u32, u32) {
+        self.tables[ctx].interval(sym)
+    }
+
+    fn update(&mut self, ctx: usize, sym: usize) {
+        self.tables[ctx].update(sym)
+    }
+
+    fn symbol_for(&self, ctx: usize, slot: u32) -> usize {
+        self.tables[ctx].find(slot)
+    }
+}
+
+/// Decoder-visible context: the magnitude band of the previous high part. The
+/// input is already-decoded, so encoder and decoder agree without transmitted
+/// state.
+#[inline]
+fn dt_context(history: &[usize]) -> usize {
+    context_of(history.last().copied().unwrap_or(0) as u8)
+}
+
+/// Eight magnitude bands over the 17-symbol high-part alphabet.
+#[inline]
+fn dt_band8(p: usize) -> usize {
+    match p {
+        0 => 0,
+        1 => 1,
+        2 => 2,
+        3..=4 => 3,
+        5..=6 => 4,
+        7..=9 => 5,
+        10..=12 => 6,
+        _ => 7,
+    }
+}
+
+/// The high-part symbol for one magnitude (identical alphabet to `EmaRans`).
+#[inline]
+fn dt_symbol(m: u64, shift: u32) -> usize {
+    let h = m >> shift;
+    if h == 0 {
+        0
+    } else if h <= DT_NON_ESCAPE_MAX {
+        h as usize
+    } else {
+        DT_K - 1
+    }
+}
+
+/// Encode `residual` under a `contexts`-table trace model with context function
+/// `ctx_of`. This is the shared envelope: `shift` byte, the sample count, the
+/// per-chunk rANS regions and the raw low/sign/escape bits.
+fn encode_trace_with<F>(contexts: usize, ctx_of: F, residual: &[i32]) -> Vec<u8>
+where
+    F: Fn(&[usize]) -> usize + Copy,
+{
+    let n = residual.len();
+    let shift = bgmc_shift(residual);
+    let mut model = TraceModel::new(contexts);
+    let mut chunks: Vec<Vec<u8>> = Vec::new();
+    let mut raw = BitWriter::new();
+    let mut t = 0usize;
+    while t < n {
+        let end = (t + DT_CHUNK).min(n);
+        let len = end - t;
+        let syms: Vec<usize> = residual[t..end]
+            .iter()
+            .map(|&r| dt_symbol(u64::from(r.unsigned_abs()), shift))
+            .collect();
+        let mut buf = vec![0u8; encode_capacity(len).max(16)];
+        let chunk = match trace_encode_chunk(&mut model, &syms, ctx_of, &mut buf) {
+            Some(region) => region.to_vec(),
+            None => Vec::new(),
+        };
+        chunks.push(chunk);
+        for (i, &r) in residual[t..end].iter().enumerate() {
+            let m = u64::from(r.unsigned_abs());
+            if shift > 0 {
+                raw.bits(m & ((1u64 << shift) - 1), shift);
+            }
+            if syms[i] == DT_K - 1 {
+                write_eg0(&mut raw, m >> shift);
+            }
+            if m > 0 {
+                raw.bit(r < 0);
+            }
+        }
+        t = end;
+    }
+    let mut out = Vec::new();
+    out.push(shift as u8);
+    out.extend_from_slice(&(n as u64).to_le_bytes());
+    out.extend_from_slice(&(chunks.len() as u32).to_le_bytes());
+    for c in &chunks {
+        put_uvarint(&mut out, c.len() as u64);
+    }
+    for c in &chunks {
+        out.extend_from_slice(c);
+    }
+    out.extend_from_slice(&raw.finish());
+    out
+}
+
+fn encode_decision_trace(residual: &[i32]) -> Vec<u8> {
+    encode_trace_with(DT_CONTEXTS, dt_context, residual)
+}
+
+/// Encoder-only ablation of the context function: the same envelope and model
+/// class under contexts of increasing richness. This is analysis machinery for
+/// `court learned-decision-trace`; only the shipped `prev_band4` variant is a
+/// bitstream codec, so the rest report payload bytes and are never decoded.
+///
+/// Each entry is `(label, complete_bytes)` where complete bytes include the
+/// codec-id byte the canonical encoding would carry.
+pub fn decision_trace_context_ablation(residual: &[i32]) -> Vec<(&'static str, u64)> {
+    type ContextFn = fn(&[usize]) -> usize;
+    fn order0(_: &[usize]) -> usize {
+        0
+    }
+    fn prev_band8(h: &[usize]) -> usize {
+        dt_band8(h.last().copied().unwrap_or(0))
+    }
+    fn band4_prev2zero(h: &[usize]) -> usize {
+        let p1 = context_of(h.last().copied().unwrap_or(0) as u8);
+        let p2z = h.len() < 2 || h[h.len() - 2] == 0;
+        p1 * 2 + usize::from(p2z)
+    }
+    fn band4_band4(h: &[usize]) -> usize {
+        let p1 = context_of(h.last().copied().unwrap_or(0) as u8);
+        let p2 = if h.len() >= 2 {
+            context_of(h[h.len() - 2] as u8)
+        } else {
+            0
+        };
+        p1 * 4 + p2
+    }
+    fn prev_full(h: &[usize]) -> usize {
+        h.last().copied().unwrap_or(0)
+    }
+    fn prev_full_prev2zero(h: &[usize]) -> usize {
+        let p1 = h.last().copied().unwrap_or(0);
+        let p2z = h.len() < 2 || h[h.len() - 2] == 0;
+        p1 * 2 + usize::from(p2z)
+    }
+    fn prev2_full(h: &[usize]) -> usize {
+        let p1 = h.last().copied().unwrap_or(0);
+        let p2 = if h.len() >= 2 { h[h.len() - 2] } else { 0 };
+        p1 * DT_K + p2
+    }
+    let variants: [(&'static str, usize, ContextFn); 8] = [
+        ("order0", 1, order0),
+        ("prev_band4", DT_CONTEXTS, dt_context),
+        ("prev_band8", 8, prev_band8),
+        ("band4_prev2zero", 8, band4_prev2zero),
+        ("band4_band4", 16, band4_band4),
+        ("prev_full", DT_K, prev_full),
+        ("prev_full_prev2zero", DT_K * 2, prev_full_prev2zero),
+        ("prev2_full", DT_K * DT_K, prev2_full),
+    ];
+    variants
+        .iter()
+        .map(|&(name, contexts, f)| {
+            (
+                name,
+                encode_trace_with(contexts, f, residual).len() as u64 + 1,
+            )
+        })
+        .collect()
+}
+
+fn decode_trace_with<F>(contexts: usize, ctx_of: F, bytes: &[u8], len: usize) -> Result<Vec<i32>>
+where
+    F: Fn(&[usize]) -> usize + Copy,
+{
+    let mut r = Reader::new(bytes);
+    let shift = u32::from(r.u8()?);
+    if shift > 24 {
+        return Err(Error::malformed("decision-trace shift out of range"));
+    }
+    let n = r.u64le()? as usize;
+    if n != len {
+        return Err(Error::malformed("decision-trace length mismatch"));
+    }
+    let nchunks = u32::from_le_bytes(r.take(4)?.try_into().unwrap()) as usize;
+    if nchunks != n.div_ceil(DT_CHUNK) {
+        return Err(Error::malformed("decision-trace chunk count mismatch"));
+    }
+    let mut lens = Vec::with_capacity(nchunks);
+    for _ in 0..nchunks {
+        lens.push(r.uvarint()? as usize);
+    }
+    let mut chunk_slices = Vec::with_capacity(nchunks);
+    for &l in &lens {
+        chunk_slices.push(r.take(l)?);
+    }
+    let raw = r.take(r.remaining())?;
+    let mut model = TraceModel::new(contexts);
+    let mut br = BitReader::new(raw);
+    let mut out = Vec::with_capacity(n);
+    for (ci, chunk) in chunk_slices.iter().enumerate() {
+        let start = ci * DT_CHUNK;
+        let end = (start + DT_CHUNK).min(n);
+        let mut syms: Vec<usize> = Vec::with_capacity(end - start);
+        trace_decode_chunk(&mut model, chunk, end - start, ctx_of, &mut syms)?;
+        for &s in &syms {
+            let low = if shift > 0 { br.read_bits(shift)? } else { 0 };
+            let h = if s == DT_K - 1 {
+                read_eg0(&mut br)?
+            } else {
+                s as u64
+            };
+            let m = (h << shift) | low;
+            if m > (1u64 << 31) {
+                return Err(Error::malformed(
+                    "decision-trace magnitude exceeds i32 range",
+                ));
+            }
+            let neg = if m > 0 { br.read_bit()? } else { false };
+            if m == (1u64 << 31) && !neg {
+                return Err(Error::malformed(
+                    "decision-trace magnitude is not representable",
+                ));
+            }
+            let value = if neg { -(m as i64) } else { m as i64 };
+            out.push(value as i32);
+        }
+    }
+    Ok(out)
+}
+
+fn decode_decision_trace(bytes: &[u8], len: usize) -> Result<Vec<i32>> {
+    decode_trace_with(DT_CONTEXTS, dt_context, bytes, len)
 }
 
 // ---------------------------------------------------------------------------
@@ -4601,7 +4912,7 @@ mod tests {
         let c = ResidualCodecV2::Reblock;
         assert_eq!(c.name(), "reblock");
         assert_eq!(ResidualCodecV2::from_id(24), Some(c));
-        assert_eq!(ResidualCodecV2::ALL_V3.len(), 26);
+        assert_eq!(ResidualCodecV2::ALL_V3.len(), 27);
         for residual in sample_residuals() {
             let payload = c.encode(&residual);
             let back = c
@@ -4630,7 +4941,7 @@ mod tests {
         let c = ResidualCodecV2::EmaRans;
         assert_eq!(c.name(), "ema_rans");
         assert_eq!(ResidualCodecV2::from_id(25), Some(c));
-        assert_eq!(ResidualCodecV2::ALL_V3.len(), 26);
+        assert_eq!(ResidualCodecV2::ALL_V3.len(), 27);
         for residual in sample_residuals() {
             let payload = c.encode(&residual);
             let back = c
@@ -4647,6 +4958,75 @@ mod tests {
             .collect();
         let payload = c.encode(&big);
         assert_eq!(c.decode(&payload, big.len()).unwrap(), big);
+    }
+
+    #[test]
+    fn decision_trace_round_trips_exactly_and_conditions_on_history() {
+        let c = ResidualCodecV2::DecisionTrace;
+        assert_eq!(c.name(), "decision_trace");
+        assert_eq!(ResidualCodecV2::from_id(26), Some(c));
+        assert_eq!(ResidualCodecV2::ALL_V3.len(), 27);
+        for residual in sample_residuals() {
+            let payload = c.encode(&residual);
+            let back = c
+                .decode(&payload, residual.len())
+                .unwrap_or_else(|e| panic!("decision_trace: {e}"));
+            assert_eq!(back, residual);
+        }
+        let extreme = vec![i32::MIN, i32::MAX, -1, 0, 1, 2, -2, 1 << 30, -(1 << 30)];
+        let payload = c.encode(&extreme);
+        assert_eq!(c.decode(&payload, extreme.len()).unwrap(), extreme);
+        // Cross several 4096-sample trace-chunk boundaries.
+        let big: Vec<i32> = (0..9000)
+            .map(|i| ((i as i64 * 2654435761) % 100003 - 50001) as i32)
+            .collect();
+        let payload = c.encode(&big);
+        assert_eq!(c.decode(&payload, big.len()).unwrap(), big);
+        // The whole point of the mechanism: on a source whose next high part
+        // depends on the previous one, context conditioning must beat the
+        // order-0 EMA model of `EmaRans`.
+        let mut regime = Vec::with_capacity(8192);
+        for i in 0..8192i32 {
+            let mag = match i % 4 {
+                0 => 1i32,
+                1 => 3,
+                2 => 9,
+                _ => 1 << 20,
+            };
+            regime.push(if i % 2 == 0 { mag } else { -mag });
+        }
+        assert!(
+            c.complete_len(&regime) <= ResidualCodecV2::EmaRans.complete_len(&regime),
+            "decision_trace {} vs ema_rans {}",
+            c.complete_len(&regime),
+            ResidualCodecV2::EmaRans.complete_len(&regime)
+        );
+    }
+
+    #[test]
+    fn decision_trace_context_ablation_is_deterministic_and_informative() {
+        let residual: Vec<i32> = (0..8192i64)
+            .map(|i| {
+                let mags = [1i64, 2, 5, 13, 40, 121, 40, 13, 5, 2];
+                let m = mags[(i as usize) % mags.len()];
+                (if (i as usize).is_multiple_of(2) {
+                    m
+                } else {
+                    -m
+                }) as i32
+            })
+            .collect();
+        let a = decision_trace_context_ablation(&residual);
+        let b = decision_trace_context_ablation(&residual);
+        assert_eq!(a, b, "ablation must be deterministic");
+        assert_eq!(a.len(), 8);
+        assert_eq!(a[0].0, "order0");
+        assert_eq!(a[1].0, "prev_band4");
+        // The shipped variant is the codec's own payload plus the id byte.
+        let shipped = ResidualCodecV2::DecisionTrace.encode(&residual).len() as u64 + 1;
+        assert_eq!(a[1].1, shipped);
+        // On a conditional source, context conditioning must beat order 0.
+        assert!(a[1].1 < a[0].1, "shipped {} vs order0 {}", a[1].1, a[0].1);
     }
 
     impl ResidualCodecV2 {
