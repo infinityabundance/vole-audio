@@ -50,6 +50,8 @@ pub mod entropy_simd;
 #[cfg(feature = "std")]
 pub mod entropyfs;
 #[cfg(feature = "std")]
+pub mod envelope_flattened_tns;
+#[cfg(feature = "std")]
 pub mod facts;
 #[cfg(feature = "std")]
 pub mod flagship;
@@ -492,6 +494,15 @@ sequential page-by-page decode on every lane count; a throughput-equivalence mec
 compression-ratio claim",
     ),
     (
+        "envelope-flattened-tns",
+        "Phase 6 mechanism 13 (`EnvelopeFlattenedTNS`, lossy/exploratory): a low-order spectral
+predictor estimated directly on a transform's spectrum spends its degrees of freedom on the gross
+envelope the scalefactors already carry; the court estimates the same order-4 predictor on the raw
+spectrum and after flattening by a smoothed envelope, measures both on the flattened target, and
+reports per-frame wins and prediction gain over transient, AM, castanet, stationary and frozen
+fixtures; it gates estimator well-formedness only and makes no quality or bitrate claim",
+    ),
+    (
         "learned-speech-trace",
         "Seal S0 diagnostic: bit-for-bit trace of the frozen B1 FLAC-5 artifact (subframe kinds, orders, precision, shift, partition order, residual payload) beside the wired three-family Exp2 VOLE byte waterfall, on the real + Mode-C corpus",
     ),
@@ -692,6 +703,7 @@ pub fn run(name: &str, receipts_root: &Path) -> crate::error::Result<Verdict> {
         "learned-admissible-search-bounds" => learned_admissible_search_bounds::run(receipts_root),
         "recoil-checkpoints" => recoil::run(receipts_root),
         "page-batch-simd" => page_batch_simd::run(receipts_root),
+        "envelope-flattened-tns" => envelope_flattened_tns::run(receipts_root),
         "learned-exp2-transfer" => learned_exp2_transfer::run(receipts_root),
         "learned-residual-codec" => learned_residual_codec::run(receipts_root),
         "learned-residual-codec2" => learned_residual_codec2::run(receipts_root),

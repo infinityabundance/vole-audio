@@ -46,6 +46,7 @@ pub mod segmented;
 pub mod serialization;
 pub mod sparse;
 pub mod stateful;
+pub mod tns;
 pub mod train;
 pub mod transfer;
 pub mod wasted;
