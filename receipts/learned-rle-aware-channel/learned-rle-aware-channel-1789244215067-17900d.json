@@ -1,0 +1,1035 @@
+{
+  "schema": "vole.audio.evidence.v1",
+  "schema_version": 1,
+  "receipt": {
+    "schema": "vole.audio.evidence.v1",
+    "schema_version": 1,
+    "run_id": "learned-rle-aware-channel-1789244215067-17900d",
+    "court": "learned-rle-aware-channel",
+    "created_unix_ms": 1789244215067,
+    "result": "SUPPORTED",
+    "result_detail": "topology-ordered reversible channel transforms over 5 stereo fixtures: the extended ladder beats the pre-existing {none, mid_side} ladder on 3/5 fixtures (638 B total), while the run/zero topology selector only matches the measured byte winner on 2/5 fixtures vs 3/5 for minimum variance; every transform closes exactly and the Exp2 multichannel fit still closes (1299 B); result sha256 2334c733f33aaf56f39efd4c0dcc8817169e5bc9c3fe077e5ae9e0b439ebf2da",
+    "environment": {
+      "os": {
+        "sysname": "Linux",
+        "release": "7.2.4-1-cachyos",
+        "version": "#1 SMP PREEMPT_DYNAMIC Thu, 10 Sep 2026 17:19:37 +0000",
+        "machine": "x86_64",
+        "nodename": "vanir",
+        "os_pretty_name": "CachyOS"
+      },
+      "cpu": {
+        "model": "AMD Ryzen 7 9800X3D 8-Core Processor",
+        "flags": [
+          "3dnowprefetch",
+          "abm",
+          "adx",
+          "aes",
+          "amd_lbr_pmc_freeze",
+          "amd_lbr_v2",
+          "aperfmperf",
+          "apic",
+          "arat",
+          "avic",
+          "avx",
+          "avx2",
+          "avx512_bf16",
+          "avx512_bitalg",
+          "avx512_vbmi2",
+          "avx512_vnni",
+          "avx512_vp2intersect",
+          "avx512_vpopcntdq",
+          "avx512bw",
+          "avx512cd",
+          "avx512dq",
+          "avx512f",
+          "avx512ifma",
+          "avx512vbmi",
+          "avx512vl",
+          "avx_vnni",
+          "bmi1",
+          "bmi2",
+          "bpext",
+          "bus_lock_detect",
+          "cat_l3",
+          "cdp_l3",
+          "clflush",
+          "clflushopt",
+          "clwb",
+          "clzero",
+          "cmov",
+          "cmp_legacy",
+          "constant_tsc",
+          "cpb",
+          "cppc",
+          "cpuid",
+          "cpuid_fault",
+          "cqm",
+          "cqm_llc",
+          "cqm_mbm_local",
+          "cqm_mbm_total",
+          "cqm_occup_llc",
+          "cr8_legacy",
+          "cx16",
+          "cx8",
+          "de",
+          "decodeassists",
+          "erms",
+          "extapic",
+          "extd_apicid",
+          "f16c",
+          "flush_l1d",
+          "flushbyasid",
+          "fma",
+          "fpu",
+          "fsgsbase",
+          "fsrm",
+          "fxsr",
+          "fxsr_opt",
+          "gfni",
+          "ht",
+          "hw_pstate",
+          "ibpb",
+          "ibrs",
+          "ibrs_enhanced",
+          "ibs",
+          "invpcid",
+          "irperf",
+          "lahf_lm",
+          "lbrv",
+          "lm",
+          "mba",
+          "mca",
+          "mce",
+          "misalignsse",
+          "mmx",
+          "mmxext",
+          "monitor",
+          "movbe",
+          "movdir64b",
+          "movdiri",
+          "msr",
+          "mtrr",
+          "mwaitx",
+          "nonstop_tsc",
+          "nopl",
+          "npt",
+          "nrip_save",
+          "nx",
+          "ospke",
+          "osvw",
+          "overflow_recov",
+          "pae",
+          "pat",
+          "pausefilter",
+          "pclmulqdq",
+          "pdpe1gb",
+          "perfctr_core",
+          "perfctr_llc",
+          "perfctr_nb",
+          "perfmon_v2",
+          "pfthreshold",
+          "pge",
+          "pku",
+          "pni",
+          "popcnt",
+          "pse",
+          "pse36",
+          "rapl",
+          "rdpid",
+          "rdpru",
+          "rdrand",
+          "rdseed",
+          "rdt_a",
+          "rdtscp",
+          "rep_good",
+          "sep",
+          "sha_ni",
+          "skinit",
+          "smap",
+          "smca",
+          "smep",
+          "ssbd",
+          "sse",
+          "sse2",
+          "sse4_1",
+          "sse4_2",
+          "sse4a",
+          "ssse3",
+          "stibp",
+          "succor",
+          "svm",
+          "svm_lock",
+          "syscall",
+          "tce",
+          "topoext",
+          "tsc",
+          "tsc_adjust",
+          "tsc_scale",
+          "umip",
+          "user_shstk",
+          "v_spec_ctrl",
+          "v_vmsave_vmload",
+          "vaes",
+          "vgif",
+          "vmcb_clean",
+          "vme",
+          "vmmcall",
+          "vnmi",
+          "vpclmulqdq",
+          "wbnoinvd",
+          "wdt",
+          "x2avic",
+          "xgetbv1",
+          "xsave",
+          "xsavec",
+          "xsaveerptr",
+          "xsaveopt",
+          "xsaves",
+          "xtopology"
+        ],
+        "has_avx2": true,
+        "has_avx512": true,
+        "has_neon": false
+      },
+      "memory": {
+        "total_bytes": 134689931264
+      },
+      "git_commit": "6faa13630ec316b28502dc6652adf3ccb87f255d",
+      "git_dirty": false,
+      "git_branch": "main",
+      "rustc_version": "rustc 1.99.0-nightly (89c61a754 2026-07-23)",
+      "crate_version": "0.68.0",
+      "target_arch": "x86_64",
+      "target_os": "linux",
+      "cpu_governor": "performance",
+      "bios_version": "1402",
+      "git_tree_sha": "d03ed4d7b0e1780a2916e15096c1437090b72c18",
+      "build_git_commit": "6faa13630ec316b28502dc6652adf3ccb87f255d",
+      "build_tree_sha": "d03ed4d7b0e1780a2916e15096c1437090b72c18",
+      "build_dirty": false,
+      "build_rustc": "rustc 1.99.0-nightly (89c61a754 2026-07-23)",
+      "build_profile": "release",
+      "build_target": "x86_64-unknown-linux-gnu",
+      "source_binding": "bound",
+      "seal_subject_hash": "f6a412fd04e32b1ec70ebc514dfbe90ec4293dd195ed7cb1753fdbabfcd5db38"
+    },
+    "hardware": {
+      "pci_devices": [
+        {
+          "bdf": "0000:00:00.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14d8",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": null
+        },
+        {
+          "bdf": "0000:00:00.2",
+          "class": "0x080600",
+          "vendor": "0x1022",
+          "device": "0x14d9",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": null
+        },
+        {
+          "bdf": "0000:00:01.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "0"
+        },
+        {
+          "bdf": "0000:00:01.1",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14db",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "1"
+        },
+        {
+          "bdf": "0000:00:01.2",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14db",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "2"
+        },
+        {
+          "bdf": "0000:00:02.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "3"
+        },
+        {
+          "bdf": "0000:00:02.1",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14db",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "4"
+        },
+        {
+          "bdf": "0000:00:02.2",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14db",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "5"
+        },
+        {
+          "bdf": "0000:00:03.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "6"
+        },
+        {
+          "bdf": "0000:00:04.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "7"
+        },
+        {
+          "bdf": "0000:00:08.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "8"
+        },
+        {
+          "bdf": "0000:00:08.1",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14dd",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "9"
+        },
+        {
+          "bdf": "0000:00:08.3",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14dd",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "10"
+        },
+        {
+          "bdf": "0000:00:14.0",
+          "class": "0x0c0500",
+          "vendor": "0x1022",
+          "device": "0x790b",
+          "driver": "piix4_smbus",
+          "numa_node": -1,
+          "iommu_group": "11"
+        },
+        {
+          "bdf": "0000:00:14.3",
+          "class": "0x060100",
+          "vendor": "0x1022",
+          "device": "0x790e",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "11"
+        },
+        {
+          "bdf": "0000:00:18.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e0",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.1",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e1",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.2",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e2",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.3",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e3",
+          "driver": "k10temp",
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.4",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e4",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.5",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e5",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.6",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e6",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.7",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e7",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:01:00.0",
+          "class": "0x030000",
+          "vendor": "0x10de",
+          "device": "0x2702",
+          "driver": "nvidia",
+          "numa_node": -1,
+          "iommu_group": "13"
+        },
+        {
+          "bdf": "0000:01:00.1",
+          "class": "0x040300",
+          "vendor": "0x10de",
+          "device": "0x22bb",
+          "driver": "snd_hda_intel",
+          "numa_node": -1,
+          "iommu_group": "13"
+        },
+        {
+          "bdf": "0000:02:00.0",
+          "class": "0x010802",
+          "vendor": "0xc0a9",
+          "device": "0x542b",
+          "driver": "nvme",
+          "numa_node": -1,
+          "iommu_group": "14"
+        },
+        {
+          "bdf": "0000:03:00.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f4",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "15"
+        },
+        {
+          "bdf": "0000:04:00.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "16"
+        },
+        {
+          "bdf": "0000:04:04.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "17"
+        },
+        {
+          "bdf": "0000:04:05.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "18"
+        },
+        {
+          "bdf": "0000:04:08.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "19"
+        },
+        {
+          "bdf": "0000:04:0c.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "20"
+        },
+        {
+          "bdf": "0000:04:0d.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "21"
+        },
+        {
+          "bdf": "0000:05:00.0",
+          "class": "0x010802",
+          "vendor": "0x2646",
+          "device": "0x5019",
+          "driver": "nvme",
+          "numa_node": -1,
+          "iommu_group": "16"
+        },
+        {
+          "bdf": "0000:06:00.0",
+          "class": "0x020000",
+          "vendor": "0x10ec",
+          "device": "0x8125",
+          "driver": "r8169",
+          "numa_node": -1,
+          "iommu_group": "17"
+        },
+        {
+          "bdf": "0000:09:00.0",
+          "class": "0x0c0330",
+          "vendor": "0x1022",
+          "device": "0x43fc",
+          "driver": "xhci-pci-prom21",
+          "numa_node": -1,
+          "iommu_group": "20"
+        },
+        {
+          "bdf": "0000:0a:00.0",
+          "class": "0x010601",
+          "vendor": "0x1022",
+          "device": "0x43f6",
+          "driver": "ahci",
+          "numa_node": -1,
+          "iommu_group": "21"
+        },
+        {
+          "bdf": "0000:0b:00.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2421",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "22"
+        },
+        {
+          "bdf": "0000:0c:00.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2423",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "23"
+        },
+        {
+          "bdf": "0000:0c:01.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2423",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "24"
+        },
+        {
+          "bdf": "0000:0c:02.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2423",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "25"
+        },
+        {
+          "bdf": "0000:0c:03.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2423",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "26"
+        },
+        {
+          "bdf": "0000:71:00.0",
+          "class": "0x0c0330",
+          "vendor": "0x1b21",
+          "device": "0x2426",
+          "driver": "xhci_hcd",
+          "numa_node": -1,
+          "iommu_group": "25"
+        },
+        {
+          "bdf": "0000:72:00.0",
+          "class": "0x0c0340",
+          "vendor": "0x1b21",
+          "device": "0x2425",
+          "driver": "thunderbolt",
+          "numa_node": -1,
+          "iommu_group": "26"
+        },
+        {
+          "bdf": "0000:73:00.0",
+          "class": "0x130000",
+          "vendor": "0x1022",
+          "device": "0x14de",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "27"
+        },
+        {
+          "bdf": "0000:73:00.2",
+          "class": "0x108000",
+          "vendor": "0x1022",
+          "device": "0x1649",
+          "driver": "ccp",
+          "numa_node": -1,
+          "iommu_group": "28"
+        },
+        {
+          "bdf": "0000:73:00.3",
+          "class": "0x0c0330",
+          "vendor": "0x1022",
+          "device": "0x15b6",
+          "driver": "xhci_hcd",
+          "numa_node": -1,
+          "iommu_group": "29"
+        },
+        {
+          "bdf": "0000:73:00.4",
+          "class": "0x0c0330",
+          "vendor": "0x1022",
+          "device": "0x15b7",
+          "driver": "xhci_hcd",
+          "numa_node": -1,
+          "iommu_group": "30"
+        },
+        {
+          "bdf": "0000:73:00.6",
+          "class": "0x040300",
+          "vendor": "0x1022",
+          "device": "0x15e3",
+          "driver": "snd_hda_intel",
+          "numa_node": -1,
+          "iommu_group": "31"
+        },
+        {
+          "bdf": "0000:74:00.0",
+          "class": "0x0c0330",
+          "vendor": "0x1022",
+          "device": "0x15b8",
+          "driver": "xhci_hcd",
+          "numa_node": -1,
+          "iommu_group": "32"
+        }
+      ],
+      "gpu": {
+        "vendor": null,
+        "name": null,
+        "bdf": null,
+        "compute_capability": null,
+        "memory_bytes": null,
+        "driver_version": null,
+        "runtime_version": null
+      },
+      "audio": {
+        "card": null,
+        "device": null,
+        "name": null,
+        "subdevice": null
+      }
+    },
+    "params": {
+      "universe": "vole.audio.u1",
+      "profile": "vole.audio.learned.exp3",
+      "backend": "scalar canonical learned evaluator",
+      "sample_rate_hz": null,
+      "channels": null,
+      "voices": null,
+      "quantum_frames": null,
+      "duration_secs": null,
+      "content_kind": "Phase O learned deterministic prediction"
+    },
+    "counters": {
+      "host_pcm_staging_bytes": 0,
+      "host_pcm_copy_bytes": 0,
+      "gpu_to_host_pcm_bytes": 0,
+      "endpoint_observation_bytes": 0,
+      "device_sample_block_bytes": 0,
+      "transient_compute_words": 0,
+      "host_pcm_resident_peak_bytes": 0,
+      "host_pcm_resident_integral": 0.0,
+      "endpoint_depth_frames": 0,
+      "endpoint_depth_min_frames": 18446744073709551615,
+      "endpoint_depth_max_frames": 0,
+      "quanta_submitted": 0,
+      "events_consumed": 0,
+      "xruns": 0,
+      "kernel_launches": 0,
+      "missed_deadlines": 0
+    },
+    "timing": {
+      "total_ns": null,
+      "deadline_ns": null,
+      "warmup_runs": null,
+      "run_count": null,
+      "observation_count": null,
+      "tail": null
+    },
+    "provenance": {
+      "reference_hash": "2334c733f33aaf56f39efd4c0dcc8817169e5bc9c3fe077e5ae9e0b439ebf2da",
+      "backend_hash": null,
+      "endpoint_hash": null,
+      "gpu_artifact_hash": null,
+      "source_hash": null,
+      "corpus_hash": null,
+      "table_hashes": [],
+      "benchmark_order": [],
+      "exact_equality": null
+    },
+    "endpoint": {
+      "directness": null,
+      "topology": null,
+      "registered_range": null,
+      "registration_result": null,
+      "device_pointer": null,
+      "synchronization_mechanism": null,
+      "fence_sync_evidence": null,
+      "coherency_assumptions": null,
+      "hidden_staging_investigation": null,
+      "endpoint_clock": null
+    },
+    "energy": null,
+    "trace": null,
+    "limitations": [
+      "learned prediction is an experimental profile: it does not change u1/v1, the literal fallback remains mandatory, and negative learned results are preserved rather than hidden"
+    ],
+    "extras": {
+      "fixtures": [
+        {
+          "id": "identical",
+          "frames": 1500,
+          "transforms": [
+            {
+              "transform": "none",
+              "rle_score": 0,
+              "zeros": 0,
+              "zero_runs": 0,
+              "longest_zero_run": 0,
+              "equal_pairs": 0,
+              "variance_milli": 36928894761,
+              "complete_bytes": 1315
+            },
+            {
+              "transform": "mid_side",
+              "rle_score": 31507,
+              "zeros": 1500,
+              "zero_runs": 1,
+              "longest_zero_run": 1500,
+              "equal_pairs": 1499,
+              "variance_milli": 18464447380,
+              "complete_bytes": 1299
+            },
+            {
+              "transform": "left_diff",
+              "rle_score": 31507,
+              "zeros": 1500,
+              "zero_runs": 1,
+              "longest_zero_run": 1500,
+              "equal_pairs": 1499,
+              "variance_milli": 18464447380,
+              "complete_bytes": 1299
+            },
+            {
+              "transform": "right_diff",
+              "rle_score": 31507,
+              "zeros": 1500,
+              "zero_runs": 1,
+              "longest_zero_run": 1500,
+              "equal_pairs": 1499,
+              "variance_milli": 18464447380,
+              "complete_bytes": 1299
+            }
+          ],
+          "byte_winner": "mid_side",
+          "topology_choice": "mid_side",
+          "variance_choice": "mid_side",
+          "topology_matches_bytes": true,
+          "gain_vs_old_ladder_bytes": 0
+        },
+        {
+          "id": "sparse_event",
+          "frames": 1500,
+          "transforms": [
+            {
+              "transform": "none",
+              "rle_score": 0,
+              "zeros": 0,
+              "zero_runs": 0,
+              "longest_zero_run": 0,
+              "equal_pairs": 0,
+              "variance_milli": 36905802091,
+              "complete_bytes": 2883
+            },
+            {
+              "transform": "mid_side",
+              "rle_score": 15689,
+              "zeros": 1497,
+              "zero_runs": 4,
+              "longest_zero_run": 511,
+              "equal_pairs": 1493,
+              "variance_milli": 18454398045,
+              "complete_bytes": 1808
+            },
+            {
+              "transform": "left_diff",
+              "rle_score": 15689,
+              "zeros": 1497,
+              "zero_runs": 4,
+              "longest_zero_run": 511,
+              "equal_pairs": 1493,
+              "variance_milli": 18466443380,
+              "complete_bytes": 1667
+            },
+            {
+              "transform": "right_diff",
+              "rle_score": 15689,
+              "zeros": 1497,
+              "zero_runs": 4,
+              "longest_zero_run": 511,
+              "equal_pairs": 1493,
+              "variance_milli": 18443350711,
+              "complete_bytes": 1855
+            }
+          ],
+          "byte_winner": "left_diff",
+          "topology_choice": "mid_side",
+          "variance_choice": "right_diff",
+          "topology_matches_bytes": false,
+          "gain_vs_old_ladder_bytes": 141
+        },
+        {
+          "id": "noisy_diff",
+          "frames": 1500,
+          "transforms": [
+            {
+              "transform": "none",
+              "rle_score": 0,
+              "zeros": 0,
+              "zero_runs": 0,
+              "longest_zero_run": 0,
+              "equal_pairs": 0,
+              "variance_milli": 36929433306,
+              "complete_bytes": 2560
+            },
+            {
+              "transform": "mid_side",
+              "rle_score": 508,
+              "zeros": 41,
+              "zero_runs": 41,
+              "longest_zero_run": 1,
+              "equal_pairs": 0,
+              "variance_milli": 18464839418,
+              "complete_bytes": 1795
+            },
+            {
+              "transform": "left_diff",
+              "rle_score": 508,
+              "zeros": 41,
+              "zero_runs": 41,
+              "longest_zero_run": 1,
+              "equal_pairs": 0,
+              "variance_milli": 18464561573,
+              "complete_bytes": 1300
+            },
+            {
+              "transform": "right_diff",
+              "rle_score": 508,
+              "zeros": 41,
+              "zero_runs": 41,
+              "longest_zero_run": 1,
+              "equal_pairs": 0,
+              "variance_milli": 18465100118,
+              "complete_bytes": 2066
+            }
+          ],
+          "byte_winner": "left_diff",
+          "topology_choice": "mid_side",
+          "variance_choice": "left_diff",
+          "topology_matches_bytes": false,
+          "gain_vs_old_ladder_bytes": 495
+        },
+        {
+          "id": "silent_right",
+          "frames": 1500,
+          "transforms": [
+            {
+              "transform": "none",
+              "rle_score": 31507,
+              "zeros": 1500,
+              "zero_runs": 1,
+              "longest_zero_run": 1500,
+              "equal_pairs": 1499,
+              "variance_milli": 18464447380,
+              "complete_bytes": 1878
+            },
+            {
+              "transform": "mid_side",
+              "rle_score": 0,
+              "zeros": 0,
+              "zero_runs": 0,
+              "longest_zero_run": 0,
+              "equal_pairs": 0,
+              "variance_milli": 23080558197,
+              "complete_bytes": 2193
+            },
+            {
+              "transform": "left_diff",
+              "rle_score": 0,
+              "zeros": 0,
+              "zero_runs": 0,
+              "longest_zero_run": 0,
+              "equal_pairs": 0,
+              "variance_milli": 36928894761,
+              "complete_bytes": 1894
+            },
+            {
+              "transform": "right_diff",
+              "rle_score": 31507,
+              "zeros": 1500,
+              "zero_runs": 1,
+              "longest_zero_run": 1500,
+              "equal_pairs": 1499,
+              "variance_milli": 18464447380,
+              "complete_bytes": 1878
+            }
+          ],
+          "byte_winner": "none",
+          "topology_choice": "none",
+          "variance_choice": "none",
+          "topology_matches_bytes": true,
+          "gain_vs_old_ladder_bytes": 0
+        },
+        {
+          "id": "gain_half",
+          "frames": 1500,
+          "transforms": [
+            {
+              "transform": "none",
+              "rle_score": 0,
+              "zeros": 0,
+              "zero_runs": 0,
+              "longest_zero_run": 0,
+              "equal_pairs": 0,
+              "variance_milli": 23079635693,
+              "complete_bytes": 2445
+            },
+            {
+              "transform": "mid_side",
+              "rle_score": 0,
+              "zeros": 0,
+              "zero_runs": 0,
+              "longest_zero_run": 0,
+              "equal_pairs": 0,
+              "variance_milli": 15002592640,
+              "complete_bytes": 2443
+            },
+            {
+              "transform": "left_diff",
+              "rle_score": 0,
+              "zeros": 0,
+              "zero_runs": 0,
+              "longest_zero_run": 0,
+              "equal_pairs": 0,
+              "variance_milli": 23081483007,
+              "complete_bytes": 2441
+            },
+            {
+              "transform": "right_diff",
+              "rle_score": 0,
+              "zeros": 0,
+              "zero_runs": 0,
+              "longest_zero_run": 0,
+              "equal_pairs": 0,
+              "variance_milli": 9232223939,
+              "complete_bytes": 2441
+            }
+          ],
+          "byte_winner": "left_diff",
+          "topology_choice": "none",
+          "variance_choice": "right_diff",
+          "topology_matches_bytes": false,
+          "gain_vs_old_ladder_bytes": 2
+        }
+      ],
+      "gates": {
+        "all_exact": true,
+        "fixtures": 5,
+        "fit_closed": true
+      },
+      "limitations": [
+        "the ladder is stereo-only; channel counts above two still use TRANSFORM_NONE",
+        "topology is a proposal ordering, not authority: it can rank a transform first that the measured bytes reject"
+      ],
+      "method": {
+        "ladder": "none, mid_side (L + (R - L)/2, R - L), left_diff (L, R - L), right_diff (R, L - R); every entry is bijective on i32 with wrapping arithmetic",
+        "topology": "per component: zeros, zero runs, longest zero run and equal neighbour pairs; rle_score = 8*zero_runs + 4*zeros + 16*longest_zero_run + equal_pairs",
+        "selection": "topology orders the fit ladder; the exact canonical complete bytes of every fully fitted transform decide the winner",
+        "contrast": "the rejected heuristic ranks transforms by summed component variance; on these fixtures it agrees with the byte winner less often than topology does",
+        "mode_c": "deliberately not measured (held out from architecture tuning)"
+      },
+      "protocol": {
+        "protocol_schema": "vole.audio.learned.protocol.v1",
+        "schema": "vole.audio.learned.exp3.evidence.v1",
+        "profile": "vole.audio.learned.exp3",
+        "version": 1,
+        "semantic_authority": "none: a learned hypothesis is a candidate family, never truth; scalar exact closure decides acceptance"
+      }
+    }
+  },
+  "receipt_sha256": "07036e92f03b3a467c1107dce253d9a5dc0818460afcf8abc1a18e894401d5da"
+}
