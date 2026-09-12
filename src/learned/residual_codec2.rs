@@ -27,7 +27,8 @@
 //! minimum complete cost.
 
 use crate::entropy::rans::{
-    BackSink, FwdReader, RansState, dec_advance, dec_init, enc_flush, enc_put, encode_capacity,
+    BackSink, FwdReader, MODEL_TOTAL, RansState, SCALE_BITS, dec_advance, dec_init, dec_slot,
+    enc_flush, enc_put, encode_capacity,
 };
 use crate::error::{Error, Kind, Result};
 
@@ -108,6 +109,9 @@ pub enum ResidualCodecV2 {
     /// Partitioned, per-block base-coder selection over the residual
     /// (Phase 6 mechanism 3, `EntropyReblock`).
     Reblock = 24,
+    /// Forward-adaptive categorical EMA rANS over a 17-symbol alphabet
+    /// (Phase 6 mechanism 5, `EmaRans17`).
+    EmaRans = 25,
 }
 
 impl ResidualCodecV2 {
@@ -147,8 +151,8 @@ impl ResidualCodecV2 {
         ResidualCodecV2::ContextRans,
     ];
 
-    /// The Exp3 additions (Seal S4, E1..E5, C0..C2, P6-3), in canonical tie order.
-    pub const ALL_V3: [ResidualCodecV2; 25] = [
+    /// The Exp3 additions (Seal S4, E1..E5, C0..C2, P6-3, P6-5), in canonical tie order.
+    pub const ALL_V3: [ResidualCodecV2; 26] = [
         ResidualCodecV2::DenseI32,
         ResidualCodecV2::SparseDelta,
         ResidualCodecV2::ZigZagVarint,
@@ -174,6 +178,7 @@ impl ResidualCodecV2 {
         ResidualCodecV2::Ctw,
         ResidualCodecV2::BgmcSse,
         ResidualCodecV2::Reblock,
+        ResidualCodecV2::EmaRans,
     ];
 
     /// Canonical codec identifier byte.
@@ -209,6 +214,7 @@ impl ResidualCodecV2 {
             ResidualCodecV2::Ctw => "ctw",
             ResidualCodecV2::BgmcSse => "bgmc_sse",
             ResidualCodecV2::Reblock => "reblock",
+            ResidualCodecV2::EmaRans => "ema_rans",
         }
     }
 
@@ -240,6 +246,7 @@ impl ResidualCodecV2 {
             22 => Some(ResidualCodecV2::Ctw),
             23 => Some(ResidualCodecV2::BgmcSse),
             24 => Some(ResidualCodecV2::Reblock),
+            25 => Some(ResidualCodecV2::EmaRans),
             _ => None,
         }
     }
@@ -302,6 +309,7 @@ impl ResidualCodecV2 {
             ResidualCodecV2::Ctw => encode_ctw(residual),
             ResidualCodecV2::BgmcSse => encode_bgmc_sse(residual),
             ResidualCodecV2::Reblock => encode_reblock(residual),
+            ResidualCodecV2::EmaRans => encode_ema_rans(residual),
         }
     }
 
@@ -338,6 +346,7 @@ impl ResidualCodecV2 {
             ResidualCodecV2::Ctw => decode_ctw(bytes, len),
             ResidualCodecV2::BgmcSse => decode_bgmc_sse(bytes, len),
             ResidualCodecV2::Reblock => decode_reblock(bytes, len),
+            ResidualCodecV2::EmaRans => decode_ema_rans(bytes, len),
         }
     }
 }
@@ -1304,6 +1313,233 @@ fn decode_reblock(bytes: &[u8], len: usize) -> Result<Vec<i32>> {
     }
     if out.len() != len {
         return Err(Error::malformed("reblock decode length mismatch"));
+    }
+    Ok(out)
+}
+
+// ---------------------------------------------------------------------------
+// id 25: EmaRans (Phase 6 mechanism 5, `EmaRans17`)
+// ---------------------------------------------------------------------------
+//
+// A forward-adaptive **categorical** rANS coder over a 17-symbol alphabet:
+// symbol 0 is a high part of zero (`|r| < 2^shift`), symbols 1..=15 are the
+// high part `h = |r| >> shift`, and symbol 16 is an escape whose high part is
+// sent as Exp-Golomb. The sign and the `shift` low bits are raw, so the
+// adaptive model spends its capacity on the coarse high part exactly as BGMC
+// does. Unlike `ContextRans`, no histogram is transmitted.
+//
+// The model is an integer EMA over the CDF, `CDF[s] += (Target(s) - CDF[s])/2^k`,
+// updated after every symbol and normalized to the frozen rANS total. rANS is
+// LIFO, so the encoder first runs the model **forward** to record each symbol's
+// interval and then emits the symbols **backward**; the decoder recomputes the
+// identical model forward. Work is chunked so the recorded trace is bounded.
+
+/// Alphabet size (the `17` of `EmaRans17`).
+const EMA_K: usize = 17;
+/// Highest high part coded by a dedicated symbol (16 is the escape).
+const EMA_NON_ESCAPE_MAX: u64 = (EMA_K as u64) - 2;
+/// EMA adaptation shift (`CDF += (target - CDF) >> EMA_RATE`).
+const EMA_RATE: u32 = 5;
+/// Trace chunk length (bounds encoder working memory).
+const EMA_CHUNK: usize = 4096;
+
+/// Integer EMA categorical model over the frozen rANS total.
+#[derive(Clone)]
+struct EmaModel {
+    /// `EMA_K + 1` cumulative frequencies; `cdf[0] = 0`, `cdf[EMA_K] = total`.
+    cdf: [u32; EMA_K + 1],
+}
+
+impl EmaModel {
+    fn new() -> Self {
+        let mut cdf = [0u32; EMA_K + 1];
+        for (i, slot) in cdf.iter_mut().enumerate() {
+            *slot = (i as u32 * MODEL_TOTAL) / EMA_K as u32;
+        }
+        cdf[0] = 0;
+        cdf[EMA_K] = MODEL_TOTAL;
+        Self { cdf }
+    }
+
+    #[inline]
+    fn interval(&self, sym: usize) -> (u32, u32) {
+        (self.cdf[sym], self.cdf[sym + 1] - self.cdf[sym])
+    }
+
+    #[inline]
+    fn find(&self, slot: u32) -> usize {
+        let mut s = 0usize;
+        while s + 1 < EMA_K && self.cdf[s + 1] <= slot {
+            s += 1;
+        }
+        s
+    }
+
+    /// `CDF[s] += (Target(s) - CDF[s]) >> EMA_RATE` with `Target(s) = 1` for
+    /// `s >= sym`, then deterministic validity clamps so the table stays
+    /// nondecreasing with every frequency at least one. Encoder and decoder
+    /// run exactly this, so the clamp only needs determinism.
+    fn update(&mut self, sym: usize) {
+        let total = i64::from(MODEL_TOTAL);
+        for i in 1..EMA_K {
+            let target = if i <= sym { 0 } else { total };
+            let c = i64::from(self.cdf[i]);
+            self.cdf[i] = (c + ((target - c) >> EMA_RATE)).clamp(0, total) as u32;
+        }
+        for i in (1..EMA_K).rev() {
+            let ub = MODEL_TOTAL - (EMA_K - i) as u32;
+            if self.cdf[i] > ub {
+                self.cdf[i] = ub;
+            }
+        }
+        for i in 1..EMA_K {
+            if self.cdf[i] < self.cdf[i - 1] + 1 {
+                self.cdf[i] = self.cdf[i - 1] + 1;
+            }
+        }
+        self.cdf[0] = 0;
+        self.cdf[EMA_K] = MODEL_TOTAL;
+    }
+}
+
+/// The high-part symbol for one magnitude.
+#[inline]
+fn ema_symbol(m: u64, shift: u32) -> usize {
+    let h = m >> shift;
+    if h == 0 {
+        0
+    } else if h <= EMA_NON_ESCAPE_MAX {
+        h as usize
+    } else {
+        EMA_K - 1
+    }
+}
+
+fn encode_ema_rans(residual: &[i32]) -> Vec<u8> {
+    let n = residual.len();
+    let shift = bgmc_shift(residual);
+    let mut model = EmaModel::new();
+    let mut chunks: Vec<Vec<u8>> = Vec::new();
+    let mut raw = BitWriter::new();
+    let mut t = 0usize;
+    while t < n {
+        let end = (t + EMA_CHUNK).min(n);
+        let len = end - t;
+        let mut starts = Vec::with_capacity(len);
+        let mut freqs = Vec::with_capacity(len);
+        let mut syms = Vec::with_capacity(len);
+        for &r in &residual[t..end] {
+            let m = u64::from(r.unsigned_abs());
+            let s = ema_symbol(m, shift);
+            let (st, fr) = model.interval(s);
+            starts.push(st);
+            freqs.push(fr);
+            model.update(s);
+            syms.push(s as u8);
+        }
+        let mut buf = vec![0u8; encode_capacity(len).max(16)];
+        let chunk = {
+            let mut sink = BackSink::new(&mut buf);
+            let mut state = RansState::new();
+            let mut ok = true;
+            for i in (0..len).rev() {
+                if !enc_put(&mut state, &mut sink, starts[i], freqs[i], SCALE_BITS) {
+                    ok = false;
+                    break;
+                }
+            }
+            if ok && enc_flush(&state, &mut sink) {
+                sink.encoded().to_vec()
+            } else {
+                Vec::new()
+            }
+        };
+        chunks.push(chunk);
+        for (i, &r) in residual[t..end].iter().enumerate() {
+            let m = u64::from(r.unsigned_abs());
+            if shift > 0 {
+                raw.bits(m & ((1u64 << shift) - 1), shift);
+            }
+            if syms[i] as usize == EMA_K - 1 {
+                write_eg0(&mut raw, m >> shift);
+            }
+            if m > 0 {
+                raw.bit(r < 0);
+            }
+        }
+        t = end;
+    }
+    let mut out = Vec::new();
+    out.push(shift as u8);
+    out.extend_from_slice(&(n as u64).to_le_bytes());
+    out.extend_from_slice(&(chunks.len() as u32).to_le_bytes());
+    for c in &chunks {
+        put_uvarint(&mut out, c.len() as u64);
+    }
+    for c in &chunks {
+        out.extend_from_slice(c);
+    }
+    out.extend_from_slice(&raw.finish());
+    out
+}
+
+fn decode_ema_rans(bytes: &[u8], len: usize) -> Result<Vec<i32>> {
+    let mut r = Reader::new(bytes);
+    let shift = u32::from(r.u8()?);
+    if shift > 24 {
+        return Err(Error::malformed("ema-rans shift out of range"));
+    }
+    let n = r.u64le()? as usize;
+    if n != len {
+        return Err(Error::malformed("ema-rans length mismatch"));
+    }
+    let nchunks = u32::from_le_bytes(r.take(4)?.try_into().unwrap()) as usize;
+    if nchunks != n.div_ceil(EMA_CHUNK) {
+        return Err(Error::malformed("ema-rans chunk count mismatch"));
+    }
+    let mut lens = Vec::with_capacity(nchunks);
+    for _ in 0..nchunks {
+        lens.push(r.uvarint()? as usize);
+    }
+    let mut chunk_slices = Vec::with_capacity(nchunks);
+    for &l in &lens {
+        chunk_slices.push(r.take(l)?);
+    }
+    let raw = r.take(r.remaining())?;
+    let mut model = EmaModel::new();
+    let mut br = BitReader::new(raw);
+    let mut out = Vec::with_capacity(n);
+    for (ci, chunk) in chunk_slices.iter().enumerate() {
+        let start = ci * EMA_CHUNK;
+        let end = (start + EMA_CHUNK).min(n);
+        let mut reader = FwdReader::new(chunk);
+        let mut state = dec_init(&mut reader)
+            .ok_or_else(|| Error::malformed("ema-rans stream is truncated"))?;
+        for _ in start..end {
+            let slot = dec_slot(&state, SCALE_BITS);
+            let s = model.find(slot);
+            let (st, fr) = model.interval(s);
+            if !dec_advance(&mut state, &mut reader, st, fr, SCALE_BITS) {
+                return Err(Error::malformed("ema-rans stream is truncated"));
+            }
+            let low = if shift > 0 { br.read_bits(shift)? } else { 0 };
+            let h = if s == EMA_K - 1 {
+                read_eg0(&mut br)?
+            } else {
+                s as u64
+            };
+            let m = (h << shift) | low;
+            if m > (1u64 << 31) {
+                return Err(Error::malformed("ema-rans magnitude exceeds i32 range"));
+            }
+            let neg = if m > 0 { br.read_bit()? } else { false };
+            if m == (1u64 << 31) && !neg {
+                return Err(Error::malformed("ema-rans magnitude is not representable"));
+            }
+            let value = if neg { -(m as i64) } else { m as i64 };
+            out.push(value as i32);
+            model.update(s);
+        }
     }
     Ok(out)
 }
@@ -4365,7 +4601,7 @@ mod tests {
         let c = ResidualCodecV2::Reblock;
         assert_eq!(c.name(), "reblock");
         assert_eq!(ResidualCodecV2::from_id(24), Some(c));
-        assert_eq!(ResidualCodecV2::ALL_V3.len(), 25);
+        assert_eq!(ResidualCodecV2::ALL_V3.len(), 26);
         for residual in sample_residuals() {
             let payload = c.encode(&residual);
             let back = c
@@ -4387,6 +4623,30 @@ mod tests {
             };
         }
         assert!(c.complete_len(&r) <= ResidualCodecV2::PartitionRice.complete_len(&r));
+    }
+
+    #[test]
+    fn ema_rans_round_trips_exactly_and_adapts() {
+        let c = ResidualCodecV2::EmaRans;
+        assert_eq!(c.name(), "ema_rans");
+        assert_eq!(ResidualCodecV2::from_id(25), Some(c));
+        assert_eq!(ResidualCodecV2::ALL_V3.len(), 26);
+        for residual in sample_residuals() {
+            let payload = c.encode(&residual);
+            let back = c
+                .decode(&payload, residual.len())
+                .unwrap_or_else(|e| panic!("ema_rans: {e}"));
+            assert_eq!(back, residual);
+        }
+        let extreme = vec![i32::MIN, i32::MAX, -1, 0, 1, 2, -2, 1 << 30, -(1 << 30)];
+        let payload = c.encode(&extreme);
+        assert_eq!(c.decode(&payload, extreme.len()).unwrap(), extreme);
+        // Cross the 4096-sample trace-chunk boundary.
+        let big: Vec<i32> = (0..9000)
+            .map(|i| ((i as i64 * 2654435761) % 100003 - 50001) as i32)
+            .collect();
+        let payload = c.encode(&big);
+        assert_eq!(c.decode(&payload, big.len()).unwrap(), big);
     }
 
     impl ResidualCodecV2 {

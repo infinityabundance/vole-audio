@@ -74,6 +74,8 @@ pub(crate) mod learned_common;
 #[cfg(feature = "std")]
 pub mod learned_determinism;
 #[cfg(feature = "std")]
+pub mod learned_ema_rans;
+#[cfg(feature = "std")]
 pub mod learned_entropy_reblock;
 #[cfg(feature = "std")]
 pub mod learned_exp2_baseline;
@@ -397,6 +399,16 @@ the same fitted pair and the existing adaptive family over non-stationary fixtur
 speech effectiveness clips; held-out Mode C untouched",
     ),
     (
+        "learned-ema-rans",
+        "Phase 6 mechanism 5 (`EmaRans17`): residual codec id 25, a forward-adaptive categorical EMA
+rANS over a 17-symbol high-part alphabet with raw sign/low bits and no transmitted histogram; the
+encoder runs the model forward to record intervals and emits symbols backward (rANS is LIFO), the
+decoder recomputes the model forward, and work is chunked so the trace is bounded; isolated
+against the best pre-existing codec, the static ContextRans baseline and the Reblock partitioner
+over magnitude-skewed fixtures and the real speech effectiveness residuals; held-out Mode C
+untouched",
+    ),
+    (
         "learned-speech-trace",
         "Seal S0 diagnostic: bit-for-bit trace of the frozen B1 FLAC-5 artifact (subframe kinds, orders, precision, shift, partition order, residual payload) beside the wired three-family Exp2 VOLE byte waterfall, on the real + Mode-C corpus",
     ),
@@ -589,6 +601,7 @@ pub fn run(name: &str, receipts_root: &Path) -> crate::error::Result<Verdict> {
         "learned-iterative-reprice" => learned_iterative_reprice::run(receipts_root),
         "learned-entropy-reblock" => learned_entropy_reblock::run(receipts_root),
         "learned-expert-mux" => learned_expert_mux::run(receipts_root),
+        "learned-ema-rans" => learned_ema_rans::run(receipts_root),
         "learned-exp2-transfer" => learned_exp2_transfer::run(receipts_root),
         "learned-residual-codec" => learned_residual_codec::run(receipts_root),
         "learned-residual-codec2" => learned_residual_codec2::run(receipts_root),
