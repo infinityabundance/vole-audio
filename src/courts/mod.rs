@@ -150,6 +150,8 @@ pub mod phase_n;
 #[cfg(feature = "std")]
 pub mod random_access;
 #[cfg(feature = "std")]
+pub mod recoil;
+#[cfg(feature = "std")]
 pub mod rocm;
 #[cfg(feature = "std")]
 pub mod rocm_d0;
@@ -470,6 +472,15 @@ the court asserts bounded == exhaustive on every fixture and reports candidates 
 pruned; held-out Mode C untouched",
     ),
     (
+        "recoil-checkpoints",
+        "Phase 6 mechanism 11 (`RecoilCheckpoints`): records rANS decoder state and reader position
+at a fixed symbol interval so disjoint ranges decode independently; the court encodes a static
+magnitude-bucket table over the frozen fixtures, builds the checkpoint index, decodes every range
+independently and proves the reassembled segments equal the full sequential decode exactly, while
+reporting the index's byte cost against the stream; decoder-chosen parallelism bought with explicit
+metadata, never a compression-ratio claim",
+    ),
+    (
         "learned-speech-trace",
         "Seal S0 diagnostic: bit-for-bit trace of the frozen B1 FLAC-5 artifact (subframe kinds, orders, precision, shift, partition order, residual payload) beside the wired three-family Exp2 VOLE byte waterfall, on the real + Mode-C corpus",
     ),
@@ -668,6 +679,7 @@ pub fn run(name: &str, receipts_root: &Path) -> crate::error::Result<Verdict> {
         "learned-rle-aware-channel" => learned_rle_aware_channel::run(receipts_root),
         "learned-solid-object-columns" => learned_solid_object_columns::run(receipts_root),
         "learned-admissible-search-bounds" => learned_admissible_search_bounds::run(receipts_root),
+        "recoil-checkpoints" => recoil::run(receipts_root),
         "learned-exp2-transfer" => learned_exp2_transfer::run(receipts_root),
         "learned-residual-codec" => learned_residual_codec::run(receipts_root),
         "learned-residual-codec2" => learned_residual_codec2::run(receipts_root),

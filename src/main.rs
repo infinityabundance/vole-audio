@@ -382,6 +382,7 @@ fn cmd_seal_verify(args: &[String]) -> Result<u8> {
                        learned-rle-aware-channel=SUPPORTED,\
                        learned-solid-object-columns=SUPPORTED,\
                        learned-admissible-search-bounds=SUPPORTED,\
+                       recoil-checkpoints=SUPPORTED,\
                        compound=SUPPORTED,\
                        cuda=SUPPORTED,d1=SUPPORTED,h2=SUPPORTED,\
                        rocm=UNSUPPORTED_BY_HARDWARE|UNSUPPORTED_BY_API|INCONCLUSIVE,\
