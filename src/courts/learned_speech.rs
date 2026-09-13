@@ -36,7 +36,7 @@ use std::path::Path;
 
 /// Frozen static-result hash (empty means "not yet frozen").
 pub const LEARNED_SPEECH_SHA256: &str =
-    "e8f110f683771a42d05c4836ea3483595ec4cc1712fc440273a71f228ad55e11";
+    "77d86958f62d1fb43c2efa70223fc5ba7abd1c7a8f837fc169310a4562eda1e3";
 
 pub(crate) const CLIPS_PER_SPLIT: usize = 8;
 
@@ -151,10 +151,11 @@ pub(crate) fn portfolio(
     if let Some(o) = best_pz {
         raw.push(("polezero", o));
     }
-    // Seal A0: natural-gradient backward-adaptive predictor over a tap ladder.
+    // Seal A0 / Phase 2A-3: natural-gradient backward-adaptive predictor over a
+    // widened tap ladder, with the step/rho/block sweep inside the fit.
     let mut best_ngsa: Option<LearnedObject> = None;
     let mut best_ngsa_bytes = u64::MAX;
-    for taps in [8u16, 16] {
+    for taps in [8u16, 12, 16] {
         if let Ok((o, _)) = fit_ngsa_object(&case.samples, frames, rate, taps, budget)
             && let Some(b) = bytes(&o)
             && b < best_ngsa_bytes

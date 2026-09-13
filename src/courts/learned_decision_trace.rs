@@ -39,7 +39,7 @@ use std::path::{Path, PathBuf};
 
 /// Frozen static-result hash (empty means "not yet frozen").
 pub const LEARNED_DECISION_TRACE_SHA256: &str =
-    "f1366fc403173de25626db49f19f1e5f3efa1e5aefe929d76b3d27441ab5fdd2";
+    "53f09b70637cc1c1aa496e641d8372930cc284f1e5bd382517ce186a292e4dac";
 
 fn payload_bytes(codec: ResidualCodecV2, residual: &[i32]) -> u64 {
     codec.encode(residual).len() as u64 + 1

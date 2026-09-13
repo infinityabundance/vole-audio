@@ -45,7 +45,7 @@ use std::path::{Path, PathBuf};
 
 /// Frozen static-result hash (empty means "not yet frozen").
 pub const LEARNED_RESIDUAL_ENTROPY_SHA256: &str =
-    "10178fede07d0ec56a1013b5bbfef6990a13ed10a222a26b0d6b460172dc1796";
+    "66a2e677bebb7d0d926120511f9839a96a07aecfed9af0ef00c00b21db82ab60";
 
 /// Maximum representative Phase-M objects (one per distinct class tuple).
 const MAX_PHASE_M_OBJECTS: usize = 12;

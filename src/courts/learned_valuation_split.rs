@@ -24,7 +24,7 @@ use std::path::{Path, PathBuf};
 
 /// Frozen static-result hash (empty means "not yet frozen").
 pub const LEARNED_VALUATION_SPLIT_SHA256: &str =
-    "a155ed76b43197aaa55bb32ebfd2c654a1aeb82263cb87bdad609b890c5cc64e";
+    "b3014910e43428b9e426b263505f69fea70255ddd77b7b5e9926c539e74a8afe";
 
 fn payload_bytes(codec: ResidualCodecV2, residual: &[i32]) -> u64 {
     codec.encode(residual).len() as u64 + 1

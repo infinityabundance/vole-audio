@@ -29,7 +29,7 @@ use std::path::{Path, PathBuf};
 
 /// Frozen static-result hash (empty means "not yet frozen").
 pub const LEARNED_ENTROPY_REBLOCK_SHA256: &str =
-    "9699b3cca864a6221cd685d4428707986e1be84c776134eaaf6a40ffaa1bf7a7";
+    "f19d8023591af4043816ff681acd3636c9c9e2d31158f1f03f97bcb049710540";
 
 /// Base-coder labels of the `Reblock` histogram.
 const BASE_NAMES: [&str; 4] = ["eg0", "rice", "golomb", "bgmc"];

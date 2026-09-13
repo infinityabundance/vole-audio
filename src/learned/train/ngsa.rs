@@ -16,9 +16,17 @@ use crate::learned::train::linear::fit_ridge;
 use crate::learned::train::{TrainBudget, TrainStats};
 
 /// Canonical natural-gradient sign step candidates (Q12 units).
-pub const NGSA_STEPS: [i16; 4] = [64, 128, 256, 512];
-/// Canonical correlation-EMA shift candidates.
-pub const NGSA_RHO_SHIFTS: [u8; 2] = [5, 7];
+///
+/// Phase 2A-3 widens the ladder around the previously frozen set: the winning
+/// family's step is the single most sensitive parameter, and a wider measured
+/// sweep can only help because the fit returns the minimum complete-bytes
+/// candidate.
+pub const NGSA_STEPS: [i16; 6] = [32, 64, 128, 256, 512, 1024];
+/// Canonical correlation-EMA shift candidates (Phase 2A-3 widened).
+pub const NGSA_RHO_SHIFTS: [u8; 3] = [5, 6, 7];
+/// Canonical block-reset candidates: a long adaptive run, and a block-local
+/// reset that lets the natural-gradient state track a drifting source.
+pub const NGSA_BLOCK_FRAMES: [Option<u32>; 2] = [None, Some(4096)];
 
 /// Fit a natural-gradient adaptive predictor object.
 pub fn fit_ngsa_object(
@@ -41,42 +49,44 @@ pub fn fit_ngsa_object(
     let mut best: Option<(NgsaPredictor, u64)> = None;
     for &step in &NGSA_STEPS {
         for &rho_shift in &NGSA_RHO_SHIFTS {
-            stats.candidates += 1;
-            let p = NgsaPredictor {
-                channels: 1,
-                taps,
-                init_weights: init_weights.clone(),
-                init_bias,
-                step,
-                rho_shift,
-                block_frames: None,
-            };
-            if p.validate().is_err() {
-                continue;
-            }
-            let o = match LearnedObject::from_intrinsic_exp2(
-                LearnedModel::Ngsa(p.clone()),
-                1,
-                frames,
-                sample_rate_hz,
-                Vec::new(),
-                source,
-            ) {
-                Ok(o) => o,
-                Err(_) => {
+            for &block_frames in &NGSA_BLOCK_FRAMES {
+                stats.candidates += 1;
+                let p = NgsaPredictor {
+                    channels: 1,
+                    taps,
+                    init_weights: init_weights.clone(),
+                    init_bias,
+                    step,
+                    rho_shift,
+                    block_frames,
+                };
+                if p.validate().is_err() {
+                    continue;
+                }
+                let o = match LearnedObject::from_intrinsic_exp2(
+                    LearnedModel::Ngsa(p.clone()),
+                    1,
+                    frames,
+                    sample_rate_hz,
+                    Vec::new(),
+                    source,
+                ) {
+                    Ok(o) => o,
+                    Err(_) => {
+                        stats.rejected += 1;
+                        continue;
+                    }
+                };
+                if !o.verify(source) {
                     stats.rejected += 1;
                     continue;
                 }
-            };
-            if !o.verify(source) {
-                stats.rejected += 1;
-                continue;
-            }
-            let bytes = crate::learned::accounting::LearnedCost::of(&o)
-                .map(|c| c.complete_bytes)
-                .unwrap_or(u64::MAX);
-            if best.as_ref().is_none_or(|(_, b)| bytes < *b) {
-                best = Some((p, bytes));
+                let bytes = crate::learned::accounting::LearnedCost::of(&o)
+                    .map(|c| c.complete_bytes)
+                    .unwrap_or(u64::MAX);
+                if best.as_ref().is_none_or(|(_, b)| bytes < *b) {
+                    best = Some((p, bytes));
+                }
             }
         }
     }

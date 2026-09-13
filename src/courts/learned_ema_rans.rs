@@ -23,7 +23,7 @@ use std::path::{Path, PathBuf};
 
 /// Frozen static-result hash (empty means "not yet frozen").
 pub const LEARNED_EMA_RANS_SHA256: &str =
-    "1dfba6d4334eef579800c85c6d9daf4a9449e777af0415cfb376fbd3f1ac3093";
+    "147e3356bfa9709a6bac85a02f5eadb4a52d5a6d474ed2f4a5e4ec15207e34a2";
 
 fn payload_bytes(codec: ResidualCodecV2, residual: &[i32]) -> u64 {
     codec.encode(residual).len() as u64 + 1

@@ -30,7 +30,7 @@ use std::path::{Path, PathBuf};
 
 /// Frozen static-result hash (empty means "not yet frozen").
 pub const LEARNED_RESIDUAL_FUSION_SHA256: &str =
-    "b01dd7e46723561166e2066436254ce739381cb2561a1efdc0cd33a3cbbcbf1f";
+    "4ff712089629fb2bf0257bf984e5bc00695bc9643e853f76b46dd4c3be056c42";
 
 /// Bit-length bucket (0..=20).
 fn bucket(v: u64) -> u64 {

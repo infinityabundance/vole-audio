@@ -39,7 +39,7 @@ use std::path::{Path, PathBuf};
 
 /// Frozen static-result hash (empty means "not yet frozen").
 pub const LEARNED_ITERATIVE_REPRICE_SHA256: &str =
-    "06b1806705f148f7ed7c66030421c293072ad1fd06cb5e2668021a2b51fdf08e";
+    "b70e01af35db3e75164c72510ec7f612b175d3a9cda8b86645d7f6c2768e1d47";
 
 /// Frozen iteration ceiling (additional parses after the proxy parse).
 const MAX_REPRICE_ITERS: usize = 4;

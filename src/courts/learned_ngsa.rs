@@ -31,7 +31,7 @@ use std::path::{Path, PathBuf};
 
 /// Frozen static-result hash (empty means "not yet frozen").
 pub const LEARNED_NGSA_SHA256: &str =
-    "99755e513542aa457273aa4d8f144070d14ce5cc2d89197fb25e9d66a50bd8cd";
+    "37ea9f4d8f9d3a170a4989eb81693d3ba8e113e86aa03ed307d2913d819fac41";
 
 /// Tap counts tried by both families.
 const TAP_LADDER: [u16; 2] = [8, 16];
