@@ -162,12 +162,14 @@ claim, and not a real-time/deadline claim.
 Phase 7 is the current program: **7A** entropy-seed proceduralization (this
 release), then **7B** `vole.audio.lossy.exp1` and **7C**
 `vole.audio.stream.voice.exp1`. Phase 7A's evidence is the
-`learned-entropy-seed` court: the blind `Compound` proposer (autocorrelation,
-harmonic projection, envelope/onset fitting, residual-guided decomposition — no
-fixture dispatch), entropy-coded H state via the Phase-2B metadata coders,
-entropy-coded exact residual via the residual-codec family, exact closure,
-bounded (random-access) materialization, determinism, and the mature learned
-predictor families competing in the same inverse decision.
+`learned-entropy-seed` court: the blind `Compound` proposer (autocorrelation
+fundamental estimation, orthogonal matching pursuit over the *integer tone atoms
+the graph can emit* with a joint least-squares re-solve and split refinement,
+harmonic projection, and envelope/onset fitting — no fixture dispatch),
+entropy-coded H state via the Phase-2B metadata coders, entropy-coded exact
+residual via the residual-codec family, exact closure, bounded (random-access)
+materialization, determinism, and the mature learned predictor families
+competing in the same inverse decision.
 
 **Executable evidence today.** `cargo run -- court <name>`. The authoritative
 court list is the registry in `src/courts/mod.rs`; the aggregate courts are

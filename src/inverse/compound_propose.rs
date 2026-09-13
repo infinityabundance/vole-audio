@@ -25,20 +25,22 @@
 use crate::compound::{CompoundGraph, CompoundNode, CompoundOp, MAX_COMPOUND_ARITY};
 use crate::error::{Error, Result};
 
-/// Default lowest fundamental searched (Hz).
+/// Default highest fundamental searched (Hz).
 pub const DEFAULT_MIN_FREQ_HZ: u32 = 40;
 /// Default highest fundamental searched (Hz).
 pub const DEFAULT_MAX_FREQ_HZ: u32 = 4_000;
+
+/// Hard ceiling on independent tones in one decomposition.
+const MAX_TONES: usize = 16;
 
 /// Bounded blind-proposal budget. Every field is an explicit ceiling.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CompoundBudget {
     /// Hard ceiling on proposed graphs.
     pub max_candidates: usize,
-    /// Largest harmonic bank (number of oscillators) proposed.
+    /// Largest harmonic bank (number of oscillators) proposed, and the ceiling
+    /// on independent tones in one decomposition.
     pub max_harmonics: usize,
-    /// Largest number of tonal layers produced by residual-guided refinement.
-    pub max_layers: usize,
     /// Largest analysis window (frames) used for projection.
     pub analysis_frames: usize,
     /// Lowest fundamental candidate (Hz).
@@ -54,7 +56,6 @@ impl Default for CompoundBudget {
         CompoundBudget {
             max_candidates: 10,
             max_harmonics: 24,
-            max_layers: 3,
             analysis_frames: 8_192,
             min_freq_hz: DEFAULT_MIN_FREQ_HZ,
             max_freq_hz: DEFAULT_MAX_FREQ_HZ,
@@ -97,8 +98,9 @@ pub enum CompoundFamily {
     EnvelopedOscillator,
     HarmonicBank,
     EnvelopedHarmonicBank,
+    ToneDecomposition,
+    EnvelopedToneDecomposition,
     EchoicBank,
-    Layered,
 }
 
 impl CompoundFamily {
@@ -112,8 +114,9 @@ impl CompoundFamily {
             CompoundFamily::EnvelopedOscillator => "envelope(oscillator)",
             CompoundFamily::HarmonicBank => "harmonic_bank",
             CompoundFamily::EnvelopedHarmonicBank => "envelope(harmonic_bank)",
+            CompoundFamily::ToneDecomposition => "tone_decomposition",
+            CompoundFamily::EnvelopedToneDecomposition => "envelope(tone_decomposition)",
             CompoundFamily::EchoicBank => "add(bank,delay(bank))",
-            CompoundFamily::Layered => "layered",
         }
     }
 }
@@ -306,65 +309,40 @@ pub fn propose(
         });
     }
 
-    // Residual-guided iterative decomposition: subtract the current tonal
-    // explanation, re-analyse the residual, and add another tonal layer, up to
-    // `max_layers`. Each layer is an independent bank, so a polyphonic mixture
-    // of non-harmonically-related tones is expressed as `Add(bank0, bank1, ...)`.
-    if budget.max_layers >= 2
-        && let Some(mut current) = bank.clone()
+    // General tonal decomposition: matching pursuit over independent tones.
+    // Unlike the harmonic bank this makes no integer-harmonic assumption, so it
+    // expresses polyphony, detuned pairs and non-harmonic mixtures.
+    let tones = decompose_tones(
+        window,
+        fs,
+        f64::from(budget.min_freq_hz),
+        f64::from(budget.max_freq_hz),
+        budget.max_harmonics.min(MAX_TONES),
+    );
+    let tone_graph_candidate = tone_graph(&tones, tonal_slice.start, fs, frames, sample_rate_hz);
+    if let Some(g) = tone_graph_candidate.clone() {
+        out.push(CompoundProposal {
+            family: CompoundFamily::ToneDecomposition,
+            label: format!("tone_decomposition(k={})", tones.len()),
+            graph: g,
+        });
+    }
+    if let Some(e) = &env
+        && let Some(g) = tone_graph_candidate
+        && let Some(eg) = with_envelope(g, e)
     {
-        for layer in 2..=budget.max_layers {
-            let Ok(base_signal) = current.materialize() else {
-                break;
-            };
-            let residual: Vec<f64> = x
-                .iter()
-                .zip(base_signal.iter())
-                .map(|(&a, &b)| a - f64::from(b))
-                .collect();
-            let r_slice = analysis_slice(n, peak_band, rms.len(), budget.analysis_frames);
-            let r_window = &residual[r_slice.clone()];
-            let Some((f1, s1)) = estimate_fundamental(
-                r_window,
-                fs,
-                f64::from(budget.min_freq_hz),
-                f64::from(budget.max_freq_hz),
-            ) else {
-                break;
-            };
-            if s1 <= 0.15 {
-                break;
-            }
-            let f1 = refine_frequency(
-                &residual,
-                fs,
-                f1,
-                f64::from(budget.min_freq_hz),
-                f64::from(budget.max_freq_hz),
-                sample_rate_hz,
-            );
-            let max_k = ((f64::from(budget.max_freq_hz) / f1).floor() as usize)
-                .min(budget.max_harmonics)
-                .max(1);
-            let r_offset = r_slice.start;
-            let Some(g2) = tonal_graph(
-                &harmonic_amplitudes(r_window, fs, f1, max_k, r_offset),
-                f1,
-                frames,
-                sample_rate_hz,
-            ) else {
-                break;
-            };
-            let Some(next) = layered(current, g2) else {
-                break;
-            };
-            current = next.clone();
-            out.push(CompoundProposal {
-                family: CompoundFamily::Layered,
-                label: format!("layered(f0={f0:.2},f1={f1:.2},layers={layer})"),
-                graph: next,
-            });
-        }
+        out.push(CompoundProposal {
+            family: CompoundFamily::EnvelopedToneDecomposition,
+            label: format!(
+                "envelope(tone_decomposition,k={},a={},d={},s={},r={})",
+                tones.len(),
+                e.0,
+                e.1,
+                e.2,
+                e.3
+            ),
+            graph: eg,
+        });
     }
 
     let _ = window;
@@ -391,22 +369,7 @@ fn node(op: CompoundOp, children: Vec<u16>) -> CompoundNode {
     CompoundNode { op, children }
 }
 
-/// Code-domain units produced per `amp_q16` unit at unity gain is `2^15`; an
-/// explicit root gain rescales a probe so the whole `amp_q16` range is usable.
-/// The gain is chosen from the peak amplitude: it is the smallest power of two
-/// (clamped to `[1, 65536]`) whose `amp_q16 = round(2a/gain)` stays in range.
-fn choose_gain(peak: f64) -> i32 {
-    if !peak.is_finite() || peak <= 0.0 {
-        return 1;
-    }
-    let need = 2.0 * peak / 65_535.0;
-    let mut gain = 1.0f64;
-    while gain < need && gain < 65_536.0 {
-        gain *= 2.0;
-    }
-    gain.min(65_536.0) as i32
-}
-
+/// Absolute-scale `amp_q16` (`code / 2^15`), `0` when unresolvable.
 /// Convert a radian phase to the frozen 2^64 phase domain (one cycle = 2^64).
 fn phase0_from_angle(theta: f64) -> u64 {
     let frac = (theta / (2.0 * std::f64::consts::PI)).rem_euclid(1.0);
@@ -447,36 +410,73 @@ fn single_oscillator_direct(
     Some(graph_of(frames, rate, vec![osc]))
 }
 
-/// Adaptive-gain tonal graph: one oscillator for a pure tone, an `Add` bank for a
-/// multi-harmonic tone, always followed by a root gain chosen from the peak
-/// amplitude so arbitrary code-domain levels are representable exactly.
-fn tonal_graph(harmonics: &[(f64, f64)], f0: f64, frames: u64, rate: u32) -> Option<CompoundGraph> {
-    let peak = harmonics.iter().map(|(a, _)| *a).fold(0.0f64, f64::max);
-    if peak <= 0.0 {
-        return None;
+/// Append one oscillator scaled to `amp` code units. The oscillator runs at
+/// maximum `amp_q16` resolution and a per-tone `Gain` applies the amplitude, so
+/// the tones can be summed without the intermediate saturating (`Add` then a
+/// single shared `Gain` would clip a loud mixture to `i32::MAX`).
+fn push_tone(
+    nodes: &mut Vec<CompoundNode>,
+    children: &mut Vec<u16>,
+    amp: f64,
+    freq: u32,
+    phase0: u64,
+) {
+    if !amp.is_finite() || amp.abs() < 0.5 {
+        return;
     }
-    let gain = choose_gain(peak);
+    let (q, gain) = tone_gain_amp(amp);
+    let osc = nodes.len() as u16;
+    nodes.push(node(
+        CompoundOp::Oscillator {
+            freq_hz: freq,
+            amp_q16: q,
+            phase0,
+        },
+        vec![],
+    ));
+    // Always apply the per-tone gain: `Gain` is a Q16 multiply, so even a gain of
+    // 1 is a 1/65536 scale, not unity.
+    let g = nodes.len() as u16;
+    nodes.push(node(CompoundOp::Gain { q16: gain }, vec![osc]));
+    children.push(g);
+}
+
+/// Split an amplitude into an oscillator `amp_q16` and an optional `Gain` so the
+/// rendered peak is as close to `amp` as the integer representation allows.
+/// `amp_q16` alone resolves `0.5` code units up to `32767`; louder tones use a
+/// power-of-two gain (step `gain/2`) while keeping full `amp_q16` resolution.
+fn tone_gain_amp(amp: f64) -> (i32, i32) {
+    let amp = amp.abs();
+    if amp <= 32_767.5 {
+        let q = (2.0 * amp).round().clamp(1.0, 65_535.0) as i32;
+        return (q, 1);
+    }
+    let mut gain = 1.0f64;
+    while 65_535.0 * gain / 2.0 < amp && gain < (1 << 24) as f64 {
+        gain *= 2.0;
+    }
+    let q = (2.0 * amp / gain).round().clamp(1.0, 65_535.0) as i32;
+    (q, gain as i32)
+}
+
+/// Adaptive-resolution tonal graph: one oscillator for a pure tone, an `Add`
+/// bank for a multi-harmonic tone, each term scaled to its own amplitude before
+/// the sum.
+fn tonal_graph(harmonics: &[(f64, f64)], f0: f64, frames: u64, rate: u32) -> Option<CompoundGraph> {
     let mut nodes: Vec<CompoundNode> = Vec::new();
     let mut children: Vec<u16> = Vec::new();
     for (k, &(amp, phase)) in harmonics.iter().enumerate() {
-        let q = (2.0 * amp / f64::from(gain)).round().clamp(0.0, 65_535.0) as i32;
-        if q == 0 {
-            continue;
-        }
         let freq = (f0 * (k + 1) as f64).round();
         if freq < 1.0 || freq > f64::from(rate / 2) {
             continue;
         }
-        let idx = nodes.len() as u16;
-        nodes.push(node(
-            CompoundOp::Oscillator {
-                freq_hz: freq as u32,
-                amp_q16: q,
-                phase0: phase0_from_angle(phase),
-            },
-            vec![],
-        ));
-        children.push(idx);
+        push_tone(
+            &mut nodes,
+            &mut children,
+            amp,
+            freq as u32,
+            phase0_from_angle(phase),
+        );
         if children.len() >= MAX_COMPOUND_ARITY as usize {
             break;
         }
@@ -487,8 +487,6 @@ fn tonal_graph(harmonics: &[(f64, f64)], f0: f64, frames: u64, rate: u32) -> Opt
     if children.len() > 1 {
         nodes.push(node(CompoundOp::Add, children));
     }
-    let root = (nodes.len() - 1) as u16;
-    nodes.push(node(CompoundOp::Gain { q16: gain }, vec![root]));
     Some(graph_of(frames, rate, nodes))
 }
 
@@ -528,32 +526,6 @@ fn with_echo(mut g: CompoundGraph, delay: u32) -> Option<CompoundGraph> {
     ));
     let delayed = (g.nodes.len() - 1) as u16;
     g.nodes.push(node(CompoundOp::Add, vec![root, delayed]));
-    Some(g)
-}
-
-/// Add two independent graphs.
-fn layered(a: CompoundGraph, b: CompoundGraph) -> Option<CompoundGraph> {
-    // Re-index b's nodes after a's.
-    let offset = u16::try_from(a.nodes.len()).ok()?;
-    let total = a.nodes.len().checked_add(b.nodes.len())?;
-    if total as u32 > crate::compound::MAX_COMPOUND_NODES {
-        return None;
-    }
-    let b_last = (b.nodes.len() - 1) as u16;
-    let mut nodes = a.nodes.clone();
-    for n in b.nodes {
-        let children = n
-            .children
-            .iter()
-            .map(|&c| c.checked_add(offset))
-            .collect::<Option<Vec<u16>>>()?;
-        nodes.push(node(n.op, children));
-    }
-    let ra = (a.nodes.len() - 1) as u16;
-    let rb = offset + b_last;
-    nodes.push(node(CompoundOp::Add, vec![ra, rb]));
-    let mut g = a;
-    g.nodes = nodes;
     Some(g)
 }
 
@@ -693,6 +665,473 @@ fn refine_frequency(x: &[f64], fs: f64, f0: f64, min_hz: f64, max_hz: f64, rate:
         cand += 1.0;
     }
     best
+}
+
+/// One complex-spectrum peak / matched tone in the analysis window's local time
+/// base: `x[t] ≈ Σ amp·sin(2π·freq·t/fs + phase)`.
+#[derive(Debug, Clone, Copy)]
+struct Tone {
+    freq: f64,
+    amp: f64,
+    phase: f64,
+}
+
+/// In-place iterative radix-2 Cooley–Tukey FFT (analysis-only, zero authority).
+/// `re`/`im` must have a power-of-two length.
+fn fft_in_place(re: &mut [f64], im: &mut [f64]) {
+    let n = re.len();
+    debug_assert!(n.is_power_of_two());
+    let mut j = 0usize;
+    for i in 1..n {
+        let mut bit = n >> 1;
+        while j & bit != 0 {
+            j ^= bit;
+            bit >>= 1;
+        }
+        j |= bit;
+        if i < j {
+            re.swap(i, j);
+            im.swap(i, j);
+        }
+    }
+    let mut len = 2usize;
+    while len <= n {
+        let ang = -2.0 * std::f64::consts::PI / len as f64;
+        let (wr, wi) = (ang.cos(), ang.sin());
+        let half = len / 2;
+        let mut i = 0usize;
+        while i < n {
+            let mut cur_r = 1.0f64;
+            let mut cur_i = 0.0f64;
+            for k in 0..half {
+                let ur = re[i + k];
+                let ui = im[i + k];
+                let xr = re[i + k + half];
+                let xi = im[i + k + half];
+                let vr = xr * cur_r - xi * cur_i;
+                let vi = xr * cur_i + xi * cur_r;
+                re[i + k] = ur + vr;
+                im[i + k] = ui + vi;
+                re[i + k + half] = ur - vr;
+                im[i + k + half] = ui - vi;
+                let nwr = cur_r * wr - cur_i * wi;
+                cur_i = cur_r * wi + cur_i * wr;
+                cur_r = nwr;
+            }
+            i += len;
+        }
+        len <<= 1;
+    }
+}
+
+/// Hann-windowed, twice-zero-padded magnitude spectrum of `x` (bins `0..n/2`).
+/// Returns `(magnitudes, n_fft, bin_hz_denominator_n)`.
+fn spectrum(x: &[f64]) -> (Vec<f64>, usize) {
+    let m = x.len();
+    if m < 4 {
+        return (Vec::new(), 0);
+    }
+    let base = m.next_power_of_two() * 2;
+    let n = base.min(1 << 15);
+    let mut re = vec![0.0f64; n];
+    let mut im = vec![0.0f64; n];
+    let denom = (m - 1) as f64;
+    for (i, &v) in x.iter().enumerate().take(n) {
+        let win = 0.5 - 0.5 * (2.0 * std::f64::consts::PI * i as f64 / denom).cos();
+        re[i] = v * win;
+    }
+    fft_in_place(&mut re, &mut im);
+    let mut mags = Vec::with_capacity(n / 2);
+    for k in 0..n / 2 {
+        mags.push((re[k] * re[k] + im[k] * im[k]).sqrt());
+    }
+    (mags, n)
+}
+
+/// Projection `(amplitude, phase)` of `x` onto a sinusoid at `f`, over the local
+/// time base `t = 0..x.len()`.
+fn project_tone(x: &[f64], fs: f64, f: f64) -> (f64, f64) {
+    let n = x.len();
+    if n == 0 || f <= 0.0 || f >= fs / 2.0 {
+        return (0.0, 0.0);
+    }
+    let w = 2.0 * std::f64::consts::PI * f / fs;
+    let mut s = 0.0f64;
+    let mut c = 0.0f64;
+    for (t, &v) in x.iter().enumerate() {
+        let a = w * t as f64;
+        s += v * a.sin();
+        c += v * a.cos();
+    }
+    let amp = 2.0 * (s * s + c * c).sqrt() / n as f64;
+    (amp, c.atan2(s))
+}
+
+/// Golden-section maximiser over `[a, b]` (analysis-only).
+fn golden_max<F: Fn(f64) -> f64>(f: F, mut a: f64, mut b: f64) -> f64 {
+    const R: f64 = 0.618_033_988_749_894_9;
+    if b <= a {
+        return a;
+    }
+    let mut c = b - R * (b - a);
+    let mut d = a + R * (b - a);
+    let mut fc = f(c);
+    let mut fd = f(d);
+    for _ in 0..30 {
+        if fc > fd {
+            b = d;
+            d = c;
+            fd = fc;
+            c = b - R * (b - a);
+            fc = f(c);
+        } else {
+            a = c;
+            c = d;
+            fc = fd;
+            d = a + R * (b - a);
+            fd = f(d);
+        }
+    }
+    0.5 * (a + b)
+}
+
+/// Best single tone in `res`: FFT magnitude peaks seed a bounded local
+/// refinement that maximises the projection amplitude.
+fn best_frequency(res: &[f64], fs: f64, min_hz: f64, max_hz: f64) -> Option<Tone> {
+    if res.len() < 16 || max_hz <= min_hz {
+        return None;
+    }
+    let (mags, n) = spectrum(res);
+    if mags.is_empty() {
+        return None;
+    }
+    let bin_hz = fs / n as f64;
+    let lo = ((min_hz / bin_hz).ceil() as usize).max(1);
+    let hi = ((max_hz / bin_hz).floor() as usize).min(mags.len().saturating_sub(2));
+    if hi <= lo {
+        return None;
+    }
+    let mut peaks: Vec<(f64, usize)> = Vec::new();
+    for k in lo..=hi {
+        if mags[k] >= mags[k - 1] && mags[k] >= mags[k + 1] {
+            peaks.push((mags[k], k));
+        }
+    }
+    peaks.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+    peaks.truncate(6);
+    let mut best: Option<Tone> = None;
+    for (_, k) in peaks {
+        let center = k as f64 * bin_hz;
+        let a = (center - 1.5 * bin_hz).max(min_hz);
+        let b = (center + 1.5 * bin_hz).min(max_hz);
+        let f = golden_max(|f| project_tone(res, fs, f).0, a, b);
+        let (amp, phase) = project_tone(res, fs, f);
+        if best.as_ref().is_none_or(|t| amp > t.amp) {
+            best = Some(Tone {
+                freq: f,
+                amp,
+                phase,
+            });
+        }
+    }
+    best
+}
+
+/// Solve the joint least-squares fit of `x` onto the real basis
+/// `{sin(w_j t), cos(w_j t)}` for the given frequencies, returning coefficients
+/// `[a_0, b_0, a_1, b_1, ...]` with `x[t] ≈ Σ a_j sin(w_j t) + b_j cos(w_j t)`.
+///
+/// The Gram matrix is solved with a tiny ridge term so nearly collinear
+/// frequencies (e.g. 180 Hz and 181 Hz inside one window) resolve to the
+/// minimum-energy split instead of one atom absorbing the other.
+fn solve_basis(x: &[f64], fs: f64, freqs: &[f64]) -> Vec<f64> {
+    let k = freqs.len();
+    let m = 2 * k;
+    let n = x.len();
+    if k == 0 {
+        return Vec::new();
+    }
+    let w: Vec<f64> = freqs
+        .iter()
+        .map(|&f| 2.0 * std::f64::consts::PI * f / fs)
+        .collect();
+    let mut g = vec![0.0f64; m * m];
+    let mut d = vec![0.0f64; m];
+    let mut s = vec![0.0f64; k];
+    let mut c = vec![0.0f64; k];
+    for (t, &v) in x.iter().enumerate() {
+        let tt = t as f64;
+        for j in 0..k {
+            let a = w[j] * tt;
+            s[j] = a.sin();
+            c[j] = a.cos();
+        }
+        for j in 0..k {
+            d[2 * j] += v * s[j];
+            d[2 * j + 1] += v * c[j];
+            for l in 0..=j {
+                let gss = g[2 * j * m + 2 * l] + s[j] * s[l];
+                g[2 * j * m + 2 * l] = gss;
+                let gsc = g[2 * j * m + 2 * l + 1] + s[j] * c[l];
+                g[2 * j * m + 2 * l + 1] = gsc;
+                let gcs = g[(2 * j + 1) * m + 2 * l] + c[j] * s[l];
+                g[(2 * j + 1) * m + 2 * l] = gcs;
+                let gcc = g[(2 * j + 1) * m + 2 * l + 1] + c[j] * c[l];
+                g[(2 * j + 1) * m + 2 * l + 1] = gcc;
+            }
+        }
+    }
+    // Mirror the lower triangle.
+    for j in 0..m {
+        for l in 0..j {
+            let v = g[j * m + l];
+            g[l * m + j] = v;
+        }
+    }
+    let ridge = 1e-6 * (n as f64 / 2.0).max(1.0);
+    for j in 0..m {
+        g[j * m + j] += ridge;
+    }
+    solve_linear(g, d, m)
+}
+
+/// Gaussian elimination with partial pivoting and a zero-size guard.
+fn solve_linear(mut a: Vec<f64>, mut b: Vec<f64>, m: usize) -> Vec<f64> {
+    for col in 0..m {
+        let mut piv = col;
+        let mut best = a[col * m + col].abs();
+        for r in col + 1..m {
+            let v = a[r * m + col].abs();
+            if v > best {
+                best = v;
+                piv = r;
+            }
+        }
+        if best < 1e-12 {
+            continue;
+        }
+        if piv != col {
+            for c in 0..m {
+                a.swap(col * m + c, piv * m + c);
+            }
+            b.swap(col, piv);
+        }
+        let d = a[col * m + col];
+        for r in col + 1..m {
+            let f = a[r * m + col] / d;
+            if f == 0.0 {
+                continue;
+            }
+            for c in col..m {
+                a[r * m + c] -= f * a[col * m + c];
+            }
+            b[r] -= f * b[col];
+        }
+    }
+    let mut x = vec![0.0f64; m];
+    for col in (0..m).rev() {
+        let d = a[col * m + col];
+        if d.abs() < 1e-15 {
+            x[col] = 0.0;
+            continue;
+        }
+        let mut s = b[col];
+        for c in col + 1..m {
+            s -= a[col * m + c] * x[c];
+        }
+        x[col] = s / d;
+    }
+    x
+}
+
+/// Synthesize the model `Σ a_j sin + b_j cos` from basis coefficients.
+fn synthesize(coeffs: &[f64], fs: f64, freqs: &[f64], n: usize) -> Vec<f64> {
+    let mut out = vec![0.0f64; n];
+    for (j, &f) in freqs.iter().enumerate() {
+        let a = coeffs[2 * j];
+        let b = coeffs[2 * j + 1];
+        let w = 2.0 * std::f64::consts::PI * f / fs;
+        for (t, o) in out.iter_mut().enumerate() {
+            let ang = w * t as f64;
+            *o += a * ang.sin() + b * ang.cos();
+        }
+    }
+    out
+}
+
+fn residual_energy(x: &[f64], model: &[f64]) -> f64 {
+    x.iter()
+        .zip(model.iter())
+        .map(|(&a, &b)| (a - b) * (a - b))
+        .sum()
+}
+
+/// Decompose the analysis window into a bounded set of tones by orthogonal
+/// matching pursuit **over the integer atom basis the graph can emit**, with a
+/// joint least-squares re-solve at every step.
+///
+/// Working directly in the integer-frequency basis is essential: two tones one
+/// hertz apart are nearly collinear inside a short window, so a continuous
+/// optimum would merge them into one fractional frequency that the integer
+/// oscillator cannot represent. Selecting integer atoms and re-solving together
+/// lets the decomposition express the detuned pair exactly.
+fn decompose_tones(
+    window: &[f64],
+    fs: f64,
+    min_hz: f64,
+    max_hz: f64,
+    max_tones: usize,
+) -> Vec<Tone> {
+    if window.len() < 16 || max_tones == 0 {
+        return Vec::new();
+    }
+    // Fit the raw window: over a finite window a sine/cosine pair naturally
+    // carries the segment mean, so subtracting it first would corrupt the fit.
+    let x: Vec<f64> = window.to_vec();
+    let n = x.len();
+    let initial_energy: f64 = x.iter().map(|v| v * v).sum();
+    if initial_energy <= f64::EPSILON {
+        return Vec::new();
+    }
+    let lo = min_hz.max(1.0);
+    let hi = max_hz.min(fs / 2.0 - 1.0);
+
+    let mut freqs: Vec<f64> = Vec::with_capacity(max_tones);
+    let mut model = vec![0.0f64; n];
+    let mut energy = initial_energy;
+    let mut first_amp = 0.0f64;
+    for _ in 0..max_tones {
+        let r: Vec<f64> = x.iter().zip(model.iter()).map(|(&a, &b)| a - b).collect();
+        let Some(t) = best_frequency(&r, fs, lo, hi) else {
+            break;
+        };
+        if freqs.is_empty() {
+            first_amp = t.amp;
+        }
+        // Choose the best unused integer frequency near the continuous estimate.
+        let base = t.freq.round();
+        let mut cand = None;
+        let mut cand_amp = 0.0f64;
+        for d in -2i32..=2 {
+            let f = (base + f64::from(d)).clamp(lo, hi);
+            if freqs.iter().any(|&u| (u - f).abs() < 0.5) {
+                continue;
+            }
+            let (amp, _) = project_tone(&r, fs, f);
+            if amp > cand_amp {
+                cand_amp = amp;
+                cand = Some(f);
+            }
+        }
+        let Some(f) = cand else {
+            break;
+        };
+        if cand_amp < (first_amp * 0.02).max(1.0) {
+            break;
+        }
+        freqs.push(f);
+        let trial_coeffs = solve_basis(&x, fs, &freqs);
+        let trial_model = synthesize(&trial_coeffs, fs, &freqs, n);
+        let next = residual_energy(&x, &trial_model);
+        if next > energy * (1.0 - 1e-5) {
+            freqs.pop();
+            break;
+        }
+        model = trial_model;
+        energy = next;
+    }
+
+    // Split refinement: greedy correlation cannot see a partial that is nearly
+    // collinear with an already-selected atom (e.g. 180 Hz vs 181 Hz inside a
+    // short window). Test adding each selected frequency's immediate integer
+    // neighbours and keep a split whenever it genuinely reduces the joint LS
+    // residual energy. Bounded by `max_tones` and by the number of selected
+    // tones.
+    let mut improved = true;
+    while improved && freqs.len() < max_tones {
+        improved = false;
+        let mut best: Option<(Vec<f64>, f64)> = None;
+        for k in 0..freqs.len() {
+            for d in [-1.0f64, 1.0] {
+                let f = freqs[k] + d;
+                if f < lo || f > hi || freqs.iter().any(|&u| (u - f).abs() < 0.5) {
+                    continue;
+                }
+                let mut trial = freqs.clone();
+                trial.push(f);
+                let c = solve_basis(&x, fs, &trial);
+                let m = synthesize(&c, fs, &trial, n);
+                let e = residual_energy(&x, &m);
+                if e < energy * (1.0 - 1e-5) && best.as_ref().is_none_or(|(_, be)| e < *be) {
+                    best = Some((trial, e));
+                }
+            }
+        }
+        if let Some((trial, e)) = best {
+            freqs = trial;
+            energy = e;
+            improved = true;
+        }
+    }
+    if freqs.is_empty() {
+        return Vec::new();
+    }
+    let coeffs = solve_basis(&x, fs, &freqs);
+
+    let floor = (first_amp * 0.01).max(0.5);
+    let mut tones = Vec::with_capacity(freqs.len());
+    for (j, &f) in freqs.iter().enumerate() {
+        let a = coeffs[2 * j];
+        let b = coeffs[2 * j + 1];
+        let amp = (a * a + b * b).sqrt();
+        if amp < floor {
+            continue;
+        }
+        tones.push(Tone {
+            freq: f,
+            amp,
+            phase: b.atan2(a),
+        });
+    }
+    tones
+}
+
+/// Build an additive graph of independent oscillators from a tone list, each
+/// scaled to its own amplitude before the sum. Absolute phase is recovered from
+/// the window offset.
+fn tone_graph(
+    tones: &[Tone],
+    offset: usize,
+    fs: f64,
+    frames: u64,
+    rate: u32,
+) -> Option<CompoundGraph> {
+    let mut nodes: Vec<CompoundNode> = Vec::new();
+    let mut children: Vec<u16> = Vec::new();
+    for t in tones {
+        let freq = t.freq.round().clamp(1.0, f64::from(rate / 2)) as u32;
+        // The tone is fit in the window's local time base; convert to the
+        // absolute phase the graph's oscillator uses from frame 0.
+        let w = 2.0 * std::f64::consts::PI * t.freq / fs;
+        let absolute = t.phase - w * offset as f64;
+        push_tone(
+            &mut nodes,
+            &mut children,
+            t.amp,
+            freq,
+            phase0_from_angle(absolute),
+        );
+        if children.len() >= MAX_COMPOUND_ARITY as usize {
+            break;
+        }
+    }
+    if children.is_empty() {
+        return None;
+    }
+    if children.len() > 1 {
+        nodes.push(node(CompoundOp::Add, children));
+    }
+    Some(graph_of(frames, rate, nodes))
 }
 
 /// Project the window onto `sin`/`cos` at each harmonic of `f0`; returns
@@ -922,9 +1361,9 @@ mod tests {
     }
 
     #[test]
-    fn layered_decomposition_improves_polyphony() {
+    fn tone_decomposition_discovers_polyphony() {
         let rate = 48_000u32;
-        let frames = 24_000usize;
+        let frames = 8_192usize;
         let mut samples = vec![0i32; frames];
         for (f, a) in [(180.0f64, 16384.0f64), (181.0, 8192.0), (270.0, 8192.0)] {
             for (t, s) in samples.iter_mut().enumerate() {
@@ -949,15 +1388,127 @@ mod tests {
             .find(|p| p.family == CompoundFamily::GainOscillator)
             .map(|p| mean_abs(&p.graph))
             .expect("a single-oscillator probe");
-        let layered = props
+        let decomposed = props
             .iter()
-            .filter(|p| p.family == CompoundFamily::Layered)
+            .filter(|p| p.family == CompoundFamily::ToneDecomposition)
             .map(|p| mean_abs(&p.graph))
             .min_by(|a, b| a.partial_cmp(b).unwrap())
-            .expect("a layered decomposition");
+            .expect("a tone decomposition");
+        // The decomposition must capture both the detuned pair and the third
+        // tone: its residual should be a fraction of a single oscillator's.
         assert!(
-            layered < single * 0.8,
-            "layered residual {layered:.0} did not beat single oscillator {single:.0}"
+            decomposed < single * 0.25,
+            "tone decomposition residual {decomposed:.0} did not beat single oscillator {single:.0}"
+        );
+    }
+
+    #[test]
+    fn tone_decomposition_matches_deterministic_polyphony() {
+        use crate::compound::{CompoundGraph, CompoundNode, CompoundOp};
+        let rate = 48_000u32;
+        let frames = 24_000u64;
+        let osc = |f: u32, a: i32, p: u64| CompoundNode {
+            op: CompoundOp::Oscillator {
+                freq_hz: f,
+                amp_q16: a,
+                phase0: p,
+            },
+            children: vec![],
+        };
+        let g = CompoundGraph {
+            channels: 1,
+            frames,
+            sample_rate_hz: rate,
+            nodes: vec![
+                osc(180, 2, 0),
+                osc(181, 1, 1 << 40),
+                osc(270, 1, 1 << 41),
+                CompoundNode {
+                    op: CompoundOp::Add,
+                    children: vec![0, 1, 2],
+                },
+            ],
+        };
+        let full = g.materialize().unwrap();
+        let samples: Vec<i32> = full[..8_192].to_vec();
+        let budget = CompoundBudget::default();
+        let props = propose(&samples, 1, rate, 8_192, &budget).unwrap();
+        let best = props
+            .iter()
+            .map(|p| {
+                let seed =
+                    crate::inverse::seed::SeedObject::from_graph_target(p.graph.clone(), &samples)
+                        .unwrap()
+                        .unwrap();
+                (seed.complete_bytes(), p.family)
+            })
+            .min_by_key(|(b, _)| *b)
+            .unwrap();
+        // The deterministic three-oscillator construction must be discovered and
+        // closed to within the integer oscillator's representational floor: the
+        // residual is a few code units, not tens of kilobytes. (~0.3 B/sample is
+        // the entropy of that quantisation noise.)
+        assert!(
+            best.0 < 3_500,
+            "best seed {} bytes (family {:?}) on a known 3-oscillator construction",
+            best.0,
+            best.1
+        );
+    }
+
+    #[test]
+    fn solve_basis_recovers_exact_tone_sums() {
+        let rate = 48_000u32;
+        let n = 8_192usize;
+        let x: Vec<f64> = (0..n)
+            .map(|t| {
+                let tf = t as f64;
+                let w = 2.0 * std::f64::consts::PI * tf / f64::from(rate);
+                65_535.0 * (180.0 * w).sin()
+                    + 32_768.0 * (181.0 * w + 0.5).sin()
+                    + 32_768.0 * (270.0 * w + 1.3).sin()
+            })
+            .collect();
+        let coeffs = solve_basis(&x, f64::from(rate), &[180.0, 181.0, 270.0]);
+        let model = synthesize(&coeffs, f64::from(rate), &[180.0, 181.0, 270.0], n);
+        let rms = (residual_energy(&x, &model) / n as f64).sqrt();
+        assert!(rms < 1.0, "LS residual rms {rms} on an exact tone sum");
+    }
+
+    #[test]
+    fn tone_decomposition_closes_a_pure_sine() {
+        let fixture = crate::entropy::corpus::named("single-sine").unwrap();
+        let ch = usize::from(fixture.channels);
+        let rate = 48_000u32;
+        let samples: Vec<i32> = fixture
+            .samples
+            .iter()
+            .step_by(ch)
+            .take(8_192)
+            .copied()
+            .collect();
+        let budget = CompoundBudget::default();
+        let props = propose(&samples, 1, rate, samples.len() as u64, &budget).unwrap();
+        // The proposer's job is the *fit*: it must close the pure sine to within
+        // the integer oscillator's representational floor (a 1-code-unit
+        // rounding difference), leaving an almost-zero residual. How many bytes
+        // that residual costs is the entropy layer's question, not the
+        // proposer's.
+        let best_fit = props
+            .iter()
+            .map(|p| {
+                let m = p.graph.materialize().unwrap();
+                samples
+                    .iter()
+                    .zip(m.iter())
+                    .map(|(&a, &b)| (f64::from(a) - f64::from(b)).abs())
+                    .sum::<f64>()
+                    / samples.len() as f64
+            })
+            .fold(f64::INFINITY, f64::min);
+        assert!(
+            best_fit < 1.0,
+            "proposer fit mean|r| = {best_fit} on a pure sine"
         );
     }
 
