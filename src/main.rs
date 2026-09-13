@@ -371,6 +371,7 @@ fn cmd_seal_verify(args: &[String]) -> Result<u8> {
                        learned-residual-anatomy=SUPPORTED,\
                        learned-residual-entropy=SUPPORTED,\
                        learned-ngsa=SUPPORTED,\
+                       learned-lossy=SUPPORTED,\
                        learned-residual-fusion=SUPPORTED,\
                        learned-stateful-parse=SUPPORTED,\
                        learned-iterative-reprice=SUPPORTED,\

@@ -143,13 +143,15 @@ entropy/adaptation ladder** (E0–F0, v0.42.0–v0.53.0) added the signed/FSM ra
 coders, the natural-gradient predictor and BGMC; **Phase 6** is complete
 (v0.54.0–v0.69.0); the Phase-2 metadata/predictor seals (v0.70.0–v0.73.0)
 added parameter deltas, SRLA coefficient refinement, the widened natural-gradient
-ladder and Zstd-style integer metadata codes; and **Phase 7A** (entropy-seed
+ladder and Zstd-style integer metadata codes; **Phase 7A** (entropy-seed
 proceduralization, v0.74.0) makes the inverse path discover a deterministic
 `Compound` explanation *blind* from samples and persists it as entropy-coded H
-state plus an entropy-coded exact residual.
+state plus an entropy-coded exact residual; and **Phase 7B** (v0.75.0) adds
+`vole.audio.lossy.exp1` — VOLE's first real lossy profile — with a
+matched-actual-bitrate court against external Opus and Lyra.
 
-**Measured position (as of v0.73.0).** On the frozen real-speech corpus
-(LibriSpeech, CC BY 4.0), the exact learned portfolio is:
+**Measured position (as of v0.73.0, lossless).** On the frozen real-speech
+corpus (LibriSpeech, CC BY 4.0), the exact learned portfolio is:
 
 | split | VOLE portfolio | FLAC-5 | FLAC-8 | record |
 | ----- | -------------- | ------ | ------ | ------ |
@@ -159,8 +161,18 @@ state plus an entropy-coded exact residual.
 That is a speech-corpus result on this host — not a general-audio flagship
 claim, and not a real-time/deadline claim.
 
-Phase 7 is the current program: **7A** entropy-seed proceduralization (this
-release), then **7B** `vole.audio.lossy.exp1` and **7C**
+**Lossy position (v0.75.0).** `vole.audio.lossy.exp1` is a real lossy
+encoder/decoder profile — two competing explanation engines (forward-LPC with a
+pitch predictor; MDCT with a Bark masking model), an MSE-optimal absolute-step
+rate allocation, and VOLE-native entropy coding — measured against external
+Opus and Lyra at **matched actual bitrate**. The measured win/loss split, the
+defects found while getting there, and the attributed remaining losing cells are
+in [PHASE_7B.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/PHASE_7B.md).
+It is not a competitor wrapper: no competitor code is imported, linked or used
+as a fallback.
+
+Phase 7 is the current program: **7A** entropy-seed proceduralization
+(sealed), **7B** `vole.audio.lossy.exp1` (this release), then **7C**
 `vole.audio.stream.voice.exp1`. Phase 7A's evidence is the
 `learned-entropy-seed` court: the blind `Compound` proposer (autocorrelation
 fundamental estimation, orthogonal matching pursuit over the *integer tone atoms
@@ -176,7 +188,7 @@ court list is the registry in `src/courts/mod.rs`; the aggregate courts are
 `all` (Phase M), `h2` (Phase H.2), `phase-n` (Phase N) and `learned` (Phase O),
 and every court emits an immutable receipt under `receipts/`. The exact seal
 expectation is checked by `vole-audio seal verify --receipts receipts`
-(74 rows at v0.74.0). The full per-phase evidence narrative — the Phase H/H.2
+(75 rows at v0.75.0). The full per-phase evidence narrative — the Phase H/H.2
 endpoint measurements, the Phase K/L inverse results, and every seal's numbers —
 lives in
 [CHANGELOG.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/CHANGELOG.md).

@@ -417,8 +417,25 @@ impl ResidualEncodingV2 {
 /// additions) and return the smallest canonical encoding; ties break by
 /// ascending id.
 pub fn encode_best_v3(residual: &[i32]) -> ResidualEncodingV2 {
+    encode_best_subset(residual, &ResidualCodecV2::ALL_V3)
+}
+
+/// A cheap subset used while the encoder is *searching* over candidate gains.
+/// The chosen candidate is re-encoded with the full family, so the subset only
+/// has to order the candidates, not define the final size.
+pub const SEARCH_CODECS: [ResidualCodecV2; 6] = [
+    ResidualCodecV2::ZeroMaskRice,
+    ResidualCodecV2::RunLengthRice,
+    ResidualCodecV2::Golomb,
+    ResidualCodecV2::FactorShift,
+    ResidualCodecV2::Bgmc,
+    ResidualCodecV2::EmaRans,
+];
+
+/// Encode with a caller-supplied codec subset, returning the smallest.
+pub fn encode_best_subset(residual: &[i32], codecs: &[ResidualCodecV2]) -> ResidualEncodingV2 {
     let mut best: Option<ResidualEncodingV2> = None;
-    for codec in ResidualCodecV2::ALL_V3 {
+    for &codec in codecs {
         let payload = codec.encode(residual);
         let mut bytes = Vec::with_capacity(payload.len() + 1);
         bytes.push(codec.id());
@@ -430,7 +447,7 @@ pub fn encode_best_v3(residual: &[i32]) -> ResidualEncodingV2 {
             Some(_) => {}
         }
     }
-    best.expect("the codec family is non-empty")
+    best.expect("the codec subset is non-empty")
 }
 
 /// Measure every v3 codec's cost for a residual.

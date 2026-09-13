@@ -343,6 +343,23 @@ buffers, CUDA persisting-L2 windows) and the Report 1/2 program are still open.
 
 ## Status
 
+Phase 7 is the current program and has exactly three objectives.
+
+**7A — entropy-seed proceduralization — complete at v0.74.0.** The inverse path
+discovers a `Compound` explanation blind from samples (court
+`learned-entropy-seed`).
+
+**7B — `vole.audio.lossy.exp1` — complete at v0.75.0.** A real lossy
+encoder/decoder profile with two explanation engines (forward-LPC + pitch
+prediction, and MDCT + Bark masking), absolute-step rate control, and a
+matched-actual-bitrate court against external Opus and Lyra. The measured
+position, the attributed losing cells and the declared remainder are in
+[`PHASE_7B.md`](PHASE_7B.md).
+
+**7C — `vole.audio.stream.voice.exp1` — open.**
+
+Earlier campaign status follows.
+
 Implemented and pushed: Track A, Track B (including the entropy decode table),
 and the Report 3 Seal S0 diagnostic courts (`learned-speech-trace`,
 `learned-real-corpus-u1`), Seal S1 fixed differences, Seal S2 dense local LPC,
@@ -363,4 +380,5 @@ CUDA/HIP graphs, entropy model p2 / compatible-model reuse, integer packing,
 lifting, page-local LZ, reciprocal rANS encode, PreparedWorld, voice coalescing,
 SHA acceleration, borrowed/mapped views, GPUDirect Storage, ALSA hardware-clock
 scheduling, radix score assembly, PGO/BOLT, energy counters) are **not yet
-implemented** and remain the declared remainder of the campaign.
+implemented** and remain the declared remainder of the campaign. The `io_uring`,
+`PartialBank` SIMD and Report 1/2 remainder are shelved for after Phase 7.

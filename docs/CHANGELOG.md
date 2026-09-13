@@ -332,15 +332,72 @@ a near-negative. It does not beat the portfolio's natural-gradient predictor, so
 it is not added to the production portfolio — the court records the family-level
 result rather than a portfolio claim.
 
+## Phase 7 — the three-objective program (v0.74.0 – )
+
+Phase 7 has exactly three objectives and no fourth track:
+
+```text
+7A — entropy-seed proceduralization for sampled audio   (v0.74.0, complete)
+7B — vole.audio.lossy.exp1 vs Opus and Lyra             (v0.75.0, this release)
+7C — vole.audio.stream.voice.exp1                       (open)
+```
+
+### v0.74.0 — Phase 7A: entropy-seed proceduralization
+
+`src/inverse/compound_propose.rs` makes the inverse path discover a
+`Compound` explanation **blind** from samples: autocorrelation fundamental
+estimation, orthogonal matching pursuit over the *integer tone atoms the graph
+can actually emit* with a joint least-squares re-solve and split refinement,
+harmonic projection, and envelope/onset fitting — with no fixture dispatch.
+`src/inverse/seed.rs` persists it as entropy-coded H state plus an
+entropy-coded exact residual, and `CompoundGraph::materialize_range` bounds
+materialization to the requested window. Court `learned-entropy-seed`: a known
+3-oscillator construction lands in **2 372 bytes** with a residual of ~3 code
+units, and the blind path recovers 180/181/270 Hz from samples alone.
+
+### v0.75.0 — Phase 7B: `vole.audio.lossy.exp1`
+
+The first real VOLE lossy profile, built on the Phase-7A principle: a
+deterministic explanation `H` is chosen by search to minimise the *actual
+emitted representation*, and whatever `H` cannot explain is quantised and coded
+with the VOLE-native entropy family. Two engines propose `H`:
+
+* **predictive** — short-term LPC with transmitted, stability-preserving
+  quantised reflection coefficients, plus a long-term pitch predictor, driven by
+  a decoder-synchronised DPCM loop;
+* **transform** — MDCT with a Bark/Schroeder masking model, a separate band
+  shape and global gain (with 2-D shape prediction), and a dead-zone scalar
+  quantiser.
+
+Rate control is an **absolute** step (reverse water-filling), which is what
+makes the allocation MSE-optimal, and the candidate is chosen as the
+lowest-distortion representation that meets the byte target. The transform's
+per-frame distortion is expressed in time-domain units (`2/N · Σe²`, verified
+against a true overlap-add) so the two engines are compared in the same units.
+
+Court `learned-lossy` measures against **external** Opus and Lyra at *matched
+actual bitrate* — each competitor's measured `(bitrate, quality)` curve is
+interpolated at VOLE's achieved bitrate, because their VBR encoders do not land
+on the requested rate — with ViSQOL as the external perceptual metric where the
+pinned binary and model run. No competitor code is imported, linked, wrapped or
+used as a fallback.
+
+Measured position, the attributed losing cells and the declared remainder are
+in [`PHASE_7B.md`](PHASE_7B.md).
+
 ## Current measured position
 
-Frozen real-speech portfolio (effectiveness + held-out Mode C, LibriSpeech
-CC BY 4.0), as of v0.57.0:
+Frozen real-speech **lossless** portfolio (effectiveness + held-out Mode C,
+LibriSpeech CC BY 4.0), as of v0.73.0:
 
 | split | VOLE portfolio | FLAC-5 | FLAC-8 | record |
 | ----- | -------------- | ------ | ------ | ------ |
-| effectiveness (dev-clean, 8 clips) | **126 620 B** | 130 331 B | 129 713 B | 7/8 wins vs both |
-| held-out Mode C (test-clean, 8 clips) | **136 852 B** | 144 145 B | 142 714 B | 8/8 wins |
+| effectiveness (dev-clean, 8 clips) | **126 264 B** | 130 331 B | 129 713 B | 7/8 wins vs both |
+| held-out Mode C (test-clean, 8 clips) | **136 783 B** | 144 145 B | 142 714 B | 8/8 wins |
+
+Lossy position (`vole.audio.lossy.exp1`, `learned-lossy` receipt) is reported in
+[`PHASE_7B.md`](PHASE_7B.md) and deliberately kept separate: it is a
+rate/quality comparison against external Opus and Lyra, not a size claim.
 
 Scale, not universality: this is a speech-corpus result on this host. No
 general-audio flagship claim is made, and no real-time/deadline claim follows

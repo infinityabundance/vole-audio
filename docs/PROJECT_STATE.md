@@ -1543,3 +1543,22 @@ policy keeps the measured-faster host surface (`SearchBudget::placement`,
    bounded experimental candidate family under `vole.audio.learned.exp1`; the
    literal fallback and exact closure remain unchanged, and no learned
    representation is claimed to be universally better.
+4. **Phase 7 — three objectives, no fourth track.**
+   * **7A entropy-seed proceduralization** — **complete at v0.74.0**. Blind
+     `Compound` proposal from samples (`src/inverse/compound_propose.rs`),
+     entropy-coded H state plus exact residual (`src/inverse/seed.rs`), bounded
+     materialization, court `learned-entropy-seed`.
+   * **7B `vole.audio.lossy.exp1`** — **complete at v0.75.0**. Two explanation
+     engines (forward-LPC + pitch prediction; MDCT + Bark masking),
+     absolute-step MSE-optimal rate control, a matched-actual-bitrate court
+     against external Opus and Lyra with ViSQOL. Measured position, attributed
+     losing cells and declared remainder: [`docs/PHASE_7B.md`](PHASE_7B.md).
+   * **7C `vole.audio.stream.voice.exp1`** — **open**. Frame constitution
+     (10/20 ms at 16 kHz), deterministic packet-impairment court, latency and
+     jitter constitutions, PLC from VOLE state, DTX/comfort noise, and external
+     Opus/EVS/Lyra controls.
+
+   Scope lock: 7B's declared remainder is native residual VQ (7B.4), the
+   procedural `H` front end (7B.5) and the residual context model (7B.6). The
+   shelved runtime tracks (`io_uring`, `PartialBank` SIMD, Reports 1–2
+   remainder) wait until after Phase 7.

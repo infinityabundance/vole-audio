@@ -108,6 +108,8 @@ pub mod learned_iterative_reprice;
 #[cfg(feature = "std")]
 pub mod learned_linear;
 #[cfg(feature = "std")]
+pub mod learned_lossy;
+#[cfg(feature = "std")]
 pub mod learned_ngsa;
 #[cfg(feature = "std")]
 pub mod learned_param_delta;
@@ -426,6 +428,14 @@ coders, exact residual entropy-coded with the residual_codec2 family, exact clos
 (random-access) materialization, determinism, and the mature learned predictor families competing
 in the same inverse decision; gates on exactness/well-formedness, reports byte outcomes including
 the high-entropy negative controls",
+    ),
+    (
+        "learned-lossy",
+        "Phase 7B: the lossy transform codec vole.audio.lossy.exp1 (MDCT + Bark masking +
+centroid scalar quantization + native entropy coding) measured against external Opus and Lyra at
+matched actual bitrate, with delay-aligned SNR, spectral distortion, ViSQOL where available, and
+encode/decode time; competitors run as external processes and only VOLE-derived integers freeze
+the result",
     ),
     (
         "learned-expert-mux",
@@ -758,6 +768,7 @@ pub fn run(name: &str, receipts_root: &Path) -> crate::error::Result<Verdict> {
         "learned-residual-anatomy" => learned_residual_anatomy::run(receipts_root),
         "learned-residual-entropy" => learned_residual_entropy::run(receipts_root),
         "learned-ngsa" => learned_ngsa::run(receipts_root),
+        "learned-lossy" => learned_lossy::run(receipts_root),
         "learned-residual-fusion" => learned_residual_fusion::run(receipts_root),
         "learned-stateful-parse" => learned_stateful_parse::run(receipts_root),
         "learned-iterative-reprice" => learned_iterative_reprice::run(receipts_root),

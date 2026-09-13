@@ -99,6 +99,11 @@ impl Error {
         Self::new(Kind::Internal, msg)
     }
 
+    /// Wrap an I/O failure with its message.
+    pub fn io(err: impl std::fmt::Display) -> Self {
+        Self::new(Kind::Io, err.to_string())
+    }
+
     pub fn kind(&self) -> Kind {
         self.kind
     }
