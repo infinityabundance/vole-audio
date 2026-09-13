@@ -1,0 +1,4341 @@
+{
+  "schema": "vole.audio.evidence.v1",
+  "schema_version": 1,
+  "receipt": {
+    "schema": "vole.audio.evidence.v1",
+    "schema_version": 1,
+    "run_id": "learned-lossy-1789320203248-16d30e",
+    "court": "learned-lossy",
+    "created_unix_ms": 1789320203248,
+    "result": "SUPPORTED",
+    "result_detail": "lossy codec vole.audio.lossy.exp1 over 17 cases vs external Opus and Lyra at matched actual bitrate: VOLE wins 76 of 89 Opus SNR cells (mean +22.64 dB), 0 of 18 Opus ViSQOL cells (mean -0.729 MOS), and 11 of 21 Lyra SNR cells (mean +3.77 dB); only VOLE-derived integers freeze the result; result sha256 426a6fab1e2b76eb8444e3ffed252b2203d2b9659be1df91b157d45ab116650f",
+    "environment": {
+      "os": {
+        "sysname": "Linux",
+        "release": "7.2.4-1-cachyos",
+        "version": "#1 SMP PREEMPT_DYNAMIC Thu, 10 Sep 2026 17:19:37 +0000",
+        "machine": "x86_64",
+        "nodename": "vanir",
+        "os_pretty_name": "CachyOS"
+      },
+      "cpu": {
+        "model": "AMD Ryzen 7 9800X3D 8-Core Processor",
+        "flags": [
+          "3dnowprefetch",
+          "abm",
+          "adx",
+          "aes",
+          "amd_lbr_pmc_freeze",
+          "amd_lbr_v2",
+          "aperfmperf",
+          "apic",
+          "arat",
+          "avic",
+          "avx",
+          "avx2",
+          "avx512_bf16",
+          "avx512_bitalg",
+          "avx512_vbmi2",
+          "avx512_vnni",
+          "avx512_vp2intersect",
+          "avx512_vpopcntdq",
+          "avx512bw",
+          "avx512cd",
+          "avx512dq",
+          "avx512f",
+          "avx512ifma",
+          "avx512vbmi",
+          "avx512vl",
+          "avx_vnni",
+          "bmi1",
+          "bmi2",
+          "bpext",
+          "bus_lock_detect",
+          "cat_l3",
+          "cdp_l3",
+          "clflush",
+          "clflushopt",
+          "clwb",
+          "clzero",
+          "cmov",
+          "cmp_legacy",
+          "constant_tsc",
+          "cpb",
+          "cppc",
+          "cpuid",
+          "cpuid_fault",
+          "cqm",
+          "cqm_llc",
+          "cqm_mbm_local",
+          "cqm_mbm_total",
+          "cqm_occup_llc",
+          "cr8_legacy",
+          "cx16",
+          "cx8",
+          "de",
+          "decodeassists",
+          "erms",
+          "extapic",
+          "extd_apicid",
+          "f16c",
+          "flush_l1d",
+          "flushbyasid",
+          "fma",
+          "fpu",
+          "fsgsbase",
+          "fsrm",
+          "fxsr",
+          "fxsr_opt",
+          "gfni",
+          "ht",
+          "hw_pstate",
+          "ibpb",
+          "ibrs",
+          "ibrs_enhanced",
+          "ibs",
+          "invpcid",
+          "irperf",
+          "lahf_lm",
+          "lbrv",
+          "lm",
+          "mba",
+          "mca",
+          "mce",
+          "misalignsse",
+          "mmx",
+          "mmxext",
+          "monitor",
+          "movbe",
+          "movdir64b",
+          "movdiri",
+          "msr",
+          "mtrr",
+          "mwaitx",
+          "nonstop_tsc",
+          "nopl",
+          "npt",
+          "nrip_save",
+          "nx",
+          "ospke",
+          "osvw",
+          "overflow_recov",
+          "pae",
+          "pat",
+          "pausefilter",
+          "pclmulqdq",
+          "pdpe1gb",
+          "perfctr_core",
+          "perfctr_llc",
+          "perfctr_nb",
+          "perfmon_v2",
+          "pfthreshold",
+          "pge",
+          "pku",
+          "pni",
+          "popcnt",
+          "pse",
+          "pse36",
+          "rapl",
+          "rdpid",
+          "rdpru",
+          "rdrand",
+          "rdseed",
+          "rdt_a",
+          "rdtscp",
+          "rep_good",
+          "sep",
+          "sha_ni",
+          "skinit",
+          "smap",
+          "smca",
+          "smep",
+          "ssbd",
+          "sse",
+          "sse2",
+          "sse4_1",
+          "sse4_2",
+          "sse4a",
+          "ssse3",
+          "stibp",
+          "succor",
+          "svm",
+          "svm_lock",
+          "syscall",
+          "tce",
+          "topoext",
+          "tsc",
+          "tsc_adjust",
+          "tsc_scale",
+          "umip",
+          "user_shstk",
+          "v_spec_ctrl",
+          "v_vmsave_vmload",
+          "vaes",
+          "vgif",
+          "vmcb_clean",
+          "vme",
+          "vmmcall",
+          "vnmi",
+          "vpclmulqdq",
+          "wbnoinvd",
+          "wdt",
+          "x2avic",
+          "xgetbv1",
+          "xsave",
+          "xsavec",
+          "xsaveerptr",
+          "xsaveopt",
+          "xsaves",
+          "xtopology"
+        ],
+        "has_avx2": true,
+        "has_avx512": true,
+        "has_neon": false
+      },
+      "memory": {
+        "total_bytes": 134689931264
+      },
+      "git_commit": "03a6d483c625cf64d2b7f21aaf859d34d18246c4",
+      "git_dirty": false,
+      "git_branch": "main",
+      "rustc_version": "rustc 1.99.0-nightly (89c61a754 2026-07-23)",
+      "crate_version": "0.75.0",
+      "target_arch": "x86_64",
+      "target_os": "linux",
+      "cpu_governor": "performance",
+      "bios_version": "1402",
+      "git_tree_sha": "ed27df79d81b62fa047ac6d58e8c92f31787b016",
+      "build_git_commit": "03a6d483c625cf64d2b7f21aaf859d34d18246c4",
+      "build_tree_sha": "ed27df79d81b62fa047ac6d58e8c92f31787b016",
+      "build_dirty": false,
+      "build_rustc": "rustc 1.99.0-nightly (89c61a754 2026-07-23)",
+      "build_profile": "release",
+      "build_target": "x86_64-unknown-linux-gnu",
+      "source_binding": "bound",
+      "seal_subject_hash": "0a441fc2b2409350c783563b0c7054f92c00c7821eb4271be46a78687990044c"
+    },
+    "hardware": {
+      "pci_devices": [
+        {
+          "bdf": "0000:00:00.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14d8",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": null
+        },
+        {
+          "bdf": "0000:00:00.2",
+          "class": "0x080600",
+          "vendor": "0x1022",
+          "device": "0x14d9",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": null
+        },
+        {
+          "bdf": "0000:00:01.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "0"
+        },
+        {
+          "bdf": "0000:00:01.1",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14db",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "1"
+        },
+        {
+          "bdf": "0000:00:01.2",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14db",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "2"
+        },
+        {
+          "bdf": "0000:00:02.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "3"
+        },
+        {
+          "bdf": "0000:00:02.1",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14db",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "4"
+        },
+        {
+          "bdf": "0000:00:02.2",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14db",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "5"
+        },
+        {
+          "bdf": "0000:00:03.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "6"
+        },
+        {
+          "bdf": "0000:00:04.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "7"
+        },
+        {
+          "bdf": "0000:00:08.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "8"
+        },
+        {
+          "bdf": "0000:00:08.1",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14dd",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "9"
+        },
+        {
+          "bdf": "0000:00:08.3",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14dd",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "10"
+        },
+        {
+          "bdf": "0000:00:14.0",
+          "class": "0x0c0500",
+          "vendor": "0x1022",
+          "device": "0x790b",
+          "driver": "piix4_smbus",
+          "numa_node": -1,
+          "iommu_group": "11"
+        },
+        {
+          "bdf": "0000:00:14.3",
+          "class": "0x060100",
+          "vendor": "0x1022",
+          "device": "0x790e",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "11"
+        },
+        {
+          "bdf": "0000:00:18.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e0",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.1",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e1",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.2",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e2",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.3",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e3",
+          "driver": "k10temp",
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.4",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e4",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.5",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e5",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.6",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e6",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.7",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e7",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:01:00.0",
+          "class": "0x030000",
+          "vendor": "0x10de",
+          "device": "0x2702",
+          "driver": "nvidia",
+          "numa_node": -1,
+          "iommu_group": "13"
+        },
+        {
+          "bdf": "0000:01:00.1",
+          "class": "0x040300",
+          "vendor": "0x10de",
+          "device": "0x22bb",
+          "driver": "snd_hda_intel",
+          "numa_node": -1,
+          "iommu_group": "13"
+        },
+        {
+          "bdf": "0000:02:00.0",
+          "class": "0x010802",
+          "vendor": "0xc0a9",
+          "device": "0x542b",
+          "driver": "nvme",
+          "numa_node": -1,
+          "iommu_group": "14"
+        },
+        {
+          "bdf": "0000:03:00.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f4",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "15"
+        },
+        {
+          "bdf": "0000:04:00.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "16"
+        },
+        {
+          "bdf": "0000:04:04.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "17"
+        },
+        {
+          "bdf": "0000:04:05.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "18"
+        },
+        {
+          "bdf": "0000:04:08.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "19"
+        },
+        {
+          "bdf": "0000:04:0c.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "20"
+        },
+        {
+          "bdf": "0000:04:0d.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "21"
+        },
+        {
+          "bdf": "0000:05:00.0",
+          "class": "0x010802",
+          "vendor": "0x2646",
+          "device": "0x5019",
+          "driver": "nvme",
+          "numa_node": -1,
+          "iommu_group": "16"
+        },
+        {
+          "bdf": "0000:06:00.0",
+          "class": "0x020000",
+          "vendor": "0x10ec",
+          "device": "0x8125",
+          "driver": "r8169",
+          "numa_node": -1,
+          "iommu_group": "17"
+        },
+        {
+          "bdf": "0000:09:00.0",
+          "class": "0x0c0330",
+          "vendor": "0x1022",
+          "device": "0x43fc",
+          "driver": "xhci-pci-prom21",
+          "numa_node": -1,
+          "iommu_group": "20"
+        },
+        {
+          "bdf": "0000:0a:00.0",
+          "class": "0x010601",
+          "vendor": "0x1022",
+          "device": "0x43f6",
+          "driver": "ahci",
+          "numa_node": -1,
+          "iommu_group": "21"
+        },
+        {
+          "bdf": "0000:0b:00.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2421",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "22"
+        },
+        {
+          "bdf": "0000:0c:00.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2423",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "23"
+        },
+        {
+          "bdf": "0000:0c:01.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2423",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "24"
+        },
+        {
+          "bdf": "0000:0c:02.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2423",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "25"
+        },
+        {
+          "bdf": "0000:0c:03.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2423",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "26"
+        },
+        {
+          "bdf": "0000:71:00.0",
+          "class": "0x0c0330",
+          "vendor": "0x1b21",
+          "device": "0x2426",
+          "driver": "xhci_hcd",
+          "numa_node": -1,
+          "iommu_group": "25"
+        },
+        {
+          "bdf": "0000:72:00.0",
+          "class": "0x0c0340",
+          "vendor": "0x1b21",
+          "device": "0x2425",
+          "driver": "thunderbolt",
+          "numa_node": -1,
+          "iommu_group": "26"
+        },
+        {
+          "bdf": "0000:73:00.0",
+          "class": "0x130000",
+          "vendor": "0x1022",
+          "device": "0x14de",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "27"
+        },
+        {
+          "bdf": "0000:73:00.2",
+          "class": "0x108000",
+          "vendor": "0x1022",
+          "device": "0x1649",
+          "driver": "ccp",
+          "numa_node": -1,
+          "iommu_group": "28"
+        },
+        {
+          "bdf": "0000:73:00.3",
+          "class": "0x0c0330",
+          "vendor": "0x1022",
+          "device": "0x15b6",
+          "driver": "xhci_hcd",
+          "numa_node": -1,
+          "iommu_group": "29"
+        },
+        {
+          "bdf": "0000:73:00.4",
+          "class": "0x0c0330",
+          "vendor": "0x1022",
+          "device": "0x15b7",
+          "driver": "xhci_hcd",
+          "numa_node": -1,
+          "iommu_group": "30"
+        },
+        {
+          "bdf": "0000:73:00.6",
+          "class": "0x040300",
+          "vendor": "0x1022",
+          "device": "0x15e3",
+          "driver": "snd_hda_intel",
+          "numa_node": -1,
+          "iommu_group": "31"
+        },
+        {
+          "bdf": "0000:74:00.0",
+          "class": "0x0c0330",
+          "vendor": "0x1022",
+          "device": "0x15b8",
+          "driver": "xhci_hcd",
+          "numa_node": -1,
+          "iommu_group": "32"
+        }
+      ],
+      "gpu": {
+        "vendor": null,
+        "name": null,
+        "bdf": null,
+        "compute_capability": null,
+        "memory_bytes": null,
+        "driver_version": null,
+        "runtime_version": null
+      },
+      "audio": {
+        "card": null,
+        "device": null,
+        "name": null,
+        "subdevice": null
+      }
+    },
+    "params": {
+      "universe": "vole.audio.u1",
+      "profile": "vole.audio.learned.exp3",
+      "backend": "scalar canonical learned evaluator",
+      "sample_rate_hz": null,
+      "channels": null,
+      "voices": null,
+      "quantum_frames": null,
+      "duration_secs": null,
+      "content_kind": "Phase O learned deterministic prediction"
+    },
+    "counters": {
+      "host_pcm_staging_bytes": 0,
+      "host_pcm_copy_bytes": 0,
+      "gpu_to_host_pcm_bytes": 0,
+      "endpoint_observation_bytes": 0,
+      "device_sample_block_bytes": 0,
+      "transient_compute_words": 0,
+      "host_pcm_resident_peak_bytes": 0,
+      "host_pcm_resident_integral": 0.0,
+      "endpoint_depth_frames": 0,
+      "endpoint_depth_min_frames": 18446744073709551615,
+      "endpoint_depth_max_frames": 0,
+      "quanta_submitted": 0,
+      "events_consumed": 0,
+      "xruns": 0,
+      "kernel_launches": 0,
+      "missed_deadlines": 0
+    },
+    "timing": {
+      "total_ns": null,
+      "deadline_ns": null,
+      "warmup_runs": null,
+      "run_count": null,
+      "observation_count": null,
+      "tail": null
+    },
+    "provenance": {
+      "reference_hash": "426a6fab1e2b76eb8444e3ffed252b2203d2b9659be1df91b157d45ab116650f",
+      "backend_hash": null,
+      "endpoint_hash": null,
+      "gpu_artifact_hash": null,
+      "source_hash": null,
+      "corpus_hash": null,
+      "table_hashes": [],
+      "benchmark_order": [],
+      "exact_equality": null
+    },
+    "endpoint": {
+      "directness": null,
+      "topology": null,
+      "registered_range": null,
+      "registration_result": null,
+      "device_pointer": null,
+      "synchronization_mechanism": null,
+      "fence_sync_evidence": null,
+      "coherency_assumptions": null,
+      "hidden_staging_investigation": null,
+      "endpoint_clock": null
+    },
+    "energy": null,
+    "trace": null,
+    "limitations": [
+      "learned prediction is an experimental profile: it does not change u1/v1, the literal fallback remains mandatory, and negative learned results are preserved rather than hidden"
+    ],
+    "extras": {
+      "cases": [
+        {
+          "id": "corpus-silence",
+          "kind": "structural",
+          "rate": 16000,
+          "channels": 1,
+          "frames": 16000,
+          "vole": [
+            {
+              "target_bps": 8000,
+              "bytes": 772,
+              "actual_bps": 6176.0,
+              "snr_db": null,
+              "spectral_db": 0.0,
+              "transient_db": 0.0,
+              "visqol_mos": null,
+              "opus_snr_at_actual": null,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": null,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 554659192,
+              "decode_ns": 1515960
+            },
+            {
+              "target_bps": 12000,
+              "bytes": 772,
+              "actual_bps": 6176.0,
+              "snr_db": null,
+              "spectral_db": 0.0,
+              "transient_db": 0.0,
+              "visqol_mos": null,
+              "opus_snr_at_actual": null,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": null,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 547628692,
+              "decode_ns": 1491886
+            },
+            {
+              "target_bps": 16000,
+              "bytes": 772,
+              "actual_bps": 6176.0,
+              "snr_db": null,
+              "spectral_db": 0.0,
+              "transient_db": 0.0,
+              "visqol_mos": null,
+              "opus_snr_at_actual": null,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": null,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 546147887,
+              "decode_ns": 1564191
+            },
+            {
+              "target_bps": 24000,
+              "bytes": 772,
+              "actual_bps": 6176.0,
+              "snr_db": null,
+              "spectral_db": 0.0,
+              "transient_db": 0.0,
+              "visqol_mos": null,
+              "opus_snr_at_actual": null,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": null,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 546168526,
+              "decode_ns": 1463763
+            },
+            {
+              "target_bps": 32000,
+              "bytes": 772,
+              "actual_bps": 6176.0,
+              "snr_db": null,
+              "spectral_db": 0.0,
+              "transient_db": 0.0,
+              "visqol_mos": null,
+              "opus_snr_at_actual": null,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": null,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 547447552,
+              "decode_ns": 1479612
+            },
+            {
+              "target_bps": 48000,
+              "bytes": 772,
+              "actual_bps": 6176.0,
+              "snr_db": null,
+              "spectral_db": 0.0,
+              "transient_db": 0.0,
+              "visqol_mos": null,
+              "opus_snr_at_actual": null,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": null,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 549220195,
+              "decode_ns": 1587084
+            },
+            {
+              "target_bps": 64000,
+              "bytes": 772,
+              "actual_bps": 6176.0,
+              "snr_db": null,
+              "spectral_db": 0.0,
+              "transient_db": 0.0,
+              "visqol_mos": null,
+              "opus_snr_at_actual": null,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": null,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 548714223,
+              "decode_ns": 1586343
+            },
+            {
+              "target_bps": 96000,
+              "bytes": 772,
+              "actual_bps": 6176.0,
+              "snr_db": null,
+              "spectral_db": 0.0,
+              "transient_db": 0.0,
+              "visqol_mos": null,
+              "opus_snr_at_actual": null,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": null,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 548278484,
+              "decode_ns": 1486074
+            }
+          ],
+          "opus": [
+            {
+              "actual_bps": 8792.0,
+              "snr_db": null,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 8792.0,
+              "snr_db": null,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 8792.0,
+              "snr_db": null,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 8792.0,
+              "snr_db": null,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 8792.0,
+              "snr_db": null,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 8792.0,
+              "snr_db": null,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 10024.0,
+              "snr_db": null,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 10024.0,
+              "snr_db": null,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 13688.0,
+              "snr_db": null,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 14880.0,
+              "snr_db": null,
+              "visqol_mos": null
+            }
+          ],
+          "lyra": [
+            {
+              "actual_bps": 3200.0,
+              "snr_db": null
+            },
+            {
+              "actual_bps": 6000.0,
+              "snr_db": null
+            },
+            {
+              "actual_bps": 9200.0,
+              "snr_db": null
+            }
+          ]
+        },
+        {
+          "id": "corpus-dc",
+          "kind": "structural",
+          "rate": 16000,
+          "channels": 1,
+          "frames": 16000,
+          "vole": [
+            {
+              "target_bps": 8000,
+              "bytes": 779,
+              "actual_bps": 6232.0,
+              "snr_db": 0.0,
+              "spectral_db": 0.0,
+              "transient_db": 0.0,
+              "visqol_mos": null,
+              "opus_snr_at_actual": null,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": 1.4121102412223543,
+              "delta_snr_vs_opus": null,
+              "delta_snr_vs_lyra": -1.4121102412223543,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 746441729,
+              "decode_ns": 1500542
+            },
+            {
+              "target_bps": 12000,
+              "bytes": 779,
+              "actual_bps": 6232.0,
+              "snr_db": 0.0,
+              "spectral_db": 0.0,
+              "transient_db": 0.0,
+              "visqol_mos": null,
+              "opus_snr_at_actual": null,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": 1.4121102412223543,
+              "delta_snr_vs_opus": null,
+              "delta_snr_vs_lyra": -1.4121102412223543,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 734357667,
+              "decode_ns": 1610939
+            },
+            {
+              "target_bps": 16000,
+              "bytes": 1906,
+              "actual_bps": 15248.0,
+              "snr_db": 28.959871751436562,
+              "spectral_db": 66.62688107884327,
+              "transient_db": 29.057093938270718,
+              "visqol_mos": null,
+              "opus_snr_at_actual": 0.2151538227683646,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 28.744717928668198,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 1213899306,
+              "decode_ns": 7830454
+            },
+            {
+              "target_bps": 24000,
+              "bytes": 2919,
+              "actual_bps": 23352.0,
+              "snr_db": 78.32231183302898,
+              "spectral_db": 14.564538132082127,
+              "transient_db": 80.33766967419538,
+              "visqol_mos": null,
+              "opus_snr_at_actual": 0.24007523164416472,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 78.0822366013848,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 13950521661,
+              "decode_ns": 8372172
+            },
+            {
+              "target_bps": 32000,
+              "bytes": 2822,
+              "actual_bps": 22576.0,
+              "snr_db": 74.79923659140407,
+              "spectral_db": 15.640429312710072,
+              "transient_db": 76.7561046212765,
+              "visqol_mos": null,
+              "opus_snr_at_actual": 0.23768887758596866,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 74.5615477138181,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 33612712730,
+              "decode_ns": 8536381
+            },
+            {
+              "target_bps": 48000,
+              "bytes": 2822,
+              "actual_bps": 22576.0,
+              "snr_db": 74.79923659140407,
+              "spectral_db": 15.640429312710072,
+              "transient_db": 76.7561046212765,
+              "visqol_mos": null,
+              "opus_snr_at_actual": 0.23768887758596866,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 74.5615477138181,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 34148528710,
+              "decode_ns": 8832658
+            },
+            {
+              "target_bps": 64000,
+              "bytes": 2822,
+              "actual_bps": 22576.0,
+              "snr_db": 74.79923659140407,
+              "spectral_db": 15.640429312710072,
+              "transient_db": 76.7561046212765,
+              "visqol_mos": null,
+              "opus_snr_at_actual": 0.23768887758596866,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 74.5615477138181,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 33905109922,
+              "decode_ns": 8526763
+            },
+            {
+              "target_bps": 96000,
+              "bytes": 2822,
+              "actual_bps": 22576.0,
+              "snr_db": 74.79923659140407,
+              "spectral_db": 15.640429312710072,
+              "transient_db": 76.7561046212765,
+              "visqol_mos": null,
+              "opus_snr_at_actual": 0.23768887758596866,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 74.5615477138181,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 34238063903,
+              "decode_ns": 8459717
+            }
+          ],
+          "opus": [
+            {
+              "actual_bps": 12672.0,
+              "snr_db": 0.20406815228065783,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 13696.0,
+              "snr_db": 0.21038111465197246,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 24048.0,
+              "snr_db": 0.24221556982007253,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 28352.0,
+              "snr_db": 0.22849300892901214,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 47728.0,
+              "snr_db": 0.23011449286276126,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 59448.0,
+              "snr_db": 0.23028772682422932,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 81584.0,
+              "snr_db": 0.23033443434632064,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 101880.0,
+              "snr_db": 0.23029524564641052,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 144520.0,
+              "snr_db": 0.23029561209322286,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 163928.0,
+              "snr_db": 0.23022591438516643,
+              "visqol_mos": null
+            }
+          ],
+          "lyra": [
+            {
+              "actual_bps": 3200.0,
+              "snr_db": 1.3838291878386877
+            },
+            {
+              "actual_bps": 6000.0,
+              "snr_db": 1.3945248552350233
+            },
+            {
+              "actual_bps": 9200.0,
+              "snr_db": 1.6370819033361395
+            }
+          ]
+        },
+        {
+          "id": "corpus-dc-negative",
+          "kind": "structural",
+          "rate": 16000,
+          "channels": 1,
+          "frames": 16000,
+          "vole": [
+            {
+              "target_bps": 8000,
+              "bytes": 779,
+              "actual_bps": 6232.0,
+              "snr_db": 0.0,
+              "spectral_db": 0.0,
+              "transient_db": 0.0,
+              "visqol_mos": null,
+              "opus_snr_at_actual": null,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": 2.802127553197368,
+              "delta_snr_vs_opus": null,
+              "delta_snr_vs_lyra": -2.802127553197368,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 785655001,
+              "decode_ns": 1606641
+            },
+            {
+              "target_bps": 12000,
+              "bytes": 1552,
+              "actual_bps": 12416.0,
+              "snr_db": 0.0,
+              "spectral_db": 0.0,
+              "transient_db": 0.0,
+              "visqol_mos": null,
+              "opus_snr_at_actual": null,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": null,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 783353835,
+              "decode_ns": 7507175
+            },
+            {
+              "target_bps": 16000,
+              "bytes": 1906,
+              "actual_bps": 15248.0,
+              "snr_db": 28.96731883924229,
+              "spectral_db": 66.62688107884327,
+              "transient_db": 29.064882522800104,
+              "visqol_mos": null,
+              "opus_snr_at_actual": 0.2168972184624261,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 28.750421620779864,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 1251350355,
+              "decode_ns": 7914652
+            },
+            {
+              "target_bps": 24000,
+              "bytes": 2872,
+              "actual_bps": 22976.0,
+              "snr_db": 76.39565765024568,
+              "spectral_db": 12.181945443259908,
+              "transient_db": 78.97872696567202,
+              "visqol_mos": null,
+              "opus_snr_at_actual": 0.2369140352632279,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 76.15874361498246,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 14238186875,
+              "decode_ns": 8658761
+            },
+            {
+              "target_bps": 32000,
+              "bytes": 2824,
+              "actual_bps": 22592.0,
+              "snr_db": 73.46192532201185,
+              "spectral_db": 15.972606479060198,
+              "transient_db": 75.4824397918383,
+              "visqol_mos": null,
+              "opus_snr_at_actual": 0.235919410825921,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 73.22600591118594,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 34434130676,
+              "decode_ns": 8653090
+            },
+            {
+              "target_bps": 48000,
+              "bytes": 2824,
+              "actual_bps": 22592.0,
+              "snr_db": 73.46192532201185,
+              "spectral_db": 15.972606479060198,
+              "transient_db": 75.4824397918383,
+              "visqol_mos": null,
+              "opus_snr_at_actual": 0.235919410825921,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 73.22600591118594,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 34345430243,
+              "decode_ns": 8810917
+            },
+            {
+              "target_bps": 64000,
+              "bytes": 2824,
+              "actual_bps": 22592.0,
+              "snr_db": 73.46192532201185,
+              "spectral_db": 15.972606479060198,
+              "transient_db": 75.4824397918383,
+              "visqol_mos": null,
+              "opus_snr_at_actual": 0.235919410825921,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 73.22600591118594,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 34452791524,
+              "decode_ns": 8740615
+            },
+            {
+              "target_bps": 96000,
+              "bytes": 2824,
+              "actual_bps": 22592.0,
+              "snr_db": 73.46192532201185,
+              "spectral_db": 15.972606479060198,
+              "transient_db": 75.4824397918383,
+              "visqol_mos": null,
+              "opus_snr_at_actual": 0.235919410825921,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 73.22600591118594,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 33461392664,
+              "decode_ns": 8456921
+            }
+          ],
+          "opus": [
+            {
+              "actual_bps": 12456.0,
+              "snr_db": 0.20373838102788908,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 13536.0,
+              "snr_db": 0.21246285117943275,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 24048.0,
+              "snr_db": 0.23969069515070973,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 28344.0,
+              "snr_db": 0.22739180838409528,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 47744.0,
+              "snr_db": 0.23060422795131025,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 59480.0,
+              "snr_db": 0.2308237787315705,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 81584.0,
+              "snr_db": 0.2301908886865657,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 101920.0,
+              "snr_db": 0.2302495982373802,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 144728.0,
+              "snr_db": 0.2302492855246591,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 164352.0,
+              "snr_db": 0.2301646829769627,
+              "visqol_mos": null
+            }
+          ],
+          "lyra": [
+            {
+              "actual_bps": 3200.0,
+              "snr_db": 2.850350801298918
+            },
+            {
+              "actual_bps": 6000.0,
+              "snr_db": 2.815043075354816
+            },
+            {
+              "actual_bps": 9200.0,
+              "snr_db": 2.6368979421486376
+            }
+          ]
+        },
+        {
+          "id": "corpus-single-sine",
+          "kind": "structural",
+          "rate": 16000,
+          "channels": 2,
+          "frames": 16000,
+          "vole": [
+            {
+              "target_bps": 8000,
+              "bytes": 1510,
+              "actual_bps": 12080.0,
+              "snr_db": 0.0,
+              "spectral_db": 1.0547149848920674,
+              "transient_db": 0.0,
+              "visqol_mos": null,
+              "opus_snr_at_actual": 0.00010953110345069261,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": -0.00010953110345069261,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 1118840037,
+              "decode_ns": 3206088
+            },
+            {
+              "target_bps": 12000,
+              "bytes": 1510,
+              "actual_bps": 12080.0,
+              "snr_db": 0.0,
+              "spectral_db": 1.0547149848920674,
+              "transient_db": 0.0,
+              "visqol_mos": null,
+              "opus_snr_at_actual": 0.00010953110345069261,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": -0.00010953110345069261,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 1300853485,
+              "decode_ns": 3224994
+            },
+            {
+              "target_bps": 16000,
+              "bytes": 1510,
+              "actual_bps": 12080.0,
+              "snr_db": 0.0,
+              "spectral_db": 1.0547149848920674,
+              "transient_db": 0.0,
+              "visqol_mos": null,
+              "opus_snr_at_actual": 0.00010953110345069261,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": -0.00010953110345069261,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 1301183926,
+              "decode_ns": 3221988
+            },
+            {
+              "target_bps": 24000,
+              "bytes": 1510,
+              "actual_bps": 12080.0,
+              "snr_db": 0.0,
+              "spectral_db": 1.0547149848920674,
+              "transient_db": 0.0,
+              "visqol_mos": null,
+              "opus_snr_at_actual": 0.00010953110345069261,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": -0.00010953110345069261,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 1299344378,
+              "decode_ns": 3100329
+            },
+            {
+              "target_bps": 32000,
+              "bytes": 3456,
+              "actual_bps": 27648.0,
+              "snr_db": 24.25519418070521,
+              "spectral_db": 41.07859906252958,
+              "transient_db": 24.29429748385058,
+              "visqol_mos": null,
+              "opus_snr_at_actual": -1.613206646069698,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 25.86840082677491,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 1391450173,
+              "decode_ns": 14503872
+            },
+            {
+              "target_bps": 48000,
+              "bytes": 5230,
+              "actual_bps": 41840.0,
+              "snr_db": 27.55674824286526,
+              "spectral_db": 31.586838580223855,
+              "transient_db": 29.343110230132293,
+              "visqol_mos": null,
+              "opus_snr_at_actual": -3.0405094103525077,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 30.597257653217767,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 1519456432,
+              "decode_ns": 15536102
+            },
+            {
+              "target_bps": 64000,
+              "bytes": 7508,
+              "actual_bps": 60064.0,
+              "snr_db": 46.35994706163751,
+              "spectral_db": 17.54983415955671,
+              "transient_db": 46.37417730328714,
+              "visqol_mos": null,
+              "opus_snr_at_actual": -3.037445683880887,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 49.3973927455184,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 1830622716,
+              "decode_ns": 15122395
+            },
+            {
+              "target_bps": 96000,
+              "bytes": 11206,
+              "actual_bps": 89648.0,
+              "snr_db": 59.137249016907646,
+              "spectral_db": 8.721858927967777,
+              "transient_db": 59.347432523302714,
+              "visqol_mos": null,
+              "opus_snr_at_actual": -2.9928493969058443,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 62.13009841381349,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 5216256728,
+              "decode_ns": 15826668
+            }
+          ],
+          "opus": [
+            {
+              "actual_bps": 10024.0,
+              "snr_db": 0.00002952651682240717,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 10024.0,
+              "snr_db": 0.00013321249281832162,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 13688.0,
+              "snr_db": 0.00009100986118262479,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 14880.0,
+              "snr_db": 0.00009100986118262479,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 34768.0,
+              "snr_db": -2.5128525820211287,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 42032.0,
+              "snr_db": -3.0548349351035857,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 55488.0,
+              "snr_db": -3.034040893737646,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 66304.0,
+              "snr_db": -3.042088579530761,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 95928.0,
+              "snr_db": -2.9796030780708342,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 122584.0,
+              "snr_db": -3.00335661070831,
+              "visqol_mos": null
+            }
+          ],
+          "lyra": []
+        },
+        {
+          "id": "corpus-harmonic-tone",
+          "kind": "structural",
+          "rate": 16000,
+          "channels": 2,
+          "frames": 16000,
+          "vole": [
+            {
+              "target_bps": 8000,
+              "bytes": 1728,
+              "actual_bps": 13824.0,
+              "snr_db": 0.0,
+              "spectral_db": 59.86970390073439,
+              "transient_db": 0.0,
+              "visqol_mos": null,
+              "opus_snr_at_actual": 0.00002458990339394705,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": -0.00002458990339394705,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 1161386917,
+              "decode_ns": 3224062
+            },
+            {
+              "target_bps": 12000,
+              "bytes": 1728,
+              "actual_bps": 13824.0,
+              "snr_db": 0.0,
+              "spectral_db": 59.86970390073439,
+              "transient_db": 0.0,
+              "visqol_mos": null,
+              "opus_snr_at_actual": 0.00002458990339394705,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": -0.00002458990339394705,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 1159341842,
+              "decode_ns": 3236976
+            },
+            {
+              "target_bps": 16000,
+              "bytes": 1728,
+              "actual_bps": 13824.0,
+              "snr_db": 0.0,
+              "spectral_db": 59.86970390073439,
+              "transient_db": 0.0,
+              "visqol_mos": null,
+              "opus_snr_at_actual": 0.00002458990339394705,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": -0.00002458990339394705,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 1567642477,
+              "decode_ns": 3225384
+            },
+            {
+              "target_bps": 24000,
+              "bytes": 1728,
+              "actual_bps": 13824.0,
+              "snr_db": 0.0,
+              "spectral_db": 59.86970390073439,
+              "transient_db": 0.0,
+              "visqol_mos": null,
+              "opus_snr_at_actual": 0.00002458990339394705,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": -0.00002458990339394705,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 1566052397,
+              "decode_ns": 3198183
+            },
+            {
+              "target_bps": 32000,
+              "bytes": 3781,
+              "actual_bps": 30248.0,
+              "snr_db": 0.1397688485647754,
+              "spectral_db": 14.877123316093472,
+              "transient_db": 1.1898969172339822,
+              "visqol_mos": null,
+              "opus_snr_at_actual": -1.6968701842615161,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 1.8366390328262916,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 1724452465,
+              "decode_ns": 14749083
+            },
+            {
+              "target_bps": 48000,
+              "bytes": 4523,
+              "actual_bps": 36184.0,
+              "snr_db": 24.084682251256186,
+              "spectral_db": 6.921561834999347,
+              "transient_db": 24.917869475841606,
+              "visqol_mos": null,
+              "opus_snr_at_actual": -2.3523079366979363,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 26.436990187954123,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 1991129015,
+              "decode_ns": 14595574
+            },
+            {
+              "target_bps": 64000,
+              "bytes": 6919,
+              "actual_bps": 55352.0,
+              "snr_db": 24.671493702554677,
+              "spectral_db": 3.5448953178363327,
+              "transient_db": 26.60662477277799,
+              "visqol_mos": null,
+              "opus_snr_at_actual": -3.057395570709396,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 27.728889273264073,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 2215127537,
+              "decode_ns": 15382855
+            },
+            {
+              "target_bps": 96000,
+              "bytes": 10163,
+              "actual_bps": 81304.0,
+              "snr_db": 30.530210787600033,
+              "spectral_db": 2.5760155060531567,
+              "transient_db": 32.16228153818366,
+              "visqol_mos": null,
+              "opus_snr_at_actual": -3.0502933146151805,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 33.580504102215215,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 2644057632,
+              "decode_ns": 16037856
+            }
+          ],
+          "opus": [
+            {
+              "actual_bps": 10024.0,
+              "snr_db": 0.000014986457650374533,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 10024.0,
+              "snr_db": 0.00003089191178921296,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 13688.0,
+              "snr_db": 0.00002458990339394705,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 14880.0,
+              "snr_db": 0.00002458990339394705,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 38136.0,
+              "snr_db": -2.567842723213417,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 45240.0,
+              "snr_db": -3.063263956097713,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 58256.0,
+              "snr_db": -3.055710266994238,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 69144.0,
+              "snr_db": -3.059923049098358,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 99040.0,
+              "snr_db": -3.0362478400433353,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 125840.0,
+              "snr_db": -3.0441255518628463,
+              "visqol_mos": null
+            }
+          ],
+          "lyra": []
+        },
+        {
+          "id": "corpus-quasi-periodic",
+          "kind": "structural",
+          "rate": 16000,
+          "channels": 1,
+          "frames": 16000,
+          "vole": [
+            {
+              "target_bps": 8000,
+              "bytes": 1068,
+              "actual_bps": 8544.0,
+              "snr_db": 0.0,
+              "spectral_db": 111.87451159306111,
+              "transient_db": 0.0,
+              "visqol_mos": null,
+              "opus_snr_at_actual": null,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": -1.085607651331115,
+              "delta_snr_vs_opus": null,
+              "delta_snr_vs_lyra": 1.085607651331115,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 581362882,
+              "decode_ns": 1613564
+            },
+            {
+              "target_bps": 12000,
+              "bytes": 1068,
+              "actual_bps": 8544.0,
+              "snr_db": 0.0,
+              "spectral_db": 111.87451159306111,
+              "transient_db": 0.0,
+              "visqol_mos": null,
+              "opus_snr_at_actual": null,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": -1.085607651331115,
+              "delta_snr_vs_opus": null,
+              "delta_snr_vs_lyra": 1.085607651331115,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 600801612,
+              "decode_ns": 1713922
+            },
+            {
+              "target_bps": 16000,
+              "bytes": 1918,
+              "actual_bps": 15344.0,
+              "snr_db": 0.10784874496342092,
+              "spectral_db": 14.618552084020084,
+              "transient_db": 0.6380543440019408,
+              "visqol_mos": null,
+              "opus_snr_at_actual": 0.12924519803201562,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": -0.021396453068594695,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 1282732532,
+              "decode_ns": 7649624
+            },
+            {
+              "target_bps": 24000,
+              "bytes": 2522,
+              "actual_bps": 20176.0,
+              "snr_db": 0.6188984533450578,
+              "spectral_db": 6.334997732326007,
+              "transient_db": 1.0002969343952992,
+              "visqol_mos": null,
+              "opus_snr_at_actual": -0.22916845394374535,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 0.8480669072888032,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 1325973829,
+              "decode_ns": 2145454
+            },
+            {
+              "target_bps": 32000,
+              "bytes": 3234,
+              "actual_bps": 25872.0,
+              "snr_db": 1.4283269801928653,
+              "spectral_db": 6.153171228910563,
+              "transient_db": 3.5459853633206158,
+              "visqol_mos": null,
+              "opus_snr_at_actual": 0.5883289530370455,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 0.8399980271558198,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 1387745017,
+              "decode_ns": 7576616
+            },
+            {
+              "target_bps": 48000,
+              "bytes": 5973,
+              "actual_bps": 47784.0,
+              "snr_db": 13.456181973173882,
+              "spectral_db": 1.514655917611899,
+              "transient_db": 14.040574150423982,
+              "visqol_mos": null,
+              "opus_snr_at_actual": 6.017395927269713,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 7.438786045904169,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 1576940198,
+              "decode_ns": 2302429
+            },
+            {
+              "target_bps": 64000,
+              "bytes": 6976,
+              "actual_bps": 55808.0,
+              "snr_db": 16.025385795965814,
+              "spectral_db": 1.1607913627545998,
+              "transient_db": 16.580131162238448,
+              "visqol_mos": null,
+              "opus_snr_at_actual": 7.636155667726264,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 8.38923012823955,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 1814567427,
+              "decode_ns": 2011863
+            },
+            {
+              "target_bps": 96000,
+              "bytes": 10807,
+              "actual_bps": 86456.0,
+              "snr_db": 27.666061041806852,
+              "spectral_db": 0.3092522355349684,
+              "transient_db": 28.21302536788513,
+              "visqol_mos": null,
+              "opus_snr_at_actual": 9.602110788180992,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 18.063950253625862,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 3003618451,
+              "decode_ns": 2458222
+            }
+          ],
+          "opus": [
+            {
+              "actual_bps": 13976.0,
+              "snr_db": -0.15821942804393452,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 15152.0,
+              "snr_db": 0.14348680009727766,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 22120.0,
+              "snr_db": -0.3733646748545234,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 25592.0,
+              "snr_db": 0.5189542381417759,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 53440.0,
+              "snr_db": 7.418765168154159,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 67680.0,
+              "snr_db": 8.72604587504047,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 94768.0,
+              "snr_db": 9.989938416963694,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 122368.0,
+              "snr_db": 10.60777784682476,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 176504.0,
+              "snr_db": 11.072693837611187,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 230864.0,
+              "snr_db": 11.167903602266446,
+              "visqol_mos": null
+            }
+          ],
+          "lyra": [
+            {
+              "actual_bps": 3200.0,
+              "snr_db": -1.4355262122337495
+            },
+            {
+              "actual_bps": 6000.0,
+              "snr_db": -1.1970912100688849
+            },
+            {
+              "actual_bps": 9200.0,
+              "snr_db": -1.0568603185748346
+            }
+          ]
+        },
+        {
+          "id": "corpus-impulse-train",
+          "kind": "structural",
+          "rate": 16000,
+          "channels": 1,
+          "frames": 16000,
+          "vole": [
+            {
+              "target_bps": 8000,
+              "bytes": 1012,
+              "actual_bps": 8096.0,
+              "snr_db": 10.831842688729905,
+              "spectral_db": 60.794122870409495,
+              "transient_db": 13.950667290060949,
+              "visqol_mos": null,
+              "opus_snr_at_actual": null,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": -1.4745215481204574,
+              "delta_snr_vs_opus": null,
+              "delta_snr_vs_lyra": 12.306364236850362,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 554404142,
+              "decode_ns": 1608344
+            },
+            {
+              "target_bps": 12000,
+              "bytes": 1471,
+              "actual_bps": 11768.0,
+              "snr_db": 35.28976724380088,
+              "spectral_db": 39.99141160841311,
+              "transient_db": 36.41870390555543,
+              "visqol_mos": null,
+              "opus_snr_at_actual": null,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": null,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 1128959965,
+              "decode_ns": 1884754
+            },
+            {
+              "target_bps": 16000,
+              "bytes": 2006,
+              "actual_bps": 16048.0,
+              "snr_db": 72.41429127724004,
+              "spectral_db": 11.511380597978219,
+              "transient_db": 73.87420685797211,
+              "visqol_mos": null,
+              "opus_snr_at_actual": 1.400567632090528,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 71.01372364514951,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 8324721381,
+              "decode_ns": 1722298
+            },
+            {
+              "target_bps": 24000,
+              "bytes": 1318,
+              "actual_bps": 10544.0,
+              "snr_db": 28.070931876682998,
+              "spectral_db": 45.386615474616946,
+              "transient_db": 29.926912917774516,
+              "visqol_mos": null,
+              "opus_snr_at_actual": null,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": null,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 25184129098,
+              "decode_ns": 1930640
+            },
+            {
+              "target_bps": 32000,
+              "bytes": 1318,
+              "actual_bps": 10544.0,
+              "snr_db": 28.070931876682998,
+              "spectral_db": 45.386615474616946,
+              "transient_db": 29.926912917774516,
+              "visqol_mos": null,
+              "opus_snr_at_actual": null,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": null,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 25480112413,
+              "decode_ns": 1917896
+            },
+            {
+              "target_bps": 48000,
+              "bytes": 1318,
+              "actual_bps": 10544.0,
+              "snr_db": 28.070931876682998,
+              "spectral_db": 45.386615474616946,
+              "transient_db": 29.926912917774516,
+              "visqol_mos": null,
+              "opus_snr_at_actual": null,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": null,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 25218340595,
+              "decode_ns": 1914921
+            },
+            {
+              "target_bps": 64000,
+              "bytes": 1318,
+              "actual_bps": 10544.0,
+              "snr_db": 28.070931876682998,
+              "spectral_db": 45.386615474616946,
+              "transient_db": 29.926912917774516,
+              "visqol_mos": null,
+              "opus_snr_at_actual": null,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": null,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 25876451997,
+              "decode_ns": 1801016
+            },
+            {
+              "target_bps": 96000,
+              "bytes": 1318,
+              "actual_bps": 10544.0,
+              "snr_db": 28.070931876682998,
+              "spectral_db": 45.386615474616946,
+              "transient_db": 29.926912917774516,
+              "visqol_mos": null,
+              "opus_snr_at_actual": null,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": null,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 27688141112,
+              "decode_ns": 1809262
+            }
+          ],
+          "opus": [
+            {
+              "actual_bps": 13672.0,
+              "snr_db": -1.343626535575305,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 14200.0,
+              "snr_db": -0.21847044725047032,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 23824.0,
+              "snr_db": 8.213143446460444,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 31688.0,
+              "snr_db": 9.63465700109574,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 52184.0,
+              "snr_db": 10.782022025881819,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 72128.0,
+              "snr_db": 10.918345330815622,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 106152.0,
+              "snr_db": 11.304035092713896,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 138488.0,
+              "snr_db": 10.950807832157366,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 202680.0,
+              "snr_db": 11.318417862475595,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 268168.0,
+              "snr_db": 11.320278028892307,
+              "visqol_mos": null
+            }
+          ],
+          "lyra": [
+            {
+              "actual_bps": 3200.0,
+              "snr_db": -1.097214802741781
+            },
+            {
+              "actual_bps": 6000.0,
+              "snr_db": -1.589229937965846
+            },
+            {
+              "actual_bps": 9200.0,
+              "snr_db": -1.4141026252247948
+            }
+          ]
+        },
+        {
+          "id": "corpus-transient-heavy",
+          "kind": "transient",
+          "rate": 16000,
+          "channels": 1,
+          "frames": 16000,
+          "vole": [
+            {
+              "target_bps": 8000,
+              "bytes": 1022,
+              "actual_bps": 8176.0,
+              "snr_db": 20.318194036090667,
+              "spectral_db": 3.320094699718623,
+              "transient_db": 23.552447579513355,
+              "visqol_mos": null,
+              "opus_snr_at_actual": null,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": 2.6200587657267667,
+              "delta_snr_vs_opus": null,
+              "delta_snr_vs_lyra": 17.6981352703639,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 561639977,
+              "decode_ns": 1593637
+            },
+            {
+              "target_bps": 12000,
+              "bytes": 1322,
+              "actual_bps": 10576.0,
+              "snr_db": 70.09910317181537,
+              "spectral_db": 0.02035077402304318,
+              "transient_db": 71.44794095674997,
+              "visqol_mos": null,
+              "opus_snr_at_actual": null,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": null,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 6719784440,
+              "decode_ns": 1746203
+            },
+            {
+              "target_bps": 16000,
+              "bytes": 1124,
+              "actual_bps": 8992.0,
+              "snr_db": 38.89463530068036,
+              "spectral_db": 0.6772427235129014,
+              "transient_db": 41.443953864731846,
+              "visqol_mos": null,
+              "opus_snr_at_actual": null,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": 2.768660612426751,
+              "delta_snr_vs_opus": null,
+              "delta_snr_vs_lyra": 36.12597468825361,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 12376429357,
+              "decode_ns": 1740342
+            },
+            {
+              "target_bps": 24000,
+              "bytes": 1124,
+              "actual_bps": 8992.0,
+              "snr_db": 38.89463530068036,
+              "spectral_db": 0.6772427235129014,
+              "transient_db": 41.443953864731846,
+              "visqol_mos": null,
+              "opus_snr_at_actual": null,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": 2.768660612426751,
+              "delta_snr_vs_opus": null,
+              "delta_snr_vs_lyra": 36.12597468825361,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 40025122616,
+              "decode_ns": 1736275
+            },
+            {
+              "target_bps": 32000,
+              "bytes": 1124,
+              "actual_bps": 8992.0,
+              "snr_db": 38.89463530068036,
+              "spectral_db": 0.6772427235129014,
+              "transient_db": 41.443953864731846,
+              "visqol_mos": null,
+              "opus_snr_at_actual": null,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": 2.768660612426751,
+              "delta_snr_vs_opus": null,
+              "delta_snr_vs_lyra": 36.12597468825361,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 41356525583,
+              "decode_ns": 1740542
+            },
+            {
+              "target_bps": 48000,
+              "bytes": 5620,
+              "actual_bps": 44960.0,
+              "snr_db": 66.42677768785073,
+              "spectral_db": 0.013611494155807313,
+              "transient_db": 72.22226400108389,
+              "visqol_mos": null,
+              "opus_snr_at_actual": 11.564884356036524,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 54.86189333181421,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 56595525008,
+              "decode_ns": 7248179
+            },
+            {
+              "target_bps": 64000,
+              "bytes": 7772,
+              "actual_bps": 62176.0,
+              "snr_db": null,
+              "spectral_db": 0.0,
+              "transient_db": 200.13144595322967,
+              "visqol_mos": null,
+              "opus_snr_at_actual": 11.58240894208656,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": null,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 95267977959,
+              "decode_ns": 7589611
+            },
+            {
+              "target_bps": 96000,
+              "bytes": 6342,
+              "actual_bps": 50736.0,
+              "snr_db": 76.04523093519485,
+              "spectral_db": 0.004919746644500208,
+              "transient_db": 84.1985852830251,
+              "visqol_mos": null,
+              "opus_snr_at_actual": 11.570763887229893,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 64.47446704796496,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 144996351544,
+              "decode_ns": 7685220
+            }
+          ],
+          "opus": [
+            {
+              "actual_bps": 13152.0,
+              "snr_db": 8.886695196366283,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 14368.0,
+              "snr_db": 10.688337160553798,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 14728.0,
+              "snr_db": 10.530567986503431,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 17784.0,
+              "snr_db": 10.987390307827967,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 20144.0,
+              "snr_db": 11.760967711698566,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 37800.0,
+              "snr_db": 11.55759601750735,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 105960.0,
+              "snr_db": 11.626977742947087,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 139000.0,
+              "snr_db": 11.952312245579776,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 204088.0,
+              "snr_db": 12.042225269975471,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 267728.0,
+              "snr_db": 12.003567584348238,
+              "visqol_mos": null
+            }
+          ],
+          "lyra": [
+            {
+              "actual_bps": 3200.0,
+              "snr_db": 1.4867312806495043
+            },
+            {
+              "actual_bps": 6000.0,
+              "snr_db": 2.223787174526807
+            },
+            {
+              "actual_bps": 9200.0,
+              "snr_db": 2.8065395145267473
+            }
+          ]
+        },
+        {
+          "id": "corpus-am-signal",
+          "kind": "structured",
+          "rate": 16000,
+          "channels": 1,
+          "frames": 16000,
+          "vole": [
+            {
+              "target_bps": 8000,
+              "bytes": 783,
+              "actual_bps": 6264.0,
+              "snr_db": 0.0,
+              "spectral_db": 16.17514211350077,
+              "transient_db": 0.0,
+              "visqol_mos": null,
+              "opus_snr_at_actual": null,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": 6.383930908469843,
+              "delta_snr_vs_opus": null,
+              "delta_snr_vs_lyra": -6.383930908469843,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 693076096,
+              "decode_ns": 1501894
+            },
+            {
+              "target_bps": 12000,
+              "bytes": 783,
+              "actual_bps": 6264.0,
+              "snr_db": 0.0,
+              "spectral_db": 16.17514211350077,
+              "transient_db": 0.0,
+              "visqol_mos": null,
+              "opus_snr_at_actual": null,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": 6.383930908469843,
+              "delta_snr_vs_opus": null,
+              "delta_snr_vs_lyra": -6.383930908469843,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 687895685,
+              "decode_ns": 1477688
+            },
+            {
+              "target_bps": 16000,
+              "bytes": 1888,
+              "actual_bps": 15104.0,
+              "snr_db": 23.429704403795203,
+              "spectral_db": 63.24029355600484,
+              "transient_db": 23.68356890577035,
+              "visqol_mos": null,
+              "opus_snr_at_actual": 28.020008782730965,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": -4.5903043789357625,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 792427676,
+              "decode_ns": 7604829
+            },
+            {
+              "target_bps": 24000,
+              "bytes": 2742,
+              "actual_bps": 21936.0,
+              "snr_db": 28.15056217419278,
+              "spectral_db": 46.87773959616391,
+              "transient_db": 30.645137592657832,
+              "visqol_mos": null,
+              "opus_snr_at_actual": 23.306613324890318,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 4.8439488493024605,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 1087879441,
+              "decode_ns": 7583810
+            },
+            {
+              "target_bps": 32000,
+              "bytes": 3380,
+              "actual_bps": 27040.0,
+              "snr_db": 34.19541352907859,
+              "spectral_db": 43.37888772250281,
+              "transient_db": 35.75942373095857,
+              "visqol_mos": null,
+              "opus_snr_at_actual": 26.732102387287345,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 7.463311141791248,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 1381622604,
+              "decode_ns": 7868856
+            },
+            {
+              "target_bps": 48000,
+              "bytes": 4714,
+              "actual_bps": 37712.0,
+              "snr_db": 37.36556714422705,
+              "spectral_db": 38.21998780175166,
+              "transient_db": 39.837193495230764,
+              "visqol_mos": null,
+              "opus_snr_at_actual": 34.2625477067689,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 3.1030194374581512,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 1968857498,
+              "decode_ns": 7879686
+            },
+            {
+              "target_bps": 64000,
+              "bytes": 6313,
+              "actual_bps": 50504.0,
+              "snr_db": 44.20156778431949,
+              "spectral_db": 28.12883870820628,
+              "transient_db": 44.39534935201131,
+              "visqol_mos": null,
+              "opus_snr_at_actual": 40.633257766327944,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 3.568310017991543,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 3078790737,
+              "decode_ns": 7859939
+            },
+            {
+              "target_bps": 96000,
+              "bytes": 11377,
+              "actual_bps": 91016.0,
+              "snr_db": 66.74543782860786,
+              "spectral_db": 13.46309463877682,
+              "transient_db": 67.91020621043404,
+              "visqol_mos": null,
+              "opus_snr_at_actual": 40.69247457255586,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 26.052963256052003,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 8195858791,
+              "decode_ns": 8804215
+            }
+          ],
+          "opus": [
+            {
+              "actual_bps": 14504.0,
+              "snr_db": 23.06206056266719,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 15072.0,
+              "snr_db": 28.042085576444503,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 23320.0,
+              "snr_db": 22.351791996779742,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 27336.0,
+              "snr_db": 27.080643214058917,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 47400.0,
+              "snr_db": 40.968242649461104,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 55744.0,
+              "snr_db": 40.067754935265526,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 73600.0,
+              "snr_db": 39.93575789908327,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 87688.0,
+              "snr_db": 40.69161616288006,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 135416.0,
+              "snr_db": 40.703926913182485,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 168032.0,
+              "snr_db": 40.71981026748111,
+              "visqol_mos": null
+            }
+          ],
+          "lyra": [
+            {
+              "actual_bps": 3200.0,
+              "snr_db": 5.302861041231262
+            },
+            {
+              "actual_bps": 6000.0,
+              "snr_db": 6.322542264866376
+            },
+            {
+              "actual_bps": 9200.0,
+              "snr_db": 7.066647035817483
+            }
+          ]
+        },
+        {
+          "id": "corpus-fm-signal",
+          "kind": "structured",
+          "rate": 16000,
+          "channels": 1,
+          "frames": 16000,
+          "vole": [
+            {
+              "target_bps": 8000,
+              "bytes": 1009,
+              "actual_bps": 8072.0,
+              "snr_db": 0.0,
+              "spectral_db": 96.34978451869668,
+              "transient_db": 0.0,
+              "visqol_mos": null,
+              "opus_snr_at_actual": null,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": 7.074823212235005,
+              "delta_snr_vs_opus": null,
+              "delta_snr_vs_lyra": -7.074823212235005,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 593215789,
+              "decode_ns": 1873222
+            },
+            {
+              "target_bps": 12000,
+              "bytes": 1009,
+              "actual_bps": 8072.0,
+              "snr_db": 0.0,
+              "spectral_db": 96.34978451869668,
+              "transient_db": 0.0,
+              "visqol_mos": null,
+              "opus_snr_at_actual": null,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": 7.074823212235005,
+              "delta_snr_vs_opus": null,
+              "delta_snr_vs_lyra": -7.074823212235005,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 578029965,
+              "decode_ns": 1781589
+            },
+            {
+              "target_bps": 16000,
+              "bytes": 1009,
+              "actual_bps": 8072.0,
+              "snr_db": 0.0,
+              "spectral_db": 96.34978451869668,
+              "transient_db": 0.0,
+              "visqol_mos": null,
+              "opus_snr_at_actual": null,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": 7.074823212235005,
+              "delta_snr_vs_opus": null,
+              "delta_snr_vs_lyra": -7.074823212235005,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 1642378091,
+              "decode_ns": 1800285
+            },
+            {
+              "target_bps": 24000,
+              "bytes": 2026,
+              "actual_bps": 16208.0,
+              "snr_db": 1.1438100773982482,
+              "spectral_db": 12.75763329578026,
+              "transient_db": 3.7569801504787224,
+              "visqol_mos": null,
+              "opus_snr_at_actual": null,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": null,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 1725606585,
+              "decode_ns": 1902598
+            },
+            {
+              "target_bps": 32000,
+              "bytes": 3848,
+              "actual_bps": 30784.0,
+              "snr_db": 23.488131035567356,
+              "spectral_db": 3.9674692506233984,
+              "transient_db": 24.875104176162885,
+              "visqol_mos": null,
+              "opus_snr_at_actual": 21.43857693384085,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 2.049554101726507,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 1771843334,
+              "decode_ns": 2472880
+            },
+            {
+              "target_bps": 48000,
+              "bytes": 5860,
+              "actual_bps": 46880.0,
+              "snr_db": 41.009773738739455,
+              "spectral_db": 0.6679422891847788,
+              "transient_db": 42.384983326615995,
+              "visqol_mos": null,
+              "opus_snr_at_actual": 22.192491110378157,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 18.817282628361298,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 3929503115,
+              "decode_ns": 2123833
+            },
+            {
+              "target_bps": 64000,
+              "bytes": 7374,
+              "actual_bps": 58992.0,
+              "snr_db": 51.94831148481775,
+              "spectral_db": 0.21806183305281113,
+              "transient_db": 52.446482566550245,
+              "visqol_mos": null,
+              "opus_snr_at_actual": 22.622646276537754,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 29.325665208279997,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 5346074363,
+              "decode_ns": 1765760
+            },
+            {
+              "target_bps": 96000,
+              "bytes": 11484,
+              "actual_bps": 91872.0,
+              "snr_db": 72.66770049770095,
+              "spectral_db": 0.019660830011013875,
+              "transient_db": 73.0941416974721,
+              "visqol_mos": null,
+              "opus_snr_at_actual": 23.790372652307855,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 48.8773278453931,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 17002359458,
+              "decode_ns": 1726095
+            }
+          ],
+          "opus": [
+            {
+              "actual_bps": 16368.0,
+              "snr_db": 6.043976279492366,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 16696.0,
+              "snr_db": 8.230365187853147,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 21192.0,
+              "snr_db": 12.85284826492351,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 24200.0,
+              "snr_db": 18.761378594934325,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 27976.0,
+              "snr_db": 21.280318830202187,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 39528.0,
+              "snr_db": 21.931386356282605,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 101488.0,
+              "snr_db": 24.13188289651118,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 132088.0,
+              "snr_db": 24.355035316014476,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 193000.0,
+              "snr_db": 25.280620930529434,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 254864.0,
+              "snr_db": 26.151758939858993,
+              "visqol_mos": null
+            }
+          ],
+          "lyra": [
+            {
+              "actual_bps": 3200.0,
+              "snr_db": 4.602766556852843
+            },
+            {
+              "actual_bps": 6000.0,
+              "snr_db": 6.399811133821636
+            },
+            {
+              "actual_bps": 9200.0,
+              "snr_db": 7.44230083021294
+            }
+          ]
+        },
+        {
+          "id": "corpus-stereo-correlated",
+          "kind": "structured",
+          "rate": 16000,
+          "channels": 2,
+          "frames": 16000,
+          "vole": [
+            {
+              "target_bps": 8000,
+              "bytes": 1699,
+              "actual_bps": 13592.0,
+              "snr_db": 0.0,
+              "spectral_db": 75.12328992003907,
+              "transient_db": 0.0,
+              "visqol_mos": null,
+              "opus_snr_at_actual": -1.0794057246104167,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 1.0794057246104167,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 1111009763,
+              "decode_ns": 3139734
+            },
+            {
+              "target_bps": 12000,
+              "bytes": 1699,
+              "actual_bps": 13592.0,
+              "snr_db": 0.0,
+              "spectral_db": 75.12328992003907,
+              "transient_db": 0.0,
+              "visqol_mos": null,
+              "opus_snr_at_actual": -1.0794057246104167,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 1.0794057246104167,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 1111361424,
+              "decode_ns": 2963633
+            },
+            {
+              "target_bps": 16000,
+              "bytes": 1699,
+              "actual_bps": 13592.0,
+              "snr_db": 0.0,
+              "spectral_db": 75.12328992003907,
+              "transient_db": 0.0,
+              "visqol_mos": null,
+              "opus_snr_at_actual": -1.0794057246104167,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 1.0794057246104167,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 1145121514,
+              "decode_ns": 3117582
+            },
+            {
+              "target_bps": 24000,
+              "bytes": 2296,
+              "actual_bps": 18368.0,
+              "snr_db": 3.0415057385609283,
+              "spectral_db": 43.16696332310881,
+              "transient_db": 3.7521475686502126,
+              "visqol_mos": null,
+              "opus_snr_at_actual": -1.060987662846446,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 4.102493401407374,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 1169196993,
+              "decode_ns": 3204004
+            },
+            {
+              "target_bps": 32000,
+              "bytes": 3792,
+              "actual_bps": 30336.0,
+              "snr_db": 10.443286172878578,
+              "spectral_db": 7.7245838744678785,
+              "transient_db": 15.170090545172009,
+              "visqol_mos": null,
+              "opus_snr_at_actual": -2.0826929802451613,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 12.525979153123739,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 1457667201,
+              "decode_ns": 9220287
+            },
+            {
+              "target_bps": 48000,
+              "bytes": 5411,
+              "actual_bps": 43288.0,
+              "snr_db": 20.966626784609424,
+              "spectral_db": 3.8998117211967025,
+              "transient_db": 23.615898837676347,
+              "visqol_mos": null,
+              "opus_snr_at_actual": -3.596642297648533,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 24.563269082257957,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 2419969471,
+              "decode_ns": 10169572
+            },
+            {
+              "target_bps": 64000,
+              "bytes": 7032,
+              "actual_bps": 56256.0,
+              "snr_db": 32.26626777905881,
+              "spectral_db": 1.1822478364931828,
+              "transient_db": 35.719168007889515,
+              "visqol_mos": null,
+              "opus_snr_at_actual": -4.154456754750012,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 36.42072453380882,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 3086117934,
+              "decode_ns": 10487420
+            },
+            {
+              "target_bps": 96000,
+              "bytes": 10334,
+              "actual_bps": 82672.0,
+              "snr_db": 44.77597178545112,
+              "spectral_db": 0.2284529772679345,
+              "transient_db": 48.28436736521493,
+              "visqol_mos": null,
+              "opus_snr_at_actual": -4.157469300295985,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 48.933441085747106,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 6381834986,
+              "decode_ns": 10359489
+            }
+          ],
+          "opus": [
+            {
+              "actual_bps": 13328.0,
+              "snr_db": -1.0757549330288345,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 14240.0,
+              "snr_db": -1.0883667584924823,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 18456.0,
+              "snr_db": -1.060403999954767,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 21952.0,
+              "snr_db": -1.1026936691650295,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 45376.0,
+              "snr_db": -3.8407070115721154,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 52256.0,
+              "snr_db": -4.152965075328543,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 67304.0,
+              "snr_db": -4.158576773312111,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 84976.0,
+              "snr_db": -4.157303265819856,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 133648.0,
+              "snr_db": -4.149781069226146,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 168248.0,
+              "snr_db": -4.154801977799053,
+              "visqol_mos": null
+            }
+          ],
+          "lyra": []
+        },
+        {
+          "id": "corpus-white-noise",
+          "kind": "negative-control",
+          "rate": 16000,
+          "channels": 1,
+          "frames": 16000,
+          "vole": [
+            {
+              "target_bps": 8000,
+              "bytes": 1059,
+              "actual_bps": 8472.0,
+              "snr_db": 0.0,
+              "spectral_db": 120.9174033430212,
+              "transient_db": 0.0,
+              "visqol_mos": null,
+              "opus_snr_at_actual": null,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": -0.12116454845658417,
+              "delta_snr_vs_opus": null,
+              "delta_snr_vs_lyra": 0.12116454845658417,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 587315485,
+              "decode_ns": 1690228
+            },
+            {
+              "target_bps": 12000,
+              "bytes": 1059,
+              "actual_bps": 8472.0,
+              "snr_db": 0.0,
+              "spectral_db": 120.9174033430212,
+              "transient_db": 0.0,
+              "visqol_mos": null,
+              "opus_snr_at_actual": null,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": -0.12116454845658417,
+              "delta_snr_vs_opus": null,
+              "delta_snr_vs_lyra": 0.12116454845658417,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 613838526,
+              "decode_ns": 1799203
+            },
+            {
+              "target_bps": 16000,
+              "bytes": 1764,
+              "actual_bps": 14112.0,
+              "snr_db": 0.006677967124360571,
+              "spectral_db": 43.61297544071193,
+              "transient_db": 0.08417577397658063,
+              "visqol_mos": null,
+              "opus_snr_at_actual": null,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": null,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 1401447541,
+              "decode_ns": 7541761
+            },
+            {
+              "target_bps": 24000,
+              "bytes": 2101,
+              "actual_bps": 16808.0,
+              "snr_db": 0.34034097806610186,
+              "spectral_db": 9.351109290035865,
+              "transient_db": 0.8521352792646018,
+              "visqol_mos": null,
+              "opus_snr_at_actual": null,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": null,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 1450850794,
+              "decode_ns": 7638042
+            },
+            {
+              "target_bps": 32000,
+              "bytes": 3689,
+              "actual_bps": 29512.0,
+              "snr_db": 12.306436830846364,
+              "spectral_db": 2.010975837120714,
+              "transient_db": 13.486892352937886,
+              "visqol_mos": null,
+              "opus_snr_at_actual": 1.6551945749922543,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 10.65124225585411,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 1548452814,
+              "decode_ns": 2603455
+            },
+            {
+              "target_bps": 48000,
+              "bytes": 5982,
+              "actual_bps": 47856.0,
+              "snr_db": 15.674767093617882,
+              "spectral_db": 1.3947523961125845,
+              "transient_db": 16.333541312369896,
+              "visqol_mos": null,
+              "opus_snr_at_actual": 2.144021895980528,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 13.530745197637355,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 1778626117,
+              "decode_ns": 2509900
+            },
+            {
+              "target_bps": 64000,
+              "bytes": 7793,
+              "actual_bps": 62344.0,
+              "snr_db": 21.59569883189232,
+              "spectral_db": 0.6665213642088367,
+              "transient_db": 22.103789661511392,
+              "visqol_mos": null,
+              "opus_snr_at_actual": 3.887765223541913,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 17.70793360835041,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 2065581237,
+              "decode_ns": 2825473
+            },
+            {
+              "target_bps": 96000,
+              "bytes": 11024,
+              "actual_bps": 88192.0,
+              "snr_db": 30.573214697868067,
+              "spectral_db": 0.24848815330780885,
+              "transient_db": 31.08550110016415,
+              "visqol_mos": null,
+              "opus_snr_at_actual": 10.02454243193902,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 20.54867226592905,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 3383975754,
+              "decode_ns": 3723732
+            }
+          ],
+          "opus": [
+            {
+              "actual_bps": 19272.0,
+              "snr_db": 0.9246611713089271,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 19320.0,
+              "snr_db": 0.9135460902513945,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 35376.0,
+              "snr_db": 2.081904417468746,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 37416.0,
+              "snr_db": 2.045271562437154,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 40640.0,
+              "snr_db": 2.0677654948837683,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 45016.0,
+              "snr_db": 2.122619877274131,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 56320.0,
+              "snr_db": 2.207805940463254,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 83992.0,
+              "snr_db": 9.92490973882857,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 99656.0,
+              "snr_db": 10.296492239990975,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 132392.0,
+              "snr_db": 10.98422238569074,
+              "visqol_mos": null
+            }
+          ],
+          "lyra": [
+            {
+              "actual_bps": 3200.0,
+              "snr_db": -0.2214204347072493
+            },
+            {
+              "actual_bps": 6000.0,
+              "snr_db": -0.19882500397144476
+            },
+            {
+              "actual_bps": 9200.0,
+              "snr_db": -0.09829366997162522
+            }
+          ]
+        },
+        {
+          "id": "corpus-random-control",
+          "kind": "negative-control",
+          "rate": 16000,
+          "channels": 2,
+          "frames": 16000,
+          "vole": [
+            {
+              "target_bps": 8000,
+              "bytes": 2052,
+              "actual_bps": 16416.0,
+              "snr_db": 0.0,
+              "spectral_db": 121.08515014609134,
+              "transient_db": 0.0,
+              "visqol_mos": null,
+              "opus_snr_at_actual": -0.24902753685549447,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 0.24902753685549447,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 1180466862,
+              "decode_ns": 3387800
+            },
+            {
+              "target_bps": 12000,
+              "bytes": 2052,
+              "actual_bps": 16416.0,
+              "snr_db": 0.0,
+              "spectral_db": 121.08515014609134,
+              "transient_db": 0.0,
+              "visqol_mos": null,
+              "opus_snr_at_actual": -0.24902753685549447,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 0.24902753685549447,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 1177701363,
+              "decode_ns": 3440158
+            },
+            {
+              "target_bps": 16000,
+              "bytes": 2052,
+              "actual_bps": 16416.0,
+              "snr_db": 0.0,
+              "spectral_db": 121.08515014609134,
+              "transient_db": 0.0,
+              "visqol_mos": null,
+              "opus_snr_at_actual": -0.24902753685549447,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 0.24902753685549447,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 1176114950,
+              "decode_ns": 3541609
+            },
+            {
+              "target_bps": 24000,
+              "bytes": 2052,
+              "actual_bps": 16416.0,
+              "snr_db": 0.0,
+              "spectral_db": 121.08515014609134,
+              "transient_db": 0.0,
+              "visqol_mos": null,
+              "opus_snr_at_actual": -0.24902753685549447,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 0.24902753685549447,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 1237653100,
+              "decode_ns": 3564271
+            },
+            {
+              "target_bps": 32000,
+              "bytes": 3452,
+              "actual_bps": 27616.0,
+              "snr_db": -0.006949288392348225,
+              "spectral_db": 55.01238746825988,
+              "transient_db": 0.0,
+              "visqol_mos": null,
+              "opus_snr_at_actual": -0.4088443528902481,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 0.4018950644978999,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 2813673168,
+              "decode_ns": 14368247
+            },
+            {
+              "target_bps": 48000,
+              "bytes": 4114,
+              "actual_bps": 32912.0,
+              "snr_db": 0.3364783441296862,
+              "spectral_db": 9.376628565482251,
+              "transient_db": 0.795349178877006,
+              "visqol_mos": null,
+              "opus_snr_at_actual": -0.624104968730814,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 0.9605833128605001,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 2883048725,
+              "decode_ns": 14862746
+            },
+            {
+              "target_bps": 64000,
+              "bytes": 7372,
+              "actual_bps": 58976.0,
+              "snr_db": 12.399098780321921,
+              "spectral_db": 2.0719047566074558,
+              "transient_db": 13.314501193045539,
+              "visqol_mos": null,
+              "opus_snr_at_actual": -1.190395819486466,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 13.589494599808386,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 3101246200,
+              "decode_ns": 5332076
+            },
+            {
+              "target_bps": 96000,
+              "bytes": 11818,
+              "actual_bps": 94544.0,
+              "snr_db": 15.609383283663567,
+              "spectral_db": 1.4727462194514647,
+              "transient_db": 16.256250233730054,
+              "visqol_mos": null,
+              "opus_snr_at_actual": -2.1122075644583385,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 17.721590848121906,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 3583537288,
+              "decode_ns": 5022894
+            }
+          ],
+          "opus": [
+            {
+              "actual_bps": 14672.0,
+              "snr_db": -0.21523611076101015,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 14792.0,
+              "snr_db": -0.2189843987238307,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 24168.0,
+              "snr_db": -0.3924354228140276,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 26704.0,
+              "snr_db": -0.3717753042409664,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 40440.0,
+              "snr_db": -0.9300872036340957,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 43064.0,
+              "snr_db": -0.9762739776824292,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 56864.0,
+              "snr_db": -1.061444480176177,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 72304.0,
+              "snr_db": -2.0041569228612426,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 79496.0,
+              "snr_db": -2.0504914858938204,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 104496.0,
+              "snr_db": -2.1530235143436447,
+              "visqol_mos": null
+            }
+          ],
+          "lyra": []
+        },
+        {
+          "id": "corpus-scrambled-control",
+          "kind": "negative-control",
+          "rate": 16000,
+          "channels": 1,
+          "frames": 16000,
+          "vole": [
+            {
+              "target_bps": 8000,
+              "bytes": 1043,
+              "actual_bps": 8344.0,
+              "snr_db": 0.0,
+              "spectral_db": 120.91444343298366,
+              "transient_db": 0.0,
+              "visqol_mos": null,
+              "opus_snr_at_actual": null,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": -0.04795656374717645,
+              "delta_snr_vs_opus": null,
+              "delta_snr_vs_lyra": 0.04795656374717645,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 591484314,
+              "decode_ns": 1729793
+            },
+            {
+              "target_bps": 12000,
+              "bytes": 1043,
+              "actual_bps": 8344.0,
+              "snr_db": 0.0,
+              "spectral_db": 120.91444343298366,
+              "transient_db": 0.0,
+              "visqol_mos": null,
+              "opus_snr_at_actual": null,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": -0.04795656374717645,
+              "delta_snr_vs_opus": null,
+              "delta_snr_vs_lyra": 0.04795656374717645,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 619731637,
+              "decode_ns": 1731536
+            },
+            {
+              "target_bps": 16000,
+              "bytes": 1759,
+              "actual_bps": 14072.0,
+              "snr_db": -0.011176613698860133,
+              "spectral_db": 48.12682604517099,
+              "transient_db": 0.05893372736359223,
+              "visqol_mos": null,
+              "opus_snr_at_actual": null,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": null,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 1426245308,
+              "decode_ns": 7366281
+            },
+            {
+              "target_bps": 24000,
+              "bytes": 2102,
+              "actual_bps": 16816.0,
+              "snr_db": 0.3461096061937393,
+              "spectral_db": 9.183911300372873,
+              "transient_db": 0.6711154788442921,
+              "visqol_mos": null,
+              "opus_snr_at_actual": null,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": null,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 1467725713,
+              "decode_ns": 7469265
+            },
+            {
+              "target_bps": 32000,
+              "bytes": 3820,
+              "actual_bps": 30560.0,
+              "snr_db": 12.359020167660583,
+              "spectral_db": 1.9926666654931395,
+              "transient_db": 13.403157486325409,
+              "visqol_mos": null,
+              "opus_snr_at_actual": 1.7502485858012269,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 10.608771581859356,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 1576604097,
+              "decode_ns": 2658439
+            },
+            {
+              "target_bps": 48000,
+              "bytes": 3820,
+              "actual_bps": 30560.0,
+              "snr_db": 12.359020167660583,
+              "spectral_db": 1.9926666654931395,
+              "transient_db": 13.403157486325409,
+              "visqol_mos": null,
+              "opus_snr_at_actual": 1.7502485858012269,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 10.608771581859356,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 1800107789,
+              "decode_ns": 2669360
+            },
+            {
+              "target_bps": 64000,
+              "bytes": 7928,
+              "actual_bps": 63424.0,
+              "snr_db": 21.55766581030507,
+              "spectral_db": 0.7271203998963909,
+              "transient_db": 21.98984354003196,
+              "visqol_mos": null,
+              "opus_snr_at_actual": 4.38018734624824,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 17.177478464056833,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 2104813725,
+              "decode_ns": 2647749
+            },
+            {
+              "target_bps": 96000,
+              "bytes": 11141,
+              "actual_bps": 89128.0,
+              "snr_db": 30.614509686227276,
+              "spectral_db": 0.26044980333994594,
+              "transient_db": 31.31686889429368,
+              "visqol_mos": null,
+              "opus_snr_at_actual": 10.2248473374822,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 20.389662348745077,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 3498698466,
+              "decode_ns": 3590141
+            }
+          ],
+          "opus": [
+            {
+              "actual_bps": 19080.0,
+              "snr_db": 0.9518983498345057,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 19112.0,
+              "snr_db": 0.95798740625108,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 35336.0,
+              "snr_db": 2.0807726418399675,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 37488.0,
+              "snr_db": 2.1003850929359444,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 40720.0,
+              "snr_db": 2.1365940529695853,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 45304.0,
+              "snr_db": 2.1592920163518716,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 55920.0,
+              "snr_db": 2.281700886579385,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 83880.0,
+              "snr_db": 10.100688281614193,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 99536.0,
+              "snr_db": 10.471083513830187,
+              "visqol_mos": null
+            },
+            {
+              "actual_bps": 132240.0,
+              "snr_db": 11.223580880721208,
+              "visqol_mos": null
+            }
+          ],
+          "lyra": [
+            {
+              "actual_bps": 3200.0,
+              "snr_db": -0.21391955916676875
+            },
+            {
+              "actual_bps": 6000.0,
+              "snr_db": -0.08173721448908995
+            },
+            {
+              "actual_bps": 9200.0,
+              "snr_db": -0.035620285148593715
+            }
+          ]
+        },
+        {
+          "id": "speech-1272-128104-0000",
+          "kind": "speech",
+          "rate": 16000,
+          "channels": 1,
+          "frames": 16000,
+          "vole": [
+            {
+              "target_bps": 8000,
+              "bytes": 1153,
+              "actual_bps": 9224.0,
+              "snr_db": 0.0,
+              "spectral_db": 88.06020611981339,
+              "transient_db": 0.0,
+              "visqol_mos": 1.19323063,
+              "opus_snr_at_actual": null,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": null,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 566755666,
+              "decode_ns": 1851943
+            },
+            {
+              "target_bps": 12000,
+              "bytes": 1499,
+              "actual_bps": 11992.0,
+              "snr_db": 7.714137466236258,
+              "spectral_db": 4.920809997449491,
+              "transient_db": 11.965941191827834,
+              "visqol_mos": 2.86384344,
+              "opus_snr_at_actual": null,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": null,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 577435648,
+              "decode_ns": 1778374
+            },
+            {
+              "target_bps": 16000,
+              "bytes": 1826,
+              "actual_bps": 14608.0,
+              "snr_db": 12.39683858278382,
+              "spectral_db": 3.7464052156120538,
+              "transient_db": 17.518065677432276,
+              "visqol_mos": 2.21628737,
+              "opus_snr_at_actual": 9.231844590356253,
+              "opus_visqol_at_actual": 2.9165571715962444,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 3.1649939924275667,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": -0.7002698015962445,
+              "encode_ns": 964277483,
+              "decode_ns": 1926102
+            },
+            {
+              "target_bps": 24000,
+              "bytes": 2778,
+              "actual_bps": 22224.0,
+              "snr_db": 25.43413394711434,
+              "spectral_db": 1.0764770164991608,
+              "transient_db": 31.65082816827657,
+              "visqol_mos": 2.7779398,
+              "opus_snr_at_actual": 11.480853761162471,
+              "opus_visqol_at_actual": 3.205636952162741,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 13.953280185951868,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": -0.42769715216274085,
+              "encode_ns": 1083752651,
+              "decode_ns": 1889743
+            },
+            {
+              "target_bps": 32000,
+              "bytes": 3839,
+              "actual_bps": 30712.0,
+              "snr_db": 32.952227648833514,
+              "spectral_db": 0.4537484599428177,
+              "transient_db": 39.91868400856476,
+              "visqol_mos": 2.95855117,
+              "opus_snr_at_actual": 12.96512568447849,
+              "opus_visqol_at_actual": 3.2000886821758843,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 19.987101964355023,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": -0.24153751217588448,
+              "encode_ns": 1195761120,
+              "decode_ns": 1910522
+            },
+            {
+              "target_bps": 48000,
+              "bytes": 5674,
+              "actual_bps": 45392.0,
+              "snr_db": 40.05060008686983,
+              "spectral_db": 0.22730917310282034,
+              "transient_db": 48.673029047835925,
+              "visqol_mos": 2.78708076,
+              "opus_snr_at_actual": 12.87077235047051,
+              "opus_visqol_at_actual": 3.275183562983752,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 27.179827736399318,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": -0.48810280298375197,
+              "encode_ns": 1524993423,
+              "decode_ns": 1951970
+            },
+            {
+              "target_bps": 64000,
+              "bytes": 7784,
+              "actual_bps": 62272.0,
+              "snr_db": 48.58998212635467,
+              "spectral_db": 0.0805435632571432,
+              "transient_db": 57.57186118180846,
+              "visqol_mos": 3.35441947,
+              "opus_snr_at_actual": 15.496746337676862,
+              "opus_visqol_at_actual": 3.5625509039783783,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 33.09323578867781,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": -0.2081314339783784,
+              "encode_ns": 2012849726,
+              "decode_ns": 2383803
+            },
+            {
+              "target_bps": 96000,
+              "bytes": 10983,
+              "actual_bps": 87864.0,
+              "snr_db": 59.937706875001794,
+              "spectral_db": 0.02319087141489036,
+              "transient_db": 69.54642272986065,
+              "visqol_mos": 4.26202774,
+              "opus_snr_at_actual": 22.5580162255211,
+              "opus_visqol_at_actual": 4.330472813347067,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 37.37969064948069,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": -0.06844507334706762,
+              "encode_ns": 4337974701,
+              "decode_ns": 2094068
+            }
+          ],
+          "opus": [
+            {
+              "actual_bps": 12920.0,
+              "snr_db": 6.813960536848873,
+              "visqol_mos": 2.85484195
+            },
+            {
+              "actual_bps": 14624.0,
+              "snr_db": 9.254762922616987,
+              "visqol_mos": 2.91714215
+            },
+            {
+              "actual_bps": 18840.0,
+              "snr_db": 10.311584297998863,
+              "visqol_mos": 3.42350245
+            },
+            {
+              "actual_bps": 22576.0,
+              "snr_db": 11.602479899174762,
+              "visqol_mos": 3.18297482
+            },
+            {
+              "actual_bps": 29696.0,
+              "snr_db": 13.002199980290541,
+              "visqol_mos": 3.193223
+            },
+            {
+              "actual_bps": 38520.0,
+              "snr_db": 12.68020826154494,
+              "visqol_mos": 3.25285172
+            },
+            {
+              "actual_bps": 54768.0,
+              "snr_db": 13.130773645256038,
+              "visqol_mos": 3.30565262
+            },
+            {
+              "actual_bps": 84368.0,
+              "snr_db": 22.46350174968786,
+              "visqol_mos": 4.31900406
+            },
+            {
+              "actual_bps": 125144.0,
+              "snr_db": 23.56588226072223,
+              "visqol_mos": 4.45277119
+            },
+            {
+              "actual_bps": 163848.0,
+              "snr_db": 24.436429493480457,
+              "visqol_mos": 4.51989937
+            }
+          ],
+          "lyra": [
+            {
+              "actual_bps": 3200.0,
+              "snr_db": 4.724264837283598
+            },
+            {
+              "actual_bps": 6000.0,
+              "snr_db": 6.915396693455556
+            },
+            {
+              "actual_bps": 9200.0,
+              "snr_db": 6.9250165845551965
+            }
+          ]
+        },
+        {
+          "id": "speech-1462-170138-0000",
+          "kind": "speech",
+          "rate": 16000,
+          "channels": 1,
+          "frames": 16000,
+          "vole": [
+            {
+              "target_bps": 8000,
+              "bytes": 1088,
+              "actual_bps": 8704.0,
+              "snr_db": 0.0,
+              "spectral_db": 89.56071106993551,
+              "transient_db": 0.0,
+              "visqol_mos": 1.0,
+              "opus_snr_at_actual": null,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": 11.60383781165185,
+              "delta_snr_vs_opus": null,
+              "delta_snr_vs_lyra": -11.60383781165185,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 566068555,
+              "decode_ns": 1756402
+            },
+            {
+              "target_bps": 12000,
+              "bytes": 1288,
+              "actual_bps": 10304.0,
+              "snr_db": 2.0160742130481784,
+              "spectral_db": 8.904429887820575,
+              "transient_db": 4.326407633783448,
+              "visqol_mos": 2.59455824,
+              "opus_snr_at_actual": null,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": null,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 562631192,
+              "decode_ns": 1751453
+            },
+            {
+              "target_bps": 16000,
+              "bytes": 1970,
+              "actual_bps": 15760.0,
+              "snr_db": 8.612808345440854,
+              "spectral_db": 6.525836103784565,
+              "transient_db": 11.85248691548197,
+              "visqol_mos": 2.80300665,
+              "opus_snr_at_actual": 16.057336676795618,
+              "opus_visqol_at_actual": 3.685649033728223,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": -7.444528331354764,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": -0.8826423837282231,
+              "encode_ns": 893516542,
+              "decode_ns": 1793632
+            },
+            {
+              "target_bps": 24000,
+              "bytes": 2855,
+              "actual_bps": 22840.0,
+              "snr_db": 29.25630080912682,
+              "spectral_db": 1.3106121822448957,
+              "transient_db": 33.4920284125015,
+              "visqol_mos": 3.57670593,
+              "opus_snr_at_actual": 21.423446891462714,
+              "opus_visqol_at_actual": 4.432071368760684,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 7.8328539176641065,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": -0.8553654387606837,
+              "encode_ns": 979942799,
+              "decode_ns": 1876017
+            },
+            {
+              "target_bps": 32000,
+              "bytes": 3655,
+              "actual_bps": 29240.0,
+              "snr_db": 36.780325622774434,
+              "spectral_db": 0.5337101592023102,
+              "transient_db": 41.99085175742815,
+              "visqol_mos": 3.82366228,
+              "opus_snr_at_actual": 24.56427341274134,
+              "opus_visqol_at_actual": 4.4498748912499995,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 12.216052210033094,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": -0.6262126112499993,
+              "encode_ns": 1064773426,
+              "decode_ns": 1800716
+            },
+            {
+              "target_bps": 48000,
+              "bytes": 5898,
+              "actual_bps": 47184.0,
+              "snr_db": 47.48918694851199,
+              "spectral_db": 0.19050550565534421,
+              "transient_db": 52.52516784725789,
+              "visqol_mos": 3.83270454,
+              "opus_snr_at_actual": 25.562266461459142,
+              "opus_visqol_at_actual": 4.453382408350668,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 21.92692048705285,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": -0.6206778683506684,
+              "encode_ns": 1350611595,
+              "decode_ns": 1934097
+            },
+            {
+              "target_bps": 64000,
+              "bytes": 7397,
+              "actual_bps": 59176.0,
+              "snr_db": 53.005655692864615,
+              "spectral_db": 0.0989221872493445,
+              "transient_db": 58.48549064484993,
+              "visqol_mos": 3.82313228,
+              "opus_snr_at_actual": 27.4513187077702,
+              "opus_visqol_at_actual": 4.519209787959661,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 25.554336985094416,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": -0.6960775079596613,
+              "encode_ns": 1705753886,
+              "decode_ns": 2261302
+            },
+            {
+              "target_bps": 96000,
+              "bytes": 11915,
+              "actual_bps": 95320.0,
+              "snr_db": 67.00523169038391,
+              "spectral_db": 0.018984836016268457,
+              "transient_db": 73.26856347607595,
+              "visqol_mos": 4.53803539,
+              "opus_snr_at_actual": 31.349103298808355,
+              "opus_visqol_at_actual": 4.55277160802209,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 35.65612839157555,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": -0.014736218022090242,
+              "encode_ns": 3523819642,
+              "decode_ns": 2233910
+            }
+          ],
+          "opus": [
+            {
+              "actual_bps": 12896.0,
+              "snr_db": 11.281784676657141,
+              "visqol_mos": 3.49690056
+            },
+            {
+              "actual_bps": 14704.0,
+              "snr_db": 15.451666134177287,
+              "visqol_mos": 3.485955
+            },
+            {
+              "actual_bps": 19296.0,
+              "snr_db": 18.085415311926692,
+              "visqol_mos": 4.35432148
+            },
+            {
+              "actual_bps": 23040.0,
+              "snr_db": 21.61182339143653,
+              "visqol_mos": 4.43645906
+            },
+            {
+              "actual_bps": 30400.0,
+              "snr_db": 25.116667287695144,
+              "visqol_mos": 4.45238495
+            },
+            {
+              "actual_bps": 39552.0,
+              "snr_db": 24.300467175926116,
+              "visqol_mos": 4.39785004
+            },
+            {
+              "actual_bps": 55704.0,
+              "snr_db": 26.970878871409532,
+              "visqol_mos": 4.51537609
+            },
+            {
+              "actual_bps": 83072.0,
+              "snr_db": 30.757940346501336,
+              "visqol_mos": 4.54559517
+            },
+            {
+              "actual_bps": 122184.0,
+              "snr_db": 32.645723281726035,
+              "visqol_mos": 4.56851196
+            },
+            {
+              "actual_bps": 159048.0,
+              "snr_db": 34.92394798287505,
+              "visqol_mos": 4.57102203
+            }
+          ],
+          "lyra": [
+            {
+              "actual_bps": 3200.0,
+              "snr_db": 9.06245174761694
+            },
+            {
+              "actual_bps": 6000.0,
+              "snr_db": 10.839470158942039
+            },
+            {
+              "actual_bps": 9200.0,
+              "snr_db": 11.744047262740633
+            }
+          ]
+        },
+        {
+          "id": "speech-1673-143396-0000",
+          "kind": "speech",
+          "rate": 16000,
+          "channels": 1,
+          "frames": 16000,
+          "vole": [
+            {
+              "target_bps": 8000,
+              "bytes": 1120,
+              "actual_bps": 8960.0,
+              "snr_db": 0.0,
+              "spectral_db": 97.92141667176197,
+              "transient_db": 0.0,
+              "visqol_mos": 1.0,
+              "opus_snr_at_actual": null,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": 10.565222195811808,
+              "delta_snr_vs_opus": null,
+              "delta_snr_vs_lyra": -10.565222195811808,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 573862088,
+              "decode_ns": 1706829
+            },
+            {
+              "target_bps": 12000,
+              "bytes": 1270,
+              "actual_bps": 10160.0,
+              "snr_db": 0.9370911106119689,
+              "spectral_db": 7.988932581306265,
+              "transient_db": 2.9510945703608216,
+              "visqol_mos": 1.0,
+              "opus_snr_at_actual": null,
+              "opus_visqol_at_actual": null,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": null,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": null,
+              "encode_ns": 585553923,
+              "decode_ns": 1672465
+            },
+            {
+              "target_bps": 16000,
+              "bytes": 1996,
+              "actual_bps": 15968.0,
+              "snr_db": 4.300980942846985,
+              "spectral_db": 7.1370975517103,
+              "transient_db": 7.048648477611849,
+              "visqol_mos": 1.0,
+              "opus_snr_at_actual": 13.967933807589324,
+              "opus_visqol_at_actual": 3.0554930780789946,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": -9.666952864742338,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": -2.0554930780789946,
+              "encode_ns": 934990236,
+              "decode_ns": 1736996
+            },
+            {
+              "target_bps": 24000,
+              "bytes": 2838,
+              "actual_bps": 22704.0,
+              "snr_db": 17.409031456176724,
+              "spectral_db": 2.874970943763491,
+              "transient_db": 22.32000443008886,
+              "visqol_mos": 1.39560652,
+              "opus_snr_at_actual": 19.62157277180152,
+              "opus_visqol_at_actual": 3.4537776752966103,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": -2.2125413156247973,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": -2.05817115529661,
+              "encode_ns": 982918034,
+              "decode_ns": 1828678
+            },
+            {
+              "target_bps": 32000,
+              "bytes": 3864,
+              "actual_bps": 30912.0,
+              "snr_db": 34.532376264901586,
+              "spectral_db": 0.6519834687413409,
+              "transient_db": 39.059541999462716,
+              "visqol_mos": 2.12849975,
+              "opus_snr_at_actual": 23.019541994462813,
+              "opus_visqol_at_actual": 3.5690256016831685,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 11.512834270438773,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": -1.4405258516831685,
+              "encode_ns": 1128893069,
+              "decode_ns": 1831183
+            },
+            {
+              "target_bps": 48000,
+              "bytes": 5201,
+              "actual_bps": 41608.0,
+              "snr_db": 42.28669844206205,
+              "spectral_db": 0.29646211301817244,
+              "transient_db": 47.66971204092211,
+              "visqol_mos": 2.74248528,
+              "opus_snr_at_actual": 22.982547144588068,
+              "opus_visqol_at_actual": 3.5229518620595535,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 19.30415129747398,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": -0.7804665820595535,
+              "encode_ns": 1278890057,
+              "decode_ns": 1787261
+            },
+            {
+              "target_bps": 64000,
+              "bytes": 7861,
+              "actual_bps": 62888.0,
+              "snr_db": 50.05933902915565,
+              "spectral_db": 0.1289606996440164,
+              "transient_db": 56.436530215767256,
+              "visqol_mos": 3.00270677,
+              "opus_snr_at_actual": 25.770129309060426,
+              "opus_visqol_at_actual": 3.9197571659895187,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 24.289209720095226,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": -0.9170503959895187,
+              "encode_ns": 1517772887,
+              "decode_ns": 2256693
+            },
+            {
+              "target_bps": 96000,
+              "bytes": 11186,
+              "actual_bps": 89488.0,
+              "snr_db": 61.760553205916516,
+              "spectral_db": 0.034448682984620824,
+              "transient_db": 68.41403736762412,
+              "visqol_mos": 4.41594553,
+              "opus_snr_at_actual": 30.646559438244044,
+              "opus_visqol_at_actual": 4.460415348855408,
+              "lyra_snr_at_actual": null,
+              "delta_snr_vs_opus": 31.113993767672472,
+              "delta_snr_vs_lyra": null,
+              "delta_visqol_vs_opus": -0.044469818855407794,
+              "encode_ns": 2641675001,
+              "decode_ns": 2233029
+            }
+          ],
+          "opus": [
+            {
+              "actual_bps": 13400.0,
+              "snr_db": 10.315444532531327,
+              "visqol_mos": 2.60526991
+            },
+            {
+              "actual_bps": 15040.0,
+              "snr_db": 12.990380722694109,
+              "visqol_mos": 2.98255157
+            },
+            {
+              "actual_bps": 19496.0,
+              "snr_db": 17.684320966544405,
+              "visqol_mos": 3.33279657
+            },
+            {
+              "actual_bps": 23272.0,
+              "snr_db": 19.96457745552535,
+              "visqol_mos": 3.47519827
+            },
+            {
+              "actual_bps": 31352.0,
+              "snr_db": 23.195482360579632,
+              "visqol_mos": 3.57442927
+            },
+            {
+              "actual_bps": 40376.0,
+              "snr_db": 22.86984398813365,
+              "visqol_mos": 3.50455451
+            },
+            {
+              "actual_bps": 56496.0,
+              "snr_db": 24.344498924858684,
+              "visqol_mos": 3.74527311
+            },
+            {
+              "actual_bps": 82448.0,
+              "snr_db": 30.132665340816697,
+              "visqol_mos": 4.45369148
+            },
+            {
+              "actual_bps": 118024.0,
+              "snr_db": 32.729582444520574,
+              "visqol_mos": 4.48766994
+            },
+            {
+              "actual_bps": 153288.0,
+              "snr_db": 34.57460423452833,
+              "visqol_mos": 4.48351574
+            }
+          ],
+          "lyra": [
+            {
+              "actual_bps": 3200.0,
+              "snr_db": 7.002656088654576
+            },
+            {
+              "actual_bps": 6000.0,
+              "snr_db": 9.204842195382275
+            },
+            {
+              "actual_bps": 9200.0,
+              "snr_db": 10.675523276927716
+            }
+          ]
+        }
+      ],
+      "harness": {
+        "profile": "vole.audio.lossy.exp1",
+        "opus": "/usr/bin/opusenc",
+        "lyra": "research/lyra-main/bazel-bin/lyra/cli_example/encoder_main",
+        "visqol": "research/visqol-master/bazel-bin/visqol",
+        "align_lag_samples": 512,
+        "opus_rates": [
+          6,
+          8,
+          12,
+          16,
+          24,
+          32,
+          48,
+          64,
+          96,
+          128
+        ],
+        "lyra_rates": [
+          3200,
+          6000,
+          9200
+        ],
+        "note": "competitors are external processes; no code is imported, linked or wrapped"
+      },
+      "limitations": [
+        "external codecs are compared on the first channel (Opus/Lyra decode to mono-comparable output); VOLE is measured per channel and averaged",
+        "Lyra is measured only on 16 kHz mono, its native domain; cells outside a competitor's measured bitrate range are null rather than extrapolated",
+        "ViSQOL is reported where the pinned binary and model run; absent metric cells are null, never invented",
+        "Opus is asked for a rate ladder with VBR, so its achieved bitrate differs from the request; all comparison is at achieved bitrate"
+      ],
+      "matched_bitrate_summary": {
+        "opus_snr_delta_mean_db": 22.644937433918336,
+        "opus_snr_cells": 89,
+        "opus_snr_wins": 76,
+        "opus_visqol_delta_mean": -0.7292262603488137,
+        "opus_visqol_cells": 18,
+        "opus_visqol_wins": 0,
+        "lyra_snr_delta_mean_db": 3.7668638858235446,
+        "lyra_snr_cells": 21,
+        "lyra_snr_wins": 11
+      },
+      "protocol": {
+        "protocol_schema": "vole.audio.learned.protocol.v1",
+        "schema": "vole.audio.learned.exp3.evidence.v1",
+        "profile": "vole.audio.learned.exp3",
+        "version": 1,
+        "semantic_authority": "none: a learned hypothesis is a candidate family, never truth; scalar exact closure decides acceptance"
+      }
+    }
+  },
+  "receipt_sha256": "214cd3c5bacb804a82041f22c3c3ea0a7766d0a1d7bc60701646c3f9574b92ec"
+}
