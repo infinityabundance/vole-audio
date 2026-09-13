@@ -86,6 +86,8 @@ pub mod learned_ema_rans;
 #[cfg(feature = "std")]
 pub mod learned_entropy_reblock;
 #[cfg(feature = "std")]
+pub mod learned_entropy_seed;
+#[cfg(feature = "std")]
 pub mod learned_exp2_baseline;
 #[cfg(feature = "std")]
 pub mod learned_exp2_mechanisms;
@@ -414,6 +416,16 @@ entropy coding alone by a shortest path over aligned boundaries, each partition 
 base coder among Exp-Golomb(0), Rice, general Golomb and BGMC; isolates the mechanism against
 PartitionRice and the best pre-existing codec over synthetic heteroscedastic fixtures and the real
 speech effectiveness residuals; every payload round-trips exactly; held-out Mode C untouched",
+    ),
+    (
+        "learned-entropy-seed",
+        "Phase 7A: entropy-seed proceduralization. Blind discovery of a deterministic Compound
+composition H from samples alone (autocorrelation, harmonic projection, envelope/onset fitting,
+residual-guided layering; no fixture dispatch), H state entropy-coded with the Phase-2B metadata
+coders, exact residual entropy-coded with the residual_codec2 family, exact closure, bounded
+(random-access) materialization, determinism, and the mature learned predictor families competing
+in the same inverse decision; gates on exactness/well-formedness, reports byte outcomes including
+the high-entropy negative controls",
     ),
     (
         "learned-expert-mux",
@@ -750,6 +762,7 @@ pub fn run(name: &str, receipts_root: &Path) -> crate::error::Result<Verdict> {
         "learned-stateful-parse" => learned_stateful_parse::run(receipts_root),
         "learned-iterative-reprice" => learned_iterative_reprice::run(receipts_root),
         "learned-entropy-reblock" => learned_entropy_reblock::run(receipts_root),
+        "learned-entropy-seed" => learned_entropy_seed::run(receipts_root),
         "learned-expert-mux" => learned_expert_mux::run(receipts_root),
         "learned-ema-rans" => learned_ema_rans::run(receipts_root),
         "learned-decision-trace" => learned_decision_trace::run(receipts_root),

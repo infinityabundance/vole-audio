@@ -208,7 +208,10 @@ impl CompoundGraph {
                     let child = &bufs[usize::from(node.children[0])];
                     let mut out = vec![0i32; n];
                     for (t, slot) in out.iter_mut().enumerate() {
-                        let src = t as i64 - *frames;
+                        // Saturating subtraction keeps extreme `Delay` offsets
+                        // total and panic-free; in the ordinary domain it is
+                        // identical to plain subtraction.
+                        let src = (t as i64).saturating_sub(*frames);
                         if src >= 0 && (src as usize) < n {
                             *slot = child[src as usize];
                         }
@@ -258,6 +261,114 @@ impl CompoundGraph {
         self.validate()?;
         let bufs = self.evaluate_nodes();
         Ok(bufs[self.root()].clone())
+    }
+
+    /// Materialize only the absolute frame window `[start, start + frames)`.
+    ///
+    /// This is the **bounded** materialization path. It evaluates the requested
+    /// interval only: oscillator phase and envelope level are derived from the
+    /// *absolute* frame index, `Delay` requests its child at a translated
+    /// position, and `Add`/`Gain`/`Envelope` transform the same bounded window.
+    ///
+    /// Working memory and traversal work scale with the requested window and
+    /// the graph's structural depth (`MAX_COMPOUND_NODES`), **not** with the
+    /// graph's total duration. The result is bit-identical to
+    /// `materialize()?[start .. start + frames]`.
+    pub fn materialize_range(&self, start: u64, frames: u64) -> Result<Vec<i32>> {
+        Ok(self.materialize_range_profiled(start, frames)?.0)
+    }
+
+    /// As [`materialize_range`](Self::materialize_range), additionally returning
+    /// the measured traversal profile so callers can prove the bound.
+    pub fn materialize_range_profiled(
+        &self,
+        start: u64,
+        frames: u64,
+    ) -> Result<(Vec<i32>, RangeProfile)> {
+        self.validate()?;
+        let end = start
+            .checked_add(frames)
+            .ok_or_else(|| Error::limit("compound window end overflows"))?;
+        if end > self.frames {
+            return Err(Error::limit("compound window exceeds the graph extent"));
+        }
+        let mut prof = RangeProfile::default();
+        let mut out = Vec::with_capacity(frames as usize);
+        let root = self.root();
+        for i in 0..frames {
+            let t = (start + i) as i64;
+            let mut depth = 0u32;
+            out.push(self.eval_frame(root, t, &mut depth, &mut prof));
+        }
+        Ok((out, prof))
+    }
+
+    /// Pull a single absolute output frame through the graph.
+    ///
+    /// Depth is bounded by the longest child path, which [`validate`] restricts
+    /// to `MAX_COMPOUND_NODES` because every child references an earlier index.
+    /// A diamond DAG is therefore re-visited once per edge, never exponentially:
+    /// each frame costs `O(edges)` work and `O(depth)` stack.
+    ///
+    /// [`validate`]: Self::validate
+    fn eval_frame(&self, node: usize, t: i64, depth: &mut u32, prof: &mut RangeProfile) -> i32 {
+        *depth += 1;
+        prof.peak_depth = prof.peak_depth.max(*depth);
+        prof.node_visits += 1;
+        let nd = &self.nodes[node];
+        let n = self.frames as i64;
+        let v = match &nd.op {
+            CompoundOp::Silence => 0,
+            CompoundOp::Constant { level } => *level,
+            CompoundOp::Oscillator {
+                freq_hz,
+                amp_q16,
+                phase0,
+            } => {
+                let incr = eff_incr(*freq_hz, 1 << 24, self.sample_rate_hz);
+                osc_sample(osc_phase(*phase0, incr, 0, t), *amp_q16)
+            }
+            CompoundOp::Gain { q16 } => {
+                let c = self.eval_frame(usize::from(nd.children[0]), t, depth, prof);
+                sat_i32(rnd_shift(i64::from(c) * i64::from(*q16), 16))
+            }
+            CompoundOp::Envelope {
+                attack_frames,
+                decay_frames,
+                sustain_q16,
+                release_frames,
+                t_on,
+                t_off,
+            } => {
+                let env = EnvelopeParams::new(
+                    *attack_frames,
+                    *decay_frames,
+                    *sustain_q16,
+                    *release_frames,
+                )
+                .expect("validated");
+                let c = self.eval_frame(usize::from(nd.children[0]), t, depth, prof);
+                let level = env.level_at(*t_on, *t_off, t);
+                sat_i32(rnd_shift(i64::from(c) * i64::from(level), 16))
+            }
+            CompoundOp::Delay { frames: d } => {
+                let src = t.saturating_sub(*d);
+                if src >= 0 && src < n {
+                    self.eval_frame(usize::from(nd.children[0]), src, depth, prof)
+                } else {
+                    0
+                }
+            }
+            CompoundOp::Add => {
+                let mut acc = 0i64;
+                for &ch in &nd.children {
+                    acc += i64::from(self.eval_frame(usize::from(ch), t, depth, prof));
+                }
+                sat_i32(acc)
+            }
+        };
+        *depth -= 1;
+        v
     }
 
     /// Canonical bytes:
@@ -430,6 +541,18 @@ impl CompoundGraph {
             Err(_) => false,
         }
     }
+}
+
+/// Measured cost of one bounded-materialization pass.
+///
+/// `peak_depth` is the deepest simultaneous child path touched while pulling a
+/// single output frame; it is bounded by the graph's node count and is
+/// independent of the requested window and of the graph's total duration.
+/// `node_visits` counts node evaluations across the whole requested window.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct RangeProfile {
+    pub peak_depth: u32,
+    pub node_visits: u64,
 }
 
 struct CompoundReader<'a> {
@@ -613,5 +736,128 @@ mod tests {
         let last = bytes.len() - 1;
         bytes[last] ^= 0x01;
         assert!(CompoundGraph::parse(&bytes).is_err());
+    }
+
+    /// A graph whose evaluator exercises every operation and every boundary
+    /// class a bounded window can split: oscillator phase, envelope attack /
+    /// decay / sustain / release, gain, and a two-hop delay chain.
+    fn boundary_rich_graph(frames: u64) -> CompoundGraph {
+        CompoundGraph {
+            channels: 1,
+            frames,
+            sample_rate_hz: 44_100,
+            nodes: vec![
+                oscillator(220, 1 << 14), // 0
+                oscillator(329, 1 << 13), // 1
+                CompoundNode {
+                    op: CompoundOp::Add, // 2
+                    children: vec![0, 1],
+                },
+                CompoundNode {
+                    op: CompoundOp::Envelope {
+                        attack_frames: 137,
+                        decay_frames: 211,
+                        sustain_q16: 1 << 15,
+                        release_frames: 353,
+                        t_on: 97,
+                        t_off: Some((frames / 2) as i64),
+                    },
+                    children: vec![2],
+                },
+                CompoundNode {
+                    op: CompoundOp::Gain { q16: 1 << 15 }, // 4
+                    children: vec![3],
+                },
+                CompoundNode {
+                    op: CompoundOp::Delay { frames: 64 }, // 5
+                    children: vec![4],
+                },
+                CompoundNode {
+                    op: CompoundOp::Delay { frames: 19 }, // 6
+                    children: vec![5],
+                },
+                CompoundNode {
+                    op: CompoundOp::Constant { level: 3 }, // 7
+                    children: Vec::new(),
+                },
+                CompoundNode {
+                    op: CompoundOp::Add, // 8
+                    children: vec![6, 7],
+                },
+            ],
+        }
+    }
+
+    /// Small deterministic LCG so the window fuzz is reproducible without a
+    /// rand dependency.
+    fn lcg(state: &mut u64) -> u64 {
+        *state = state
+            .wrapping_mul(6_364_136_223_846_793_005)
+            .wrapping_add(1_442_695_040_888_963_407);
+        *state
+    }
+
+    #[test]
+    fn bounded_materialization_matches_the_reference_slice() {
+        let g = boundary_rich_graph(50_000);
+        let reference = g.materialize().unwrap();
+        // Deterministic randomized windows of varied length and offset, plus
+        // the exact operation boundaries.
+        let mut state = 0x1234_5678_9abc_def0u64;
+        let mut checked = 0u32;
+        for _ in 0..400 {
+            let start = lcg(&mut state) % g.frames;
+            let remaining = g.frames - start;
+            let len = 1 + lcg(&mut state) % remaining.min(9000);
+            let got = g.materialize_range(start, len).unwrap();
+            let want = &reference[start as usize..(start + len) as usize];
+            assert_eq!(got.as_slice(), want, "window {start}+{len}");
+            checked += 1;
+        }
+        // Boundary-crossing windows: enveloped t_on=97, the two delay edges at
+        // 64 and 64+19, the decay end at 97+137+211, and the release start at
+        // frames/2.
+        for edge in [0u64, 64, 83, 97, 234, 445, 25_000] {
+            for pre in 0..8 {
+                let start = edge.saturating_sub(pre);
+                let len = 17u64.min(g.frames - start);
+                let got = g.materialize_range(start, len).unwrap();
+                assert_eq!(
+                    got.as_slice(),
+                    &reference[start as usize..(start + len) as usize]
+                );
+                checked += 1;
+            }
+        }
+        assert_eq!(checked, 456);
+    }
+
+    #[test]
+    fn bounded_materialization_rejects_out_of_extent_windows() {
+        let g = boundary_rich_graph(1000);
+        assert!(g.materialize_range(0, 1000).is_ok());
+        assert!(g.materialize_range(1000, 0).is_ok());
+        assert!(g.materialize_range(999, 2).is_err());
+        assert!(g.materialize_range(1001, 0).is_err());
+        assert!(g.materialize_range(u64::MAX, 1).is_err());
+    }
+
+    #[test]
+    fn bounded_scratch_is_independent_of_duration() {
+        let short = boundary_rich_graph(1_000);
+        let long = boundary_rich_graph(4_000_000);
+        let (sv_s, prof_s) = short.materialize_range_profiled(500, 64).unwrap();
+        let reference_short = short.materialize().unwrap();
+        assert_eq!(sv_s.as_slice(), &reference_short[500..564]);
+        // Same topology => same structural depth, regardless of extent.
+        let (_, prof_long) = long.materialize_range_profiled(3_000_000, 64).unwrap();
+        assert_eq!(prof_s.peak_depth, prof_long.peak_depth);
+        // Traversal work scales with the requested window, not the duration.
+        assert_eq!(prof_s.node_visits, prof_long.node_visits);
+        // Depth is bounded by the node count, never by the frame count.
+        assert!(prof_s.peak_depth as usize <= long.nodes.len());
+        // A 64-frame window cannot visit the whole graph per frame repeatedly;
+        // the per-frame cost is exactly the reachable edge count.
+        assert!(prof_s.node_visits <= 64 * long.nodes.len() as u64);
     }
 }

@@ -375,6 +375,7 @@ fn cmd_seal_verify(args: &[String]) -> Result<u8> {
                        learned-stateful-parse=SUPPORTED,\
                        learned-iterative-reprice=SUPPORTED,\
                        learned-entropy-reblock=SUPPORTED,\
+                       learned-entropy-seed=SUPPORTED,\
                        learned-expert-mux=SUPPORTED,\
                        learned-ema-rans=SUPPORTED,\
                        learned-decision-trace=SUPPORTED,\

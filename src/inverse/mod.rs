@@ -46,11 +46,13 @@
 //! evaluator. See `docs/INVERSE.md` for the accounting rules and the
 //! explicitly deferred candidate families.
 
+pub mod compound_propose;
 pub mod cost;
 pub mod frontier;
 pub mod observe;
 pub mod propose;
 pub mod search;
+pub mod seed;
 pub mod serialize;
 
 use crate::error::{Error, Result};

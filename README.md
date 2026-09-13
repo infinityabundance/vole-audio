@@ -140,30 +140,41 @@ candidate and adds the v2 residual codecs and mechanism families; the
 **speech campaign** (Seals S0–S8, v0.29.0–v0.37.0) took the exact learned
 portfolio past FLAC-8 on a frozen LibriSpeech-derived corpus; the **fourth-pass
 entropy/adaptation ladder** (E0–F0, v0.42.0–v0.53.0) added the signed/FSM range
-coders, the natural-gradient predictor and BGMC; and **Phase 6** is in progress,
-sealing one mechanism per release.
+coders, the natural-gradient predictor and BGMC; **Phase 6** is complete
+(v0.54.0–v0.69.0); the Phase-2 metadata/predictor seals (v0.70.0–v0.73.0)
+added parameter deltas, SRLA coefficient refinement, the widened natural-gradient
+ladder and Zstd-style integer metadata codes; and **Phase 7A** (entropy-seed
+proceduralization, v0.74.0) makes the inverse path discover a deterministic
+`Compound` explanation *blind* from samples and persists it as entropy-coded H
+state plus an entropy-coded exact residual.
 
-**Measured position (as of v0.57.0).** On the frozen real-speech corpus
+**Measured position (as of v0.73.0).** On the frozen real-speech corpus
 (LibriSpeech, CC BY 4.0), the exact learned portfolio is:
 
 | split | VOLE portfolio | FLAC-5 | FLAC-8 | record |
 | ----- | -------------- | ------ | ------ | ------ |
-| effectiveness (dev-clean, 8 clips) | **126 620 B** | 130 331 B | 129 713 B | 7/8 wins vs both |
-| held-out Mode C (test-clean, 8 clips) | **136 852 B** | 144 145 B | 142 714 B | 8/8 wins |
+| effectiveness (dev-clean, 8 clips) | **126 264 B** | 130 331 B | 129 713 B | 7/8 wins vs both |
+| held-out Mode C (test-clean, 8 clips) | **136 783 B** | 144 145 B | 142 714 B | 8/8 wins |
 
 That is a speech-corpus result on this host — not a general-audio flagship
 claim, and not a real-time/deadline claim.
 
-Phase 6 so far: `StatefulSyntaxParse` (v0.54.0), `IterativeReprice` (v0.55.0),
-`EntropyReblock` (v0.56.0 — it moved effectiveness 126 899 → 126 620 B and
-Mode C 137 362 → 136 852 B), and `SampleExpertMux` (v0.57.0).
+Phase 7 is the current program: **7A** entropy-seed proceduralization (this
+release), then **7B** `vole.audio.lossy.exp1` and **7C**
+`vole.audio.stream.voice.exp1`. Phase 7A's evidence is the
+`learned-entropy-seed` court: the blind `Compound` proposer (autocorrelation,
+harmonic projection, envelope/onset fitting, residual-guided decomposition — no
+fixture dispatch), entropy-coded H state via the Phase-2B metadata coders,
+entropy-coded exact residual via the residual-codec family, exact closure,
+bounded (random-access) materialization, determinism, and the mature learned
+predictor families competing in the same inverse decision.
 
 **Executable evidence today.** `cargo run -- court <name>`. The authoritative
 court list is the registry in `src/courts/mod.rs`; the aggregate courts are
 `all` (Phase M), `h2` (Phase H.2), `phase-n` (Phase N) and `learned` (Phase O),
 and every court emits an immutable receipt under `receipts/`. The exact seal
 expectation is checked by `vole-audio seal verify --receipts receipts`
-(59 rows at v0.57.0). The full per-phase evidence narrative — the Phase H/H.2
+(74 rows at v0.74.0). The full per-phase evidence narrative — the Phase H/H.2
 endpoint measurements, the Phase K/L inverse results, and every seal's numbers —
 lives in
 [CHANGELOG.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/CHANGELOG.md).
