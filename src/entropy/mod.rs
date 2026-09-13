@@ -64,6 +64,8 @@ pub mod pivot;
 #[cfg(feature = "std")]
 pub mod recoil;
 #[cfg(feature = "std")]
+pub mod repcode;
+#[cfg(feature = "std")]
 pub mod represent;
 #[cfg(feature = "std")]
 pub mod search;

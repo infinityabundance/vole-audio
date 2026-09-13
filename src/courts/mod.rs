@@ -152,6 +152,8 @@ pub mod learned_valuation_split;
 #[cfg(feature = "std")]
 pub(crate) mod measure;
 #[cfg(feature = "std")]
+pub mod metadata_codes;
+#[cfg(feature = "std")]
 pub mod negative;
 #[cfg(feature = "std")]
 pub mod page_batch_simd;
@@ -549,6 +551,14 @@ improve so the code-length proxy never overrides the physical artifact; measured
 LPC models, with the premise (that the lpc family moves the portfolio) reported honestly",
     ),
     (
+        "metadata-codes",
+        "Phase 2B (Zstd-style integer codes): a three-entry recent-value cache with two-bit references
+and a per-stream baseline with unsigned varint deltas, applied to real VOLE metadata streams
+(per-segment frame counts and per-segment predictor orders) extracted from fitted bidirectional-LPC
+objects; both codecs round-trip exactly and are measured against the fixed-width u32 spelling, with
+the honest context that these streams are only a few bytes inside sub-1% models",
+    ),
+    (
         "learned-speech-trace",
         "Seal S0 diagnostic: bit-for-bit trace of the frozen B1 FLAC-5 artifact (subframe kinds, orders, precision, shift, partition order, residual payload) beside the wired three-family Exp2 VOLE byte waterfall, on the real + Mode-C corpus",
     ),
@@ -754,6 +764,7 @@ pub fn run(name: &str, receipts_root: &Path) -> crate::error::Result<Verdict> {
         "pivot-side-streams" => pivot_side_streams::run(receipts_root),
         "learned-param-delta" => learned_param_delta::run(receipts_root),
         "learned-srla-refine" => learned_srla_refine::run(receipts_root),
+        "metadata-codes" => metadata_codes::run(receipts_root),
         "learned-exp2-transfer" => learned_exp2_transfer::run(receipts_root),
         "learned-residual-codec" => learned_residual_codec::run(receipts_root),
         "learned-residual-codec2" => learned_residual_codec2::run(receipts_root),
