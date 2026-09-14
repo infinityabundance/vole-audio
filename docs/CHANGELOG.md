@@ -520,6 +520,51 @@ repository-wide seal still requires a source-bound battery on the tagged tree.
   is unaffected (its result identity is unchanged); the whole library test suite
   passes (793 passed, 12 ignored).
 
+## Phase 7C.2-E — fractional-track ACELP (v0.79.0)
+
+A second, exp2-only excitation core (`src/voice/fcelp.rs`, wire **family 3**),
+offered *alongside* the 7C.2-B/D core and selected by exact bits against measured
+distortion. `exp1` and its frozen synthesis loop are untouched, and the
+regression court still reproduces `cc2addfa…` bit-exactly.
+
+* **Fractional long-term prediction.** The lag is resolved at quarter-sample
+  resolution by interpolating the reconstructed excitation with a fixed 4-tap
+  Lagrange filter. The control core is limited to one 16 kHz sample (62.5 µs);
+  `voice_bench pg` measures that its integer predictor adds only 0.66 dB over the
+  LPC residual on real speech.
+* **Interleaved-track innovation.** Four interleaved tracks of `k` signed pulses,
+  with the pulse count carried by the codebook **class** rather than a field. A
+  free pulse codebook with one shared gain has a structural flaw — adding a pulse
+  always adds energy, so it coarsens rather than refines. `voice_bench cmp`
+  measures it: the control core reaches 10.66 dB at one pulse per subframe and
+  *falls* to 3.83 dB at two.
+* **Measured A/B on the frozen effectiveness corpus** (600 frames,
+  `voice_bench exp2`), versus the 7C.2-B/D core: **+1.77 dB at 12 kbps** and
+  **+2.23 dB at 16 kbps**; versus scalar+noise, +3.27 dB and +3.26 dB. Synthetic
+  hard-rate ladder at those rates moved from 4.61/4.36 dB to 6.63/8.75 dB.
+* **Honest limitation.** Family 3 needs 189/253 bits per 20 ms frame, so it is
+  selected in **zero** frames at 3.2, 6, 8 and 9.2 kbps. The 12–16 kbps win is
+  real; the low-rate target is still open and belongs to the cheaper-side-
+  information seals.
+* **Repair en route.** `exp2`'s family-1 pulse budget was still derived from the
+  pre-7C.2-D per-subframe overhead model, so the encoder believed CELP did not
+  fit at 6–8 kbps. Deriving it from the exact serialised size lifted the
+  synthetic 8 kbps cell from 0.09 dB to 3.45 dB.
+* **Cost, disclosed.** The first working version breached the constitution
+  (encode p99 11 477 µs at 16 kbps). Three measured fixes — offer the core once
+  per frame instead of six times, hoist the perceptual filter into a precomputed
+  `vp::Weighting`, and a weights-passing `synthesize_w` — brought it to
+  **4805 µs**, inside the 5 ms budget, with no quality loss.
+* **Retained finding.** The long-term gain is *recursive* (it multiplies the
+  interpolated reconstructed excitation, so `out(g)` is a polynomial in `g`, not
+  linear). This invalidated a planned one-probe search shortcut and is pinned by
+  test.
+
+`voice.exp2` is still **not a live profile**; the numbers above are development-
+instrument measurements on the frozen effectiveness corpus, not court results.
+Library suite: 799 passed, 12 ignored, 0 failed. Both courts reproduce their
+frozen identities (`cc2addfa…`, `23eaf361…`).
+
 ## Current measured position
 
 Frozen real-speech **lossless** portfolio (effectiveness + held-out Mode C,

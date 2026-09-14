@@ -29,6 +29,7 @@
 use crate::error::{Error, Kind, Result};
 use crate::voice::VoiceState;
 use crate::voice::celp;
+use crate::voice::fcelp;
 use crate::voice::predict as vp;
 use crate::voice::residual;
 use crate::voice::vq;
@@ -249,6 +250,12 @@ pub enum Excitation {
     /// three-bit seed the encoder chooses. This is what makes a 64-bit (3.2
     /// kbps) frame expressible at all.
     Noise { gain: i32, seed: u8 },
+    /// 7C.2-E track ACELP: a **fractional** long-term predictor and an
+    /// interleaved-track algebraic innovation. Its pulse count is the codebook
+    /// class, so it spends no count field and cannot truncate a subframe. It is
+    /// a *second* core, selected against the others by exact bits and measured
+    /// distortion, never forced.
+    Ac3(fcelp::Params),
 }
 
 impl Excitation {
@@ -283,6 +290,20 @@ impl Excitation {
                             + count * usize::from(celp::SIGN_BITS))
             }
             Excitation::Noise { .. } => usize::from(FAMILY_BITS) + 6 + 3,
+            Excitation::Ac3(p) => {
+                let nsub = p.subframes.len();
+                let tail = nsub.saturating_sub(1);
+                let per = p.per_track.clamp(1, fcelp::MAX_PER_TRACK);
+                usize::from(FAMILY_BITS)
+                    + 2
+                    + usize::from(fcelp::LAG_Q_BITS)
+                    + 4 * tail
+                    + usize::from(celp::PITCH_GAIN_BITS)
+                    + 3 * tail
+                    + usize::from(celp::GAIN_BITS)
+                    + 4 * tail
+                    + nsub * fcelp::TRACKS * usize::from(fcelp::track_bits(per))
+            }
         }
     }
 
@@ -357,6 +378,67 @@ impl Excitation {
                 w.bits((*gain).clamp(0, celp::GAIN_LEVELS - 1) as u32, 6);
                 w.bits(u32::from(*seed) & 0x7, 3);
             }
+            Excitation::Ac3(p) => {
+                w.bits(3, FAMILY_BITS);
+                let per = p.per_track.clamp(1, fcelp::MAX_PER_TRACK);
+                w.bits((per - 1) as u32, 2);
+                if p.subframes.is_empty() {
+                    return;
+                }
+                // Fractional lag anchor + quarter-sample contour.
+                let mut lag = p.subframes[0].lag_q;
+                w.bits(
+                    (lag - fcelp::LAG_Q_MIN).clamp(0, (1 << fcelp::LAG_Q_BITS) - 1) as u32,
+                    fcelp::LAG_Q_BITS,
+                );
+                for sub in p.subframes.iter().skip(1) {
+                    let d = (sub.lag_q - lag).clamp(-8, 7);
+                    w.bits((d as u32) & 0xF, 4);
+                    lag = (lag + d).clamp(fcelp::LAG_Q_MIN, fcelp::LAG_Q_MAX);
+                }
+                // Pitch gain + deltas.
+                let mut pg = p.subframes[0].pitch_gain;
+                w.bits(
+                    pg.clamp(0, celp::PITCH_GAIN_LEVELS - 1) as u32,
+                    celp::PITCH_GAIN_BITS,
+                );
+                for sub in p.subframes.iter().skip(1) {
+                    let d = (sub.pitch_gain - pg).clamp(-4, 3);
+                    w.bits((d as u32) & 0x7, 3);
+                    pg = (pg + d).clamp(0, celp::PITCH_GAIN_LEVELS - 1);
+                }
+                // Innovation gain + deltas.
+                let mut g = p.subframes[0].gain;
+                w.bits(g.clamp(0, celp::GAIN_LEVELS - 1) as u32, celp::GAIN_BITS);
+                for sub in p.subframes.iter().skip(1) {
+                    let d = (sub.gain - g).clamp(-8, 7);
+                    w.bits((d as u32) & 0xF, 4);
+                    g = (g + d).clamp(0, celp::GAIN_LEVELS - 1);
+                }
+                // One index per track per subframe.
+                let tb = fcelp::track_bits(per);
+                for sub in &p.subframes {
+                    for t in 0..fcelp::TRACKS {
+                        let mut poss: Vec<usize> = Vec::new();
+                        let mut signs: Vec<bool> = Vec::new();
+                        for &(pos, positive) in &sub.pulses {
+                            let pos = usize::from(pos);
+                            if pos % fcelp::TRACKS == t {
+                                poss.push(pos / fcelp::TRACKS);
+                                signs.push(positive);
+                            }
+                        }
+                        if poss.len() != per {
+                            // Only a well-formed frame is written; a malformed one
+                            // is padded so the writer never panics. The encoder
+                            // only ever offers well-formed frames.
+                            w.bits(0, tb);
+                            continue;
+                        }
+                        w.bits(fcelp::rank_track(&poss, &signs) as u32, tb);
+                    }
+                }
+            }
         }
     }
 
@@ -423,6 +505,66 @@ impl Excitation {
                 let gain = r.bits(6)? as i32;
                 let seed = r.bits(3)? as u8;
                 Ok(Excitation::Noise { gain, seed })
+            }
+            3 => {
+                let nsub = celp::subframes(frame_len);
+                let per = r.bits(2)? as usize + 1;
+                if per > fcelp::MAX_PER_TRACK {
+                    return Err(Error::malformed(
+                        "voice.exp2 ACELP codebook class above the bound",
+                    ));
+                }
+                // Fractional lag anchor + contour.
+                let anchor = fcelp::LAG_Q_MIN + r.bits(fcelp::LAG_Q_BITS)? as i32;
+                let mut lags = vec![anchor.clamp(fcelp::LAG_Q_MIN, fcelp::LAG_Q_MAX)];
+                for _ in 1..nsub {
+                    let d = sign_extend(r.bits(4)?, 4);
+                    let prev = *lags.last().unwrap();
+                    lags.push((prev + d).clamp(fcelp::LAG_Q_MIN, fcelp::LAG_Q_MAX));
+                }
+                // Pitch gain + deltas.
+                let mut pgs = vec![r.bits(celp::PITCH_GAIN_BITS)? as i32];
+                for _ in 1..nsub {
+                    let d = sign_extend(r.bits(3)?, 3);
+                    let prev = *pgs.last().unwrap();
+                    pgs.push((prev + d).clamp(0, celp::PITCH_GAIN_LEVELS - 1));
+                }
+                // Innovation gain + deltas.
+                let mut gs = vec![r.bits(celp::GAIN_BITS)? as i32];
+                for _ in 1..nsub {
+                    let d = sign_extend(r.bits(4)?, 4);
+                    let prev = *gs.last().unwrap();
+                    gs.push((prev + d).clamp(0, celp::GAIN_LEVELS - 1));
+                }
+                // One index per track per subframe.
+                let tb = fcelp::track_bits(per);
+                let mut p = fcelp::Params {
+                    per_track: per,
+                    subframes: Vec::with_capacity(nsub),
+                };
+                for i in 0..nsub {
+                    let mut pulses: Vec<(u8, bool)> = Vec::with_capacity(per * fcelp::TRACKS);
+                    for t in 0..fcelp::TRACKS {
+                        let (local, signs) = fcelp::unrank_track(u64::from(r.bits(tb)?), per);
+                        for (k, &lp) in local.iter().enumerate() {
+                            let pos = t + lp * fcelp::TRACKS;
+                            if pos >= fcelp::SUB_LEN {
+                                return Err(Error::malformed(
+                                    "voice.exp2 ACELP track position out of range",
+                                ));
+                            }
+                            pulses.push((pos as u8, signs[k]));
+                        }
+                    }
+                    pulses.sort_unstable_by_key(|&(pos, _)| pos);
+                    p.subframes.push(fcelp::Subframe {
+                        lag_q: lags[i],
+                        pitch_gain: pgs[i],
+                        gain: gs[i],
+                        pulses,
+                    });
+                }
+                Ok(Excitation::Ac3(p))
             }
             _ => Err(Error::new(
                 Kind::Unsupported,
@@ -540,6 +682,10 @@ impl Frame2 {
                     .collect();
                 vp::synthesize_excitation(state, &k_q, width, 0, 0, &exc)
             }
+            Excitation::Ac3(params) => {
+                let shot = fcelp::reconstruct(params, frame_len)?;
+                shot.render(state, &k_q, width)
+            }
         };
         Ok(samples
             .iter()
@@ -558,6 +704,45 @@ pub const DECLARED_RATES: [(u32, usize); 6] = [
     (16_000, 320),
 ];
 
+/// Exact information bits a family-1 CELP frame costs at `count` pulses per
+/// subframe. This is the encoder's real budget authority for the control core:
+/// side information is frame-level (7C.2-D), so the old per-subframe overhead
+/// model no longer describes the wire and must not be used to derive `maxp`.
+fn celp_bits(nsub: usize, count: usize) -> usize {
+    let tail = nsub.saturating_sub(1);
+    usize::from(FAMILY_BITS)
+        + usize::from(celp::LAG_BITS)
+        + 4 * tail
+        + usize::from(celp::PITCH_GAIN_BITS)
+        + 3 * tail
+        + usize::from(celp::GAIN_BITS)
+        + 4 * tail
+        + usize::from(celp::COUNT_BITS)
+        + nsub * (usize::from(celp::position_bits(count)) + count * usize::from(celp::SIGN_BITS))
+}
+
+/// Diagnostic label for the excitation family a frame selects. Development
+/// instrument: it lets an experiment report *which* core won rather than only
+/// the resulting distortion.
+pub fn family_label(f: &Frame2) -> &'static str {
+    match f.excitation {
+        Excitation::Scalar { .. } => "scalar",
+        Excitation::Celp(_) => "celp",
+        Excitation::Noise { .. } => "noise",
+        Excitation::Ac3(_) => "acelp",
+    }
+}
+
+/// Innovation pulse count of a frame (total across subframes). Development
+/// instrument.
+pub fn pulse_count(f: &Frame2) -> usize {
+    match &f.excitation {
+        Excitation::Celp(p) => p.subframes.iter().map(|s| s.pulses.len()).sum(),
+        Excitation::Ac3(p) => p.subframes.iter().map(|s| s.pulses.len()).sum(),
+        _ => 0,
+    }
+}
+
 /// Sum of squared error between a frame and its reconstruction.
 fn mse(a: &[f64], b: &[f64]) -> f64 {
     a.iter().zip(b.iter()).map(|(x, y)| (x - y) * (x - y)).sum()
@@ -571,6 +756,26 @@ fn noise_gain_codes(rms: f64) -> [i32; 3] {
         centre.clamp(0, celp::GAIN_LEVELS - 1),
         (centre + 8).clamp(0, celp::GAIN_LEVELS - 1),
     ]
+}
+
+/// Which excitation cores the encoder is allowed to offer. The default offers
+/// every implemented core; the switches exist so a controlled A/B can attribute
+/// a measured delta to one mechanism instead of to the whole phase.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Options {
+    /// Offer the 7C.2-B/D free-combinatorial CELP core (family 1).
+    pub celp: bool,
+    /// Offer the 7C.2-E fractional-track ACELP core (family 3).
+    pub track_acelp: bool,
+}
+
+impl Default for Options {
+    fn default() -> Self {
+        Options {
+            celp: true,
+            track_acelp: true,
+        }
+    }
 }
 
 /// The `exp2` frame codec: hard-rate encoding and faithful decoding.
@@ -587,6 +792,16 @@ impl Exp2Codec {
     /// Encode one frame into at most `frame_bits` bits; returns the artifact and
     /// the exact information bit count.
     pub fn encode_frame(state: &VoiceState, frame: &[i32], frame_bits: usize) -> (Vec<u8>, usize) {
+        Self::encode_frame_with(state, frame, frame_bits, Options::default())
+    }
+
+    /// [`Exp2Codec::encode_frame`] with an explicit core selection.
+    pub fn encode_frame_with(
+        state: &VoiceState,
+        frame: &[i32],
+        frame_bits: usize,
+        sel: Options,
+    ) -> (Vec<u8>, usize) {
         let f: Vec<f64> = frame.iter().map(|&v| f64::from(v)).collect();
         let mut best: Option<(f64, usize, Frame2)> = None;
         let cands = vp::analyse(state, frame, 0);
@@ -594,7 +809,22 @@ impl Exp2Codec {
         let rms = (f.iter().map(|v| v * v).sum::<f64>() / f.len().max(1) as f64).sqrt();
         let noise_codes = noise_gain_codes(rms);
 
-        for c in cands.iter().take(3) {
+        // The fractional-track core is the most expensive analysis, so it is
+        // offered exactly once per frame: on the cheapest spectral tier (which is
+        // the only one that ever leaves room for pulses) and on the candidate the
+        // analysis itself ranks best by residual energy. Offering it on every
+        // candidate/tier combination multiplied its cost sixfold for a measured
+        // zero quality difference; the encode deadline is a constitution
+        // requirement, so the work has to be spent where it is used.
+        let best_cand = cands
+            .iter()
+            .take(3)
+            .enumerate()
+            .min_by(|a, b| a.1.energy.total_cmp(&b.1.energy))
+            .map(|(i, _)| i)
+            .unwrap_or(0);
+
+        for (ci, c) in cands.iter().take(3).enumerate() {
             let mut opts: Vec<(Vec<i32>, u8, Spectral)> = Vec::new();
             if c.model.order == vq::VQ_ORDER
                 && let Some(lsf) = crate::voice::lsf::reflections_to_lsf(&c.k_raw)
@@ -615,7 +845,7 @@ impl Exp2Codec {
                 },
             ));
 
-            for (k_q, width, spectral) in opts {
+            for (si, (k_q, width, spectral)) in opts.into_iter().enumerate() {
                 let model = vp::FrameModel { width, ..c.model };
                 // Every candidate is scored on its **round-tripped** frame, so the
                 // encoder measures exactly what the decoder will reconstruct. This
@@ -647,15 +877,46 @@ impl Exp2Codec {
                     }
                 };
 
-                // ACELP, within the remaining allowance.
-                let avail = frame_bits.saturating_sub(spectral.bits()) / nsub;
-                let maxp = celp::max_pulses_for_bits(avail);
-                if maxp > 0 {
+                // ACELP, within the remaining allowance. The pulse count is
+                // derived from the exact serialised size, so it tracks the real
+                // budget instead of a stale per-subframe overhead model.
+                let maxp = (0..=celp::MAX_PULSES)
+                    .filter(|&k| spectral.bits() + celp_bits(nsub, k) <= frame_bits)
+                    .max()
+                    .unwrap_or(0);
+                if sel.celp && spectral.bits() + celp_bits(nsub, maxp) <= frame_bits {
                     let (params, _d, _shot) = celp::analyse(state, &f, &model, &k_q, maxp);
                     consider(Frame2 {
                         spectral: spectral.clone(),
                         excitation: Excitation::Celp(params),
                     });
+                }
+
+                // 7C.2-E: the fractional-track core, offered against the control
+                // core rather than replacing it. Its pulse count is the codebook
+                // class, so each class is one candidate and the selector decides.
+                if sel.track_acelp && ci == best_cand && si == 0 {
+                    for per in 1..=fcelp::MAX_PER_TRACK {
+                        let dummy = fcelp::Params {
+                            per_track: per,
+                            subframes: (0..nsub)
+                                .map(|_| fcelp::Subframe {
+                                    lag_q: fcelp::LAG_Q_MIN,
+                                    pitch_gain: 0,
+                                    gain: 0,
+                                    pulses: Vec::new(),
+                                })
+                                .collect(),
+                        };
+                        if spectral.bits() + Excitation::Ac3(dummy).bits() > frame_bits {
+                            continue;
+                        }
+                        let (params, _d, _shot) = fcelp::analyse(state, &f, &model, &k_q, per);
+                        consider(Frame2 {
+                            spectral: spectral.clone(),
+                            excitation: Excitation::Ac3(params),
+                        });
+                    }
                 }
 
                 // Scalar residual across the gain ladder.
@@ -917,6 +1178,76 @@ mod tests {
             let snr = 10.0 * (sig / err).log10();
             println!("{bps} bps allowance {bits}: hard-rate SNR {snr:.2} dB over {frames} frames");
         }
+    }
+
+    fn sample_ac3(n: usize, per: usize) -> fcelp::Params {
+        let nsub = celp::subframes(n);
+        fcelp::Params {
+            per_track: per,
+            subframes: (0..nsub)
+                .map(|s| {
+                    let mut pulses: Vec<(u8, bool)> = Vec::new();
+                    for t in 0..fcelp::TRACKS {
+                        for k in 0..per {
+                            let pos = t + (k * 3 + s) * fcelp::TRACKS;
+                            pulses.push((pos as u8, (s + t + k) % 2 == 0));
+                        }
+                    }
+                    pulses.sort_unstable_by_key(|&(p, _)| p);
+                    fcelp::Subframe {
+                        lag_q: 160 + s as i32 * 3,
+                        pitch_gain: 8 + s as i32 * 2,
+                        gain: 16 + s as i32 * 3,
+                        pulses,
+                    }
+                })
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn ac3_frames_round_trip_and_are_wire_idempotent() {
+        for n in [160usize, 320] {
+            for per in 1..=fcelp::MAX_PER_TRACK {
+                let f = Frame2 {
+                    spectral: Spectral::Vq([1, 2, 3, 4]),
+                    excitation: Excitation::Ac3(sample_ac3(n, per)),
+                };
+                let (bytes, bits) = f.write();
+                assert_eq!(bits, f.bits(), "accounting must be exact");
+                assert!(bytes.len() * 8 >= bits && bytes.len() * 8 < bits + 8);
+                let back = Frame2::read(&bytes, n).unwrap();
+                assert_eq!(back, f, "the canonical frame must survive the wire");
+                // Wire idempotence, as for the control core.
+                let (bytes2, bits2) = back.write();
+                assert_eq!(bits2, back.bits());
+                assert_eq!(bytes2, bytes);
+                assert_eq!(Frame2::read(&bytes2, n).unwrap(), back);
+            }
+        }
+    }
+
+    #[test]
+    fn the_two_acelp_cores_are_distinct_wire_families() {
+        // The control core and the 7C.2-E core must be distinguishable on the
+        // wire, or a decoder could not tell which synthesis loop to run.
+        let control = Frame2 {
+            spectral: Spectral::Vq([0, 0, 0, 0]),
+            excitation: Excitation::Celp(sample_celp(320, 4)),
+        };
+        let track = Frame2 {
+            spectral: Spectral::Vq([0, 0, 0, 0]),
+            excitation: Excitation::Ac3(sample_ac3(320, 1)),
+        };
+        assert_eq!(family_label(&control), "celp");
+        assert_eq!(family_label(&track), "acelp");
+        assert_eq!(pulse_count(&control), 16);
+        assert_eq!(pulse_count(&track), 16);
+        let (bc, _) = control.write();
+        let (bt, _) = track.write();
+        assert_ne!(bc, bt);
+        assert_eq!(Frame2::read(&bc, 320).unwrap(), control);
+        assert_eq!(Frame2::read(&bt, 320).unwrap(), track);
     }
 
     #[test]

@@ -115,6 +115,93 @@ pub fn weight_gammas() -> (f64, f64) {
 ///
 /// The filter memory starts at zero for each call, so every candidate for the same
 /// span is scored on identical footing.
+/// One `exp1`/`exp2` synthesis' worth of weight-dependent state, built once and
+/// reused across candidate evaluations.
+///
+/// [`weighted_error_energy`] rebuilds the gamma ladders on every call, which is
+/// correct but wasteful when a search scores hundreds of candidates against the
+/// same spectrum. This type does the same arithmetic with the ladders
+/// precomputed, so a search can hoist the construction out of its inner loop.
+pub struct Weighting {
+    w: Vec<f64>,
+    wg1: Vec<f64>,
+    wg2: Vec<f64>,
+    order: usize,
+    passthrough: bool,
+}
+
+impl Weighting {
+    /// Build the measure for a quantised reflection vector at a ladder width.
+    pub fn new(k_q: &[i32], width: u8) -> Weighting {
+        let w = weights_of(k_q, width);
+        let (gamma1, gamma2) = weight_gammas();
+        Weighting::from_weights(&w, gamma1, gamma2)
+    }
+
+    /// The short-term synthesis weights this measure was built from.
+    pub fn weights(&self) -> &[f64] {
+        &self.w
+    }
+
+    /// Build the measure from explicit synthesis weights and filter gammas.
+    pub fn from_weights(w: &[f64], gamma1: f64, gamma2: f64) -> Weighting {
+        let order = w.len();
+        let passthrough = order == 0 || (gamma1 - gamma2).abs() < 1e-12;
+        let mut wg1 = vec![0.0f64; order];
+        let mut wg2 = vec![0.0f64; order];
+        let (mut a1, mut a2) = (gamma1, gamma2);
+        for j in 0..order {
+            wg1[j] = w[j] * a1;
+            wg2[j] = w[j] * a2;
+            a1 *= gamma1;
+            a2 *= gamma2;
+        }
+        Weighting {
+            w: w.to_vec(),
+            wg1,
+            wg2,
+            order,
+            passthrough,
+        }
+    }
+
+    /// The weighted error energy of `out` against `target`.
+    pub fn error(&self, target: &[f64], out: &[f64]) -> f64 {
+        if self.passthrough {
+            return target
+                .iter()
+                .zip(out.iter())
+                .map(|(x, y)| (x - y) * (x - y))
+                .sum();
+        }
+        let order = self.order;
+        let mut e_hist = vec![0.0f64; order];
+        let mut ew_hist = vec![0.0f64; order];
+        let mut acc = 0.0f64;
+        let n = target.len().min(out.len());
+        for i in 0..n {
+            let e = target[i] - out[i];
+            let mut num = e;
+            for (j, &h) in e_hist.iter().enumerate() {
+                num -= self.wg1[j] * h;
+            }
+            let mut ew = num;
+            for (j, &h) in ew_hist.iter().enumerate() {
+                ew += self.wg2[j] * h;
+            }
+            acc += ew * ew;
+            if order > 1 {
+                e_hist.copy_within(0..order - 1, 1);
+                ew_hist.copy_within(0..order - 1, 1);
+            }
+            e_hist[0] = e;
+            ew_hist[0] = ew;
+        }
+        acc
+    }
+}
+
+/// Perceptually weighted error energy under the shared weighting filter.
 pub fn weighted_error_energy(
     target: &[f64],
     out: &[f64],
@@ -132,38 +219,7 @@ pub fn weighted_error_energy(
             .map(|(x, y)| (x - y) * (x - y))
             .sum();
     }
-    let mut gamma1_pow = vec![0.0f64; order];
-    let mut gamma2_pow = vec![0.0f64; order];
-    let (mut a1, mut a2) = (gamma1, gamma2);
-    for j in 0..order {
-        gamma1_pow[j] = a1;
-        gamma2_pow[j] = a2;
-        a1 *= gamma1;
-        a2 *= gamma2;
-    }
-    let mut e_hist = vec![0.0f64; order];
-    let mut ew_hist = vec![0.0f64; order];
-    let mut acc = 0.0f64;
-    let n = target.len().min(out.len());
-    for i in 0..n {
-        let e = target[i] - out[i];
-        let mut num = e;
-        for (j, &wj) in w.iter().enumerate() {
-            num -= wj * gamma1_pow[j] * e_hist[j];
-        }
-        let mut ew = num;
-        for (j, &wj) in w.iter().enumerate() {
-            ew += wj * gamma2_pow[j] * ew_hist[j];
-        }
-        acc += ew * ew;
-        if order > 1 {
-            e_hist.copy_within(0..order - 1, 1);
-            ew_hist.copy_within(0..order - 1, 1);
-        }
-        e_hist[0] = e;
-        ew_hist[0] = ew;
-    }
-    acc
+    Weighting::from_weights(w, gamma1, gamma2).error(target, out)
 }
 
 /// Reflection coefficients of a `width`-bit quantiser have `shift = width - 1`.

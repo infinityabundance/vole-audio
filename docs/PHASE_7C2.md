@@ -94,7 +94,15 @@ excitation := family(2)
                             count(3)
                             nsub × { rank(ceil(log2 C(80,count))) signs(count) }
               family 2  noise:  gain(6) seed(3)
-              family 3  reserved (tcx / procedural, 7C.2-G/H)
+              family 3  acelp (7C.2-E):
+                            class(2)                          # pulses per track − 1
+                            lag_q_anchor(11)                  # quarter-sample lag
+                            (nsub−1) × lag_q_delta(4)         # ±2 samples, clamped
+                            pitch_gain(5)
+                            (nsub−1) × pitch_gain_delta(3)
+                            gain(6)
+                            (nsub−1) × gain_delta(4)
+                            nsub × TRACKS × rank(ceil(log2 C(20,k)·2^k))
 ```
 
 * A CELP frame **carries no residual length**: its length follows from the
@@ -105,6 +113,15 @@ excitation := family(2)
   innovation gain plus 4-bit deltas, and one frame pulse count. The deltas clamp,
   so the wire is a *canonicalising* map: writing a frame and reading it back
   yields a fixed point, asserted by the `celp_wire_is_idempotent…` test.
+* The **fractional-track core** (family 3, 7C.2-E) carries its pulse count as the
+  codebook class, not as a field, and places pulses on four interleaved tracks
+  (positions ≡ track mod 4), at most `class + 1` per track, each with a sign
+  carried in the track index. The position rank is therefore over
+  `C(20,k)·2^k` for each track rather than over `C(80,count)` for the whole
+  subframe. Independent tracks are what stop a single shared gain from
+  *coarsening* the innovation as pulses are added (measured below), and an
+  implicit class is what stops one subframe's pulse count from truncating
+  another's.
 * `pb = ceil(log2 C(80, count))`; pulse sets are canonical (ascending positions).
 * The exact information bit count of a `Frame2` is `Frame2::bits()` and must
   equal the writer's count (`exp2.rs` asserts this in test).
@@ -115,8 +132,13 @@ excitation := family(2)
 | --- | --- | --- |
 | HPE-ACELP | voiced / quasi-periodic | fractional multi-tap adaptive excitation + track-structured algebraic innovation |
 | HPE-NOISE | unvoiced, breath, fricatives | deterministic shaped stochastic excitation + sparse correction |
-| HPE-TCX | transients, mixed | LPC-conditioned MDCT/PVQ excitation (reuse existing machinery) |
-| HPE-PR | 3.2–9.2 kbps | transmitted structural base + zero-bit predicted/procedural refinement + optional correction |
+| HPE-TCX | transients, mixed | LPC-conditioned MDCT/PVQ excitation (reuse existing machinery) — 7C.2-G |
+| HPE-PR | 3.2–9.2 kbps | transmitted structural base + zero-bit predicted/procedural refinement + optional correction — 7C.2-H |
+
+Implemented excitation **families** in the wire (`src/voice/exp2.rs`): family 0
+scalar, family 1 free-combinatorial CELP (7C.2-B/D), family 2 noise, family 3
+fractional-track ACELP (7C.2-E). The remaining cores become further families
+without disturbing the selector.
 
 Classification proposes candidates. **The selector is exact serialised bits
 versus measured reconstruction distortion**, with the hard rate ceiling as a
@@ -216,7 +238,7 @@ now, before any `exp2` codec work, so the challenger court cannot be tuned.
 | 7C.2-B | bit-accurate mode-specific serializer | **implemented** (`src/voice/exp2.rs`): bit writer/reader, tiered spectrum, CELP and scalar families, exact round-trip and exact bit accounting, and a **decode path proven faithful** to the shared synthesis loop for both families; floor removed. Not yet a live profile |
 | 7C.2-C | hard-rate fallback architecture | **complete**: a low-information noise core, `Frame2::minimal` legal at 64 bits, and `Exp2Codec::encode_frame` — a hard-rate encoder that never exceeds the frame allowance (no `OVERSHOOT_LIMIT`). Measured on a synthetic speech-like signal over 40 frames per rate: 3.2 kbps 0.00 dB, 6 kbps 0.07, 8 kbps 0.07, 9.2 kbps 3.90, 12 kbps 4.89, 16 kbps 5.45 dB SNR. The 6–8 kbps cells collapse to the noise core because the per-subframe **23-bit overhead** does not fit 120–160 bits: this is the measured motivation for 7C.2-D |
 | 7C.2-D | frame pitch anchor + contours, gain prediction, implicit pulse count | **implemented** (`src/voice/exp2.rs`): CELP side information is one frame lag anchor (9 b) + 4-bit contour, one pitch gain (5 b) + 3-bit deltas, one innovation gain (6 b) + 4-bit deltas, and one frame pulse count (3 b). Per-subframe overhead fell from 23 b to ~6 b, a **60 b/frame** reduction at 320 samples. The wire is now a canonicalising map and the property asserted is idempotence plus decode fidelity to the read-back shot (not equality to pre-wire search parameters). Ladder over a synthetic speech-like signal, 40 frames/rate: 3.2 kbps 0.00 dB, 6 kbps 0.09, 8 kbps 0.09, 9.2 kbps 3.60, 12 kbps 4.61, 16 kbps 4.36. 6–8 kbps still collapse to the noise core, and 16 kbps regressed (5.45 → 4.36) because a single shared pulse count cannot satisfy subframes that want different counts: this is precisely the tension 7C.2-E removes by spreading side information at its intrinsic rate rather than at the subframe rate |
-| 7C.2-E | fractional multi-tap LTP + track ACELP + joint R–D search | CELP beats the scalar path in complete bits *and* perceptual quality |
+| 7C.2-E | fractional multi-tap LTP + track ACELP + joint R–D search | **implemented** (`src/voice/fcelp.rs`, wire family 3). Quarter-sample lag via a fixed 4-tap Lagrange interpolation of the reconstructed excitation; four interleaved tracks of `k` signed pulses, with the pulse count carried by the codebook class instead of a field; joint per-subframe selection where the pitch is scored through the real synthesis loop and the innovation gain is closed-loop. **Measured A/B on the frozen effectiveness corpus (600 frames, `voice_bench exp2`):** vs the 7C.2-B/D CELP core, +1.77 dB at 12 kbps and +2.23 dB at 16 kbps; vs the scalar+noise baseline +3.27 dB and +3.26 dB. The core wins 271/600 frames at 12 kbps and 279/600 at 16 kbps. **It is never selected at ≤ 9.2 kbps**, because its side information does not fit those allowances: that is the measured motivation for 7C.2-F/G/H. Synthetic hard-rate ladder moved from 4.61/4.36 dB to **6.63/8.75 dB** at 12/16 kbps. Encode p99 was 11 477 µs when first written; after three measured cost fixes it is **4805 µs**, inside the 5 ms constitution. Two findings are retained as tests: the long-term gain is *recursive* (the output is a polynomial in the gain, not linear), and the class field removes the shared-count truncation flaw |
 | 7C.2-F | voicing-dependent allocation + noise excitation | held-out RD gain; no dev-only promotion |
 | 7C.2-G | TCX/PVQ escape mode | selected naturally by exact RD; improves mixed/transient cells |
 | 7C.2-H | procedural excitation + zero-bit predicted refinement | valid 6–9.2 kbps points improve perceptual metrics |
@@ -237,7 +259,64 @@ uncertainty reported. A weaker but honest outcome (beating Opus/EVS while
 measuring that Lyra 3.2 remains ahead) is acceptable and preferred to a nominal
 three-way "win" obtained by manipulating operating points.
 
-## 10. Non-claims
+## 11. Seal 7C.2-E — measured record
+
+**Mechanism 1: fractional long-term prediction.** The control core resolves the
+pitch lag to one 16 kHz sample (62.5 µs). At a 200 Hz voice the period is 80
+samples, so a one-sample lag error is a 1.25 % period error and the predictor
+phase drifts across the 5 ms subframe. `voice_bench pg` measures the
+consequence: the integer long-term predictor adds only **0.66 dB** over the LPC
+residual on real speech. Family 3 resolves the lag at **quarter-sample**
+resolution by interpolating the reconstructed excitation with a fixed 4-tap
+Lagrange filter (`INTERP`), whose coefficients are a partition of unity so the
+integer fraction reduces exactly to the integer tap (asserted by test).
+
+**Mechanism 2: interleaved tracks instead of a free pulse codebook.** A free
+`count`-subset of 80 positions with a single shared gain has a structural
+flaw: every pulse has unit magnitude times that one gain, so adding a pulse
+always adds energy. It cannot refine, it can only coarsen. `voice_bench cmp`
+measures it directly — the control core reaches **10.66 dB** with one pulse per
+subframe and *falls* to **3.83 dB** with two. Family 3 spreads the innovation
+over four interleaved tracks by construction, carries the sign inside each track
+index, and takes its pulse count from the codebook class, so it spends no count
+field and cannot truncate a subframe.
+
+**Mechanism 3: joint selection.** Each subframe's pitch candidate is scored with
+the adaptive term synthesised through the real loop, and the winning innovation
+set's gain is re-selected by closed-loop synthesis rather than by the
+correlation proxy. The selector remains exact bits vs measured distortion: the
+core is offered alongside the control core, never forced.
+
+**A finding that changed the design.** The synthesis loop is *recursive* in the
+long-term gain: the gain multiplies the interpolated reconstructed excitation, so
+it sits inside the predictor's own feedback. `out(g)` is therefore a polynomial
+in `g`, not `zir + g·q`, and the cheap one-probe-per-lag shortcut is invalid. The
+analysis therefore synthesises each gain candidate explicitly, which is the
+dominant cost and is why the lag set is kept focused. Asserted by
+`the_long_term_gain_is_recursive_so_scoring_must_resynthesise`.
+
+**A repair found en route.** `exp2`'s family-1 pulse budget was still derived
+from the pre-7C.2-D per-subframe overhead model, so the encoder believed CELP did
+not fit at 6–8 kbps and fell back to the noise core. Deriving `maxp` from the
+exact serialised size lifted the synthetic 8 kbps cell from 0.09 dB to 3.45 dB.
+The `celp::max_pulses_for_bits` helper is unchanged, because `exp1` still uses
+it.
+
+**Cost, disclosed.** The first working version breached the constitution: encode
+p99 11 477 µs at 16 kbps. Three measured fixes brought it to 4805 µs: offering
+the core once per frame (best-residual candidate × cheapest spectral tier)
+instead of six times, hoisting the perceptual weighting filter into a
+precomputed `vp::Weighting`, and a weights-passing `synthesize_w` so the search
+does not rebuild the short-term filter per candidate. Quality was unaffected. All
+declared rates are within the 5 ms budget.
+
+**What it does not do.** Family 3 needs 189 bits (VQ spectrum + one pulse per
+track) and 253 bits (two per track) per 20 ms frame. It therefore cannot appear at
+3.2, 6, 8 or 9.2 kbps, and the measured A/B shows it is selected in **zero**
+frames there. The 12–16 kbps win is real and measured; the low-rate target is
+still open and belongs to the cheaper-side-information seals.
+
+## 12. Non-claims
 
 * `exp1` remains the control; its wire format is untouched.
 * The serializer in `src/voice/exp2.rs` is not yet a live profile: no court

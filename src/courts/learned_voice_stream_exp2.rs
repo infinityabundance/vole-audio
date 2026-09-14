@@ -122,7 +122,8 @@ fn integrated_quality_delta(vole: &[(f64, f64)], competitor: &[(f64, f64)]) -> O
     }
     let lo = v[0].0.max(c[0].0);
     let hi = v[v.len() - 1].0.min(c[c.len() - 1].0);
-    if !(lo < hi) {
+    // `!(lo < hi)` also rejects a NaN bound, which `lo >= hi` would not.
+    if !matches!(lo.partial_cmp(&hi), Some(std::cmp::Ordering::Less)) {
         return None;
     }
     let mut knots: Vec<f64> = vec![lo, hi];

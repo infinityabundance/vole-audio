@@ -20,6 +20,7 @@
 
 pub mod celp;
 pub mod exp2;
+pub mod fcelp;
 pub mod impair;
 pub mod lsf;
 pub mod plc;

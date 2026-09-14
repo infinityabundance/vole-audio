@@ -12,10 +12,12 @@
 //! cargo run --release --example voice_bench -- 320 1      # one shape
 //! cargo run --release --example voice_bench -- diag       # predictor RD curve
 //! cargo run --release --example voice_bench -- celp       # excitation coder RD
+//! cargo run --release --example voice_bench -- exp2       # voice.exp2 core A/B
 //! cargo run --release --example voice_bench -- dump       # write case WAVs
 //! ```
 
 use vole_audio::learned::corpus_real;
+use vole_audio::voice::exp2::{self, Exp2Codec, Options};
 use vole_audio::voice::predict as vp;
 use vole_audio::voice::{VoiceConfig, VoiceDecoder, VoiceEncoder};
 
@@ -227,6 +229,10 @@ fn main() {
             coder_compare(160);
             return;
         }
+        Some("exp2") => {
+            exp2_probe(args.get(1).map(String::as_str));
+            return;
+        }
         _ => {}
     }
     let filter: Option<(u32, u8)> = if args.len() >= 2 {
@@ -290,6 +296,111 @@ fn main() {
                  enc p99 {:>5} us max {:>5} us | model {model_bytes:>7} res {residual_bytes:>7} B vq {vq_frames:>4}",
                 percentile(&encode_us, 99.0),
                 encode_us.last().copied().unwrap_or(0)
+            );
+        }
+    }
+}
+
+/// `voice.exp2` core A/B on real speech: the same held-aside code path with the
+/// 7C.2-E fractional-track core offered and withheld, at every declared rate.
+/// Development instrument; the court remains the authority.
+fn exp2_probe(filter: Option<&str>) {
+    let cases = cases();
+    let mut source: Vec<i32> = Vec::new();
+    for (_, s) in &cases {
+        source.extend_from_slice(s);
+    }
+    const FRAME: usize = 320;
+    let configs: [(&str, Options); 3] = [
+        (
+            "scalar+noise      ",
+            Options {
+                celp: false,
+                track_acelp: false,
+            },
+        ),
+        (
+            "+celp (7C.2-B/D)  ",
+            Options {
+                celp: true,
+                track_acelp: false,
+            },
+        ),
+        (
+            "+acelp (7C.2-E)   ",
+            Options {
+                celp: true,
+                track_acelp: true,
+            },
+        ),
+    ];
+    println!(
+        "voice.exp2 core A/B over {} samples of frozen effectiveness speech",
+        source.len()
+    );
+    println!("  rate | configuration       | SNR mean | bits/frame | enc p99 | families (frames)");
+    for (bps, bits) in exp2::DECLARED_RATES {
+        if let Some(f) = filter
+            && f != bps.to_string()
+        {
+            continue;
+        }
+        for (label, opts) in configs {
+            let mut state = vp::VoiceState::new();
+            let mut sig = 0.0f64;
+            let mut err = 0.0f64;
+            let mut used = 0usize;
+            let mut frames = 0usize;
+            let mut per_family: std::collections::BTreeMap<&str, usize> =
+                std::collections::BTreeMap::new();
+            let mut pulses = 0usize;
+            let mut enc_us: Vec<i64> = Vec::new();
+            for chunk in source.chunks(FRAME) {
+                if chunk.len() < FRAME {
+                    break;
+                }
+                let enc_state = state.clone();
+                let t0 = std::time::Instant::now();
+                let (bytes, nbits) = Exp2Codec::encode_frame_with(&enc_state, chunk, bits, opts);
+                enc_us.push(t0.elapsed().as_micros() as i64);
+                assert!(
+                    nbits <= bits,
+                    "{bps}: {nbits} bits over the {bits}-bit allowance"
+                );
+                used += nbits;
+                if let Ok(f) = exp2::Frame2::read(&bytes, FRAME) {
+                    *per_family.entry(exp2::family_label(&f)).or_default() += 1;
+                    pulses += exp2::pulse_count(&f);
+                }
+                let out = Exp2Codec::decode_frame(&mut state, &bytes, FRAME).unwrap();
+                let f: Vec<f64> = chunk.iter().map(|&v| f64::from(v)).collect();
+                let o: Vec<f64> = out.iter().map(|&v| f64::from(v)).collect();
+                sig += f.iter().map(|v| v * v).sum::<f64>();
+                err += f
+                    .iter()
+                    .zip(&o)
+                    .map(|(a, b)| (a - b) * (a - b))
+                    .sum::<f64>();
+                frames += 1;
+            }
+            enc_us.sort_unstable();
+            let snr = if err > 0.0 {
+                10.0 * (sig / err).log10()
+            } else {
+                f64::NAN
+            };
+            let fam: String = per_family
+                .iter()
+                .map(|(k, v)| format!("{k} {v}"))
+                .collect::<Vec<_>>()
+                .join(", ");
+            println!(
+                "  {:>4} | {label} | {:>8.2} | {:>10.1} | {:>6}us | {fam} (pulses/frame {:.1})",
+                bps,
+                snr,
+                used as f64 / frames.max(1) as f64,
+                percentile(&enc_us, 99.0),
+                pulses as f64 / frames.max(1) as f64
             );
         }
     }
