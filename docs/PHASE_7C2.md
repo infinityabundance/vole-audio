@@ -247,7 +247,7 @@ now, before any `exp2` codec work, so the challenger court cannot be tuned.
 | 7C.2-E | fractional multi-tap LTP + track ACELP + joint R–D search | **implemented** (`src/voice/fcelp.rs`, wire family 3). Quarter-sample lag via a fixed 4-tap Lagrange interpolation of the reconstructed excitation; four interleaved tracks of `k` signed pulses, with the pulse count carried by the codebook class instead of a field; joint per-subframe selection where the pitch is scored through the real synthesis loop and the innovation gain is closed-loop. **Measured A/B on the frozen effectiveness corpus (600 frames, `voice_bench exp2`):** vs the 7C.2-B/D CELP core, +1.77 dB at 12 kbps and +2.23 dB at 16 kbps; vs the scalar+noise baseline +3.27 dB and +3.26 dB. The core wins 271/600 frames at 12 kbps and 279/600 at 16 kbps. **It is never selected at ≤ 9.2 kbps**, because its side information does not fit those allowances: that is the measured motivation for 7C.2-F/G/H. Synthetic hard-rate ladder moved from 4.61/4.36 dB to **6.63/8.75 dB** at 12/16 kbps. Encode p99 was 11 477 µs when first written; after three measured cost fixes it is **4805 µs**, inside the 5 ms constitution. Two findings are retained as tests: the long-term gain is *recursive* (the output is a polynomial in the gain, not linear), and the class field removes the shared-count truncation flaw |
 | 7C.2-F | voicing-dependent allocation + noise excitation | **implemented, not promoted; two negative results recorded.** (a) The **nested spectral operating point** (`Spectral::Vq0`, tier 2, 18 bits vs 34, saving 16 bits/frame) is legal because the MSVQ is embedded, but it is selected in **zero frames at every declared rate** — the coarse spectrum's distortion penalty exceeds the excitation the freed bits buy. Kept in-tree at zero cost when unused; it is a prerequisite for 7C.2-H. (b) **Diagnosis: at 3.2 kbps the codec outputs near-silence** (SNR 0.00 dB), because for an *uncorrelated* excitation — exactly what the stochastic fallback produces — MSE is minimised by gain → 0, so the selector prefers silence to correctly-levelled shaped noise. A short-time envelope term (`envelope_penalty`, weight `ENV_WEIGHT`) was implemented as §10 requires and **measured and disabled**: at weight 2.0 waveform SNR fell at 6/8/9.2/16 kbps and rose only at 12 kbps. Promotion on dev-only evidence is forbidden, so the weight ships at 0.0 |
 | 7C.2-G | TCX/PVQ escape mode | **implemented, measured, disabled; negative result recorded.** A new voice-track primitive `src/voice/pvq.rs` (orthonormal DCT-IV + PVQ, no dependency on the general-audio `src/lossy/` track) backs an escape sub-mode of the fallback family, so ACELP frames pay zero bits for it. On the frozen development corpus it is selected in **zero frames at every declared rate** — bits and SNR are identical with and without it — and it costs up to **8864 µs** encode p99 at 16 kbps against the 5 ms constitution. The mechanism is verified *faithful* by test (`the_escape_core_reconstructs_its_own_quantisation`), so the negative is a real measurement. The diagnosis in §13 ties it to 7C.2-F: with MSE as the objective, any reconstruction with correlation ρ < 0.5 scores worse than silence |
-| 7C.2-H | procedural excitation + zero-bit predicted refinement | **four steps landed.** (1) The perceptual arbiter (§14) and (2) the **fitted selector weight** (§15) — mean MOS-LQO 1.250 → **1.416 (+13 %)**, with **SNR and MOS disagreeing in sign** at 6 and 9.2 kbps, the phase's most important result, which also reverses 7C.2-G's verdict. (3) **Procedural excitation** (§16): implemented, tested, packet-local by construction, selected in **zero frames**; shipped disabled. (4) **The prediction split** (§17): the proposed re-balance of short-term against long-term prediction order is **refuted by measurement** — total prediction gain is maximized at the highest short-term order (19.62 dB) and a finer spectrum does not change it. That closes the prediction direction and confirms the remaining lever is quantisation efficiency. Zero-bit predicted refinement still to come |
+| 7C.2-H | procedural excitation + zero-bit predicted refinement | **five steps landed.** (1) The perceptual arbiter (§14) and (2) the **fitted selector weight** (§15) — mean MOS-LQO 1.250 → **1.416 (+13 %)**, with **SNR and MOS disagreeing in sign** at 6 and 9.2 kbps, the phase's most important result, which also reverses 7C.2-G's verdict. (3) **Procedural excitation** (§16): implemented, tested, packet-local by construction, selected in **zero frames**; shipped disabled. (4) **The prediction split** (§17): the proposed re-balance of short-term against long-term prediction order is **refuted** — total prediction gain is maximized at the highest short-term order (19.62 dB). (5) **Scalar rate resolution** (§18): the idle channel is **not** a defect fixable by a finer scalar gain ladder — the fine ladder used 41 more bits per frame at 16 kbps and scored 0.082 MOS worse. That closes the under-spend hypothesis and points at entropy coding as the cheap-bits lever. Zero-bit predicted refinement still to come |
 | 7C.2-I | packet-reset entropy coding of remaining uncertainty | artifact shrinks without quality or recovery regression |
 | 7C.2-J | frozen causal learned refinement experiment | promote only if a gain survives model size, decode p99, memory and the held-out court |
 | 7C.2-K | final listening + impairment seal | superiority claim permitted **only** here |
@@ -703,7 +703,50 @@ The remaining levers are **quantisation efficiency** — the spectral envelope (
 and packet-reset entropy coding (7C.2-I) — not more excitation structure and not a
 re-balanced predictor.
 
-## 18. Non-claims
+## 18. Scalar rate resolution — 7C.2-H, fifth step (hypothesis refuted)
+
+§14 measured that the encoder leaves up to **53 %** of the frame allowance idle at
+6–9.2 kbps, and that the scalar residual is selected in almost no frames. The
+evident reading was a defect: `residual::encode_best` emits the *smallest* artifact
+for whatever symbols the quantiser produced, and the scalar candidate swept only
+seven gain codes, so the path had almost no rate resolution and could not spend the
+budget it was given. The test was to extend the sweep to `GAIN_MIN..=60` in steps
+of four (17 values, ≈2.4× the candidates).
+
+**It is refuted, and the refutation is unusually clean.**
+
+```text
+rate      SNR before → after     ViSQOL before → after
+8 kbps    +0.73 → +0.79          1.383 → 1.357
+9.2 kbps  +1.22 → +1.56          1.408 → 1.242
+12 kbps   +4.77 → +3.83          1.414 → 1.328
+16 kbps   +4.80 → +5.47          1.428 → 1.333
+```
+
+Waveform SNR *rises* at 9.2 and 16 kbps while ViSQOL *falls* by 0.03–0.17 MOS
+across 8–16 kbps, and encode p99 rises to 6315 µs at 16 kbps. Another SNR/MOS
+divergence, in the opposite direction from §15's — and decisive, because ViSQOL is
+the arbiter.
+
+The decisive detail is the **scalar-only** configuration, which has no other core
+to hide behind:
+
+```text
+16 kbps, scalar+noise only:  147.3 bits, 1.211 MOS  (seven gains)
+                             188.4 bits, 1.129 MOS  (fine ladder)
+```
+
+Given more rate resolution, the scalar path spends 41 more bits per frame and
+scores **0.082 MOS worse**. So the idle channel is not a defect that scalar rate
+resolution can fix: the encoder is *right* to decline those bits. The under-spend
+is a symptom of the scalar quantiser's quality, not of its search.
+
+**Verdict: rejected and reverted**, and the v0.85.0 baseline reproduces exactly
+(8/9.2/12/16 kbps → 1.383/1.408/1.414/1.428 MOS on 121.2/139.9/214.6/251.8 bits).
+The lever it points at is the *opposite* of spending more bits: make the existing
+bits cheaper, which is 7C.2-I's packet-reset entropy coding.
+
+## 19. Non-claims
 
 * `exp1` remains the control; its wire format is untouched.
 * The serializer in `src/voice/exp2.rs` is not yet a live profile: no court

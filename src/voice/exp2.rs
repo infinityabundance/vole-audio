@@ -1371,6 +1371,21 @@ impl Exp2Codec {
                 }
 
                 // Scalar residual across the gain ladder.
+                //
+                // The gain is the scalar path's only rate control: the quantiser
+                // step sets how many residual symbols survive, and
+                // `residual::encode_best` then emits the smallest artifact for
+                // those symbols. A *finer* ladder was implemented and measured, on
+                // the theory that a coarse one leaves the frame allowance unspent
+                // (see §14). It is **rejected**: extending the sweep to
+                // `GAIN_MIN..=60` step 4 raised waveform SNR at 9.2 kbps (+0.34)
+                // and 16 kbps (+0.67) but lowered ViSQOL by 0.03–0.17 MOS across
+                // 8–16 kbps, and pushed encode p99 to 6315 µs at 16 kbps.
+                // Remarkably the scalar-only configuration used *more* bits and
+                // scored *worse* (1.211 → 1.129 at 16 kbps), so the idle channel is
+                // not a defect that scalar rate resolution can fix: the encoder is
+                // right to decline those bits. The cheap-bits lever is entropy
+                // coding (7C.2-I), not more scalar candidates.
                 for gain in [-4, 4, 12, 20, 28, 36, 44] {
                     let s = vp::close_loop_gains(
                         state,

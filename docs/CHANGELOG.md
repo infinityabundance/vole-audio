@@ -835,6 +835,42 @@ predictor.
 Diagnostic only: no codec behaviour changed, and the regression court is
 unaffected. Voice tests: 100 passed.
 
+## Phase 7C.2-H (fifth step) — the idle channel is not a scalar-search defect (v0.86.0)
+
+§14 measured that the encoder leaves up to **53 %** of the frame allowance idle at
+6–9.2 kbps, and that the scalar residual is selected in almost no frames. The
+evident reading was a defect: `residual::encode_best` emits the *smallest* artifact
+for the symbols the quantiser produced, and the scalar candidate swept only seven
+gain codes — the path's only rate control — so it could not spend the budget it was
+given. The test was to extend the sweep to `GAIN_MIN..=60` step 4 (17 values).
+
+**Refuted, and unusually cleanly.**
+
+| rate | SNR before → after | ViSQOL before → after |
+| ---- | ------------------ | --------------------- |
+| 8 kbps | +0.73 → +0.79 | 1.383 → 1.357 |
+| 9.2 kbps | +1.22 → +1.56 | 1.408 → **1.242** |
+| 12 kbps | +4.77 → +3.83 | 1.414 → 1.328 |
+| 16 kbps | +4.80 → +5.47 | 1.428 → 1.333 |
+
+Waveform SNR *rises* at 9.2 and 16 kbps while ViSQOL *falls* by 0.03–0.17 MOS
+across 8–16 kbps, and encode p99 reaches 6315 µs at 16 kbps. Another SNR/MOS
+divergence, in the opposite direction from v0.83.0's — and decisive, since ViSQOL
+is the arbiter.
+
+The decisive detail is the **scalar-only** configuration, which has no other core
+to hide behind: at 16 kbps it moves from 147.3 bits / 1.211 MOS to 188.4 bits /
+**1.129 MOS**. Given more rate resolution the scalar path spends 41 more bits per
+frame and scores 0.082 MOS **worse**. The idle channel is therefore not a defect
+that scalar rate resolution can fix — the encoder is right to decline those bits,
+and the under-spend is a symptom of the scalar quantiser's *quality*, not its
+search.
+
+**Rejected and reverted**; the v0.85.0 baseline reproduces exactly
+(8/9.2/12/16 kbps → 1.383/1.408/1.414/1.428 MOS on 121.2/139.9/214.6/251.8 bits).
+The lever it points at is the opposite of spending more bits: make the existing
+bits cheaper, which is 7C.2-I's packet-reset entropy coding.
+
 ## Current measured position
 
 Frozen real-speech **lossless** portfolio (effectiveness + held-out Mode C,
