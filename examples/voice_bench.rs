@@ -318,6 +318,27 @@ fn opts(celp: bool, track_acelp: bool, tcx: bool) -> Options {
         celp,
         track_acelp,
         tcx,
+        proc: true,
+        env_weight: exp2::DEFAULT_ENV_WEIGHT,
+    }
+}
+
+/// The same, with the procedural core withheld entirely.
+fn opts_no_proc(celp: bool, track_acelp: bool, tcx: bool) -> Options {
+    Options {
+        proc: false,
+        ..opts(celp, track_acelp, tcx)
+    }
+}
+
+/// The procedural core alone. Separates "the mechanism is weak" from "the
+/// selector chose it away", which a whole-stack row cannot distinguish.
+fn opts_proc_only() -> Options {
+    Options {
+        celp: false,
+        track_acelp: false,
+        tcx: false,
+        proc: true,
         env_weight: exp2::DEFAULT_ENV_WEIGHT,
     }
 }
@@ -332,10 +353,12 @@ fn exp2_probe(filter: Option<&str>) {
         source.extend_from_slice(s);
     }
     const FRAME: usize = 320;
-    let configs: [(&str, Options); 4] = [
-        ("scalar+noise      ", opts(false, false, false)),
-        ("+celp (7C.2-B/D)  ", opts(true, false, false)),
-        ("+acelp (7C.2-E)   ", opts(true, true, false)),
+    let configs: [(&str, Options); 6] = [
+        ("scalar+noise      ", opts_no_proc(false, false, false)),
+        ("proc only (7C.2-H)", opts_proc_only()),
+        ("+celp (7C.2-B/D)  ", opts_no_proc(true, false, false)),
+        ("+acelp (7C.2-E)   ", opts_no_proc(true, true, false)),
+        ("+proc (7C.2-H)    ", opts(true, true, false)),
         ("+tcx (7C.2-G)     ", opts(true, true, true)),
     ];
     println!(
@@ -579,6 +602,7 @@ fn weight_probe() {
                 celp: true,
                 track_acelp: true,
                 tcx: false,
+                proc: true,
                 env_weight: w,
             };
             let tag = format!("w{}-{bps}", (w * 100.0) as u32);
@@ -603,10 +627,12 @@ fn visqol_probe() {
     let dir = std::path::PathBuf::from("target/voice-bench-vq");
     std::fs::create_dir_all(&dir).unwrap();
     const FRAME: usize = 320;
-    let configs: [(&str, Options); 4] = [
-        ("noise only        ", opts(false, false, false)),
-        ("+celp (7C.2-B/D)  ", opts(true, false, false)),
-        ("+acelp (7C.2-E)   ", opts(true, true, false)),
+    let configs: [(&str, Options); 6] = [
+        ("noise only        ", opts_no_proc(false, false, false)),
+        ("proc only (7C.2-H)", opts_proc_only()),
+        ("+celp (7C.2-B/D)  ", opts_no_proc(true, false, false)),
+        ("+acelp (7C.2-E)   ", opts_no_proc(true, true, false)),
+        ("+proc (7C.2-H)    ", opts(true, true, false)),
         ("+tcx (7C.2-G)     ", opts(true, true, true)),
     ];
     // References first, and a self-comparison so the instrument reports its own

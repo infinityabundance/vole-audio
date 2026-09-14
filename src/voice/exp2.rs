@@ -31,6 +31,7 @@ use crate::voice::VoiceState;
 use crate::voice::celp;
 use crate::voice::fcelp;
 use crate::voice::predict as vp;
+use crate::voice::proc;
 use crate::voice::pvq;
 use crate::voice::residual;
 use crate::voice::vq;
@@ -149,6 +150,15 @@ impl<'a> BitReader<'a> {
 // ---------------------------------------------------------------------------
 // Frame syntax
 // ---------------------------------------------------------------------------
+
+/// Bits of the fallback family's sub-mode discriminator.
+pub const SUB_BITS: u8 = 2;
+/// Bits of the procedural excitation's pitch-lag field.
+pub const PROC_LAG_BITS: u8 = 11;
+/// Bits of the procedural excitation's phase field.
+pub const PROC_PHASE_BITS: u8 = 6;
+/// Smallest procedural lag code (quarter samples).
+const PROC_LAG_Q_MIN: i32 = vp::MIN_LAG as i32 * (1 << proc::FRAC_BITS);
 
 /// Bits of the spectral tier selector.
 pub const TIER_BITS: u8 = 2;
@@ -291,6 +301,24 @@ pub enum Excitation {
         /// One PVQ index per block.
         indices: Vec<u32>,
     },
+    /// 7C.2-H procedural excitation: a pitch-synchronous glottal excitation
+    /// blended with shaped noise, **materialised by the decoder** from 31 bits
+    /// rather than received as a waveform.
+    ///
+    /// Every sample is a pure function of these fields and the sample index, so
+    /// packet independence holds by construction. See [`crate::voice::proc`].
+    Proc {
+        /// Pitch period in quarter samples (`proc::FRAC_BITS`).
+        lag_q: i32,
+        /// Excitation level; the generated signal's RMS is exactly this.
+        gain: i32,
+        /// `0` is pure noise, `proc::VOICING_LEVELS - 1` a pure pulse train.
+        voicing: i32,
+        /// Coherent-component phase, in `0..proc::PHASE_STEPS`.
+        phase: i32,
+        /// Packet-local phase and noise seed.
+        seed: u8,
+    },
 }
 
 impl Excitation {
@@ -324,15 +352,24 @@ impl Excitation {
                         * (usize::from(celp::position_bits(count))
                             + count * usize::from(celp::SIGN_BITS))
             }
-            Excitation::Noise { .. } => usize::from(FAMILY_BITS) + 1 + 6 + 3,
+            Excitation::Noise { .. } => usize::from(FAMILY_BITS) + usize::from(SUB_BITS) + 6 + 3,
             Excitation::Tcx { k, gains, indices } => {
                 let blocks = indices.len().max(gains.len());
                 usize::from(FAMILY_BITS)
-                    + 1
+                    + usize::from(SUB_BITS)
                     + usize::from(pvq::K_BITS)
                     + usize::from(celp::GAIN_BITS)
                     + 3 * blocks.saturating_sub(1)
                     + blocks * usize::from(pvq::index_bits(*k))
+            }
+            Excitation::Proc { .. } => {
+                usize::from(FAMILY_BITS)
+                    + usize::from(SUB_BITS)
+                    + usize::from(PROC_LAG_BITS)
+                    + 6
+                    + 4
+                    + usize::from(PROC_PHASE_BITS)
+                    + 3
             }
             Excitation::Ac3(p) => {
                 let nsub = p.subframes.len();
@@ -419,13 +456,13 @@ impl Excitation {
             }
             Excitation::Noise { gain, seed } => {
                 w.bits(2, FAMILY_BITS);
-                w.bits(0, 1);
+                w.bits(0, SUB_BITS);
                 w.bits((*gain).clamp(0, celp::GAIN_LEVELS - 1) as u32, 6);
                 w.bits(u32::from(*seed) & 0x7, 3);
             }
             Excitation::Tcx { k, gains, indices } => {
                 w.bits(2, FAMILY_BITS);
-                w.bits(1, 1);
+                w.bits(1, SUB_BITS);
                 let k = (*k).min(pvq::MAX_PULSES);
                 w.bits(k as u32, pvq::K_BITS);
                 // One anchor gain plus 3-bit block deltas.
@@ -444,6 +481,27 @@ impl Excitation {
                 for &idx in indices {
                     w.bits(idx, bits);
                 }
+            }
+            Excitation::Proc {
+                lag_q,
+                gain,
+                voicing,
+                phase,
+                seed,
+            } => {
+                w.bits(2, FAMILY_BITS);
+                w.bits(2, SUB_BITS);
+                w.bits(
+                    (lag_q - PROC_LAG_Q_MIN).clamp(0, (1 << PROC_LAG_BITS) - 1) as u32,
+                    PROC_LAG_BITS,
+                );
+                w.bits((*gain).clamp(0, celp::GAIN_LEVELS - 1) as u32, 6);
+                w.bits((*voicing).clamp(0, proc::VOICING_LEVELS - 1) as u32, 4);
+                w.bits(
+                    (*phase).clamp(0, proc::PHASE_STEPS as i32 - 1) as u32,
+                    PROC_PHASE_BITS,
+                );
+                w.bits(u32::from(*seed) & 0x7, 3);
             }
             Excitation::Ac3(p) => {
                 w.bits(3, FAMILY_BITS);
@@ -569,10 +627,41 @@ impl Excitation {
                 Ok(Excitation::Celp(p))
             }
             2 => {
-                if r.bits(1)? == 0 {
+                let sub = r.bits(SUB_BITS)?;
+                if sub == 0 {
                     let gain = r.bits(6)? as i32;
                     let seed = r.bits(3)? as u8;
                     return Ok(Excitation::Noise { gain, seed });
+                }
+                if sub == 2 {
+                    let lag_q = PROC_LAG_Q_MIN + r.bits(PROC_LAG_BITS)? as i32;
+                    let gain = r.bits(6)? as i32;
+                    let voicing = r.bits(4)? as i32;
+                    if voicing >= proc::VOICING_LEVELS {
+                        return Err(Error::malformed(
+                            "voice.exp2 procedural voicing above the bound",
+                        ));
+                    }
+                    let phase = r.bits(PROC_PHASE_BITS)? as i32;
+                    if phase >= proc::PHASE_STEPS as i32 {
+                        return Err(Error::malformed(
+                            "voice.exp2 procedural phase above the bound",
+                        ));
+                    }
+                    let seed = r.bits(3)? as u8;
+                    return Ok(Excitation::Proc {
+                        lag_q,
+                        gain,
+                        voicing,
+                        phase,
+                        seed,
+                    });
+                }
+                if sub != 1 {
+                    return Err(Error::new(
+                        Kind::Unsupported,
+                        "voice.exp2 fallback sub-mode reserved",
+                    ));
                 }
                 let blocks = frame_len.div_ceil(pvq::BLOCK);
                 if frame_len == 0 || !frame_len.is_multiple_of(pvq::BLOCK) {
@@ -782,6 +871,28 @@ impl Frame2 {
                 let shot = fcelp::reconstruct(params, frame_len)?;
                 shot.render(state, &k_q, width)
             }
+            Excitation::Proc {
+                lag_q,
+                gain,
+                voicing,
+                phase,
+                seed,
+            } => {
+                if !(0..proc::VOICING_LEVELS).contains(voicing) {
+                    return Err(Error::malformed(
+                        "voice.exp2 procedural voicing above the bound",
+                    ));
+                }
+                if !(0..proc::PHASE_STEPS as i32).contains(phase) {
+                    return Err(Error::malformed(
+                        "voice.exp2 procedural phase above the bound",
+                    ));
+                }
+                let level = celp::gain_of(*gain);
+                let frac = f64::from(*phase) / proc::PHASE_STEPS as f64;
+                let exc = proc::excitation(frame_len, *lag_q, level, *voicing, frac, *seed);
+                vp::synthesize_excitation(state, &k_q, width, 0, 0, &exc)
+            }
             Excitation::Tcx { k, gains, indices } => {
                 if frame_len == 0 || !frame_len.is_multiple_of(pvq::BLOCK) {
                     return Err(Error::malformed(
@@ -856,6 +967,7 @@ pub fn family_label(f: &Frame2) -> &'static str {
         Excitation::Noise { .. } => "noise",
         Excitation::Ac3(_) => "acelp",
         Excitation::Tcx { .. } => "tcx",
+        Excitation::Proc { .. } => "proc",
     }
 }
 
@@ -996,6 +1108,8 @@ pub struct Options {
     pub track_acelp: bool,
     /// Offer the 7C.2-G transform/PVQ escape (fallback family sub-mode).
     pub tcx: bool,
+    /// Offer the 7C.2-H procedural excitation (fallback family sub-mode).
+    pub proc: bool,
     /// Weight of the temporal-envelope term in the selector proxy.
     ///
     /// `0.0` is plain MSE. The term exists because MSE alone prefers silence to
@@ -1040,6 +1154,17 @@ impl Default for Options {
             // experiment stays reproducible and so it can be re-judged once the
             // selector objective is fixed.
             tcx: false,
+            // **Measured and disabled** (7C.2-H). The procedural excitation is
+            // considered at every rate and selected in **zero frames**, even when
+            // it is the only pitched core on offer: its output is bit-identical to
+            // the stochastic fallback's. The reason is measured, not assumed —
+            // `voice_bench pg` shows order-16 LPC already takes 18.31 dB while a
+            // pitch predictor on top adds only **0.66 dB**, so the residual the
+            // excitation has to code is very nearly pitch-free and no long-term
+            // model has more than a fraction of a dB to gain from it. Offering it
+            // costs 0.9–1.5 ms of encode time, so it does not ship enabled. The
+            // full mechanism is retained, tested, and reproducible.
+            proc: false,
             env_weight: DEFAULT_ENV_WEIGHT,
         }
     }
@@ -1195,6 +1320,53 @@ impl Exp2Codec {
                             spectral: spectral.clone(),
                             excitation: Excitation::Ac3(params),
                         });
+                    }
+                }
+
+                // 7C.2-H: the procedural excitation, offered on the candidate the
+                // analysis ranks best and on the two cheap spectral tiers, where
+                // its 31 bits can actually be afforded. The decoder materialises
+                // the excitation; the selector measures the result like any other
+                // core, so this is not a new exception to the RD authority.
+                if sel.proc && ci == best_cand && si <= 1 && !f.is_empty() {
+                    let zeros = vec![0.0f64; f.len()];
+                    let mut probe = state.clone();
+                    let zir =
+                        vp::synthesize_excitation(&mut probe, &k_q, model.width, 0, 0, &zeros);
+                    let resid: Vec<f64> = f.iter().zip(&zir).map(|(a, b)| a - b).collect();
+                    let rms = (resid.iter().map(|x| x * x).sum::<f64>() / f.len() as f64).sqrt();
+                    let centre = celp::gain_code(rms.max(1.0));
+                    let base = model.lag.max(vp::MIN_LAG as i32);
+                    // The phase is *solved for*, not searched together with
+                    // everything else: a comb carries no memory, so its phase has
+                    // to be transmitted, and enumerating it jointly with lag,
+                    // voicing, gain and seed would multiply the search by 64.
+                    // Solving it per combination costs `O(P·N)` and lets the wire
+                    // carry a 64-step phase for six bits.
+                    let step = 1i32 << proc::FRAC_BITS;
+                    for d in -1..=1i32 {
+                        let bi = (base + d).clamp(vp::MIN_LAG as i32, vp::MAX_LAG as i32);
+                        for f in 0..step {
+                            let lag = bi * step + f;
+                            let period = f64::from(lag) / f64::from(step as u32);
+                            let (phase, _) = proc::best_phase(&resid, period, proc::PHASE_STEPS);
+                            for &voicing in &[0i32, 8, proc::VOICING_LEVELS - 1] {
+                                for gain in [centre, (centre + 4).min(celp::GAIN_LEVELS - 1)] {
+                                    for seed in 0..2u8 {
+                                        consider(Frame2 {
+                                            spectral: spectral.clone(),
+                                            excitation: Excitation::Proc {
+                                                lag_q: lag,
+                                                gain,
+                                                voicing,
+                                                phase: phase as i32,
+                                                seed,
+                                            },
+                                        });
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -1559,9 +1731,9 @@ mod tests {
         };
         let (bytes, bits) = f.write();
         assert_eq!(bits, f.bits());
-        // tier(2) + two 8-bit stage-0 sub-indices + family(2) + sub-mode(1)
+        // tier(2) + two 8-bit stage-0 sub-indices + family(2) + sub-mode(2)
         // + gain(6) + seed(3).
-        assert_eq!(bits, 2 + 16 + 2 + 1 + 6 + 3);
+        assert_eq!(bits, 2 + 16 + 2 + 2 + 6 + 3);
         // 16 bits cheaper than the full index on the same frame.
         let full_frame = Frame2 {
             spectral: Spectral::Vq(full),

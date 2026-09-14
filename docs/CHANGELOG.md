@@ -741,6 +741,53 @@ problem, not a regression introduced here.
 
 Regression court `learned-voice-stream` unaffected. Voice tests: 95 passed.
 
+## Phase 7C.2-H (third step) — procedural excitation, and the diagnosis it forced (v0.84.0)
+
+The charter's §13 proposes the decoder *materialise* the excitation. `src/voice/proc.rs`
+implements it: a pitch-synchronous glottal excitation blended with shaped noise,
+every sample a pure function of the transmitted fields and the sample index, so
+packet independence holds by construction. It costs
+`lag_q(11) · gain(6) · voicing(4) · phase(6) · seed(3)` = 34 bits as a sub-mode of
+the fallback family, so ACELP frames pay nothing for it. Tests pin the three
+properties that matter: exact transmitted RMS at every voicing, pulses on the
+transmitted fractional period, and determinism.
+
+**Measured: selected in zero frames.** Forced to be the only core on offer, its
+output is bit-identical to the stochastic fallback at every rate (MOS-LQO 1.000 /
+1.445 / 1.453 / 1.423 / 1.158 / 1.211 at 3.2/6/8/9.2/12/16 kbps), and identical in
+waveform SNR and bits/frame. Offering it costs 0.9–1.5 ms encode, so it ships
+disabled.
+
+* **Two hypotheses tested and rejected.** (a) *Phase resolution*: a comb carries
+  no memory, so its phase must be transmitted, and the first version spent 3 bits
+  on four positions inside `period/8`. The diagnostic
+  `phase_resolution_is_what_limits_a_memoryless_pulse_train` shows the coarse grid
+  is a limiter in isolation (a 64-step grid reaches ≈0.70 against a pure comb at
+  period 81). The phase became a 6-bit field **solved analytically**
+  (`proc::best_phase`). Effect on the codec: none. (b) *Lag resolution*: the lag
+  field is already quarter-sample but only integer lags were searched; searching
+  its full transmitted resolution costs no wire bits. Effect: none.
+* **The real cause, measured.** `voice_bench pg`: order-16 LPC already extracts
+  **18.31 dB**, and a pitch predictor on that residual adds only **0.66 dB**
+  (18.97 dB total). Order-16 short-term prediction over 20 ms has absorbed most of
+  the pitch periodicity, so the residual the excitation must code is very nearly
+  pitch-free.
+
+> **The binding constraint is the short-term predictor's order, not the excitation
+> model.** A high-order LPC that has already eaten the pitch leaves every long-term
+> mechanism under 1 dB of headroom and leaves the quantiser an almost-white
+> residual — which the MSE objective then declines to code.
+
+This one number explains all three excitation negatives of the phase (7C.1's weak
+adaptive codebook, 7C.2-G's escape core, this procedural core) and why 7C.2-E's
+fractional LTP only began paying at 12–16 kbps. The standards do not make this
+trade: SILK pairs a *low-order* short-term filter with a fifth-order long-term
+predictor, deliberately splitting the prediction. Re-balancing short-term against
+long-term prediction order is the next work on this path.
+
+Regression court `learned-voice-stream` reproduces `cc2addfa…`. Voice tests: 100
+passed. New code clippy-clean and rustfmt-clean.
+
 ## Current measured position
 
 Frozen real-speech **lossless** portfolio (effectiveness + held-out Mode C,

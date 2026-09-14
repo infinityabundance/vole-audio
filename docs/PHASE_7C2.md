@@ -247,7 +247,7 @@ now, before any `exp2` codec work, so the challenger court cannot be tuned.
 | 7C.2-E | fractional multi-tap LTP + track ACELP + joint R–D search | **implemented** (`src/voice/fcelp.rs`, wire family 3). Quarter-sample lag via a fixed 4-tap Lagrange interpolation of the reconstructed excitation; four interleaved tracks of `k` signed pulses, with the pulse count carried by the codebook class instead of a field; joint per-subframe selection where the pitch is scored through the real synthesis loop and the innovation gain is closed-loop. **Measured A/B on the frozen effectiveness corpus (600 frames, `voice_bench exp2`):** vs the 7C.2-B/D CELP core, +1.77 dB at 12 kbps and +2.23 dB at 16 kbps; vs the scalar+noise baseline +3.27 dB and +3.26 dB. The core wins 271/600 frames at 12 kbps and 279/600 at 16 kbps. **It is never selected at ≤ 9.2 kbps**, because its side information does not fit those allowances: that is the measured motivation for 7C.2-F/G/H. Synthetic hard-rate ladder moved from 4.61/4.36 dB to **6.63/8.75 dB** at 12/16 kbps. Encode p99 was 11 477 µs when first written; after three measured cost fixes it is **4805 µs**, inside the 5 ms constitution. Two findings are retained as tests: the long-term gain is *recursive* (the output is a polynomial in the gain, not linear), and the class field removes the shared-count truncation flaw |
 | 7C.2-F | voicing-dependent allocation + noise excitation | **implemented, not promoted; two negative results recorded.** (a) The **nested spectral operating point** (`Spectral::Vq0`, tier 2, 18 bits vs 34, saving 16 bits/frame) is legal because the MSVQ is embedded, but it is selected in **zero frames at every declared rate** — the coarse spectrum's distortion penalty exceeds the excitation the freed bits buy. Kept in-tree at zero cost when unused; it is a prerequisite for 7C.2-H. (b) **Diagnosis: at 3.2 kbps the codec outputs near-silence** (SNR 0.00 dB), because for an *uncorrelated* excitation — exactly what the stochastic fallback produces — MSE is minimised by gain → 0, so the selector prefers silence to correctly-levelled shaped noise. A short-time envelope term (`envelope_penalty`, weight `ENV_WEIGHT`) was implemented as §10 requires and **measured and disabled**: at weight 2.0 waveform SNR fell at 6/8/9.2/16 kbps and rose only at 12 kbps. Promotion on dev-only evidence is forbidden, so the weight ships at 0.0 |
 | 7C.2-G | TCX/PVQ escape mode | **implemented, measured, disabled; negative result recorded.** A new voice-track primitive `src/voice/pvq.rs` (orthonormal DCT-IV + PVQ, no dependency on the general-audio `src/lossy/` track) backs an escape sub-mode of the fallback family, so ACELP frames pay zero bits for it. On the frozen development corpus it is selected in **zero frames at every declared rate** — bits and SNR are identical with and without it — and it costs up to **8864 µs** encode p99 at 16 kbps against the 5 ms constitution. The mechanism is verified *faithful* by test (`the_escape_core_reconstructs_its_own_quantisation`), so the negative is a real measurement. The diagnosis in §13 ties it to 7C.2-F: with MSE as the objective, any reconstruction with correlation ρ < 0.5 scores worse than silence |
-| 7C.2-H | procedural excitation + zero-bit predicted refinement | **two steps landed, and the second is the phase's most important result.** (1) The perceptual arbiter (§14): `voice_bench visqol` runs the court's frozen ViSQOL protocol on the development corpus, confirming 7C.2-E's 12/16 kbps win perceptually and 7C.2-G's negative, and exposing that the encoder left up to 53 % of the frame allowance idle. (2) The **fitted selector weight** (§15): the envelope weight is fitted on development material (`voice_bench weights`), peaking at **2.0**; mean MOS-LQO rises 1.250 → **1.416** (+13 %), and **SNR and MOS now disagree in sign at 6 and 9.2 kbps** — the measured vindication of §10. The fit also *reverses* 7C.2-G's verdict: the escape core is selected at 8–9.2 kbps under the perceptual proxy and is better there, but its cost still blocks it. Procedural excitation still to come |
+| 7C.2-H | procedural excitation + zero-bit predicted refinement | **three steps landed.** (1) The perceptual arbiter (§14) and (2) the **fitted selector weight** (§15) — mean MOS-LQO 1.250 → **1.416 (+13 %)**, with **SNR and MOS disagreeing in sign** at 6 and 9.2 kbps, which is the phase's most important result and reverses 7C.2-G's verdict. (3) **Procedural excitation** (§16): implemented, tested, packet-local by construction, and selected in **zero frames** even when it is the only pitched core; shipped disabled. Two hypotheses (phase resolution, lag resolution) were tested and rejected; the real cause is measured — order-16 LPC takes 18.31 dB and leaves the residual with only **0.66 dB** of pitch predictability, so every long-term mechanism has under 1 dB of headroom. Zero-bit predicted refinement still to come |
 | 7C.2-I | packet-reset entropy coding of remaining uncertainty | artifact shrinks without quality or recovery regression |
 | 7C.2-J | frozen causal learned refinement experiment | promote only if a gain survives model size, decode p99, memory and the held-out court |
 | 7C.2-K | final listening + impairment seal | superiority claim permitted **only** here |
@@ -576,7 +576,82 @@ court. The voice profile's encode deadline is an open problem inherited from 7C,
 not introduced here, and it is recorded as such rather than attributed to the
 selector change.
 
-## 16. Non-claims
+## 16. Procedural excitation — 7C.2-H, third step (negative, with a diagnosis)
+
+The charter's §13 proposes the decoder *materialise* the excitation: transmit the
+structure, generate the detail. `src/voice/proc.rs` implements exactly that — a
+pitch-synchronous glottal excitation blended with shaped noise, every sample a
+pure function of the transmitted fields and the sample index, so packet
+independence holds by construction rather than by review. It carries `lag_q(11)`
+· `gain(6)` · `voicing(4)` · `phase(6)` · `seed(3)` = 34 bits, as a sub-mode of
+the fallback family, so ACELP frames pay nothing for it.
+
+Three properties are pinned by test: the output RMS is exactly the transmitted
+level at every voicing value (including the blend's cross term), the pulse train
+lands on the transmitted fractional period, and the generator is deterministic and
+packet-local.
+
+**Measured: selected in zero frames.** Forced to be the *only* core on offer, its
+output is bit-identical to the stochastic fallback at every rate:
+
+```text
+rate      noise only   proc only    +acelp      +proc
+3.2 kbps     1.000       1.000       1.000      1.000
+6 kbps       1.445       1.445       1.445      1.445
+8 kbps       1.453       1.453       1.383      1.383
+9.2 kbps     1.423       1.423       1.408      1.408
+12 kbps      1.158       1.158       1.414      1.414
+16 kbps      1.211       1.211       1.428      1.428
+```
+
+The same holds in waveform SNR and in bits/frame. Offering the core costs
+0.9–1.5 ms of encode time, so it ships **disabled**.
+
+**Two hypotheses were tested and rejected before the real cause was found.**
+
+1. *Phase resolution.* A comb carries no memory, so its phase must be transmitted,
+   and the first version spent 3 bits on it — four positions inside a `period/8`
+   span. The diagnostic `phase_resolution_is_what_limits_a_memoryless_pulse_train`
+   confirms the coarse grid is a limiter in isolation (a 64-step grid reaches
+   ≈0.70 correlation against a pure comb at period 81, an 8-step grid far less).
+   So the phase became a **6-bit field solved for analytically** (`proc::best_phase`,
+   `O(P·N)` per parameter combination) rather than searched jointly. Measured
+   effect on the codec: **none**.
+2. *Lag resolution.* The lag field is already quarter-sample, but only integer
+   lags were searched. Searching its full transmitted resolution costs no wire
+   bits. Measured effect: **none**.
+
+**The actual cause, and it generalises.** `voice_bench pg` reports that order-16
+LPC already extracts **18.31 dB** and that a pitch predictor on top of that
+residual adds only **0.66 dB**:
+
+```text
+signal energy          1.1337e12
+LPC residual energy    1.6748e10   gain 18.31 dB
++pitch residual energy 1.4381e10   gain 18.97 dB
+```
+
+Order-16 short-term prediction over a 20 ms frame has already absorbed most of the
+pitch periodicity. The residual the excitation has to code is therefore *very
+nearly pitch-free*, and no long-term or procedural model has more than a fraction
+of a dB to win from it. That single number explains all three of this phase's
+excitation negatives — 7C.1's weak adaptive codebook, 7C.2-G's escape core, and
+this procedural core — and it also explains why 7C.2-E's fractional LTP only
+started paying at 12–16 kbps, where the spectrum is good enough for the residual
+to retain structure.
+
+> **The binding constraint is the short-term predictor's order, not the excitation
+> model.** A high-order LPC that has already eaten the pitch leaves every long-term
+> mechanism with under 1 dB of headroom, and leaves the excitation quantiser with
+> an almost-white residual — which the MSE objective then declines to code.
+
+The standards do not do this: SILK pairs a *low-order* short-term filter with a
+fifth-order long-term predictor, deliberately splitting the prediction so that the
+long-term stage has structure to exploit. The next work on this path is therefore
+to re-balance short-term and long-term prediction order (§16's spectral work is the
+same lever from the other side), not to add further excitation machinery.
+
+## 17. Non-claims
 
 * `exp1` remains the control; its wire format is untouched.
 * The serializer in `src/voice/exp2.rs` is not yet a live profile: no court
