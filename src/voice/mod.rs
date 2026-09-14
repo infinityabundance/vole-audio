@@ -18,10 +18,13 @@
 //! packet loss and jitter lives in [`crate::voice::impair`] and is purely
 //! in-process and deterministic.
 
+pub mod celp;
 pub mod impair;
+pub mod lsf;
 pub mod plc;
 pub mod predict;
 pub mod residual;
+pub mod vq;
 
 use crate::error::{Error, Kind, Result};
 use crate::learned::lpc::{pack_signed, unpack_signed};
@@ -62,6 +65,37 @@ pub const OVERSHOOT_LIMIT: usize = 4;
 /// cheapest non-degenerate step and its worst quality — so the allowance floors
 /// here and the overshoot stays bounded and visible.
 pub const MIN_FRAME_BYTES: usize = 8;
+
+/// Residual steps used to rank *models* against the byte allowance.
+///
+/// A model must be compared at a step near its own residual scale. Ranking every
+/// candidate at one fixed step is meaningless whenever that step is far from the
+/// signal's level: a step five times too coarse quantises every model's residual
+/// to zero, so all models score the frame's own energy and the winner is noise.
+/// The ladder spans four orders of magnitude (`step = 2^(gain/2)`); the winning
+/// model is afterwards refined over every step. The count is bounded so the
+/// per-frame encode deadline still holds.
+pub const PROBE_GAINS: [i32; 5] = [-4, 8, 20, 32, 44];
+
+/// Candidates kept for the closed-loop ranking (of the 5 orders × 3 estimators
+/// analysis proposes). The bound exists to hold the encode deadline, which is a
+/// constitution requirement; pruning is by open-loop residual energy, a proposal
+/// heuristic only.
+pub const CANDIDATE_KEEP: usize = 3;
+
+/// Spectral descriptions carried into the full step sweep. The probe ladder is a
+/// cheap screen; the final choice is made on exact bytes and exact distortion
+/// over every step, so the coarse grid cannot decide the winner.
+pub const PROBE_FINALISTS: usize = 2;
+
+/// Whether the scalar path searches a per-subframe residual gain shape.
+///
+/// The mechanism is implemented, wired and tested, and it is measured to *lower*
+/// the court's matched-bitrate SNR while pushing encode p99 past the 5 ms
+/// constitution (6053 µs, max 8276 µs). It is therefore defaulted **off** like
+/// the redundancy mechanism: retained and priced rather than deleted, so a later
+/// change to the encoder's search can re-open it on evidence.
+pub const SUBFRAME_GAIN: bool = false;
 
 /// Voice codec configuration.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -188,8 +222,29 @@ const FLAG_CAPSULE: u8 = 1 << 1;
 const FLAG_REDUNDANCY: u8 = 1 << 2;
 const FLAG_CONCEALED: u8 = 1 << 3;
 
+/// Residual payload marker for a scalar frame whose residual carries a
+/// per-subframe gain block. `0..=2` and `>= 128` are the compact/general entropy
+/// ids and `3` is the CELP payload, so `4` is free. A uniform-gain frame writes
+/// no marker and no block, so the per-subframe mechanism costs nothing when it is
+/// not used.
+const GAIN_MARKER: u8 = 4;
+
 /// Pack a frame model into its `mode` byte.
 pub fn pack_mode(m: &FrameModel) -> Result<u8> {
+    if m.is_vq() {
+        // The VQ marker uses estimator 3; `order` must be the codebook order and
+        // the width bits are unused.
+        if m.order != vq::VQ_ORDER {
+            return Err(Error::internal(
+                "voice VQ order disagrees with the codebook",
+            ));
+        }
+        let order_idx = ORDER_LADDER
+            .iter()
+            .position(|&o| o == m.order)
+            .ok_or_else(|| Error::internal("voice order outside the ladder"))?;
+        return Ok(vp::VQ_ESTIMATOR | (u8::from(m.lag > 0) << 2) | ((order_idx as u8) << 3));
+    }
     let order_idx = ORDER_LADDER
         .iter()
         .position(|&o| o == m.order)
@@ -213,7 +268,22 @@ pub fn unpack_mode(mode: u8) -> Result<FrameModel> {
     let pitch = (mode >> 2) & 1 == 1;
     let order_idx = ((mode >> 3) & 0b111) as usize;
     let width_idx = ((mode >> 6) & 0b11) as usize;
-    if estimator > 2 || order_idx >= ORDER_LADDER.len() || width_idx >= WIDTH_LADDER.len() {
+    if order_idx >= ORDER_LADDER.len() {
+        return Err(Error::malformed("voice mode byte out of domain"));
+    }
+    if estimator == vp::VQ_ESTIMATOR {
+        if width_idx != 0 || ORDER_LADDER[order_idx] != vq::VQ_ORDER {
+            return Err(Error::malformed("voice VQ mode byte out of domain"));
+        }
+        return Ok(FrameModel {
+            estimator,
+            order: vq::VQ_ORDER,
+            width: vq::VQ_INTERNAL_WIDTH,
+            lag: if pitch { 1 } else { 0 },
+            ltpg_q: 0,
+        });
+    }
+    if estimator > 2 || width_idx >= WIDTH_LADDER.len() {
         return Err(Error::malformed("voice mode byte out of domain"));
     }
     Ok(FrameModel {
@@ -456,14 +526,30 @@ impl Redundancy {
 pub struct CodedFrame {
     /// The frame model.
     pub model: FrameModel,
-    /// Quantised reflection codes at `model.width`.
+    /// Reflection codes the synthesiser reads. For the scalar path these are the
+    /// transmitted codes at `model.width`; for the vector-quantised path they are
+    /// the codes the codebook index reconstructs at [`vq::VQ_INTERNAL_WIDTH`].
     pub k_q: Vec<i32>,
-    /// Residual gain code.
+    /// Wire bytes of the spectral description: packed signed scalar reflection
+    /// codes, or the vector-quantiser index. Empty on a frame built from a
+    /// capsule or the redundancy copy, which is never serialised.
+    pub spectral: Vec<u8>,
+    /// Residual gain code. The frame's base gain; for the scalar path it is
+    /// `gains[0]`. Unused on a CELP frame.
     pub gain: i32,
+    /// Per-subframe residual gain codes (one per [`vp::RESIDUAL_SUB_LEN`]
+    /// samples) on the scalar path; empty on a CELP frame. The quantiser step
+    /// tracks the residual level within 5 ms, which is what escapes the
+    /// coarse-quantiser overload of a single frame-wide step.
+    pub gains: Vec<i32>,
     /// Complete entropy artifact (codec id byte + payload).
     pub residual: Vec<u8>,
-    /// The quantised residual symbols.
+    /// The quantised residual symbols. Empty on a CELP frame.
     pub symbols: Vec<i32>,
+    /// The reconstructed fixed excitation, present exactly when the frame uses
+    /// the CELP excitation coder. The decoder runs this shot through the shared
+    /// synthesis loop; it is never re-derived from `symbols`.
+    pub excitation: Option<celp::Shot>,
 }
 
 impl CodedFrame {
@@ -475,8 +561,7 @@ impl CodedFrame {
             w.u16(self.model.lag.clamp(0, i32::from(u16::MAX)) as u16);
             w.u8(self.model.ltpg_q.clamp(0, LTPG_LEVELS - 1) as u8);
         }
-        let packed = pack_signed(&self.k_q, self.model.width);
-        w.bytes(&packed);
+        w.bytes(&self.spectral);
         w.u16(self.residual.len().min(u16::MAX as usize) as u16);
         w.bytes(&self.residual);
     }
@@ -493,22 +578,75 @@ impl CodedFrame {
                 return Err(Error::malformed("voice pitch lag below the constitution"));
             }
         }
-        let k_bytes = (model.order * usize::from(model.width)).div_ceil(8);
-        let raw = unpack_signed(r.take(k_bytes)?, model.width, model.order)?;
-        // The wire field is two's complement, so its most negative code would
-        // dequantise to k = -1 and make the synthesis filter marginally stable.
-        // The encoder never emits it; a corrupt packet could, so clamp here.
-        let k_q = vp::clamp_k_codes(&raw, model.width);
+        let spectral: Vec<u8> = if model.is_vq() {
+            r.take(vq::VQ_INDEX_BYTES)?.to_vec()
+        } else {
+            let k_bytes = (model.order * usize::from(model.width)).div_ceil(8);
+            r.take(k_bytes)?.to_vec()
+        };
+        let k_q = if model.is_vq() {
+            let idx: [u8; vq::VQ_INDEX_BYTES] = spectral
+                .as_slice()
+                .try_into()
+                .map_err(|_| Error::malformed("voice VQ index length mismatch"))?;
+            vq::decode_index(&idx)
+        } else {
+            let raw = unpack_signed(&spectral, model.width, model.order)?;
+            // The wire field is two's complement, so its most negative code would
+            // dequantise to k = -1 and make the synthesis filter marginally stable.
+            // The encoder never emits it; a corrupt packet could, so clamp here.
+            vp::clamp_k_codes(&raw, model.width)
+        };
         let rlen = usize::from(r.u16()?);
         let residual = r.take(rlen)?.to_vec();
-        let symbols = residual::decode(&residual, frame_len)?;
+        // A CELP payload carries transmitted excitation parameters, not a scalar
+        // symbol stream; the excitation it reconstructs is the *only* thing the
+        // synthesiser sees, so the decoder never re-quantises it.
+        let (symbols, excitation, gains) = if residual.first() == Some(&celp::CODEC_ID) {
+            let params = celp::decode_payload(&residual, frame_len)?;
+            let shot = celp::reconstruct(&params, frame_len)?;
+            (Vec::new(), Some(shot), Vec::new())
+        } else if residual.first() == Some(&GAIN_MARKER) {
+            let nsub = vp::gain_subframes(frame_len);
+            let blen = vp::gain_block_bytes(frame_len);
+            if residual.len() < 1 + blen {
+                return Err(Error::malformed("voice gain block is truncated"));
+            }
+            let gains = vp::decode_gain_deltas(gain, &residual[1..1 + blen], nsub);
+            let symbols = residual::decode(&residual[1 + blen..], frame_len)?;
+            (symbols, None, gains)
+        } else {
+            (residual::decode(&residual, frame_len)?, None, vec![gain])
+        };
         Ok(CodedFrame {
             model,
             k_q,
+            spectral,
             gain,
+            gains,
             residual,
             symbols,
+            excitation,
         })
+    }
+
+    /// Run this frame through the shared synthesis loop, whichever excitation
+    /// coder produced it. This is the single place the two paths meet, so the
+    /// encoder's state and the decoder's state cannot drift apart.
+    fn synthesize_into(&self, state: &mut VoiceState) -> Vec<f64> {
+        match &self.excitation {
+            Some(shot) => shot.render(state, &self.k_q, self.model.width),
+            None => vp::synthesize_gains(
+                state,
+                &self.k_q,
+                self.model.width,
+                vp::RESIDUAL_SUB_LEN,
+                &self.gains,
+                self.model.lag,
+                self.model.ltpg_q,
+                &self.symbols,
+            ),
+        }
     }
 }
 
@@ -572,6 +710,29 @@ fn comfort_shape(shape: u8) -> [i32; 4] {
 // ---------------------------------------------------------------------------
 // Encoder
 // ---------------------------------------------------------------------------
+
+/// Canonicalise a gain shape through the wire code, so the encoder reconstructs
+/// with exactly the gains the decoder reads.
+fn canonical_gains(gains: &[i32]) -> Vec<i32> {
+    let bytes = vp::encode_gain_deltas(gains);
+    vp::decode_gain_deltas(gains[0], &bytes, gains.len())
+}
+
+/// Build a scalar frame's residual: the entropy artifact alone when the gain
+/// shape is uniform, or a marker, the packed per-subframe gain block, and the
+/// entropy artifact when it is not.
+fn scalar_residual(gains: &[i32], symbols: &[i32], frame_len: usize) -> Vec<u8> {
+    let enc = residual::encode_best(symbols, &SEARCH_CODECS);
+    let uniform = gains.iter().all(|&g| g == gains[0]);
+    if uniform {
+        return enc;
+    }
+    let mut v = Vec::with_capacity(1 + vp::gain_block_bytes(frame_len) + enc.len());
+    v.push(GAIN_MARKER);
+    v.extend_from_slice(&vp::encode_gain_deltas(gains));
+    v.extend_from_slice(&enc);
+    v
+}
 
 /// The voice encoder. Holds exactly the state the decoder holds, so its own
 /// reconstruction is what the decoder will hear.
@@ -674,7 +835,20 @@ impl VoiceEncoder {
             let frame = &samples[f * n..(f + 1) * n];
             let frame_budget = (per_frame + carry).max(1);
             let c = self.encode_frame(frame, frame_budget)?;
-            carry = frame_budget.saturating_sub(c.residual.len() + c.model.description_bytes());
+            // Credit from an underspending frame carries forward, but is capped at
+            // one frame's allowance: the overshoot permit is a multiple of the
+            // budget, so an uncapped carry would let a cheap CELP frame inflate a
+            // later frame's permit without bound.
+            carry = frame_budget
+                .saturating_sub(c.residual.len() + c.model.description_bytes())
+                .min(per_frame);
+            // The encoder advances its state once per packet, not once per frame.
+            // Advancing per frame is a plausible-looking "correctness" fix (the
+            // decoder reconstructs frame by frame), and it was implemented and
+            // measured: the clean matched-bitrate means are unchanged while the
+            // impaired-cell mean falls 3.42 -> 2.94 dB and encode p99 rises
+            // 4.57 -> 5.69 ms. It is therefore rejected on evidence, not kept for
+            // looking tidy.
             coded.push(c);
         }
 
@@ -700,15 +874,7 @@ impl VoiceEncoder {
 
     fn advance(&mut self, coded: &[CodedFrame]) {
         for c in coded {
-            vp::synthesize(
-                &mut self.state,
-                &c.k_q,
-                c.model.width,
-                c.model.lag,
-                c.model.ltpg_q,
-                c.gain,
-                &c.symbols,
-            );
+            c.synthesize_into(&mut self.state);
         }
     }
 
@@ -788,8 +954,14 @@ impl VoiceEncoder {
         vp::synthesize(&mut self.state, &k_q, 6, 0, 0, 0, &symbols);
     }
 
-    /// Encode one frame: bounded candidate competition and an exact sweep over
-    /// the residual step against the physical byte budget.
+    /// Encode one frame: bounded candidate competition with a joint model × step
+    /// search against the physical byte budget.
+    ///
+    /// The spectral descriptions compete as equals: every scalar
+    /// estimator×order×width and the vector-quantised spectrum are each ranked by
+    /// the lowest distortion reachable at a step whose *complete* frame (model
+    /// bytes + exact residual bytes) fits the allowance. The winner is then
+    /// refined over the full step ladder.
     fn encode_frame(&self, frame: &[i32], budget: usize) -> Result<CodedFrame> {
         let f: Vec<f64> = frame.iter().map(|&v| f64::from(v)).collect();
         let lag_hint = self.last.as_ref().map_or(0, |c| c.model.lag);
@@ -797,121 +969,296 @@ impl VoiceEncoder {
         if cands.is_empty() {
             return Err(Error::internal("voice analysis proposed no candidate"));
         }
-        // Stage A: rank by open-loop residual energy (a proposal), then refine
-        // the top few by closed-loop distortion at a common reference gain.
-        let mut order: Vec<usize> = (0..cands.len()).collect();
-        order.sort_by(|&a, &b| {
+        // Bound the closed-loop work: prune to the lowest open-loop residual
+        // energy candidates. This is a proposal heuristic; every accept/reject
+        // decision below is still made on closed-loop distortion and exact bytes.
+        let mut keep: Vec<usize> = (0..cands.len()).collect();
+        keep.sort_by(|&a, &b| {
             cands[a]
                 .energy
                 .partial_cmp(&cands[b].energy)
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
-        order.truncate(4);
-        let ref_gain = GAIN_MIN + (GAIN_MAX - GAIN_MIN) / 2;
-        // Bytes a model would cost before any residual symbol, including the
-        // mode/gain bytes and the residual length field.
-        let wire_cost = |m: &FrameModel| m.description_bytes() + 2;
-        let mut best: Option<(usize, u8)> = None;
-        let mut best_d = f64::INFINITY;
-        let mut cheapest: Option<(usize, u8)> = None;
-        let mut cheapest_cost = usize::MAX;
-        for &ci in &order {
+        keep.truncate(CANDIDATE_KEEP);
+        // The vector-quantised spectrum is built from the single lowest-energy
+        // order-16 candidate: the LSF conversion and codebook search are the most
+        // expensive analysis steps, and the scalar path already competes with the
+        // remaining candidates at every width.
+        let vq_source = keep
+            .iter()
+            .copied()
+            .filter(|&ci| cands[ci].model.order == vq::VQ_ORDER)
+            .min_by(|&a, &b| {
+                cands[a]
+                    .energy
+                    .partial_cmp(&cands[b].energy)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+        // Every spectral description this frame may take.
+        struct Repr {
+            model: FrameModel,
+            k_q: Vec<i32>,
+            spectral: Vec<u8>,
+        }
+        let mut reprs: Vec<Repr> = Vec::new();
+        for &ci in &keep {
+            let c = &cands[ci];
             for &width in &WIDTH_LADDER {
-                let mut model = cands[ci].model;
-                model.width = width;
-                let cost = wire_cost(&model);
-                if cost < cheapest_cost {
-                    cheapest_cost = cost;
-                    cheapest = Some((ci, width));
+                let model = FrameModel { width, ..c.model };
+                let k_q = vp::quantise_k(&reflection_of(&c.k_q, c.model.width), width);
+                let spectral = pack_signed(&k_q, width);
+                reprs.push(Repr {
+                    model,
+                    k_q,
+                    spectral,
+                });
+            }
+            // The vector-quantised spectrum, at the codebook's order only. The
+            // input LSF is taken from the unquantised estimator output: the
+            // width-6 codes are too coarse to feed a codebook already carrying a
+            // quarter of their resolution.
+            if Some(ci) == vq_source
+                && let Some(lsf) = lsf::reflections_to_lsf(&c.k_raw)
+                && let Some(idx) = vq::encode_lsf(&lsf)
+            {
+                reprs.push(Repr {
+                    model: FrameModel {
+                        estimator: vp::VQ_ESTIMATOR,
+                        order: vq::VQ_ORDER,
+                        width: vq::VQ_INTERNAL_WIDTH,
+                        lag: c.model.lag,
+                        ltpg_q: c.model.ltpg_q,
+                    },
+                    k_q: vq::decode_index(&idx),
+                    spectral: idx.to_vec(),
+                });
+            }
+        }
+        let limit = budget.saturating_mul(OVERSHOOT_LIMIT);
+        // Cheap probe screen: score every description by the best distortion it
+        // reaches at a step whose complete frame fits the allowance.
+        let mut scored: Vec<(f64, usize)> = Vec::new();
+        let mut over_scored: Vec<(f64, usize)> = Vec::new();
+        let mut cheapest = 0usize;
+        let mut cheapest_cost = usize::MAX;
+        for (i, r) in reprs.iter().enumerate() {
+            let cost = r.model.description_bytes() + 2;
+            if cost < cheapest_cost {
+                cheapest_cost = cost;
+                cheapest = i;
+            }
+            // A model whose description alone overruns the frame's whole byte
+            // allowance cannot be rescued by a coarser step, so it must not win
+            // a distortion ranking.
+            if cost > budget {
+                continue;
+            }
+            let mut fit: Option<f64> = None;
+            let mut over: Option<f64> = None;
+            for &gain in &PROBE_GAINS {
+                let s = vp::close_loop(&self.state, &f, &r.model, &r.k_q, gain);
+                let total = cost + residual::estimated_bytes(&s.symbols);
+                let d = s.distortion;
+                if total <= budget {
+                    if fit.is_none_or(|b| d < b) {
+                        fit = Some(d);
+                    }
+                } else if total <= limit && over.is_none_or(|b| d < b) {
+                    over = Some(d);
                 }
-                // A model whose description alone overruns the frame's whole
-                // byte allowance cannot be rescued by a coarser quantiser, so
-                // it must not win the distortion ranking.
-                if cost > budget {
-                    continue;
+            }
+            if let Some(d) = fit {
+                scored.push((d, i));
+            } else if let Some(d) = over {
+                over_scored.push((d, i));
+            }
+        }
+        scored.sort_by(|a, b| a.0.total_cmp(&b.0));
+        over_scored.sort_by(|a, b| a.0.total_cmp(&b.0));
+        // Finalists: the screen's best few plus the cheapest description, each
+        // re-optimised over the full step ladder so the winner is chosen on exact
+        // distortion under exact bytes.
+        let mut finalists: Vec<usize> = scored
+            .iter()
+            .take(PROBE_FINALISTS)
+            .map(|&(_, i)| i)
+            .collect();
+        if finalists.is_empty() {
+            finalists = over_scored
+                .iter()
+                .take(PROBE_FINALISTS)
+                .map(|&(_, i)| i)
+                .collect();
+        }
+        if !finalists.contains(&cheapest) {
+            finalists.push(cheapest);
+        }
+        enum Winner {
+            Scalar {
+                gains: Vec<i32>,
+                symbols: Vec<i32>,
+                residual: Vec<u8>,
+            },
+            Celp {
+                shot: celp::Shot,
+                residual: Vec<u8>,
+            },
+        }
+        // Lowest complete distortion wins, whether or not the frame fits the
+        // allowance: the bounded overshoot permit is part of the profile's design
+        // and is reported honestly as the difference between target and actual
+        // bitrate.
+        struct Pick {
+            d: f64,
+            index: usize,
+            winner: Winner,
+        }
+        let better = |cand_d: f64, best: &Option<Pick>| match best {
+            None => true,
+            Some(b) => cand_d < b.d,
+        };
+        let mut best: Option<Pick> = None;
+        for (fi, &i) in finalists.iter().enumerate() {
+            let r = &reprs[i];
+            let descr = r.model.description_bytes() + 2;
+            // Scalar dead-zone residual with a per-subframe quantiser step.
+            if let Some((gains, symbols, d)) =
+                self.choose_gains(&f, &r.model, &r.k_q, descr, budget)
+            {
+                let residual = scalar_residual(&gains, &symbols, f.len());
+                if residual.len() <= u16::MAX as usize {
+                    if better(d, &best) {
+                        best = Some(Pick {
+                            d,
+                            index: i,
+                            winner: Winner::Scalar {
+                                gains,
+                                symbols,
+                                residual,
+                            },
+                        });
+                    }
                 }
-                let k_q =
-                    vp::quantise_k(&reflection_of(&cands[ci].k_q, cands[ci].model.width), width);
-                let s = vp::close_loop(&self.state, &f, &model, &k_q, ref_gain);
-                if s.distortion < best_d {
-                    best_d = s.distortion;
-                    best = Some((ci, width));
+            }
+            // CELP excitation. The pulse count is derived from the allowance, so
+            // the excitation rate tracks the budget instead of being pinned at one
+            // pulse per subframe; the search is analysis-by-synthesis on the exact
+            // decoder loop. It runs for the probe's best description only, because
+            // it is the most expensive analysis step and the encode deadline is a
+            // constitution requirement.
+            if celp::SELECTED && fi == 0 {
+                let nsub = celp::subframes(frame.len()).max(1);
+                let avail_bits = budget.saturating_sub(descr + 1) * 8;
+                let max_pulses = celp::max_pulses_for_bits(avail_bits / nsub);
+                if max_pulses > 0 {
+                    let (params, d, shot) =
+                        celp::analyse(&self.state, &f, &r.model, &r.k_q, max_pulses);
+                    let residual = celp::encode_payload(&params);
+                    let fits = residual.len() + descr <= budget;
+                    if fits && better(d, &best) {
+                        best = Some(Pick {
+                            d,
+                            index: i,
+                            winner: Winner::Celp { shot, residual },
+                        });
+                    }
                 }
             }
         }
-        // With an impossible budget, transmit the cheapest description rather
-        // than an expensive one the residual cannot follow. The court reports
-        // the resulting quality honestly instead of hiding it behind silence.
-        let (ci, width) = best
-            .or(cheapest)
-            .ok_or_else(|| Error::internal("voice candidate search empty"))?;
-        let model = FrameModel {
-            width,
-            ..cands[ci].model
-        };
-        let k_q = vp::quantise_k(&reflection_of(&cands[ci].k_q, cands[ci].model.width), width);
-
-        // Stage B: the residual step. The step is swept exactly — bisection
-        // would be wrong here, because the byte cost is not monotone in the step
-        // near the point where the dead zone swallows the whole frame. Among the
-        // steps whose complete frame fits, the lowest distortion wins; if none
-        // fits, the encoder is allowed a bounded overshoot rather than being
-        // forced into silence, and the court reports the real byte count.
-        let descr = model.description_bytes() + 2;
-        let mut chosen = self.choose_gain(&f, &model, &k_q, descr, budget);
-        if chosen.is_none()
-            && let Some((cci, cwidth)) = cheapest
-            && (cci, cwidth) != (ci, width)
+        if let Some(Pick {
+            index: i, winner, ..
+        }) = best
         {
-            let cmodel = FrameModel {
-                width: cwidth,
-                ..cands[cci].model
-            };
-            let ck = vp::quantise_k(
-                &reflection_of(&cands[cci].k_q, cands[cci].model.width),
-                cwidth,
-            );
-            let cdescr = cmodel.description_bytes() + 2;
-            if let Some(v) = self.choose_gain(&f, &cmodel, &ck, cdescr, budget) {
-                let residual = residual::encode_best(&v.1, &SEARCH_CODECS);
-                if residual.len() <= u16::MAX as usize {
+            let r = &reprs[i];
+            match winner {
+                Winner::Scalar {
+                    gains,
+                    symbols,
+                    residual,
+                } => {
+                    let gain = gains.first().copied().unwrap_or(GAIN_MAX);
                     return Ok(CodedFrame {
-                        model: cmodel,
-                        k_q: ck,
-                        gain: v.0,
+                        model: r.model,
+                        k_q: r.k_q.clone(),
+                        spectral: r.spectral.clone(),
+                        gain,
+                        gains,
                         residual,
-                        symbols: v.1,
+                        symbols,
+                        excitation: None,
+                    });
+                }
+                Winner::Celp { shot, residual } => {
+                    return Ok(CodedFrame {
+                        model: r.model,
+                        k_q: r.k_q.clone(),
+                        spectral: r.spectral.clone(),
+                        gain: 0,
+                        gains: Vec::new(),
+                        residual,
+                        symbols: Vec::new(),
+                        excitation: Some(shot),
                     });
                 }
             }
         }
-        let (gain, symbols) = match chosen.take() {
-            Some(v) => v,
+        // With an impossible budget — or a winner whose residual overflows the
+        // u16 length field — transmit the cheapest description rather than an
+        // expensive one the residual cannot follow. The court reports the
+        // resulting quality honestly instead of hiding it behind silence.
+        let c = &reprs[cheapest];
+        let cdescr = c.model.description_bytes() + 2;
+        let (gains, symbols) = match self.choose_gains(&f, &c.model, &c.k_q, cdescr, budget) {
+            Some((g, s, _)) => (g, s),
             None => {
-                let s = vp::close_loop(&self.state, &f, &model, &k_q, GAIN_MAX);
-                (GAIN_MAX, s.symbols)
+                let g = vec![GAIN_MAX; vp::gain_subframes(f.len())];
+                let s = vp::close_loop_gains(
+                    &self.state,
+                    &f,
+                    &c.model,
+                    &c.k_q,
+                    vp::RESIDUAL_SUB_LEN,
+                    &g,
+                )
+                .symbols;
+                (g, s)
             }
         };
-        let residual = residual::encode_best(&symbols, &SEARCH_CODECS);
+        let gain = gains.first().copied().unwrap_or(GAIN_MAX);
+        let residual = scalar_residual(&gains, &symbols, f.len());
         if residual.len() <= u16::MAX as usize {
             return Ok(CodedFrame {
-                model,
-                k_q,
+                model: c.model,
+                k_q: c.k_q.clone(),
+                spectral: c.spectral.clone(),
                 gain,
+                gains,
                 residual,
                 symbols,
+                excitation: None,
             });
         }
         // Wire-format guard: a residual longer than a u16 falls back to the
         // coarsest step, which always fits for any bounded frame.
-        let s = vp::close_loop(&self.state, &f, &model, &k_q, GAIN_MAX);
-        let residual = residual::encode_best(&s.symbols, &SEARCH_CODECS);
+        let gains = vec![GAIN_MAX; vp::gain_subframes(f.len())];
+        let s = vp::close_loop_gains(
+            &self.state,
+            &f,
+            &c.model,
+            &c.k_q,
+            vp::RESIDUAL_SUB_LEN,
+            &gains,
+        );
+        let residual = scalar_residual(&gains, &s.symbols, f.len());
         Ok(CodedFrame {
-            model,
-            k_q,
+            model: c.model,
+            k_q: c.k_q.clone(),
+            spectral: c.spectral.clone(),
             gain: GAIN_MAX,
+            gains,
             residual,
             symbols: s.symbols,
+            excitation: None,
         })
     }
 
@@ -978,6 +1325,87 @@ impl VoiceEncoder {
             return Some((gain, symbols));
         }
         last_resort.map(|(_, gain, symbols)| (gain, symbols))
+    }
+
+    /// Per-subframe residual gains and the symbols they quantise, plus the
+    /// weighted distortion of the chosen shape.
+    ///
+    /// The search starts from the best *uniform* gain the byte allowance admits
+    /// (the preference order of [`Self::choose_gain`]) and then refines one
+    /// subframe at a time. Every candidate is canonicalised through the 4-bit
+    /// chained-delta wire code before it is scored and before it is kept, so the
+    /// gains the encoder reconstructs with are exactly the gains the decoder will
+    /// read: a divergence here would desynchronise the stream.
+    fn choose_gains(
+        &self,
+        frame: &[f64],
+        model: &FrameModel,
+        k_q: &[i32],
+        description_bytes: usize,
+        budget: usize,
+    ) -> Option<(Vec<i32>, Vec<i32>, f64)> {
+        let nsub = vp::gain_subframes(frame.len());
+        let block = vp::gain_block_bytes(frame.len());
+        let limit = budget.saturating_mul(OVERSHOOT_LIMIT);
+        let (g0, _) = self.choose_gain(frame, model, k_q, description_bytes, budget)?;
+        let mut gains = vec![g0; nsub];
+        // Prefer a shape whose complete frame fits the allowance; only when none
+        // can fit is the bounded overshoot permit used. This preserves
+        // `choose_gain`'s own preference order.
+        let mut cap = budget;
+        let mut best = self.eval_gains(frame, model, k_q, description_bytes, block, &gains, cap);
+        if best.is_none() {
+            cap = limit;
+            best = self.eval_gains(frame, model, k_q, description_bytes, block, &gains, cap);
+        }
+        if best.is_none() {
+            let s =
+                vp::close_loop_gains(&self.state, frame, model, k_q, vp::RESIDUAL_SUB_LEN, &gains);
+            return Some((gains, s.symbols, s.distortion));
+        }
+        if !SUBFRAME_GAIN {
+            let (d, symbols) = best.expect("uniform gain shape was evaluated");
+            return Some((gains, symbols, d));
+        }
+        for _pass in 0..1 {
+            for i in 0..nsub {
+                for step in [-6i32, -3, 3, 6] {
+                    let mut trial = gains.clone();
+                    trial[i] = (trial[i] + step).clamp(GAIN_MIN, GAIN_MAX);
+                    let trial = canonical_gains(&trial);
+                    if trial == gains {
+                        continue;
+                    }
+                    if let Some((d, symbols)) =
+                        self.eval_gains(frame, model, k_q, description_bytes, block, &trial, cap)
+                        && d < best.as_ref().map(|b| b.0).unwrap_or(f64::INFINITY)
+                    {
+                        gains = trial;
+                        best = Some((d, symbols));
+                    }
+                }
+            }
+        }
+        let (d, symbols) = best.expect("uniform gain shape was evaluated");
+        Some((gains, symbols, d))
+    }
+
+    /// Weighted distortion of one gain shape, if its complete frame fits `limit`.
+    fn eval_gains(
+        &self,
+        frame: &[f64],
+        model: &FrameModel,
+        k_q: &[i32],
+        description_bytes: usize,
+        block: usize,
+        gains: &[i32],
+        limit: usize,
+    ) -> Option<(f64, Vec<i32>)> {
+        let s = vp::close_loop_gains(&self.state, frame, model, k_q, vp::RESIDUAL_SUB_LEN, gains);
+        let uniform = gains.iter().all(|&g| g == gains[0]);
+        let overhead = if uniform { 0 } else { 1 + block };
+        let cost = description_bytes + overhead + residual::estimated_bytes(&s.symbols);
+        (cost <= limit).then_some((s.distortion, s.symbols))
     }
 
     /// The encoder's own reconstruction ring, for evidence and tests.
@@ -1073,15 +1501,7 @@ impl VoiceDecoder {
         }
         let mut out = Vec::with_capacity(self.config.packet_samples());
         for c in &coded {
-            let samples = vp::synthesize(
-                &mut self.state,
-                &c.k_q,
-                c.model.width,
-                c.model.lag,
-                c.model.ltpg_q,
-                c.gain,
-                &c.symbols,
-            );
+            let samples = c.synthesize_into(&mut self.state);
             out.extend(samples.into_iter().map(round_sample));
         }
         self.last = coded.last().cloned();
@@ -1139,9 +1559,12 @@ impl VoiceDecoder {
         self.last = Some(CodedFrame {
             model,
             k_q: c.spectral.iter().map(|&v| i32::from(v)).collect(),
+            spectral: Vec::new(),
             gain: c.gain,
+            gains: vec![c.gain],
             residual: Vec::new(),
             symbols: Vec::new(),
+            excitation: None,
         });
     }
 
@@ -1160,6 +1583,11 @@ impl VoiceDecoder {
                 model.ltpg_q = red.ltpg_q;
             }
             if self.last.is_none() {
+                let red_gain = if red.mask & RED_GAIN != 0 {
+                    red.gain
+                } else {
+                    0
+                };
                 self.last = Some(CodedFrame {
                     model,
                     k_q: red
@@ -1168,13 +1596,12 @@ impl VoiceDecoder {
                         .take(model.order)
                         .map(|&v| i32::from(v))
                         .collect(),
-                    gain: if red.mask & RED_GAIN != 0 {
-                        red.gain
-                    } else {
-                        0
-                    },
+                    spectral: Vec::new(),
+                    gain: red_gain,
+                    gains: vec![red_gain],
                     residual: Vec::new(),
                     symbols: Vec::new(),
+                    excitation: None,
                 });
             }
         }
@@ -1410,8 +1837,11 @@ mod tests {
     #[test]
     fn the_encoder_picks_a_model_that_fits_the_frame_allowance() {
         // At 16 kbps with 20 ms frames the allowance is 40 bytes; the model
-        // description must leave room for the residual.
-        let cfg = config(320, 1, 16_000);
+        // description must leave room for the residual. Redundancy is off here:
+        // it is a separately-priced mechanism that deliberately spends packet
+        // bytes, so it is not part of this contract.
+        let mut cfg = config(320, 1, 16_000);
+        cfg.redundancy = false;
         let mut enc = VoiceEncoder::new(cfg).unwrap();
         let src = speech(320 * 4, 0x31);
         for chunk in src.chunks(320) {

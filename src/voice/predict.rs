@@ -62,11 +62,109 @@ pub const HIST_LEN: usize = MAX_LAG + 16;
 pub const GAIN_MIN: i32 = -4;
 /// Upper residual gain bound searched by the closed loop.
 pub const GAIN_MAX: i32 = 44;
+/// Samples per residual-gain subframe. A single quantiser step per 20 ms frame
+/// is the coarse-quantiser overload trap the standards avoid: AMR-WB, EVS and
+/// SILK all carry one gain per 5 ms. 80 samples = 5 ms at 16 kHz.
+pub const RESIDUAL_SUB_LEN: usize = 80;
 /// Saturation applied to every reconstructed sample. A resonant synthesis
 /// filter is minimum phase but can still ring far up on sustained excitation;
 /// saturating keeps the ring finite **identically** on both sides, because both
 /// run this same loop.
 pub const SATURATION: f64 = 2.0e9;
+
+/// Numerator bandwidth-expansion factor of the perceptual weighting filter.
+pub const WEIGHT_GAMMA1: f64 = 0.9;
+/// Denominator bandwidth-expansion factor of the perceptual weighting filter.
+pub const WEIGHT_GAMMA2: f64 = 0.6;
+
+/// Whether the closed loop minimises the *perceptually weighted* error.
+///
+/// The mechanism is implemented and tested ([`weighted_error_energy`]), and with
+/// `γ₁ = γ₂ = 1` it reduces exactly to plain MSE, so this switch is the only
+/// difference between the two objectives. It is **off** because it is measured to
+/// lower the profile's declared metric: enabling it changes which model and
+/// excitation are chosen toward perceptually better but MSE-worse reconstructions
+/// (320×1 @24k falls 11.07 → 9.32 dB and @32k 15.52 → 13.34 dB on the court's
+/// cases), and almost doubles the distortion-evaluation cost, pushing encode p99
+/// to 6.8 ms against the 5 ms constitution. It should be re-opened together with
+/// the court's ViSQOL column, which is the metric it is actually for.
+pub const WEIGHTING: bool = false;
+
+/// The `(γ₁, γ₂)` pair the closed loop uses.
+pub fn weight_gammas() -> (f64, f64) {
+    if WEIGHTING {
+        (WEIGHT_GAMMA1, WEIGHT_GAMMA2)
+    } else {
+        (1.0, 1.0)
+    }
+}
+
+/// Perceptually weighted error energy of a reconstruction.
+///
+/// Plain MSE spends bits on error the ear never hears (formant peaks) and starves
+/// the spectral valleys where it does. CELP therefore minimises the error through
+/// the weighting filter
+///
+/// ```text
+/// W(z) = A(z/γ₁) / A(z/γ₂),   A(z) = 1 − Σ_j w_j z^-j
+/// ```
+/// which de-emphasises the formants. The filter is encoder-only: the decoder is
+/// unchanged and no bit is spent on it. Implementing it as
+/// `(1 − Σ w_j γ₁^j z^-j)·E = (1 − Σ w_j γ₂^j z^-j)·E_w` gives the recursion
+/// `e_w[n] = e[n] − Σ_j w_j γ₁^j e[n−j] + Σ_j w_j γ₂^j e_w[n−j]`.
+///
+/// The filter memory starts at zero for each call, so every candidate for the same
+/// span is scored on identical footing.
+pub fn weighted_error_energy(
+    target: &[f64],
+    out: &[f64],
+    w: &[f64],
+    gamma1: f64,
+    gamma2: f64,
+) -> f64 {
+    let order = w.len();
+    // `γ₁ = γ₂` makes `W(z) = 1`, so the weighted error is the plain error. Taking
+    // that branch keeps the disabled switch free rather than paying the filter.
+    if order == 0 || (gamma1 - gamma2).abs() < 1e-12 {
+        return target
+            .iter()
+            .zip(out.iter())
+            .map(|(x, y)| (x - y) * (x - y))
+            .sum();
+    }
+    let mut gamma1_pow = vec![0.0f64; order];
+    let mut gamma2_pow = vec![0.0f64; order];
+    let (mut a1, mut a2) = (gamma1, gamma2);
+    for j in 0..order {
+        gamma1_pow[j] = a1;
+        gamma2_pow[j] = a2;
+        a1 *= gamma1;
+        a2 *= gamma2;
+    }
+    let mut e_hist = vec![0.0f64; order];
+    let mut ew_hist = vec![0.0f64; order];
+    let mut acc = 0.0f64;
+    let n = target.len().min(out.len());
+    for i in 0..n {
+        let e = target[i] - out[i];
+        let mut num = e;
+        for (j, &wj) in w.iter().enumerate() {
+            num -= wj * gamma1_pow[j] * e_hist[j];
+        }
+        let mut ew = num;
+        for (j, &wj) in w.iter().enumerate() {
+            ew += wj * gamma2_pow[j] * ew_hist[j];
+        }
+        acc += ew * ew;
+        if order > 1 {
+            e_hist.copy_within(0..order - 1, 1);
+            ew_hist.copy_within(0..order - 1, 1);
+        }
+        e_hist[0] = e;
+        ew_hist[0] = ew;
+    }
+    acc
+}
 
 /// Reflection coefficients of a `width`-bit quantiser have `shift = width - 1`.
 pub fn shift_of(width: u8) -> u8 {
@@ -88,10 +186,26 @@ pub struct FrameModel {
     pub ltpg_q: i32,
 }
 
+/// The `estimator` value reserved for the vector-quantised spectral path. The
+/// scalar estimators are 0..=2, so 3 is free and needs no extra mode bit; when
+/// it is set, `order` is [`crate::voice::vq::VQ_ORDER`] and `width` is
+/// [`crate::voice::vq::VQ_INTERNAL_WIDTH`] (an internal synthesis width, not a
+/// wire field).
+pub const VQ_ESTIMATOR: u8 = 3;
+
 impl FrameModel {
+    /// True when the spectrum is transmitted as a vector-quantiser index.
+    pub fn is_vq(&self) -> bool {
+        self.estimator == VQ_ESTIMATOR
+    }
+
     /// Bytes the model description occupies in a frame record.
     pub fn description_bytes(&self) -> usize {
-        let k_bytes = (self.order * usize::from(self.width)).div_ceil(8);
+        let k_bytes = if self.is_vq() {
+            crate::voice::vq::VQ_INDEX_BYTES
+        } else {
+            (self.order * usize::from(self.width)).div_ceil(8)
+        };
         1 + 1 + if self.lag > 0 { 3 } else { 0 } + k_bytes
     }
 }
@@ -191,10 +305,48 @@ fn effective_lag(lag: i32) -> usize {
     }
 }
 
-/// Synthesis from an explicit excitation stream.
+/// Synthesis from an explicit excitation stream with a **per-subframe** long-term
+/// predictor.
 ///
-/// This is the single reconstruction primitive. [`synthesize`] maps quantised
-/// symbols onto it; concealment supplies a repeated excitation directly.
+/// This is the single reconstruction primitive and the CELP loop. The adaptive
+/// term is the adaptive codebook: `gₐ(s)·u[n−lag(s)]` where `u` is the *total*
+/// excitation ring (previous adaptive plus fixed contributions), so the predictor
+/// accumulates a periodic waveform across frames instead of reading only the
+/// fixed part. `sub_len` fixes which subframe's `(lag, gain)` applies.
+pub fn synthesize_celp(
+    state: &mut VoiceState,
+    k_q: &[i32],
+    width: u8,
+    sub_len: usize,
+    pitch: &[(i32, i32)],
+    fixed: &[f64],
+) -> Vec<f64> {
+    let w = weights_of(k_q, width);
+    let sub_len = sub_len.max(1);
+    let mut out = Vec::with_capacity(fixed.len());
+    for (n, &e) in fixed.iter().enumerate() {
+        let (lag_i, ltpg_q) = pitch.get(n / sub_len).copied().unwrap_or((0, 0));
+        let ltpg = long_term_gain(ltpg_q);
+        let lag = effective_lag(lag_i);
+        let mut st = 0.0f64;
+        for (j, &wj) in w.iter().enumerate() {
+            st += wj * state.at(j);
+        }
+        let adaptive = if lag > 0 {
+            ltpg * state.excitation(lag - 1)
+        } else {
+            0.0
+        };
+        let u = (adaptive + e).clamp(-SATURATION, SATURATION);
+        let xh = (st + u).clamp(-SATURATION, SATURATION);
+        state.push(xh, u);
+        out.push(xh);
+    }
+    out
+}
+
+/// The uniform-pitch special case: one `(lag, gain)` for the whole span. The
+/// scalar path and concealment use this.
 pub fn synthesize_excitation(
     state: &mut VoiceState,
     k_q: &[i32],
@@ -203,23 +355,115 @@ pub fn synthesize_excitation(
     ltpg_q: i32,
     excitation: &[f64],
 ) -> Vec<f64> {
-    let w = weights_of(k_q, width);
-    let ltpg = long_term_gain(ltpg_q);
-    let lag = effective_lag(lag);
-    let mut out = Vec::with_capacity(excitation.len());
-    for &e in excitation {
-        let mut pred = 0.0f64;
-        for (j, &wj) in w.iter().enumerate() {
-            pred += wj * state.at(j);
+    let pitch = [(lag, ltpg_q)];
+    synthesize_celp(
+        state,
+        k_q,
+        width,
+        excitation.len().max(1),
+        &pitch,
+        excitation,
+    )
+}
+
+/// The residual gain code in force at sample `n`.
+#[inline]
+fn gain_at(gains: &[i32], sub_len: usize, n: usize) -> i32 {
+    if gains.is_empty() {
+        return GAIN_MAX;
+    }
+    gains[(n / sub_len.max(1)).min(gains.len() - 1)]
+}
+
+/// Subframe count for a frame of `n` samples at the residual-gain geometry.
+pub fn gain_subframes(n: usize) -> usize {
+    n.div_ceil(RESIDUAL_SUB_LEN).max(1)
+}
+
+/// Bits of the per-subframe gain block: one 4-bit delta per subframe after the
+/// first. The first gain rides in the frame's own gain byte.
+pub fn gain_block_bits(n: usize) -> usize {
+    gain_subframes(n).saturating_sub(1) * 4
+}
+
+/// Bytes of the per-subframe gain block.
+pub fn gain_block_bytes(n: usize) -> usize {
+    gain_block_bits(n).div_ceil(8)
+}
+
+/// Largest magnitude a chained 4-bit gain delta can carry.
+pub const GAIN_DELTA_LIMIT: i32 = 7;
+
+/// Pack the subframe gains after the first as chained 4-bit signed deltas,
+/// MSB-first. The encoder must reconstruct from the *quantised* deltas, so a
+/// value that cannot be represented is clamped here and again by the decoder.
+pub fn encode_gain_deltas(gains: &[i32]) -> Vec<u8> {
+    let mut out = Vec::new();
+    let mut acc = 0u32;
+    let mut bits = 0u32;
+    for pair in gains.windows(2) {
+        let d = (pair[1] - pair[0]).clamp(-GAIN_DELTA_LIMIT - 1, GAIN_DELTA_LIMIT);
+        acc = (acc << 4) | ((d as u32) & 0xF);
+        bits += 4;
+        if bits == 8 {
+            out.push(acc as u8);
+            acc = 0;
+            bits = 0;
         }
-        if lag > 0 {
-            pred += ltpg * state.excitation(lag - 1);
-        }
-        let xh = (pred + e).clamp(-SATURATION, SATURATION);
-        state.push(xh, e);
-        out.push(xh);
+    }
+    if bits > 0 {
+        out.push((acc << (8 - bits)) as u8);
     }
     out
+}
+
+/// Inverse of [`encode_gain_deltas`], returning exactly `nsub` gains.
+pub fn decode_gain_deltas(base: i32, bytes: &[u8], nsub: usize) -> Vec<i32> {
+    let mut gains = Vec::with_capacity(nsub);
+    gains.push(base);
+    let mut pos = 0usize;
+    for _ in 1..nsub {
+        let byte = bytes.get(pos >> 3).copied().unwrap_or(0);
+        let nibble = (byte >> (4 - (pos & 4))) & 0xF;
+        pos += 4;
+        let d = if nibble >= 8 {
+            i32::from(nibble) - 16
+        } else {
+            i32::from(nibble)
+        };
+        let prev = *gains.last().unwrap();
+        gains.push((prev + d).clamp(GAIN_MIN, GAIN_MAX));
+    }
+    gains
+}
+
+/// Reconstruction from a symbol stream whose quantiser step may change per
+/// subframe.
+///
+/// The step at sample `n` is `step_of(gains[n / sub_len])` (clamped to the last
+/// entry). `sub_len == usize::MAX` collapses to the single-gain case, which is
+/// what [`synthesize`] passes. Encoder and decoder run this identical loop, so a
+/// per-subframe gain cannot desynchronise them.
+#[allow(clippy::too_many_arguments)]
+pub fn synthesize_gains(
+    state: &mut VoiceState,
+    k_q: &[i32],
+    width: u8,
+    sub_len: usize,
+    gains: &[i32],
+    lag: i32,
+    ltpg_q: i32,
+    symbols: &[i32],
+) -> Vec<f64> {
+    let excitation: Vec<f64> = symbols
+        .iter()
+        .enumerate()
+        .map(|(n, &s)| {
+            let q = lp::quantizer(lp::step_of(gain_at(gains, sub_len, n)));
+            q.reconstruct(i64::from(s), lp::RECONSTRUCTION_OFFSET)
+        })
+        .collect();
+    synthesize_excitation(state, k_q, width, lag, ltpg_q, &excitation)
 }
 
 /// The shared synthesis loop used by the encoder's probe and the decoder.
@@ -233,12 +477,7 @@ pub fn synthesize(
     gain: i32,
     symbols: &[i32],
 ) -> Vec<f64> {
-    let q = lp::quantizer(lp::step_of(gain));
-    let excitation: Vec<f64> = symbols
-        .iter()
-        .map(|&s| q.reconstruct(i64::from(s), lp::RECONSTRUCTION_OFFSET))
-        .collect();
-    synthesize_excitation(state, k_q, width, lag, ltpg_q, &excitation)
+    synthesize_gains(state, k_q, width, usize::MAX, &[gain], lag, ltpg_q, symbols)
 }
 
 /// Quantise a reflection vector, guaranteeing `|k| < 1` for every code.
@@ -439,6 +678,10 @@ pub struct Candidate {
     pub model: FrameModel,
     /// Quantised reflection vector at the proposal width.
     pub k_q: Vec<i32>,
+    /// Unquantised reflection vector this candidate came from, at `model.order`.
+    /// The spectral vector quantiser needs it: converting the coarse width-6
+    /// codes would feed the codebook a spectrum the encoder never saw.
+    pub k_raw: Vec<f64>,
     /// Open-loop residual energy (ranking only, never a decision).
     pub energy: f64,
 }
@@ -471,6 +714,7 @@ pub fn analyse(state: &VoiceState, frame: &[i32], lag_hint: i32) -> Vec<Candidat
                     ltpg_q: if lag > 0 { lp::quantize_ltpg(ltpg) } else { 0 },
                 },
                 k_q: quantise_k(sub, 6),
+                k_raw: sub.to_vec(),
                 energy,
             });
         }
@@ -489,34 +733,55 @@ pub fn close_loop(
     k_q: &[i32],
     gain: i32,
 ) -> Synthesis {
+    close_loop_gains(state, frame, model, k_q, usize::MAX, &[gain])
+}
+
+/// Closed-loop evaluation with a quantiser step that may change per subframe.
+///
+/// This is the gain-normalised excitation search the standards use to escape the
+/// coarse-quantiser overload of a single frame-wide step: the step tracks the
+/// residual level within 5 ms instead of being set by the loudest moment of the
+/// whole frame. `sub_len == usize::MAX` is the uniform-gain case.
+pub fn close_loop_gains(
+    state: &VoiceState,
+    frame: &[f64],
+    model: &FrameModel,
+    k_q: &[i32],
+    sub_len: usize,
+    gains: &[i32],
+) -> Synthesis {
     let mut probe = state.clone();
     let mut symbols = Vec::with_capacity(frame.len());
     let mut samples = Vec::with_capacity(frame.len());
     let w = weights_of(k_q, model.width);
-    let q = lp::quantizer(lp::step_of(gain));
     let ltpg = long_term_gain(model.ltpg_q);
     let lag = effective_lag(model.lag);
-    let mut distortion = 0.0f64;
-    for &x in frame.iter() {
-        let mut pred = 0.0f64;
+    for (n, &x) in frame.iter().enumerate() {
+        let q = lp::quantizer(lp::step_of(gain_at(gains, sub_len, n)));
+        let mut st = 0.0f64;
         for (j, &wj) in w.iter().enumerate() {
-            pred += wj * probe.at(j);
+            st += wj * probe.at(j);
         }
-        if lag > 0 {
-            pred += ltpg * probe.excitation(lag - 1);
-        }
-        let r = x - pred;
-        let sym = q.symbol(r).clamp(-lp::MAX_SYMBOL, lp::MAX_SYMBOL);
+        let adaptive = if lag > 0 {
+            ltpg * probe.excitation(lag - 1)
+        } else {
+            0.0
+        };
+        let target = x - st - adaptive;
+        let sym = q.symbol(target).clamp(-lp::MAX_SYMBOL, lp::MAX_SYMBOL);
         // The distortion must describe the *transmitted* symbol, or the rate
         // search would be comparing two different quantisers.
-        let err = q.reconstruct(sym, lp::RECONSTRUCTION_OFFSET);
-        let xh = (pred + err).clamp(-SATURATION, SATURATION);
-        probe.push(xh, err);
+        let fixed = q.reconstruct(sym, lp::RECONSTRUCTION_OFFSET);
+        let u = (adaptive + fixed).clamp(-SATURATION, SATURATION);
+        let xh = (st + u).clamp(-SATURATION, SATURATION);
+        probe.push(xh, u);
         symbols.push(sym as i32);
         samples.push(xh);
-        let d = x - xh;
-        distortion += d * d;
     }
+    // The distortion is the *perceptually weighted* error energy (plain MSE when
+    // weighting is off), and it is encoder-only.
+    let (g1, g2) = weight_gammas();
+    let distortion = weighted_error_energy(frame, &samples, &w, g1, g2);
     Synthesis {
         samples,
         distortion,
@@ -638,10 +903,11 @@ mod tests {
         let mut dec = s.clone();
         let out = synthesize(&mut dec, &k_q, 6, 71, 18, 8, &synth.symbols);
         assert_eq!(out, synth.samples);
-        let mut e = 0.0f64;
-        for (&x, &y) in frame.iter().zip(synth.samples.iter()) {
-            e += (x - y) * (x - y);
-        }
+        // The distortion is the perceptually weighted error energy, so it must be
+        // reproduced by the shared weighting filter, not by a plain MSE sum.
+        let w = weights_of(&k_q, 6);
+        let (g1, g2) = weight_gammas();
+        let e = weighted_error_energy(&frame, &synth.samples, &w, g1, g2);
         assert!((e - synth.distortion).abs() < 1e-6);
     }
 

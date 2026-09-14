@@ -26,6 +26,7 @@ license = "MIT OR Apache-2.0"
 exclude = [
     "rust-toolchain.toml",
     "scripts/",
+    "examples/",
     "receipts/",
     "corpus/generated/",
     "docs/",

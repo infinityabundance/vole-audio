@@ -660,3 +660,46 @@ measurement that sets its priority:
 
 Resolution and any attributed losing cells are recorded in the 7C receipts and
 summarised in `docs/OPTIMIZATION.md`.
+
+### 13.7 Increment: LSF MSVQ + CELP excitation (measured)
+
+Two of §13.4's items were built and measured: an order-16 LSF split multi-stage
+vector quantiser (`src/voice/vq.rs`, frozen asset `assets/voice/lsf_msvq_v1.bin`,
+training and accounting in [`VOICE_VQ.md`](VOICE_VQ.md)) and an
+analysis-by-synthesis CELP excitation coder (`src/voice/celp.rs`), plus a
+perceptually weighted error objective (`predict.rs::weighted_error_energy`,
+currently defaulted off).
+
+Measured by the same court, same corpus, matched actual bitrate:
+
+```text
+                    v0.76.0            MSVQ+CELP          +combinatorial positions
+Opus   wins         0 of 3             0 of 3             0 of 3
+       mean ΔSNR    −8.36 dB           −7.40 dB           −7.15 dB
+EVS    wins         0 of 3             0 of 3             0 of 3
+       mean ΔSNR    −5.75 dB           −4.77 dB           −4.32 dB
+Lyra   cells        0                  0                  0
+encode p99          1.46 ms            4.77 ms            4.57 ms   (budget 5 ms)
+result sha256       —                  4d348517…          cc2addfa…
+```
+
+Three further mechanisms were implemented and **rejected on measurement**: a
+per-subframe residual gain shape (`SUBFRAME_GAIN`, defaulted off — matched means
+−7.42/−5.15 dB, encode p99 6053 µs), a per-frame encoder state advance (matched
+means unchanged; impaired mean 3.42 → 2.94 dB, encode p99 4.57 → 5.69 ms), and
+fit-preferring winner selection (−7.42/−5.15 dB). Each is retained in the tree
+and re-openable; none beat the state in the table, so none is defaulted on. The
+attribution — with the predictor measured at 18.31 dB gain, the scalar residual
+measured at the 0.83-bit/sample overload of §2.2, and a direct A/B showing the
+current CELP coder is a **net negative** at 12 kbps — is in
+[`VOICE_RD.md`](VOICE_RD.md), and the sourced mechanism reference (AMR-WB, EVS,
+Opus/SILK, PVQ) is in [`VOICE_MECHANISMS.md`](VOICE_MECHANISMS.md). The CELP
+mechanism is correct (it minimises the weighted synthesised error) and its
+pulse-position cost has been cut, but its remaining per-subframe overhead (23
+bits) still keeps it from winning at 8–12 kbps; that is the defect to fix next,
+not the search.
+
+This subsection records a loss. It does not claim the increment is a solution,
+and the mechanisms it names as *still to build* (efficient algebraic codebook,
+fractional pitch, ISP prediction, index entropy coding) are listed as not yet
+implemented.

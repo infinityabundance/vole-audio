@@ -1,5 +1,6 @@
 # Research materials and working context are not part of the implementation tree.
 /research/
+/.research/
 /vole-audio-prompt.txt
 
 # Rust build artifacts

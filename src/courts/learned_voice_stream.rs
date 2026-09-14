@@ -39,7 +39,7 @@ use std::process::Command;
 /// Frozen static-result hash over the VOLE-derived projection. Empty until the
 /// first observation is frozen; see `docs/PHASE_7C.md` §11.
 pub const LEARNED_VOICE_STREAM_SHA256: &str =
-    "989e3c3b98a304da615e1880a5ec0a4fb285aae50b612f720359fd9300f7c331";
+    "cc2addfa019a96b3c722ddaabe9fd0dff7eee4ed0cc47039eb435acecc2dba50";
 
 /// VOLE voice operating points (bits per second).
 const VOLE_RATES: [u32; 6] = [6_000, 8_000, 12_000, 16_000, 24_000, 32_000];
