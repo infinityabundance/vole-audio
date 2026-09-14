@@ -160,6 +160,12 @@ pub const FAMILY_BITS: u8 = 2;
 pub enum Spectral {
     /// The frozen 28-bit split-MSVQ index.
     Vq([u8; vq::VQ_INDEX_BYTES]),
+    /// The **nested** operating point (7C.2-F): stage 0 of each split only, with
+    /// stage 1 implied zero. The MSVQ is embedded, so this is a legal, coarser
+    /// spectrum that costs 16 bits instead of 28 — not a second codebook. At
+    /// 3.2 kbps the full index is 53 % of the frame, which is why a nested point
+    /// has to exist before anything else can be transmitted there.
+    Vq0([u8; vq::VQ_INDEX_BYTES]),
     /// Scalar reflection codes at one ladder width; order is the code count.
     Scalar { width: u8, codes: Vec<i32> },
 }
@@ -169,6 +175,7 @@ impl Spectral {
     pub fn bits(&self) -> usize {
         match self {
             Spectral::Vq(_) => usize::from(TIER_BITS) + vq::VQ_INDEX_BYTES * 8,
+            Spectral::Vq0(_) => usize::from(TIER_BITS) + vq::STAGE0_BITS as usize,
             Spectral::Scalar { width, codes } => {
                 usize::from(TIER_BITS) + 5 + codes.len() * usize::from(*width)
             }
@@ -180,6 +187,12 @@ impl Spectral {
             Spectral::Vq(idx) => {
                 w.bits(0, TIER_BITS);
                 w.bytes(idx);
+            }
+            Spectral::Vq0(idx) => {
+                w.bits(2, TIER_BITS);
+                let (s0, s1) = vq::stage0(idx);
+                w.bits(u32::from(s0), 8);
+                w.bits(u32::from(s1), 8);
             }
             Spectral::Scalar { width, codes } => {
                 w.bits(1, TIER_BITS);
@@ -225,6 +238,12 @@ impl Spectral {
                     codes.push(((raw << shift) as i32) >> shift);
                 }
                 Ok(Spectral::Scalar { width, codes })
+            }
+            2 => {
+                let s0 = r.bits(8)? as u8;
+                let s1 = r.bits(8)? as u8;
+                let idx = vq::pack_stage0(s0, s1);
+                Ok(Spectral::Vq0(idx))
             }
             _ => Err(Error::new(
                 Kind::Unsupported,
@@ -635,7 +654,9 @@ impl Frame2 {
     /// quantiser width for the shared synthesis loop.
     pub fn synthesis_codes(&self) -> (Vec<i32>, u8) {
         match &self.spectral {
-            Spectral::Vq(idx) => (vq::decode_index(idx), vq::VQ_INTERNAL_WIDTH),
+            Spectral::Vq(idx) | Spectral::Vq0(idx) => {
+                (vq::decode_index(idx), vq::VQ_INTERNAL_WIDTH)
+            }
             Spectral::Scalar { width, codes } => (codes.clone(), *width),
         }
     }
@@ -748,6 +769,57 @@ fn mse(a: &[f64], b: &[f64]) -> f64 {
     a.iter().zip(b.iter()).map(|(x, y)| (x - y) * (x - y)).sum()
 }
 
+/// Samples per envelope subframe of the local perceptual proxy.
+const ENV_SUB: usize = 80;
+/// Weight of the temporal-envelope term in the selector's proxy.
+///
+/// **Measured and disabled** (7C.2-F), exactly as `SUBFRAME_GAIN` was in 7C.1.
+/// The mechanism is sound — raw MSE is the wrong selector for a stochastic
+/// excitation, and `envelope_penalty` fixes that — but at `2.0` the controlled
+/// A/B on the frozen development corpus moved waveform SNR *down* at 6 kbps
+/// (+0.24 → −0.69), 8 kbps (+1.04 → +0.73), 9.2 kbps (+1.77 → +1.22) and
+/// 16 kbps (+5.04 → +4.80), and up only at 12 kbps (+4.23 → +4.77). Selection
+/// shifted toward level-matched but uncorrelated noise frames.
+///
+/// Whether that trade is perceptually better cannot be decided from SNR, which
+/// this charter explicitly refuses to make the north star, and `voice.exp2` is
+/// not yet a live profile, so the external court cannot arbitrate. Promoting a
+/// selector change on dev-only evidence is forbidden by §7 and §10, so the term
+/// is retained in-tree at zero weight until a court can measure it.
+pub const ENV_WEIGHT: f64 = 0.0;
+
+/// Temporal-envelope mismatch, in units of energy.
+///
+/// Raw MSE is the wrong selector for a *stochastic* excitation. When the
+/// reconstruction is uncorrelated with the target, which is exactly what the
+/// low-rate noise core produces, the MSE-optimal gain is **zero**: silence scores
+/// better than correctly-levelled shaped noise. Measured at 3.2 kbps this made
+/// the codec output near-silence (SNR 0.00 dB) while claiming to be lossy speech.
+/// Adding a short-time envelope term makes a level-matched noisy frame score
+/// better than a silent one, which is what the ear hears too.
+fn envelope_penalty(target: &[f64], out: &[f64]) -> f64 {
+    let n = target.len().min(out.len());
+    if n == 0 {
+        return 0.0;
+    }
+    let mut pen = 0.0f64;
+    for lo in (0..n).step_by(ENV_SUB) {
+        let hi = (lo + ENV_SUB).min(n);
+        let m = (hi - lo) as f64;
+        let et = (target[lo..hi].iter().map(|x| x * x).sum::<f64>() / m).sqrt();
+        let eo = (out[lo..hi].iter().map(|x| x * x).sum::<f64>() / m).sqrt();
+        pen += (et - eo) * (et - eo) * m;
+    }
+    pen
+}
+
+/// The selector's local perceptual proxy: waveform error plus a temporal-envelope
+/// term. The weights are fitted on the development corpus and then frozen; the
+/// external court remains the authority on whether the proxy correlates with it.
+fn proxy(target: &[f64], out: &[f64]) -> f64 {
+    mse(target, out) + ENV_WEIGHT * envelope_penalty(target, out)
+}
+
 /// Pulse-gain codes spanning the level implied by a residual RMS.
 fn noise_gain_codes(rms: f64) -> [i32; 3] {
     let centre = celp::gain_code(rms.max(1.0));
@@ -835,6 +907,18 @@ impl Exp2Codec {
                     vq::VQ_INTERNAL_WIDTH,
                     Spectral::Vq(idx),
                 ));
+                // 7C.2-F: the nested operating point, offered so the selector can
+                // trade spectral precision for transmitted excitation. It is a
+                // legal frame the decoder reconstructs exactly, and the encoder
+                // measures its consequence through the same round-trip as any
+                // other candidate.
+                let (s0, s1) = vq::stage0(&idx);
+                let idx0 = vq::pack_stage0(s0, s1);
+                opts.push((
+                    vq::decode_index(&idx0),
+                    vq::VQ_INTERNAL_WIDTH,
+                    Spectral::Vq0(idx0),
+                ));
             }
             opts.push((
                 c.k_q.clone(),
@@ -865,7 +949,7 @@ impl Exp2Codec {
                         return;
                     };
                     let o: Vec<f64> = out.iter().map(|&v| f64::from(v)).collect();
-                    let d = mse(&f, &o);
+                    let d = proxy(&f, &o);
                     let better = match &best {
                         None => true,
                         Some((bd, bb, _)) => {
@@ -895,7 +979,7 @@ impl Exp2Codec {
                 // 7C.2-E: the fractional-track core, offered against the control
                 // core rather than replacing it. Its pulse count is the codebook
                 // class, so each class is one candidate and the selector decides.
-                if sel.track_acelp && ci == best_cand && si == 0 {
+                if sel.track_acelp && ci == best_cand && si <= 1 {
                     for per in 1..=fcelp::MAX_PER_TRACK {
                         let dummy = fcelp::Params {
                             per_track: per,
@@ -1248,6 +1332,68 @@ mod tests {
         assert_ne!(bc, bt);
         assert_eq!(Frame2::read(&bc, 320).unwrap(), control);
         assert_eq!(Frame2::read(&bt, 320).unwrap(), track);
+    }
+
+    #[test]
+    fn nested_spectral_tier_round_trips_and_is_exactly_smaller() {
+        // The MSVQ is embedded, so stage 0 alone is a legal coarser spectrum.
+        let full = [0x5Au8, 0x33, 0xC7, 0x01];
+        let (s0, s1) = vq::stage0(&full);
+        let nested = vq::pack_stage0(s0, s1);
+        let f = Frame2 {
+            spectral: Spectral::Vq0(nested),
+            excitation: Excitation::Noise { gain: 20, seed: 1 },
+        };
+        let (bytes, bits) = f.write();
+        assert_eq!(bits, f.bits());
+        // tier(2) + two 8-bit stage-0 sub-indices.
+        assert_eq!(bits, 2 + 16 + 2 + 6 + 3);
+        // 16 bits cheaper than the full index on the same frame.
+        let full_frame = Frame2 {
+            spectral: Spectral::Vq(full),
+            excitation: Excitation::Noise { gain: 20, seed: 1 },
+        };
+        assert_eq!(full_frame.bits() - f.bits(), 16);
+        let back = Frame2::read(&bytes, 320).unwrap();
+        assert_eq!(back, f, "the nested tier must survive the wire");
+        // And the two tiers must address the same codebook: the nested decode is
+        // the full decode of the same index with stage 1 zeroed.
+        assert_eq!(back.synthesis_codes(), f.synthesis_codes());
+        let (b2, n2) = back.write();
+        assert_eq!((b2, n2), (bytes, bits));
+    }
+
+    #[test]
+    fn envelope_penalty_rejects_silence_that_raw_mse_accepts() {
+        // The measured 7C.2-F finding, pinned so it cannot silently regress: for
+        // an uncorrelated reconstruction, MSE is *minimised by silence*, while the
+        // envelope term prefers a level-matched frame.
+        let target: Vec<f64> = (0..320)
+            .map(|i| 1000.0 * (0.2 * i as f64).sin() + 500.0 * (0.9 * i as f64).cos())
+            .collect();
+        let silent = vec![0.0f64; 320];
+        // Uncorrelated, but with the right short-time level.
+        let mut s = 0x1234_5678u64;
+        let mut noisy = Vec::with_capacity(320);
+        for lo in (0..320).step_by(ENV_SUB) {
+            let hi = (lo + ENV_SUB).min(320);
+            let e = (target[lo..hi].iter().map(|x| x * x).sum::<f64>() / (hi - lo) as f64).sqrt();
+            for _ in lo..hi {
+                s = s.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
+                noisy.push(e * (((s >> 40) as i64 % 2001 - 1000) as f64 / 1000.0));
+            }
+        }
+        // Raw MSE prefers silence...
+        assert!(mse(&target, &silent) < mse(&target, &noisy));
+        // ...while the envelope penalty prefers the level-matched frame.
+        assert!(envelope_penalty(&target, &silent) > envelope_penalty(&target, &noisy));
+        // With a positive weight the proxy would also prefer it; the shipped
+        // weight is 0 (disabled pending court evidence), so assert the mechanism
+        // directly rather than the constant.
+        let w = 2.0;
+        let d_silent = mse(&target, &silent) + w * envelope_penalty(&target, &silent);
+        let d_noisy = mse(&target, &noisy) + w * envelope_penalty(&target, &noisy);
+        assert!(d_noisy < d_silent);
     }
 
     #[test]

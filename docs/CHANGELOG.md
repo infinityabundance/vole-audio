@@ -565,6 +565,41 @@ instrument measurements on the frozen effectiveness corpus, not court results.
 Library suite: 799 passed, 12 ignored, 0 failed. Both courts reproduce their
 frozen identities (`cc2addfa…`, `23eaf361…`).
 
+## Phase 7C.2-F — nested spectral tier and selector proxy (v0.80.0)
+
+Seal 7C.2-F was scoped as rate-scaled spectral precision plus voicing-dependent
+allocation. Both halves were implemented; **neither is promoted**, and both
+negative results are recorded.
+
+* **Nested spectral operating point.** `vq::stage0` / `vq::pack_stage0` expose the
+  MSVQ's stage 0, and `Spectral::Vq0` (wire tier 2) transmits it alone — 18 bits
+  instead of 34, a 16-bit saving that is a legal *nested* spectrum because the
+  codebook is embedded. Measured A/B: identical to the bit at every declared
+  rate, with the tier selected in **zero** frames. At 9.2 kbps the full spectrum
+  plus a coarse ACELP frame already fit, so the freed bits buy fewer pulses than
+  the precision they cost. Retained in-tree (free when unused, and the
+  precondition for 7C.2-H).
+* **A structural finding: MSE selects silence.** At 3.2 kbps the measured SNR is
+  **0.00 dB** — the output is uncorrelated with the input. Cause: for a
+  stochastic excitation the MSE-optimal gain is zero, so silence outscores
+  correctly-levelled shaped noise and the lowest-rate fallback degenerates to
+  near-silence. This is a concrete instance of the charter's §10 warning that SNR
+  cannot be the search objective.
+* **Envelope proxy implemented, measured, disabled.** `envelope_penalty` (a
+  short-time temporal-envelope term) plus `mse + W·penalty`, as §10 requires. At
+  `W = 2.0` waveform SNR *fell* at 6/8/9.2/16 kbps (+0.24 → −0.69, +1.04 →
+  +0.73, +1.77 → +1.22, +5.04 → +4.80) and rose only at 12 kbps (+4.23 →
+  +4.77). Promotion on dev-only evidence is forbidden and `voice.exp2` is not a
+  live profile, so `ENV_WEIGHT = 0.0` and the mechanism is retained in-tree,
+  following the `SUBFRAME_GAIN` precedent from 7C.1. A test pins the property.
+* **Reading.** The low-rate deficit is not a frame-local parameter-allocation
+  problem; the 64-bit frame cannot carry a coarse spectrum, a pitch trajectory,
+  gains and a useful innovation simultaneously. That confirms the charter's own
+  §18 conclusion that 3.2 kbps must be a synthesis/refinement mode (7C.2-H).
+
+No quality or bitrate claim is made. Regression court `learned-voice-stream`
+still reproduces `cc2addfa…`. Library suite: 88 voice tests pass.
+
 ## Current measured position
 
 Frozen real-speech **lossless** portfolio (effectiveness + held-out Mode C,

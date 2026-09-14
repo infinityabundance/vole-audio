@@ -78,10 +78,12 @@ frame whose mode does not use it.
 
 ```text
 frame := spectral excitation
+excitation := family(2)
 spectral := tier(2)
-              tier 0  index(28)                       # frozen split-MSVQ
+              tier 0  index(32)                       # full split-MSVQ (28 used)
               tier 1  order(3) width(2) codes(order×width)   # scalar reflection
-              tier 2,3 reserved
+              tier 2  stage0(8) stage0(8)             # nested: stage 0 only, 16 b
+              tier 3  reserved
 excitation := family(2)
               family 0  scalar: gain(8) payload_bits(12) payload(payload_bits)
               family 1  celp (7C.2-D):
@@ -239,7 +241,7 @@ now, before any `exp2` codec work, so the challenger court cannot be tuned.
 | 7C.2-C | hard-rate fallback architecture | **complete**: a low-information noise core, `Frame2::minimal` legal at 64 bits, and `Exp2Codec::encode_frame` — a hard-rate encoder that never exceeds the frame allowance (no `OVERSHOOT_LIMIT`). Measured on a synthetic speech-like signal over 40 frames per rate: 3.2 kbps 0.00 dB, 6 kbps 0.07, 8 kbps 0.07, 9.2 kbps 3.90, 12 kbps 4.89, 16 kbps 5.45 dB SNR. The 6–8 kbps cells collapse to the noise core because the per-subframe **23-bit overhead** does not fit 120–160 bits: this is the measured motivation for 7C.2-D |
 | 7C.2-D | frame pitch anchor + contours, gain prediction, implicit pulse count | **implemented** (`src/voice/exp2.rs`): CELP side information is one frame lag anchor (9 b) + 4-bit contour, one pitch gain (5 b) + 3-bit deltas, one innovation gain (6 b) + 4-bit deltas, and one frame pulse count (3 b). Per-subframe overhead fell from 23 b to ~6 b, a **60 b/frame** reduction at 320 samples. The wire is now a canonicalising map and the property asserted is idempotence plus decode fidelity to the read-back shot (not equality to pre-wire search parameters). Ladder over a synthetic speech-like signal, 40 frames/rate: 3.2 kbps 0.00 dB, 6 kbps 0.09, 8 kbps 0.09, 9.2 kbps 3.60, 12 kbps 4.61, 16 kbps 4.36. 6–8 kbps still collapse to the noise core, and 16 kbps regressed (5.45 → 4.36) because a single shared pulse count cannot satisfy subframes that want different counts: this is precisely the tension 7C.2-E removes by spreading side information at its intrinsic rate rather than at the subframe rate |
 | 7C.2-E | fractional multi-tap LTP + track ACELP + joint R–D search | **implemented** (`src/voice/fcelp.rs`, wire family 3). Quarter-sample lag via a fixed 4-tap Lagrange interpolation of the reconstructed excitation; four interleaved tracks of `k` signed pulses, with the pulse count carried by the codebook class instead of a field; joint per-subframe selection where the pitch is scored through the real synthesis loop and the innovation gain is closed-loop. **Measured A/B on the frozen effectiveness corpus (600 frames, `voice_bench exp2`):** vs the 7C.2-B/D CELP core, +1.77 dB at 12 kbps and +2.23 dB at 16 kbps; vs the scalar+noise baseline +3.27 dB and +3.26 dB. The core wins 271/600 frames at 12 kbps and 279/600 at 16 kbps. **It is never selected at ≤ 9.2 kbps**, because its side information does not fit those allowances: that is the measured motivation for 7C.2-F/G/H. Synthetic hard-rate ladder moved from 4.61/4.36 dB to **6.63/8.75 dB** at 12/16 kbps. Encode p99 was 11 477 µs when first written; after three measured cost fixes it is **4805 µs**, inside the 5 ms constitution. Two findings are retained as tests: the long-term gain is *recursive* (the output is a polynomial in the gain, not linear), and the class field removes the shared-count truncation flaw |
-| 7C.2-F | voicing-dependent allocation + noise excitation | held-out RD gain; no dev-only promotion |
+| 7C.2-F | voicing-dependent allocation + noise excitation | **implemented, not promoted; two negative results recorded.** (a) The **nested spectral operating point** (`Spectral::Vq0`, tier 2, 18 bits vs 34, saving 16 bits/frame) is legal because the MSVQ is embedded, but it is selected in **zero frames at every declared rate** — the coarse spectrum's distortion penalty exceeds the excitation the freed bits buy. Kept in-tree at zero cost when unused; it is a prerequisite for 7C.2-H. (b) **Diagnosis: at 3.2 kbps the codec outputs near-silence** (SNR 0.00 dB), because for an *uncorrelated* excitation — exactly what the stochastic fallback produces — MSE is minimised by gain → 0, so the selector prefers silence to correctly-levelled shaped noise. A short-time envelope term (`envelope_penalty`, weight `ENV_WEIGHT`) was implemented as §10 requires and **measured and disabled**: at weight 2.0 waveform SNR fell at 6/8/9.2/16 kbps and rose only at 12 kbps. Promotion on dev-only evidence is forbidden, so the weight ships at 0.0 |
 | 7C.2-G | TCX/PVQ escape mode | selected naturally by exact RD; improves mixed/transient cells |
 | 7C.2-H | procedural excitation + zero-bit predicted refinement | valid 6–9.2 kbps points improve perceptual metrics |
 | 7C.2-I | packet-reset entropy coding of remaining uncertainty | artifact shrinks without quality or recovery regression |
@@ -316,7 +318,61 @@ track) and 253 bits (two per track) per 20 ms frame. It therefore cannot appear 
 frames there. The 12–16 kbps win is real and measured; the low-rate target is
 still open and belongs to the cheaper-side-information seals.
 
-## 12. Non-claims
+## 12. Seal 7C.2-F — measured record (no promotable gain)
+
+Seal 7C.2-F was scoped as rate-scaled spectral precision plus voicing-dependent
+allocation. Both halves were implemented. **Neither is promoted**, and the reason
+is measured rather than assumed.
+
+**The nested spectral operating point.** `vq::stage0` / `vq::pack_stage0` extract
+and rebuild a stage-0-only index; the encoder offers it as `Spectral::Vq0`
+(tier 2) for both ACELP cores and every excitation. It is exactly 16 bits cheaper
+than the full index (18 vs 34), and it is a *nested* point rather than a second
+codebook: the MSVQ is embedded, so stage 0 is the coarse envelope the full index
+refines. The controlled A/B is unchanged to the bit at every declared rate, and
+the family histogram shows the tier is selected in **zero frames**. The reason is
+visible in the budget: at 9.2 kbps the full spectrum (34 b) plus a coarse ACELP
+frame already fit inside 184 bits, so the freed 16 bits buy fewer additional
+pulses than the spectral precision they cost. The tier stays in-tree — it is a
+legal operating point that costs nothing when unused, and it is the precondition
+for 7C.2-H — but a mechanism that loses its A/B does not get promoted.
+
+**The finding that matters more than the seal: MSE selects silence.** At 3.2 kbps
+(64 bits/frame) the codec's measured SNR is **0.00 dB**, which is not "poor
+quality" but "the output is uncorrelated with the input". Tracing it gives a
+structural result:
+
+> For a *stochastic* excitation the MSE-optimal gain is zero. If the
+> reconstruction is uncorrelated with the target, `min_g ‖t − g·h‖²` is attained
+> at `g = (t·h)/(h·h) ≈ 0`. Silence therefore scores better than
+> correctly-levelled shaped noise, and the lowest-rate fallback degenerates to
+> near-silence.
+
+This is why the charter's §10 warning — "raw SNR cannot remain the search north
+star" — is not stylistic: MSE is not merely a weak proxy at the bottom of the
+rate range, it is the *wrong* objective for the fallback core. A short-time
+temporal-envelope term (`envelope_penalty`) and a combined proxy
+(`mse + W·penalty`) were implemented accordingly, and the property is pinned by
+`envelope_penalty_rejects_silence_that_raw_mse_accepts`.
+
+**Why the fix ships disabled.** At `W = 2.0` the controlled A/B
+(`voice_bench exp2`, 600 frames of the frozen development corpus) moved waveform
+SNR **down**: 6 kbps +0.24 → −0.69, 8 kbps +1.04 → +0.73, 9.2 kbps +1.77 → +1.22,
+16 kbps +5.04 → +4.80, with an increase only at 12 kbps (+4.23 → +4.77) as
+selection shifted toward level-matched but uncorrelated noise frames. Whether that
+trade is perceptually better is exactly what SNR cannot decide, and `voice.exp2`
+is not a live profile, so the external court cannot arbitrate. §7 and §10 forbid
+promotion on dev-only evidence, so `ENV_WEIGHT = 0.0` and the term is retained
+in-tree, following the `SUBFRAME_GAIN` precedent from 7C.1.
+
+**Conclusion.** 7C.2-F produced no promotable gain, and the honest reading is
+that the low-rate deficit is **not** a parameter-allocation problem that
+frame-local tuning can solve. The 64-bit frame cannot carry a coarse spectrum,
+a pitch trajectory, gains and a useful innovation at once, which confirms §18:
+3.2 kbps has to be a synthesis-and-refinement mode (7C.2-H), not "ACELP with
+fewer pulses".
+
+## 13. Non-claims
 
 * `exp1` remains the control; its wire format is untouched.
 * The serializer in `src/voice/exp2.rs` is not yet a live profile: no court

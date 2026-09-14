@@ -207,6 +207,29 @@ fn parse_asset(bytes: &[u8]) -> Codebook {
     }
 }
 
+/// The two stage-0 sub-indices of a canonical index, as an 8-bit pair.
+///
+/// The MSVQ is embedded: stage 0 is the coarse envelope and stage 1 refines it,
+/// so a **nested operating point** can transmit stage 0 alone and decode a legal,
+/// coarser spectrum. This is the accessor that makes 7C.2-F's rate-scaled
+/// spectrum possible without a second codebook.
+pub fn stage0(index: &[u8; VQ_INDEX_BYTES]) -> (u8, u8) {
+    let p = unpack(index);
+    (p[0][0] as u8, p[1][0] as u8)
+}
+
+/// Rebuild a canonical index from stage-0 sub-indices alone (stage 1 zeroed).
+pub fn pack_stage0(s0: u8, s1: u8) -> [u8; VQ_INDEX_BYTES] {
+    let mut packed = 0u32;
+    packed |= u32::from(s0) << SPLIT_SHIFT[0];
+    packed |= u32::from(s1) << SPLIT_SHIFT[1];
+    packed.to_le_bytes()
+}
+
+/// Bits one split's stage-0 field occupies, and therefore the exact size of the
+/// nested (stage-0-only) spectral operating point.
+pub const STAGE0_BITS: u32 = STAGE_BITS[0][0] + STAGE_BITS[1][0];
+
 /// Unpack a wire index into `[split][stage]` sub-indices.
 #[inline]
 fn unpack(index: &[u8; VQ_INDEX_BYTES]) -> [[usize; STAGES]; SPLITS] {
