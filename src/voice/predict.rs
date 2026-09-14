@@ -719,6 +719,27 @@ pub fn analyse(state: &VoiceState, frame: &[i32], lag_hint: i32) -> Vec<Candidat
             });
         }
     }
+    // Every estimator can decline a frame (an all-zero or degenerate block makes
+    // the reflection recursion fail). A codec must never have no model: fall back
+    // to the stable degenerate model `A(z) = 1` (all-zero reflections), which is
+    // minimum phase by construction and lets the residual path carry the frame.
+    if out.is_empty() {
+        let order = *ORDER_LADDER.last().unwrap();
+        let zeros = vec![0.0f64; order];
+        let energy = open_loop_energy(state, &f, &zeros, 6);
+        out.push(Candidate {
+            model: FrameModel {
+                estimator: 0,
+                order,
+                width: 6,
+                lag: 0,
+                ltpg_q: 0,
+            },
+            k_q: quantise_k(&zeros, 6),
+            k_raw: zeros,
+            energy,
+        });
+    }
     out
 }
 

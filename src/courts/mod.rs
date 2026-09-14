@@ -155,6 +155,7 @@ pub mod learned_u1_wasted;
 pub mod learned_valuation_split;
 #[cfg(feature = "std")]
 pub mod learned_voice_stream;
+pub mod learned_voice_stream_exp2;
 #[cfg(feature = "std")]
 pub(crate) mod measure;
 #[cfg(feature = "std")]
@@ -446,6 +447,14 @@ causal frames, absolute parameters, bounded reconstructed state, state capsules,
 redundancy, VAD/DTX with procedural comfort noise) measured on clean quality at matched actual
 bitrate against external Opus, EVS and Lyra, and on the latency/loss/jitter Pareto surface through
 a deterministic seeded impairment engine; concealed audio is never claimed as reconstruction",
+    ),
+    (
+        "learned-voice-stream-exp2",
+        "Phase 7C.2-A challenger court for vole.audio.stream.voice.exp2 (constitution
+ docs/PHASE_7C2.md, frozen before the codec work): the codec under test — the voice.exp1 control
+ until 7C.2-C lands voice.exp2 — measured on a speaker-disjoint held-out corpus (test-clean) with
+ the headline metric an integrated bitrate-at-equal-quality delta (BD-rate equivalent) against
+ external Opus, EVS and Lyra with a bootstrap confidence interval, not a count of individual cells",
     ),
     (
         "learned-expert-mux",
@@ -780,6 +789,7 @@ pub fn run(name: &str, receipts_root: &Path) -> crate::error::Result<Verdict> {
         "learned-ngsa" => learned_ngsa::run(receipts_root),
         "learned-lossy" => learned_lossy::run(receipts_root),
         "learned-voice-stream" => learned_voice_stream::run(receipts_root),
+        "learned-voice-stream-exp2" => learned_voice_stream_exp2::run(receipts_root),
         "learned-residual-fusion" => learned_residual_fusion::run(receipts_root),
         "learned-stateful-parse" => learned_stateful_parse::run(receipts_root),
         "learned-iterative-reprice" => learned_iterative_reprice::run(receipts_root),

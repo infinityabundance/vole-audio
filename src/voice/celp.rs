@@ -177,14 +177,14 @@ fn comb(n: u32, k: u32) -> u64 {
 
 /// Bits to carry the rank of a `count`-subset of `SUB_LEN` positions: exactly
 /// `ceil(log2 C(SUB_LEN, count))`, and zero for the empty set.
-fn position_bits(count: usize) -> u8 {
+pub(crate) fn position_bits(count: usize) -> u8 {
     let c = comb(SUB_LEN as u32, count as u32);
     if c <= 1 { 0 } else { (c - 1).ilog2() as u8 + 1 }
 }
 
 /// Rank of a strictly increasing position set in the combinatorial number
 /// system: `Σ_i C(p_i, i + 1)`. Bijective onto `0..C(SUB_LEN, k)`.
-fn rank_positions(sorted: &[u8]) -> u64 {
+pub(crate) fn rank_positions(sorted: &[u8]) -> u64 {
     sorted
         .iter()
         .enumerate()
@@ -193,7 +193,7 @@ fn rank_positions(sorted: &[u8]) -> u64 {
 }
 
 /// Inverse of [`rank_positions`].
-fn unrank_positions(mut rank: u64, count: usize) -> Vec<u8> {
+pub(crate) fn unrank_positions(mut rank: u64, count: usize) -> Vec<u8> {
     let mut out = vec![0u8; count];
     let mut upper = (SUB_LEN as u32).saturating_sub(1);
     for i in (1..=count as u32).rev() {

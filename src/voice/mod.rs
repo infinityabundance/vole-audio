@@ -19,6 +19,7 @@
 //! in-process and deterministic.
 
 pub mod celp;
+pub mod exp2;
 pub mod impair;
 pub mod lsf;
 pub mod plc;

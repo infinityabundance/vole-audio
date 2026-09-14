@@ -127,6 +127,37 @@ pub fn mode_c_clips() -> Vec<RealClip> {
     parse_clips_from(MANIFEST_JSON, "mode_c")
 }
 
+/// The frozen Phase 7C.2-A **challenger** corpus.
+///
+/// It is the held-out `test-clean` split: speaker-disjoint from the regression
+/// court's `effectiveness` (dev-clean) material and from the LSF-VQ training
+/// split, and frozen in the same manifest under the same hash discipline. It is
+/// fixed **before** any `voice.exp2` codec work, so the challenger court cannot
+/// be tuned to.
+pub fn challenger_clips() -> Vec<RealClip> {
+    mode_c_clips()
+}
+
+/// Identity of the frozen 7C.2-A challenger corpus.
+pub fn challenger_corpus_sha256() -> String {
+    let mut bytes = Vec::new();
+    bytes.extend_from_slice(b"vole.audio.stream.voice.exp2.challenger.v1");
+    for clip in challenger_clips() {
+        bytes.extend_from_slice(clip.id.as_bytes());
+        bytes.push(0);
+        bytes.extend_from_slice(clip.split.as_bytes());
+        bytes.push(0);
+        bytes.extend_from_slice(clip.speaker.as_bytes());
+        bytes.push(0);
+        bytes.extend_from_slice(clip.path.as_bytes());
+        bytes.push(0);
+        bytes.extend_from_slice(&clip.frames.to_le_bytes());
+        bytes.extend_from_slice(clip.canonical_i32_sha256.as_bytes());
+        bytes.push(b'\n');
+    }
+    hex(&Sha256::digest(&bytes))
+}
+
 /// U1-domain effectiveness clips (frozen U1 s16 mapping, Seal S0).
 pub fn u1_effectiveness_clips() -> Vec<RealClip> {
     parse_clips_from(MANIFEST_U1_JSON, "effectiveness")
@@ -340,6 +371,25 @@ pub fn load_cases_domain(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn challenger_corpus_is_held_out_and_speaker_disjoint() {
+        let challenger = challenger_clips();
+        assert_eq!(challenger.len(), 8);
+        assert!(challenger.iter().all(|c| c.split == "test-clean"));
+        let eff = effectiveness_clips();
+        let dev: Vec<&str> = eff.iter().map(|c| c.speaker.as_str()).collect();
+        assert!(
+            challenger
+                .iter()
+                .all(|c| !dev.contains(&c.speaker.as_str())),
+            "the challenger corpus must be speaker-disjoint from the regression material"
+        );
+        let id = challenger_corpus_sha256();
+        assert_eq!(id.len(), 64);
+        assert_ne!(id, real_corpus_sha256());
+        assert_eq!(id, challenger_corpus_sha256(), "identity must be stable");
+    }
 
     #[test]
     fn manifest_is_frozen_and_well_formed() {

@@ -82,14 +82,14 @@ const RECOVERY_HOLD_SEGMENTS: usize = 1;
 // Tool discovery
 // ---------------------------------------------------------------------------
 
-struct VoiceTools {
-    media: media::Tools,
-    evs_cod: Option<PathBuf>,
-    evs_dec: Option<PathBuf>,
+pub(crate) struct VoiceTools {
+    pub(crate) media: media::Tools,
+    pub(crate) evs_cod: Option<PathBuf>,
+    pub(crate) evs_dec: Option<PathBuf>,
 }
 
 impl VoiceTools {
-    fn discover() -> VoiceTools {
+    pub(crate) fn discover() -> VoiceTools {
         let r = media::research_root();
         let evs_cod = r.join("clean-evs-master/EVS_cod");
         let evs_dec = r.join("clean-evs-master/EVS_dec");
@@ -181,7 +181,7 @@ fn evs_decode(tools: &VoiceTools, bit: &Path, work: &Path, tag: &str) -> Option<
 }
 
 /// Write a raw 16-bit little-endian mono stream, which is what EVS reads.
-fn write_raw16(path: &Path, samples: &[i32]) -> Result<()> {
+pub(crate) fn write_raw16(path: &Path, samples: &[i32]) -> Result<()> {
     let mut out = Vec::with_capacity(samples.len() * 2);
     for &s in samples {
         out.extend_from_slice(&(s.clamp(-32_768, 32_767) as i16).to_le_bytes());
@@ -193,7 +193,7 @@ fn write_raw16(path: &Path, samples: &[i32]) -> Result<()> {
 // Small numeric helpers
 // ---------------------------------------------------------------------------
 
-fn percentile(sorted: &[i64], p: f64) -> i64 {
+pub(crate) fn percentile(sorted: &[i64], p: f64) -> i64 {
     if sorted.is_empty() {
         return 0;
     }
@@ -262,9 +262,9 @@ fn recovery_ms(
 // Cases
 // ---------------------------------------------------------------------------
 
-struct Case {
-    id: String,
-    samples: Vec<i32>,
+pub(crate) struct Case {
+    pub(crate) id: String,
+    pub(crate) samples: Vec<i32>,
 }
 
 /// Conversation-scale cases are built by concatenating consecutive frozen
@@ -284,9 +284,24 @@ fn cases() -> Result<Vec<Case>> {
             "the voice court needs the frozen real speech corpus",
         ));
     }
-    let clips = crate::learned::corpus_real::effectiveness_clips();
+    cases_from(
+        &crate::learned::corpus_real::effectiveness_clips(),
+        CASE_CLIP_POOL,
+        CASE_TARGET_SAMPLES,
+    )
+}
+
+/// Build conversation-scale cases by concatenating consecutive clips of a
+/// provided frozen corpus, in manifest order, with no injected separator.
+/// Deterministic, so a challenger court can use a different split without
+/// changing the construction rule.
+pub(crate) fn cases_from(
+    clips: &[crate::learned::corpus_real::RealClip],
+    pool: usize,
+    target: usize,
+) -> Result<Vec<Case>> {
     let scratch = PathBuf::from("target/voice-court/scratch");
-    let loaded = crate::learned::corpus_real::load_cases(&clips, CASE_CLIP_POOL, &scratch)?;
+    let loaded = crate::learned::corpus_real::load_cases(clips, pool, &scratch)?;
     let mut groups: Vec<(String, Vec<i32>)> = Vec::new();
     for c in loaded {
         let ch = usize::from(c.clip.channels);
@@ -296,8 +311,8 @@ fn cases() -> Result<Vec<Case>> {
             continue;
         }
         match groups.last_mut() {
-            Some((_, acc)) if acc.len() < CASE_TARGET_SAMPLES => {
-                let want = (CASE_TARGET_SAMPLES - acc.len()).min(c.samples.len());
+            Some((_, acc)) if acc.len() < target => {
+                let want = (target - acc.len()).min(c.samples.len());
                 acc.extend_from_slice(&c.samples[..want]);
             }
             _ => groups.push((c.clip.id.clone(), c.samples.clone())),
@@ -326,14 +341,14 @@ fn cases() -> Result<Vec<Case>> {
 // VOLE measurement
 // ---------------------------------------------------------------------------
 
-struct CleanRun {
-    bytes: usize,
-    samples: Vec<i32>,
-    encode_ns: Vec<i64>,
-    decode_ns: Vec<i64>,
-    inactive: usize,
-    active_bytes: usize,
-    inactive_bytes: usize,
+pub(crate) struct CleanRun {
+    pub(crate) bytes: usize,
+    pub(crate) samples: Vec<i32>,
+    pub(crate) encode_ns: Vec<i64>,
+    pub(crate) decode_ns: Vec<i64>,
+    pub(crate) inactive: usize,
+    pub(crate) active_bytes: usize,
+    pub(crate) inactive_bytes: usize,
 }
 
 /// The constitution's default configuration for one operating point.
@@ -344,7 +359,12 @@ struct CleanRun {
 /// buffer has not yet released, which this codec's measured depth does not
 /// create. The mechanism is retained and priced rather than deleted, so a
 /// future depth or delay change can re-open the question on evidence.
-fn config_for(frame_len: u32, frames_per_packet: u8, bps: u32, dtx: bool) -> VoiceConfig {
+pub(crate) fn config_for(
+    frame_len: u32,
+    frames_per_packet: u8,
+    bps: u32,
+    dtx: bool,
+) -> VoiceConfig {
     VoiceConfig {
         sample_rate_hz: 16_000,
         frame_len,
@@ -357,7 +377,7 @@ fn config_for(frame_len: u32, frames_per_packet: u8, bps: u32, dtx: bool) -> Voi
 }
 
 /// Encode and cleanly decode one configuration, timing every packet.
-fn run_clean(cfg: VoiceConfig, source: &[i32]) -> Result<CleanRun> {
+pub(crate) fn run_clean(cfg: VoiceConfig, source: &[i32]) -> Result<CleanRun> {
     let n = cfg.packet_samples();
     let mut enc = VoiceEncoder::new(cfg)?;
     let mut dec = VoiceDecoder::new(cfg)?;
@@ -666,7 +686,7 @@ fn impairment_report(
     })
 }
 
-fn snr_aligned(reference: &[i32], test: &[i32]) -> f64 {
+pub(crate) fn snr_aligned(reference: &[i32], test: &[i32]) -> f64 {
     let lag = media::best_lag(reference, test, ALIGN_LAG);
     let (a, b) = media::aligned_pair(reference, test, lag);
     media::snr_db(&a, &b)
@@ -1120,7 +1140,7 @@ pub fn run(receipts_root: &Path) -> Result<Verdict> {
     )
 }
 
-fn run_visqol(
+pub(crate) fn run_visqol(
     tools: &VoiceTools,
     work: &Path,
     case: &str,
@@ -1164,7 +1184,10 @@ fn competitor_visqol(
 }
 
 /// Interpolate a competitor's measured curve at each VOLE operating point.
-fn matched_summary(vole: &[media::Point], competitor: &[media::Point]) -> serde_json::Value {
+pub(crate) fn matched_summary(
+    vole: &[media::Point],
+    competitor: &[media::Point],
+) -> serde_json::Value {
     if competitor.is_empty() {
         return serde_json::json!({
             "available": false,
@@ -1225,7 +1248,7 @@ fn matched_summary(vole: &[media::Point], competitor: &[media::Point]) -> serde_
 // Competitor ladders
 // ---------------------------------------------------------------------------
 
-fn opus_points(
+pub(crate) fn opus_points(
     tools: &VoiceTools,
     wav: &Path,
     work: &Path,
@@ -1282,7 +1305,12 @@ fn opus_points(
     out
 }
 
-fn evs_points(tools: &VoiceTools, raw: &Path, work: &Path, reference: &[i32]) -> Vec<media::Point> {
+pub(crate) fn evs_points(
+    tools: &VoiceTools,
+    raw: &Path,
+    work: &Path,
+    reference: &[i32],
+) -> Vec<media::Point> {
     let seconds = reference.len() as f64 / 16_000.0;
     let mut out = Vec::new();
     for &bps in &EVS_RATES {
@@ -1312,7 +1340,7 @@ fn evs_points(tools: &VoiceTools, raw: &Path, work: &Path, reference: &[i32]) ->
     out
 }
 
-fn lyra_points(
+pub(crate) fn lyra_points(
     tools: &VoiceTools,
     wav: &Path,
     work: &Path,

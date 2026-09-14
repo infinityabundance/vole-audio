@@ -441,6 +441,54 @@ attributed to scalar coefficient transmission setting a ~17.7 kbps floor before
 any residual symbol exists. The remainder, with coefficient vector quantisation
 first, is declared in [`PHASE_7C.md`](PHASE_7C.md) §13.4.
 
+## Phase 7C.1 — `vole.audio.stream.voice.exp1` increment (v0.76.0)
+
+LSF split multi-stage VQ (`src/voice/vq.rs`, frozen asset
+`assets/voice/lsf_msvq_v1.bin`), analysis-by-synthesis CELP excitation
+(`src/voice/celp.rs`) with combinatorial pulse-position coding, and two
+mechanisms retained but **defaulted off after measurement** (per-subframe
+residual gain; per-frame encoder state advance). Measured at matched actual
+bitrate: **−7.15 dB** vs Opus, **−4.32 dB** vs EVS (0 of 3 cells won), no
+operating point inside Lyra's range. Attribution in
+[`VOICE_RD.md`](VOICE_RD.md); the sourced mechanism reference is
+[`VOICE_MECHANISMS.md`](VOICE_MECHANISMS.md).
+
+## Phase 7C.2-A/B — `vole.audio.stream.voice.exp2` charter and serializer (v0.77.0)
+
+Charter [`PHASE_7C2.md`](PHASE_7C2.md) frozen **before** code, in the same
+discipline as 7C.
+
+* **The `exp1` representation floor, removed.** The generic frame envelope
+  duplicates CELP-specific pitch/gain and pads to bytes. For a 320-sample
+  pitched VQ-spectrum CELP frame the committed serializer spends 188 information
+  bits at zero pulses (padded 192); the new bit-accurate, mode-specific
+  serializer (`src/voice/exp2.rs`) spends **128**, and at four pulses 316 →
+  **228**. Both figures are asserted by test, not estimated. At 3.2 kbps a 20 ms
+  frame is 64 bits, which `exp1` cannot express at all.
+* **Challenger court.** `learned-voice-stream-exp2` is frozen before the codec
+  work, on a **speaker-disjoint held-out** corpus (test-clean, identity
+  `7de2453d2b249130b2edff2b457fcc29a37eb200215387aac82debec4200c6fa`), and
+  reports an integrated bitrate-at-equal-quality delta with a case-level
+  bootstrap CI plus its robust dual, quality-at-equal-rate.
+* **Control baseline (a loss, recorded before tuning).** On the `voice.exp1`
+  control: quality-at-equal-rate vs Opus **−4.54 dB SNR** (95 % CI −5.35 …
+  −3.72) and −2.61 ViSQOL MOS, vs EVS −4.39 dB / −2.59 MOS, vs Lyra `n/a` (no
+  overlapping rate range); bitrate-at-equal-quality vs Opus **+2.72 dB**
+  (CI +2.53 … +2.91), vs EVS +3.39 dB. `voice.exp2` is **not yet a live
+  profile**; only the serializer's bit accounting and decode fidelity are
+  established.
+* **Incidental fix.** `predict::analyse` could propose no candidate on a
+  degenerate frame (e.g. digital silence), erroring the encoder; it now falls
+  back to the stable model `A(z) = 1`. The regression court's result identity is
+  unchanged (`cc2addfa…`).
+
+Seal status: the full 76-row `seal verify` battery was **not** re-run for
+v0.77.0. The regression court `learned-voice-stream` remains SUPPORTED at
+`cc2addfa019a96b3c722ddaabe9fd0dff7eee4ed0cc47039eb435acecc2dba50` and the new
+challenger court is SUPPORTED at
+`23eaf3610af66d789bb188aedd6e1359ba9ac06ba706d691a2f853845588d43c`; the
+repository-wide seal still requires a source-bound battery on the tagged tree.
+
 ## Current measured position
 
 Frozen real-speech **lossless** portfolio (effectiveness + held-out Mode C,
