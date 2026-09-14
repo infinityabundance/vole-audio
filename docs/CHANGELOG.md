@@ -689,6 +689,58 @@ conclusion independently by a perceptual measure.
 
 Regression court `learned-voice-stream` unaffected. Voice tests: 95 passed.
 
+## Phase 7C.2-H (second step) — fitted selector weight (v0.83.0)
+
+The most important result of the phase. §12–§14 established that the MSE
+selector objective was the binding blocker; this seal fits a perceptual proxy on
+development material against ViSQOL, as the charter prescribes, and measures what
+changes.
+
+**The fit** (`voice_bench weights`), mean MOS-LQO over five rates:
+
+| weight | 6 kbps | 8 kbps | 9.2 kbps | 12 kbps | 16 kbps | mean |
+| ------ | ------ | ------ | -------- | ------- | ------- | ---- |
+| 0.0 | 1.205 | 1.180 | 1.156 | 1.342 | 1.369 | 1.250 |
+| 0.5 | 1.390 | 1.309 | 1.183 | 1.304 | 1.298 | 1.297 |
+| **2.0** | 1.445 | **1.383** | **1.408** | 1.414 | 1.428 | **1.416** |
+| 4.0 | **1.496** | 1.248 | 1.305 | **1.443** | **1.459** | 1.390 |
+| 8.0 | 1.316 | 1.318 | 1.413 | 1.303 | 1.377 | 1.345 |
+
+Unimodal and shallow; `2.0` peaks the mean and is best or near-best at every
+rate, while `4.0` collapses at 8 kbps. Frozen as `DEFAULT_ENV_WEIGHT`, recorded
+as a **dev fit** (three cases) with **no claim attached** until the held-out court
+measures it.
+
+**SNR and perceptual quality now disagree in sign.**
+
+| rate | SNR (w=0 → w=2) | ViSQOL MOS (w=0 → w=2) |
+| ---- | --------------- | ---------------------- |
+| 6 kbps | +0.24 → **−0.69** | 1.205 → **1.445** |
+| 8 kbps | +1.04 → +0.73 | 1.180 → **1.383** |
+| 9.2 kbps | +1.77 → **1.22** | 1.156 → **1.408** |
+| 12 kbps | +4.23 → +4.77 | 1.342 → 1.414 |
+| 16 kbps | +5.04 → +4.80 | 1.369 → 1.428 |
+
+At 6 and 9.2 kbps the measures move in **opposite directions** and the perceptual
+judge prefers what the waveform measure rejects. Mean MOS rises 1.250 → 1.416
+(+13 %), largest where the codec was weakest. This is the measured vindication of
+the charter's refusal to make SNR the search objective: for three seals it was not
+merely imprecise at the bottom of the rate range, it pointed the wrong way.
+
+**7C.2-G's verdict is reversed.** Under MSE the escape core was selected in zero
+frames. Under the fitted proxy it is selected at 8 and 9.2 kbps and is *better*
+(1.406 vs 1.383; 1.481 vs 1.408) at the same or fewer bits. It still ships
+disabled, because the cost stands (4464 µs at 8 kbps, 5379 at 9.2 kbps, 8.8 ms at
+16 kbps); the switch remains so the reversal is reproducible. A mechanism can be
+rejected by a bad objective and be fine.
+
+**Cost, disclosed as pre-existing.** Encode p99 at 16 kbps is 5527 µs against the
+5 ms constitution — but the *control* `voice.exp1` baseline is already 5811 µs in
+the regression court, so the voice profile's encode deadline is an inherited open
+problem, not a regression introduced here.
+
+Regression court `learned-voice-stream` unaffected. Voice tests: 95 passed.
+
 ## Current measured position
 
 Frozen real-speech **lossless** portfolio (effectiveness + held-out Mode C,

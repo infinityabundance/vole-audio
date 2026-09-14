@@ -247,7 +247,7 @@ now, before any `exp2` codec work, so the challenger court cannot be tuned.
 | 7C.2-E | fractional multi-tap LTP + track ACELP + joint R–D search | **implemented** (`src/voice/fcelp.rs`, wire family 3). Quarter-sample lag via a fixed 4-tap Lagrange interpolation of the reconstructed excitation; four interleaved tracks of `k` signed pulses, with the pulse count carried by the codebook class instead of a field; joint per-subframe selection where the pitch is scored through the real synthesis loop and the innovation gain is closed-loop. **Measured A/B on the frozen effectiveness corpus (600 frames, `voice_bench exp2`):** vs the 7C.2-B/D CELP core, +1.77 dB at 12 kbps and +2.23 dB at 16 kbps; vs the scalar+noise baseline +3.27 dB and +3.26 dB. The core wins 271/600 frames at 12 kbps and 279/600 at 16 kbps. **It is never selected at ≤ 9.2 kbps**, because its side information does not fit those allowances: that is the measured motivation for 7C.2-F/G/H. Synthetic hard-rate ladder moved from 4.61/4.36 dB to **6.63/8.75 dB** at 12/16 kbps. Encode p99 was 11 477 µs when first written; after three measured cost fixes it is **4805 µs**, inside the 5 ms constitution. Two findings are retained as tests: the long-term gain is *recursive* (the output is a polynomial in the gain, not linear), and the class field removes the shared-count truncation flaw |
 | 7C.2-F | voicing-dependent allocation + noise excitation | **implemented, not promoted; two negative results recorded.** (a) The **nested spectral operating point** (`Spectral::Vq0`, tier 2, 18 bits vs 34, saving 16 bits/frame) is legal because the MSVQ is embedded, but it is selected in **zero frames at every declared rate** — the coarse spectrum's distortion penalty exceeds the excitation the freed bits buy. Kept in-tree at zero cost when unused; it is a prerequisite for 7C.2-H. (b) **Diagnosis: at 3.2 kbps the codec outputs near-silence** (SNR 0.00 dB), because for an *uncorrelated* excitation — exactly what the stochastic fallback produces — MSE is minimised by gain → 0, so the selector prefers silence to correctly-levelled shaped noise. A short-time envelope term (`envelope_penalty`, weight `ENV_WEIGHT`) was implemented as §10 requires and **measured and disabled**: at weight 2.0 waveform SNR fell at 6/8/9.2/16 kbps and rose only at 12 kbps. Promotion on dev-only evidence is forbidden, so the weight ships at 0.0 |
 | 7C.2-G | TCX/PVQ escape mode | **implemented, measured, disabled; negative result recorded.** A new voice-track primitive `src/voice/pvq.rs` (orthonormal DCT-IV + PVQ, no dependency on the general-audio `src/lossy/` track) backs an escape sub-mode of the fallback family, so ACELP frames pay zero bits for it. On the frozen development corpus it is selected in **zero frames at every declared rate** — bits and SNR are identical with and without it — and it costs up to **8864 µs** encode p99 at 16 kbps against the 5 ms constitution. The mechanism is verified *faithful* by test (`the_escape_core_reconstructs_its_own_quantisation`), so the negative is a real measurement. The diagnosis in §13 ties it to 7C.2-F: with MSE as the objective, any reconstruction with correlation ρ < 0.5 scores worse than silence |
-| 7C.2-H | procedural excitation + zero-bit predicted refinement | **first step landed: the perceptual arbiter (see §14).** `voice_bench visqol` runs the court's frozen ViSQOL protocol on the development corpus. It confirms 7C.2-E's 12/16 kbps win perceptually (+0.12 / +0.23 MOS-LQO over the control core), confirms 7C.2-G's negative (bit-identical), and exposes that the encoder leaves up to **53 %** of the frame allowance unspent when only fallback cores exist. Procedural excitation still to come |
+| 7C.2-H | procedural excitation + zero-bit predicted refinement | **two steps landed, and the second is the phase's most important result.** (1) The perceptual arbiter (§14): `voice_bench visqol` runs the court's frozen ViSQOL protocol on the development corpus, confirming 7C.2-E's 12/16 kbps win perceptually and 7C.2-G's negative, and exposing that the encoder left up to 53 % of the frame allowance idle. (2) The **fitted selector weight** (§15): the envelope weight is fitted on development material (`voice_bench weights`), peaking at **2.0**; mean MOS-LQO rises 1.250 → **1.416** (+13 %), and **SNR and MOS now disagree in sign at 6 and 9.2 kbps** — the measured vindication of §10. The fit also *reverses* 7C.2-G's verdict: the escape core is selected at 8–9.2 kbps under the perceptual proxy and is better there, but its cost still blocks it. Procedural excitation still to come |
 | 7C.2-I | packet-reset entropy coding of remaining uncertainty | artifact shrinks without quality or recovery regression |
 | 7C.2-J | frozen causal learned refinement experiment | promote only if a gain survives model size, decode p99, memory and the held-out court |
 | 7C.2-K | final listening + impairment seal | superiority claim permitted **only** here |
@@ -521,7 +521,62 @@ At 3.2–9.2 kbps the spread between cores is within ±0.03 MOS, so the low-rate
 range is uniformly non-competitive *regardless of core*, which is 7C.2-F's
 conclusion reached independently by a perceptual measure.
 
-## 15. Non-claims
+## 15. Fitted selector weight — 7C.2-H, second step
+
+§14 established that the MSE objective is the binding blocker. §7 prescribes the
+remedy: fit the proxy's free parameter on **development** material, freeze it, and
+let the held-out court decide whether the proxy correlates with a perceptual
+judge. `voice_bench weights` does the fitting.
+
+**The fit.** Mean MOS-LQO over the five rates, by envelope weight:
+
+```text
+w = 0.0   1.250      w = 1.0   1.344      w = 4.0   1.390
+w = 0.25  1.293      w = 2.0   1.416      w = 8.0   1.345
+```
+
+The response is unimodal and shallow. `2.0` peaks the mean and is best or
+near-best at *every* rate, while `4.0` collapses at 8 kbps (1.248 against 1.383).
+That shallow, monotone-in-the-middle shape is what makes the choice defensible
+rather than a knife edge. It is frozen as [`exp2::DEFAULT_ENV_WEIGHT`], recorded
+as a **dev fit** — three development cases — and **no quality claim attaches to
+it** until the held-out court measures it.
+
+**The result that matters: SNR and perceptual quality now disagree in sign.**
+
+```text
+rate      SNR (w=0 → w=2)        ViSQOL MOS (w=0 → w=2)
+6 kbps     +0.24 → −0.69          1.205 → 1.445
+8 kbps     +1.04 → +0.73          1.180 → 1.383
+9.2 kbps   +1.77 → 1.22           1.156 → 1.408
+12 kbps    +4.23 → +4.77          1.342 → 1.414
+16 kbps    +5.04 → +4.80          1.369 → 1.428
+```
+
+At 6 kbps and 9.2 kbps the two measures move in **opposite directions**, and the
+perceptual judge prefers the configuration the waveform measure rejects. This is
+the concrete, measured vindication of the charter's §10 refusal to make SNR the
+north star: for three seals the objective was not merely imprecise at the bottom
+of the rate range, it was pointing the wrong way. Mean MOS rises from 1.250 to
+1.416, a 13 % relative improvement, with the largest gains exactly where the
+codec was weakest.
+
+**A re-judgement: 7C.2-G was partly an artifact of the objective.** Under MSE the
+escape core was selected in zero frames at every rate. Under the fitted proxy it
+is now selected at 8 kbps and 9.2 kbps, and is *better* there (1.406 vs 1.383 and
+1.481 vs 1.408) while using the same or fewer bits. Its quality judgement is
+therefore reversed. It still does **not** ship enabled, because the cost stands:
+its encode p99 is 4464 µs at 8 kbps and 5379 µs at 9.2 kbps, and §13's 8.8 ms at
+16 kbps. The switch is retained so the reversal is reproducible.
+
+**Cost, and it is a pre-existing gap.** With the fitted proxy the encode p99 at
+16 kbps is 5527 µs against the 5 ms constitution. This is not a new regression:
+the *control* `voice.exp1` baseline is already **5811 µs** in the regression
+court. The voice profile's encode deadline is an open problem inherited from 7C,
+not introduced here, and it is recorded as such rather than attributed to the
+selector change.
+
+## 16. Non-claims
 
 * `exp1` remains the control; its wire format is untouched.
 * The serializer in `src/voice/exp2.rs` is not yet a live profile: no court

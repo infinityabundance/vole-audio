@@ -241,6 +241,10 @@ fn main() {
             visqol_probe();
             return;
         }
+        Some("weights") => {
+            weight_probe();
+            return;
+        }
         _ => {}
     }
     let filter: Option<(u32, u8)> = if args.len() >= 2 {
@@ -309,6 +313,15 @@ fn main() {
     }
 }
 
+fn opts(celp: bool, track_acelp: bool, tcx: bool) -> Options {
+    Options {
+        celp,
+        track_acelp,
+        tcx,
+        env_weight: exp2::DEFAULT_ENV_WEIGHT,
+    }
+}
+
 /// `voice.exp2` core A/B on real speech: the same held-aside code path with the
 /// 7C.2-E fractional-track core offered and withheld, at every declared rate.
 /// Development instrument; the court remains the authority.
@@ -320,38 +333,10 @@ fn exp2_probe(filter: Option<&str>) {
     }
     const FRAME: usize = 320;
     let configs: [(&str, Options); 4] = [
-        (
-            "scalar+noise      ",
-            Options {
-                celp: false,
-                track_acelp: false,
-                tcx: false,
-            },
-        ),
-        (
-            "+celp (7C.2-B/D)  ",
-            Options {
-                celp: true,
-                track_acelp: false,
-                tcx: false,
-            },
-        ),
-        (
-            "+acelp (7C.2-E)   ",
-            Options {
-                celp: true,
-                track_acelp: true,
-                tcx: false,
-            },
-        ),
-        (
-            "+tcx (7C.2-G)     ",
-            Options {
-                celp: true,
-                track_acelp: true,
-                tcx: true,
-            },
-        ),
+        ("scalar+noise      ", opts(false, false, false)),
+        ("+celp (7C.2-B/D)  ", opts(true, false, false)),
+        ("+acelp (7C.2-E)   ", opts(true, true, false)),
+        ("+tcx (7C.2-G)     ", opts(true, true, true)),
     ];
     println!(
         "voice.exp2 core A/B over {} samples of frozen effectiveness speech",
@@ -486,6 +471,126 @@ fn visqol_mos(reference: &Path, degraded: &Path) -> Option<f64> {
     rows.last()?.split(',').nth(col)?.trim().parse::<f64>().ok()
 }
 
+/// Encode, decode and score one configuration over the development corpus.
+/// Returns `(MOS-LQO mean, bits/frame, encode p99 µs, cases scored)`.
+#[allow(clippy::too_many_arguments)]
+fn score_config(
+    cases: &[(String, Vec<i32>)],
+    refs: &[std::path::PathBuf],
+    dir: &Path,
+    bits: usize,
+    opts: Options,
+    tag: &str,
+    frame: usize,
+) -> Option<(f64, f64, i64, usize)> {
+    let mut mos_sum = 0.0;
+    let mut scored = 0usize;
+    let mut used = 0usize;
+    let mut frames = 0usize;
+    let mut enc_us: Vec<i64> = Vec::new();
+    for (i, (_, source)) in cases.iter().enumerate() {
+        let mut state = vp::VoiceState::new();
+        let mut out: Vec<i32> = Vec::with_capacity(source.len());
+        for chunk in source.chunks(frame) {
+            if chunk.len() < frame {
+                break;
+            }
+            let enc_state = state.clone();
+            let t0 = std::time::Instant::now();
+            let (bytes, nbits) = Exp2Codec::encode_frame_with(&enc_state, chunk, bits, opts);
+            enc_us.push(t0.elapsed().as_micros() as i64);
+            used += nbits;
+            frames += 1;
+            out.extend_from_slice(&Exp2Codec::decode_frame(&mut state, &bytes, frame).unwrap());
+        }
+        let p = dir.join(format!("deg-{tag}-{i}.wav"));
+        write_wav(&p, &out).unwrap();
+        if let Some(m) = visqol_mos(&refs[i], &p) {
+            mos_sum += m;
+            scored += 1;
+        }
+    }
+    enc_us.sort_unstable();
+    (scored > 0).then(|| {
+        (
+            mos_sum / scored as f64,
+            used as f64 / frames.max(1) as f64,
+            percentile(&enc_us, 99.0),
+            scored,
+        )
+    })
+}
+
+/// Write the development references once and report ViSQOL's own ceiling.
+fn write_references(
+    cases: &[(String, Vec<i32>)],
+    dir: &Path,
+) -> Option<(Vec<std::path::PathBuf>, f64)> {
+    let refs: Vec<std::path::PathBuf> = cases
+        .iter()
+        .enumerate()
+        .map(|(i, (_, s))| {
+            let p = dir.join(format!("ref-{i}.wav"));
+            write_wav(&p, s).unwrap();
+            p
+        })
+        .collect();
+    let mut sum = 0.0;
+    let mut n = 0usize;
+    for p in &refs {
+        if let Some(m) = visqol_mos(p, p) {
+            sum += m;
+            n += 1;
+        }
+    }
+    (n > 0).then(|| (refs, sum / n as f64))
+}
+
+/// Fit the selector's envelope weight against ViSQOL on the **development**
+/// corpus.
+///
+/// This is the charter's prescribed procedure: the proxy's free parameter is
+/// fitted on development material and then frozen, and the held-out challenger
+/// court is what decides whether the proxy correlates with a perceptual judge.
+/// The sweep also reports bits/frame, because §14 measured the MSE objective
+/// leaving up to 53 % of the allowance idle and a fix must spend it.
+fn weight_probe() {
+    let cases = cases();
+    let dir = std::path::PathBuf::from("target/voice-bench-vq");
+    std::fs::create_dir_all(&dir).unwrap();
+    const FRAME: usize = 320;
+    let Some((refs, ceiling)) = write_references(&cases, &dir) else {
+        println!("visqol is not available (research/visqol-master is missing)");
+        return;
+    };
+    let weights = [0.0f64, 0.25, 0.5, 1.0, 2.0, 4.0, 8.0];
+    let wanted = [6_000u32, 8_000, 9_200, 12_000, 16_000];
+    println!(
+        "envelope-weight sweep over {} development cases (ViSQOL speech mode, ceiling {ceiling:.3})",
+        cases.len()
+    );
+    println!("  weight | rate | MOS-LQO mean | bits/frame | enc p99");
+    for w in weights {
+        for (bps, bits) in exp2::DECLARED_RATES {
+            if !wanted.contains(&bps) {
+                continue;
+            }
+            let o = Options {
+                celp: true,
+                track_acelp: true,
+                tcx: false,
+                env_weight: w,
+            };
+            let tag = format!("w{}-{bps}", (w * 100.0) as u32);
+            if let Some((mos, bpf, p99, _)) =
+                score_config(&cases, &refs, &dir, bits, o, &tag, FRAME)
+            {
+                println!("  {w:>6} | {bps:>4} | {mos:>12.3} | {bpf:>10.1} | {p99:>6}us");
+            }
+        }
+    }
+}
+
 /// Perceptual A/B of the `voice.exp2` cores on the development corpus, with
 /// ViSQOL as arbiter.
 ///
@@ -499,114 +604,31 @@ fn visqol_probe() {
     std::fs::create_dir_all(&dir).unwrap();
     const FRAME: usize = 320;
     let configs: [(&str, Options); 4] = [
-        (
-            "noise only        ",
-            Options {
-                celp: false,
-                track_acelp: false,
-                tcx: false,
-            },
-        ),
-        (
-            "+celp (7C.2-B/D)  ",
-            Options {
-                celp: true,
-                track_acelp: false,
-                tcx: false,
-            },
-        ),
-        (
-            "+acelp (7C.2-E)   ",
-            Options {
-                celp: true,
-                track_acelp: true,
-                tcx: false,
-            },
-        ),
-        (
-            "+tcx (7C.2-G)     ",
-            Options {
-                celp: true,
-                track_acelp: true,
-                tcx: true,
-            },
-        ),
+        ("noise only        ", opts(false, false, false)),
+        ("+celp (7C.2-B/D)  ", opts(true, false, false)),
+        ("+acelp (7C.2-E)   ", opts(true, true, false)),
+        ("+tcx (7C.2-G)     ", opts(true, true, true)),
     ];
     // References first, and a self-comparison so the instrument reports its own
     // ceiling instead of implying that 5.0 is reachable.
-    let refs: Vec<std::path::PathBuf> = cases
-        .iter()
-        .enumerate()
-        .map(|(i, (_, s))| {
-            let p = dir.join(format!("ref-{i}.wav"));
-            write_wav(&p, s).unwrap();
-            p
-        })
-        .collect();
-    let mut self_sum = 0.0;
-    let mut self_n = 0usize;
-    for p in &refs {
-        if let Some(m) = visqol_mos(p, p) {
-            self_sum += m;
-            self_n += 1;
-        }
-    }
-    if self_n == 0 {
+    let Some((refs, ceiling)) = write_references(&cases, &dir) else {
         println!("visqol is not available (research/visqol-master is missing)");
         return;
-    }
+    };
     println!(
         "voice.exp2 perceptual A/B over {} development cases (ViSQOL speech mode)",
         cases.len()
     );
-    println!(
-        "  self-comparison ceiling: {:.3} MOS-LQO (not 5.0)",
-        self_sum / self_n as f64
-    );
+    println!("  self-comparison ceiling: {ceiling:.3} MOS-LQO (not 5.0)");
     println!("  rate | configuration       | MOS-LQO mean | bits/frame | enc p99");
     for (bps, bits) in exp2::DECLARED_RATES {
         for (ci, (label, opts)) in configs.iter().enumerate() {
-            let mut mos_sum = 0.0;
-            let mut n = 0usize;
-            let mut used = 0usize;
-            let mut frames = 0usize;
-            let mut enc_us: Vec<i64> = Vec::new();
-            for (i, (_, source)) in cases.iter().enumerate() {
-                let mut state = vp::VoiceState::new();
-                let mut out: Vec<i32> = Vec::with_capacity(source.len());
-                for chunk in source.chunks(FRAME) {
-                    if chunk.len() < FRAME {
-                        break;
-                    }
-                    let enc_state = state.clone();
-                    let t0 = std::time::Instant::now();
-                    let (bytes, nbits) =
-                        Exp2Codec::encode_frame_with(&enc_state, chunk, bits, *opts);
-                    enc_us.push(t0.elapsed().as_micros() as i64);
-                    used += nbits;
-                    frames += 1;
-                    out.extend_from_slice(
-                        &Exp2Codec::decode_frame(&mut state, &bytes, FRAME).unwrap(),
-                    );
-                }
-                let p = dir.join(format!("deg-{ci}-{bps}-{i}.wav"));
-                write_wav(&p, &out).unwrap();
-                if let Some(m) = visqol_mos(&refs[i], &p) {
-                    mos_sum += m;
-                    n += 1;
-                }
+            let tag = format!("c{ci}-{bps}");
+            if let Some((mos, bpf, p99, _)) =
+                score_config(&cases, &refs, &dir, bits, *opts, &tag, FRAME)
+            {
+                println!("  {bps:>4} | {label} | {mos:>12.3} | {bpf:>10.1} | {p99:>6}us");
             }
-            enc_us.sort_unstable();
-            if n == 0 {
-                continue;
-            }
-            println!(
-                "  {:>4} | {label} | {:>12.3} | {:>10.1} | {:>6}us",
-                bps,
-                mos_sum / n as f64,
-                used as f64 / frames.max(1) as f64,
-                percentile(&enc_us, 99.0)
-            );
         }
     }
 }

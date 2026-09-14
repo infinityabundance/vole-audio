@@ -931,22 +931,17 @@ fn mse(a: &[f64], b: &[f64]) -> f64 {
 
 /// Samples per envelope subframe of the local perceptual proxy.
 const ENV_SUB: usize = 80;
-/// Weight of the temporal-envelope term in the selector's proxy.
+/// The 7C.2-F envelope-proxy weight, recorded for the seal history and used by
+/// the test that pins the mechanism.
 ///
-/// **Measured and disabled** (7C.2-F), exactly as `SUBFRAME_GAIN` was in 7C.1.
-/// The mechanism is sound — raw MSE is the wrong selector for a stochastic
-/// excitation, and `envelope_penalty` fixes that — but at `2.0` the controlled
-/// A/B on the frozen development corpus moved waveform SNR *down* at 6 kbps
-/// (+0.24 → −0.69), 8 kbps (+1.04 → +0.73), 9.2 kbps (+1.77 → +1.22) and
-/// 16 kbps (+5.04 → +4.80), and up only at 12 kbps (+4.23 → +4.77). Selection
-/// shifted toward level-matched but uncorrelated noise frames.
-///
-/// Whether that trade is perceptually better cannot be decided from SNR, which
-/// this charter explicitly refuses to make the north star, and `voice.exp2` is
-/// not yet a live profile, so the external court cannot arbitrate. Promoting a
-/// selector change on dev-only evidence is forbidden by §7 and §10, so the term
-/// is retained in-tree at zero weight until a court can measure it.
-pub const ENV_WEIGHT: f64 = 0.0;
+/// Superseded in the codec by [`Options::env_weight`], which is fitted against
+/// ViSQOL on the development corpus. At `2.0` the 7C.2-F controlled A/B moved
+/// waveform SNR *down* at 6 kbps (+0.24 → −0.69), 8 kbps (+1.04 → +0.73),
+/// 9.2 kbps (+1.77 → +1.22) and 16 kbps (+5.04 → +4.80), and up only at
+/// 12 kbps (+4.23 → +4.77). That measurement is why the weight became a fitted
+/// parameter instead of a constant.
+#[cfg(test)]
+const ENV_WEIGHT_HISTORY: f64 = 2.0;
 
 /// Temporal-envelope mismatch, in units of energy.
 ///
@@ -976,8 +971,8 @@ fn envelope_penalty(target: &[f64], out: &[f64]) -> f64 {
 /// The selector's local perceptual proxy: waveform error plus a temporal-envelope
 /// term. The weights are fitted on the development corpus and then frozen; the
 /// external court remains the authority on whether the proxy correlates with it.
-fn proxy(target: &[f64], out: &[f64]) -> f64 {
-    mse(target, out) + ENV_WEIGHT * envelope_penalty(target, out)
+fn proxy(target: &[f64], out: &[f64], env_weight: f64) -> f64 {
+    mse(target, out) + env_weight * envelope_penalty(target, out)
 }
 
 /// Pulse-gain codes spanning the level implied by a residual RMS.
@@ -993,7 +988,7 @@ fn noise_gain_codes(rms: f64) -> [i32; 3] {
 /// Which excitation cores the encoder is allowed to offer. The default offers
 /// every implemented core; the switches exist so a controlled A/B can attribute
 /// a measured delta to one mechanism instead of to the whole phase.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Options {
     /// Offer the 7C.2-B/D free-combinatorial CELP core (family 1).
     pub celp: bool,
@@ -1001,7 +996,35 @@ pub struct Options {
     pub track_acelp: bool,
     /// Offer the 7C.2-G transform/PVQ escape (fallback family sub-mode).
     pub tcx: bool,
+    /// Weight of the temporal-envelope term in the selector proxy.
+    ///
+    /// `0.0` is plain MSE. The term exists because MSE alone prefers silence to
+    /// any reconstruction with correlation below 0.5 (§12–§14). The weight is a
+    /// *free parameter* precisely so it can be fitted against a perceptual judge
+    /// on the development corpus rather than asserted;
+    /// [`DEFAULT_ENV_WEIGHT`] is the fitted value.
+    pub env_weight: f64,
 }
+
+/// The fitted envelope-proxy weight. See [`Options::env_weight`].
+///
+/// **Fitted on the development corpus against ViSQOL** (`voice_bench weights`),
+/// as §7 prescribes: the proxy's free parameter is fitted on development material
+/// and then frozen, and the held-out challenger court is what decides whether it
+/// correlates with a perceptual judge. Mean MOS-LQO over five rates:
+///
+/// ```text
+/// w = 0.0   1.250     w = 1.0   1.344     w = 4.0   1.390
+/// w = 0.25  1.293     w = 2.0   1.416     w = 8.0   1.345
+/// ```
+///
+/// `2.0` peaks the mean and is best or near-best at *every* rate, whereas `4.0`
+/// collapses at 8 kbps (1.248). The fit is from three development cases, so it is
+/// recorded as a dev fit rather than a result: **no quality claim attaches to it
+/// until the held-out court measures it**, and `voice.exp2` is not yet a live
+/// profile. The response is unimodal and shallow, which is what makes the choice
+/// defensible rather than a knife edge.
+pub const DEFAULT_ENV_WEIGHT: f64 = 2.0;
 
 impl Default for Options {
     fn default() -> Self {
@@ -1009,7 +1032,7 @@ impl Default for Options {
             celp: true,
             track_acelp: true,
             // **Measured and disabled** (7C.2-G), following the `SUBFRAME_GAIN`
-            // and `ENV_WEIGHT` precedents. On the frozen development corpus the
+            // precedent. On the frozen development corpus the
             // escape core is selected in **zero frames** at every declared rate,
             // and offering it costs up to 8864 µs encode p99 at 16 kbps against
             // the 5 ms constitution. A mechanism that wins nothing and breaches
@@ -1017,6 +1040,7 @@ impl Default for Options {
             // experiment stays reproducible and so it can be re-judged once the
             // selector objective is fixed.
             tcx: false,
+            env_weight: DEFAULT_ENV_WEIGHT,
         }
     }
 }
@@ -1120,7 +1144,7 @@ impl Exp2Codec {
                         return;
                     };
                     let o: Vec<f64> = out.iter().map(|&v| f64::from(v)).collect();
-                    let d = proxy(&f, &o);
+                    let d = proxy(&f, &o, sel.env_weight);
                     let better = match &best {
                         None => true,
                         Some((bd, bb, _)) => {
@@ -1578,9 +1602,9 @@ mod tests {
         // ...while the envelope penalty prefers the level-matched frame.
         assert!(envelope_penalty(&target, &silent) > envelope_penalty(&target, &noisy));
         // With a positive weight the proxy would also prefer it; the shipped
-        // weight is 0 (disabled pending court evidence), so assert the mechanism
-        // directly rather than the constant.
-        let w = 2.0;
+        // weight is fitted separately (see `Options::env_weight`), so assert the
+        // mechanism at the recorded 7C.2-F weight rather than at the constant.
+        let w = ENV_WEIGHT_HISTORY;
         let d_silent = mse(&target, &silent) + w * envelope_penalty(&target, &silent);
         let d_noisy = mse(&target, &noisy) + w * envelope_penalty(&target, &noisy);
         assert!(d_noisy < d_silent);
