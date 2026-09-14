@@ -600,6 +600,52 @@ negative results are recorded.
 No quality or bitrate claim is made. Regression court `learned-voice-stream`
 still reproduces `cc2addfa…`. Library suite: 88 voice tests pass.
 
+## Phase 7C.2-G — transform/PVQ escape mode: a new voice track (v0.81.0)
+
+A new voice-track primitive and an escape excitation core, **implemented,
+measured, and shipped disabled**. The most important output is the diagnosis in
+[`PHASE_7C2.md`](PHASE_7C2.md) §13.
+
+* **A new track, deliberately.** The charter suggested reusing the existing
+transform machinery, but that lives in `src/lossy/` — the general-audio lossy
+profile — and cannot be used here. `lossy::mdct::Mdct` is a *framing* transform
+reconstructed by windowed overlap-add; inverting its sine window inside a single
+frame amplifies edge quantisation noise by ≈200× at `n = 160`, and a per-frame
+escape has no second half to cancel it against. `src/voice/pvq.rs` therefore
+adds a self-contained orthonormal **DCT-IV** plus **PVQ**
+(`count`/`rank`/`unrank`/greedy shape) with **zero dependency on the lossy
+track**.
+* **Wire placement.** The escape is a **sub-mode of the fallback family** (one
+discriminator bit), not a fifth family, so ACELP frames pay nothing for it. A
+fifth family would have cost one bit on every frame, including 3.2 kbps where
+the escape cannot fit at all.
+* **Measured negative.** On the frozen development corpus (600 frames) it is
+selected in **zero frames at every declared rate** — the A/B is identical in
+bits and SNR. Encode p99 reached **11 258 µs** at 16 kbps; sharing the transform
+across pulse densities (it depends on the tier, not on `k`) brought that to
+**8864 µs**, still outside the 5 ms constitution. Shipped disabled via
+`Options::default().tcx = false`.
+* **Verified faithful before being called a negative.**
+`the_escape_core_reconstructs_its_own_quantisation` drives the real encode path
+and checks the decoded shape correlates > 0.5 with what it was given, so the
+result is about the selection, not the wiring.
+* **The generalising diagnosis.** With MSE as the objective, a reconstruction
+with correlation `ρ` has error `2E(1−ρ)` while silence has error `E`, so
+**silence outscores every reconstruction with `ρ < 0.5`**. A sparse PVQ
+transform shape at these rates sits below that threshold. MSE does not merely
+prefer weak reconstructions; at the bottom of the rate range it prefers
+*nothing*. Every non-CELP core at low and mid rate is currently judged by an
+objective structurally biased against it — and the natural fix (7C.2-F's
+envelope proxy) lowered waveform SNR and so cannot be promoted without an
+external perceptual court.
+* **Structural constraints found.** `V(40,8) > 2^32`, so the block size or the
+index width had to change — the block was set to the codec's own 5 ms subframe.
+And the greedy PVQ score `(x_i)²` ties across signs, so a search that does not
+break the tie toward the target picks the wrong sign; both are pinned by tests.
+
+Regression court `learned-voice-stream` still reproduces `cc2addfa…`. Voice
+tests: 95 passed.
+
 ## Current measured position
 
 Frozen real-speech **lossless** portfolio (effectiveness + held-out Mode C,

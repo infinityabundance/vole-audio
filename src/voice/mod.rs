@@ -25,6 +25,7 @@ pub mod impair;
 pub mod lsf;
 pub mod plc;
 pub mod predict;
+pub mod pvq;
 pub mod residual;
 pub mod vq;
 

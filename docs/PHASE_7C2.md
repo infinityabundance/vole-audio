@@ -95,7 +95,11 @@ excitation := family(2)
                             (nsub−1) × gain_delta(4)         # ±8, clamped
                             count(3)
                             nsub × { rank(ceil(log2 C(80,count))) signs(count) }
-              family 2  noise:  gain(6) seed(3)
+              family 2  fallback, sub-mode(1):
+                          0  noise:  gain(6) seed(3)
+                          1  escape: k(3)
+                                     anchor_gain(6) + (blocks−1) × delta(3)
+                                     blocks × pvq_index(ceil(log2 V(80,k)))
               family 3  acelp (7C.2-E):
                             class(2)                          # pulses per track − 1
                             lag_q_anchor(11)                  # quarter-sample lag
@@ -134,7 +138,7 @@ excitation := family(2)
 | --- | --- | --- |
 | HPE-ACELP | voiced / quasi-periodic | fractional multi-tap adaptive excitation + track-structured algebraic innovation |
 | HPE-NOISE | unvoiced, breath, fricatives | deterministic shaped stochastic excitation + sparse correction |
-| HPE-TCX | transients, mixed | LPC-conditioned MDCT/PVQ excitation (reuse existing machinery) — 7C.2-G |
+| HPE-TCX | transients, mixed | LPC-conditioned MDCT/PVQ excitation (reuse existing machinery) — **7C.2-G, implemented and disabled; see §13** |
 | HPE-PR | 3.2–9.2 kbps | transmitted structural base + zero-bit predicted/procedural refinement + optional correction — 7C.2-H |
 
 Implemented excitation **families** in the wire (`src/voice/exp2.rs`): family 0
@@ -242,7 +246,7 @@ now, before any `exp2` codec work, so the challenger court cannot be tuned.
 | 7C.2-D | frame pitch anchor + contours, gain prediction, implicit pulse count | **implemented** (`src/voice/exp2.rs`): CELP side information is one frame lag anchor (9 b) + 4-bit contour, one pitch gain (5 b) + 3-bit deltas, one innovation gain (6 b) + 4-bit deltas, and one frame pulse count (3 b). Per-subframe overhead fell from 23 b to ~6 b, a **60 b/frame** reduction at 320 samples. The wire is now a canonicalising map and the property asserted is idempotence plus decode fidelity to the read-back shot (not equality to pre-wire search parameters). Ladder over a synthetic speech-like signal, 40 frames/rate: 3.2 kbps 0.00 dB, 6 kbps 0.09, 8 kbps 0.09, 9.2 kbps 3.60, 12 kbps 4.61, 16 kbps 4.36. 6–8 kbps still collapse to the noise core, and 16 kbps regressed (5.45 → 4.36) because a single shared pulse count cannot satisfy subframes that want different counts: this is precisely the tension 7C.2-E removes by spreading side information at its intrinsic rate rather than at the subframe rate |
 | 7C.2-E | fractional multi-tap LTP + track ACELP + joint R–D search | **implemented** (`src/voice/fcelp.rs`, wire family 3). Quarter-sample lag via a fixed 4-tap Lagrange interpolation of the reconstructed excitation; four interleaved tracks of `k` signed pulses, with the pulse count carried by the codebook class instead of a field; joint per-subframe selection where the pitch is scored through the real synthesis loop and the innovation gain is closed-loop. **Measured A/B on the frozen effectiveness corpus (600 frames, `voice_bench exp2`):** vs the 7C.2-B/D CELP core, +1.77 dB at 12 kbps and +2.23 dB at 16 kbps; vs the scalar+noise baseline +3.27 dB and +3.26 dB. The core wins 271/600 frames at 12 kbps and 279/600 at 16 kbps. **It is never selected at ≤ 9.2 kbps**, because its side information does not fit those allowances: that is the measured motivation for 7C.2-F/G/H. Synthetic hard-rate ladder moved from 4.61/4.36 dB to **6.63/8.75 dB** at 12/16 kbps. Encode p99 was 11 477 µs when first written; after three measured cost fixes it is **4805 µs**, inside the 5 ms constitution. Two findings are retained as tests: the long-term gain is *recursive* (the output is a polynomial in the gain, not linear), and the class field removes the shared-count truncation flaw |
 | 7C.2-F | voicing-dependent allocation + noise excitation | **implemented, not promoted; two negative results recorded.** (a) The **nested spectral operating point** (`Spectral::Vq0`, tier 2, 18 bits vs 34, saving 16 bits/frame) is legal because the MSVQ is embedded, but it is selected in **zero frames at every declared rate** — the coarse spectrum's distortion penalty exceeds the excitation the freed bits buy. Kept in-tree at zero cost when unused; it is a prerequisite for 7C.2-H. (b) **Diagnosis: at 3.2 kbps the codec outputs near-silence** (SNR 0.00 dB), because for an *uncorrelated* excitation — exactly what the stochastic fallback produces — MSE is minimised by gain → 0, so the selector prefers silence to correctly-levelled shaped noise. A short-time envelope term (`envelope_penalty`, weight `ENV_WEIGHT`) was implemented as §10 requires and **measured and disabled**: at weight 2.0 waveform SNR fell at 6/8/9.2/16 kbps and rose only at 12 kbps. Promotion on dev-only evidence is forbidden, so the weight ships at 0.0 |
-| 7C.2-G | TCX/PVQ escape mode | selected naturally by exact RD; improves mixed/transient cells |
+| 7C.2-G | TCX/PVQ escape mode | **implemented, measured, disabled; negative result recorded.** A new voice-track primitive `src/voice/pvq.rs` (orthonormal DCT-IV + PVQ, no dependency on the general-audio `src/lossy/` track) backs an escape sub-mode of the fallback family, so ACELP frames pay zero bits for it. On the frozen development corpus it is selected in **zero frames at every declared rate** — bits and SNR are identical with and without it — and it costs up to **8864 µs** encode p99 at 16 kbps against the 5 ms constitution. The mechanism is verified *faithful* by test (`the_escape_core_reconstructs_its_own_quantisation`), so the negative is a real measurement. The diagnosis in §13 ties it to 7C.2-F: with MSE as the objective, any reconstruction with correlation ρ < 0.5 scores worse than silence |
 | 7C.2-H | procedural excitation + zero-bit predicted refinement | valid 6–9.2 kbps points improve perceptual metrics |
 | 7C.2-I | packet-reset entropy coding of remaining uncertainty | artifact shrinks without quality or recovery regression |
 | 7C.2-J | frozen causal learned refinement experiment | promote only if a gain survives model size, decode p99, memory and the held-out court |
@@ -372,7 +376,89 @@ a pitch trajectory, gains and a useful innovation at once, which confirms §18:
 3.2 kbps has to be a synthesis-and-refinement mode (7C.2-H), not "ACELP with
 fewer pulses".
 
-## 13. Non-claims
+## 13. Seal 7C.2-G — measured record (negative result)
+
+**A new track, not the general-audio one.** The charter suggested reusing the
+existing transform machinery. That machinery lives in `src/lossy/`
+(`mdct.rs`, `transform.rs`, `psy.rs`), which is the **general-audio lossy
+profile**, and it cannot be used here. `lossy::mdct::Mdct` is a *framing*
+transform: `n` coefficients from a `2n`-sample windowed input, reconstructed by
+windowed overlap-add across frames. Its synthesis returns `w[m]·x[m]`, so
+recovering the input within one frame means dividing by the sine window, whose
+smallest value is `sin(π/4n) ≈ π/4n` at the frame edges — about a 200×
+amplification of edge quantisation noise at `n = 160`. A per-frame escape
+excitation has no overlap-add and no second half to cancel that error against.
+
+So 7C.2-G adds a **new voice-track primitive**, `src/voice/pvq.rs`, with zero
+dependency on the lossy track:
+
+* an **orthonormal, self-inverse DCT-IV** (`dct4` *is* its inverse), so the
+  coefficient norm equals the residual norm and a transmitted gain means
+  exactly what it says;
+* **PVQ** with the analytic cardinality `V(n,k)` the charter asked for —
+  `count`, `rank`, `unrank`, and a greedy shape search — so a pulse count fixes
+  the transmitted rate with no learned probability table;
+* fixed **80-sample blocks**, deliberately the codec's own 5 ms subframe. The
+  block size sets the index cost per pulse: at 40 samples a *single* pulse
+already costs 7 bits, which is why the escape mode can only reach 6 kbps at
+  the larger block. The cap `MAX_PULSES = 5` follows from `V(80,6) > 2^32`, i.e.
+  from the wire's index width, not from the quantiser's quality.
+
+**Wire placement.** The escape mode is a **sub-mode of the fallback family**
+(one discriminator bit on family 2), not a fifth family. A fifth family would
+need three family bits and would cost one bit on *every* frame — including
+3.2 kbps, where the escape mode cannot fit at all. This way an ACELP frame pays
+nothing for the escape core's existence.
+
+**Measured, and negative.** `voice_bench exp2` over the frozen development
+corpus (600 frames), A/B with the escape offered and withheld:
+
+```text
+rate      SNR with      SNR without   frames choosing the escape
+3.2 kbps    -0.00         -0.00        0 / 600
+6 kbps       0.24          0.24        0 / 600
+8 kbps       1.04          1.04        0 / 600
+9.2 kbps     1.77          1.77        0 / 600
+12 kbps      4.23          4.23        0 / 600
+16 kbps      5.04          5.04        0 / 600
+```
+
+Bit counts are identical too, so the selected frames are literally the same
+frames. The escape core is offered at every pulse density that fits (from
+`k = 1`, which fits at 6 kbps) and loses every comparison.
+
+**Cost, disclosed.** Offering it breached the constitution: encode p99 reached
+**11 258 µs** at 16 kbps. The transform depends on the spectral tier but not on
+the pulse density, so hoisting it out of the `k` loop brought that to
+**8864 µs** — better, still far outside 5 ms.
+
+**The mechanism is faithful, so this is a real negative.** Before accepting the
+result, the encode path was pinned by test: given a residual built from a few
+transform components, the frame the encoder actually emits decodes to a block
+whose shape correlates better than 0.5 with what it was given
+(`the_escape_core_reconstructs_its_own_quantisation`). The failure is therefore
+in the *selection*, not in the wiring.
+
+**The diagnosis, and it generalises.** Combining this with §12 gives a single
+structural result:
+
+> With MSE as the objective, a reconstruction whose correlation with the target
+> is `ρ` has error `2E(1−ρ)`, while silence has error `E`. Silence therefore
+> scores **better than any reconstruction with `ρ < 0.5`** — and a sparse PVQ
+> transform shape at these rates sits below that threshold. So does the
+> stochastic fallback. MSE does not merely prefer weak reconstructions; at the
+> bottom of the rate range it prefers *nothing at all*.
+
+This is why 7C.2-F's envelope proxy existed, and why it was not promotable: the
+natural fix lowers waveform SNR, and only an external perceptual court can
+arbitrate. The consequence for the phase is important and is recorded as such:
+**every non-CELP core at low and mid rate is currently being judged by an
+objective that is structurally biased against it.** The escape core is retained
+in-tree but **disabled** (`Options::default().tcx = false`), following the
+`SUBFRAME_GAIN` precedent, so the experiment stays reproducible and can be
+re-judged once the selector objective is fixed.
+
+## 14. Non-claims
 
 * `exp1` remains the control; its wire format is untouched.
 * The serializer in `src/voice/exp2.rs` is not yet a live profile: no court

@@ -31,6 +31,7 @@ use crate::voice::VoiceState;
 use crate::voice::celp;
 use crate::voice::fcelp;
 use crate::voice::predict as vp;
+use crate::voice::pvq;
 use crate::voice::residual;
 use crate::voice::vq;
 
@@ -275,6 +276,21 @@ pub enum Excitation {
     /// a *second* core, selected against the others by exact bits and measured
     /// distortion, never forced.
     Ac3(fcelp::Params),
+    /// 7C.2-G transform escape: the LPC residual coded in an orthonormal
+    /// transform domain with PVQ shapes and one gain per 5 ms block.
+    ///
+    /// Carried as a **sub-mode of the fallback family** (family 2, one
+    /// discriminator bit) rather than as a new family, so every ACELP frame is
+    /// untouched: adding a fifth family would cost one bit on *every* frame,
+    /// including the low rates where this core cannot fit at all.
+    Tcx {
+        /// Pulses per block, identical in every block.
+        k: usize,
+        /// One gain code per block.
+        gains: Vec<i32>,
+        /// One PVQ index per block.
+        indices: Vec<u32>,
+    },
 }
 
 impl Excitation {
@@ -308,7 +324,16 @@ impl Excitation {
                         * (usize::from(celp::position_bits(count))
                             + count * usize::from(celp::SIGN_BITS))
             }
-            Excitation::Noise { .. } => usize::from(FAMILY_BITS) + 6 + 3,
+            Excitation::Noise { .. } => usize::from(FAMILY_BITS) + 1 + 6 + 3,
+            Excitation::Tcx { k, gains, indices } => {
+                let blocks = indices.len().max(gains.len());
+                usize::from(FAMILY_BITS)
+                    + 1
+                    + usize::from(pvq::K_BITS)
+                    + usize::from(celp::GAIN_BITS)
+                    + 3 * blocks.saturating_sub(1)
+                    + blocks * usize::from(pvq::index_bits(*k))
+            }
             Excitation::Ac3(p) => {
                 let nsub = p.subframes.len();
                 let tail = nsub.saturating_sub(1);
@@ -394,8 +419,31 @@ impl Excitation {
             }
             Excitation::Noise { gain, seed } => {
                 w.bits(2, FAMILY_BITS);
+                w.bits(0, 1);
                 w.bits((*gain).clamp(0, celp::GAIN_LEVELS - 1) as u32, 6);
                 w.bits(u32::from(*seed) & 0x7, 3);
+            }
+            Excitation::Tcx { k, gains, indices } => {
+                w.bits(2, FAMILY_BITS);
+                w.bits(1, 1);
+                let k = (*k).min(pvq::MAX_PULSES);
+                w.bits(k as u32, pvq::K_BITS);
+                // One anchor gain plus 3-bit block deltas.
+                let anchor = gains.first().copied().unwrap_or(0);
+                w.bits(
+                    anchor.clamp(0, celp::GAIN_LEVELS - 1) as u32,
+                    celp::GAIN_BITS,
+                );
+                let mut prev = anchor.clamp(0, celp::GAIN_LEVELS - 1);
+                for &g in gains.iter().skip(1) {
+                    let d = (g - prev).clamp(-4, 3);
+                    w.bits((d as u32) & 0x7, 3);
+                    prev = (prev + d).clamp(0, celp::GAIN_LEVELS - 1);
+                }
+                let bits = pvq::index_bits(k);
+                for &idx in indices {
+                    w.bits(idx, bits);
+                }
             }
             Excitation::Ac3(p) => {
                 w.bits(3, FAMILY_BITS);
@@ -521,9 +569,36 @@ impl Excitation {
                 Ok(Excitation::Celp(p))
             }
             2 => {
-                let gain = r.bits(6)? as i32;
-                let seed = r.bits(3)? as u8;
-                Ok(Excitation::Noise { gain, seed })
+                if r.bits(1)? == 0 {
+                    let gain = r.bits(6)? as i32;
+                    let seed = r.bits(3)? as u8;
+                    return Ok(Excitation::Noise { gain, seed });
+                }
+                let blocks = frame_len.div_ceil(pvq::BLOCK);
+                if frame_len == 0 || !frame_len.is_multiple_of(pvq::BLOCK) {
+                    return Err(Error::malformed(
+                        "voice.exp2 escape frame is not a whole number of blocks",
+                    ));
+                }
+                let k = r.bits(pvq::K_BITS)? as usize;
+                if k > pvq::MAX_PULSES {
+                    return Err(Error::malformed(
+                        "voice.exp2 escape pulse count above the bound",
+                    ));
+                }
+                let anchor = r.bits(celp::GAIN_BITS)? as i32;
+                let mut gains = vec![anchor.clamp(0, celp::GAIN_LEVELS - 1)];
+                for _ in 1..blocks {
+                    let d = sign_extend(r.bits(3)?, 3);
+                    let prev = *gains.last().unwrap();
+                    gains.push((prev + d).clamp(0, celp::GAIN_LEVELS - 1));
+                }
+                let bits = pvq::index_bits(k);
+                let mut indices = Vec::with_capacity(blocks);
+                for _ in 0..blocks {
+                    indices.push(if bits > 0 { r.bits(bits)? } else { 0 });
+                }
+                Ok(Excitation::Tcx { k, gains, indices })
             }
             3 => {
                 let nsub = celp::subframes(frame_len);
@@ -707,6 +782,35 @@ impl Frame2 {
                 let shot = fcelp::reconstruct(params, frame_len)?;
                 shot.render(state, &k_q, width)
             }
+            Excitation::Tcx { k, gains, indices } => {
+                if frame_len == 0 || !frame_len.is_multiple_of(pvq::BLOCK) {
+                    return Err(Error::malformed(
+                        "voice.exp2 escape frame is not a whole number of blocks",
+                    ));
+                }
+                if *k > pvq::MAX_PULSES {
+                    return Err(Error::malformed(
+                        "voice.exp2 escape pulse count above the bound",
+                    ));
+                }
+                let blocks = frame_len / pvq::BLOCK;
+                if gains.len() != blocks || indices.len() != blocks {
+                    return Err(Error::malformed("voice.exp2 escape block count mismatch"));
+                }
+                let mut coeffs = vec![0.0f64; frame_len];
+                for b in 0..blocks {
+                    let y = pvq::unrank(u128::from(indices[b]), pvq::BLOCK, *k);
+                    let norm = y.iter().map(|v| f64::from(v * v)).sum::<f64>().sqrt();
+                    if norm <= 0.0 {
+                        continue;
+                    }
+                    let scale = celp::gain_of(gains[b]) / norm;
+                    let block: Vec<f64> = y.iter().map(|v| scale * f64::from(*v)).collect();
+                    let r = pvq::idct4(&block);
+                    coeffs[b * pvq::BLOCK..(b + 1) * pvq::BLOCK].copy_from_slice(&r);
+                }
+                vp::synthesize_excitation(state, &k_q, width, 0, 0, &coeffs)
+            }
         };
         Ok(samples
             .iter()
@@ -751,6 +855,7 @@ pub fn family_label(f: &Frame2) -> &'static str {
         Excitation::Celp(_) => "celp",
         Excitation::Noise { .. } => "noise",
         Excitation::Ac3(_) => "acelp",
+        Excitation::Tcx { .. } => "tcx",
     }
 }
 
@@ -760,8 +865,63 @@ pub fn pulse_count(f: &Frame2) -> usize {
     match &f.excitation {
         Excitation::Celp(p) => p.subframes.iter().map(|s| s.pulses.len()).sum(),
         Excitation::Ac3(p) => p.subframes.iter().map(|s| s.pulses.len()).sum(),
+        Excitation::Tcx { k, indices, .. } => k * indices.len(),
         _ => 0,
     }
+}
+
+/// Exact information bits a transform-escape frame costs. Mirrors
+/// [`Excitation::bits`] for the escape sub-mode, so the encoder's feasibility
+/// check and the wire's accounting cannot disagree.
+fn tcx_bits(blocks: usize, k: usize) -> usize {
+    usize::from(FAMILY_BITS)
+        + 1
+        + usize::from(pvq::K_BITS)
+        + usize::from(celp::GAIN_BITS)
+        + 3 * blocks.saturating_sub(1)
+        + blocks * usize::from(pvq::index_bits(k))
+}
+
+/// Quantise a precomputed transform of the LPC residual with PVQ at `k` pulses
+/// per block.
+///
+/// The residual is the target minus the short-term filter's zero-input response,
+/// which is the same excitation the scalar and noise cores are handed, so all
+/// three fallbacks are directly comparable inside the selector. The DCT-IV is
+/// orthonormal, so the coefficient norm is the residual norm and the per-block
+/// gain means what it says.
+///
+/// The transform is taken by the caller and shared across `k`: the coefficients
+/// depend on the spectral tier but not on the pulse density, so recomputing them
+/// per `k` would multiply the most expensive part of the search for nothing.
+fn tcx_candidate(
+    coeffs: &[f64],
+    k: usize,
+    spectral: &Spectral,
+    frame_bits: usize,
+) -> Option<Frame2> {
+    let len = coeffs.len();
+    if len == 0 || !len.is_multiple_of(pvq::BLOCK) || k == 0 || k > pvq::MAX_PULSES {
+        return None;
+    }
+    let blocks = len / pvq::BLOCK;
+    if spectral.bits() + tcx_bits(blocks, k) > frame_bits {
+        return None;
+    }
+    let mut gains = Vec::with_capacity(blocks);
+    let mut indices = Vec::with_capacity(blocks);
+    for b in 0..blocks {
+        let cb = &coeffs[b * pvq::BLOCK..(b + 1) * pvq::BLOCK];
+        let norm = cb.iter().map(|v| v * v).sum::<f64>().sqrt();
+        gains.push(celp::gain_code(norm));
+        let y = pvq::encode_shape(cb, k);
+        // `pvq::MAX_PULSES` is chosen so `V(BLOCK, k) ≤ 2^32`, hence the rank fits.
+        indices.push(pvq::rank(&y) as u32);
+    }
+    Some(Frame2 {
+        spectral: spectral.clone(),
+        excitation: Excitation::Tcx { k, gains, indices },
+    })
 }
 
 /// Sum of squared error between a frame and its reconstruction.
@@ -839,6 +999,8 @@ pub struct Options {
     pub celp: bool,
     /// Offer the 7C.2-E fractional-track ACELP core (family 3).
     pub track_acelp: bool,
+    /// Offer the 7C.2-G transform/PVQ escape (fallback family sub-mode).
+    pub tcx: bool,
 }
 
 impl Default for Options {
@@ -846,6 +1008,15 @@ impl Default for Options {
         Options {
             celp: true,
             track_acelp: true,
+            // **Measured and disabled** (7C.2-G), following the `SUBFRAME_GAIN`
+            // and `ENV_WEIGHT` precedents. On the frozen development corpus the
+            // escape core is selected in **zero frames** at every declared rate,
+            // and offering it costs up to 8864 µs encode p99 at 16 kbps against
+            // the 5 ms constitution. A mechanism that wins nothing and breaches
+            // the deadline does not ship enabled; the switch is kept so the
+            // experiment stays reproducible and so it can be re-judged once the
+            // selector objective is fixed.
+            tcx: false,
         }
     }
 }
@@ -1027,6 +1198,24 @@ impl Exp2Codec {
                             spectral: spectral.clone(),
                             excitation: Excitation::Noise { gain: code, seed },
                         });
+                    }
+                }
+
+                // 7C.2-G: the transform escape, offered at every pulse density
+                // that fits. It shares the fallback family, so frames that choose
+                // a CELP core pay nothing for its existence. The transform is
+                // taken once per tier and shared across the pulse densities.
+                if sel.tcx && !f.is_empty() && f.len().is_multiple_of(pvq::BLOCK) {
+                    let zeros = vec![0.0f64; f.len()];
+                    let mut probe = state.clone();
+                    let zir =
+                        vp::synthesize_excitation(&mut probe, &k_q, model.width, 0, 0, &zeros);
+                    let resid: Vec<f64> = f.iter().zip(&zir).map(|(a, b)| a - b).collect();
+                    let coeffs = pvq::forward_blocks(&resid);
+                    for k in 1..=pvq::MAX_PULSES {
+                        if let Some(fr) = tcx_candidate(&coeffs, k, &spectral, frame_bits) {
+                            consider(fr);
+                        }
                     }
                 }
             }
@@ -1346,8 +1535,9 @@ mod tests {
         };
         let (bytes, bits) = f.write();
         assert_eq!(bits, f.bits());
-        // tier(2) + two 8-bit stage-0 sub-indices.
-        assert_eq!(bits, 2 + 16 + 2 + 6 + 3);
+        // tier(2) + two 8-bit stage-0 sub-indices + family(2) + sub-mode(1)
+        // + gain(6) + seed(3).
+        assert_eq!(bits, 2 + 16 + 2 + 1 + 6 + 3);
         // 16 bits cheaper than the full index on the same frame.
         let full_frame = Frame2 {
             spectral: Spectral::Vq(full),
@@ -1394,6 +1584,80 @@ mod tests {
         let d_silent = mse(&target, &silent) + w * envelope_penalty(&target, &silent);
         let d_noisy = mse(&target, &noisy) + w * envelope_penalty(&target, &noisy);
         assert!(d_noisy < d_silent);
+    }
+
+    #[test]
+    fn tcx_frames_round_trip_exactly_and_are_wire_idempotent() {
+        let f = Frame2 {
+            spectral: Spectral::Vq([1, 2, 3, 4]),
+            excitation: Excitation::Tcx {
+                k: 3,
+                gains: vec![30, 28, 31, 29],
+                indices: vec![1, 2, 3, 4],
+            },
+        };
+        let (bytes, bits) = f.write();
+        assert_eq!(bits, f.bits(), "accounting must be exact");
+        assert!(bytes.len() * 8 >= bits && bytes.len() * 8 < bits + 8);
+        let back = Frame2::read(&bytes, 320).unwrap();
+        assert_eq!(back, f, "the canonical escape frame must survive the wire");
+        let (bytes2, bits2) = back.write();
+        assert_eq!(bytes2, bytes);
+        assert_eq!(bits2, bits);
+        assert_eq!(Frame2::read(&bytes2, 320).unwrap(), back);
+        // A partial frame that is not a whole number of blocks is not a legal
+        // escape frame, and must be rejected rather than guessed at.
+        assert!(Frame2::read(&bytes, 300).is_err());
+        // The escape mode must actually emit signal, not a zero block.
+        let mut st = VoiceState::new();
+        let out = back.decode_into(&mut st, 320).unwrap();
+        assert!(out.iter().any(|&v| v != 0));
+    }
+
+    /// The escape core's *mechanism* must be faithful, or "it is never selected"
+    /// would be a bug report rather than a measurement. This drives the exact
+    /// encode path the selector uses and checks that the decoded block recovers
+    /// the shape it was given.
+    #[test]
+    fn the_escape_core_reconstructs_its_own_quantisation() {
+        let len = 320usize;
+        let mut resid = vec![0.0f64; len];
+        for (i, v) in resid[..pvq::BLOCK].iter_mut().enumerate() {
+            let x = i as f64 + 0.5;
+            let n = pvq::BLOCK as f64;
+            *v = 500.0 * (std::f64::consts::PI * x * 2.5 / n).sin()
+                + 300.0 * (std::f64::consts::PI * x * 7.5 / n).cos();
+        }
+        let coeffs = pvq::forward_blocks(&resid);
+        let f = tcx_candidate(&coeffs, 4, &Spectral::Vq([0; 4]), 10_000)
+            .expect("the escape candidate must be constructible");
+        let (bytes, _) = f.write();
+        let back = Frame2::read(&bytes, len).unwrap();
+        let Excitation::Tcx { k, gains, indices } = &back.excitation else {
+            panic!("the frame was written as an escape frame")
+        };
+        let y = pvq::unrank(u128::from(indices[0]), pvq::BLOCK, *k);
+        let norm = y.iter().map(|v| f64::from(v * v)).sum::<f64>().sqrt();
+        assert!(norm > 0.0, "the shape must not be empty");
+        let scale = celp::gain_of(gains[0]) / norm;
+        let c0 = &coeffs[..pvq::BLOCK];
+        let dot: f64 = c0
+            .iter()
+            .zip(&y)
+            .map(|(a, b)| a * scale * f64::from(*b))
+            .sum();
+        let na: f64 = c0.iter().map(|v| v * v).sum::<f64>().sqrt();
+        let nb: f64 = y
+            .iter()
+            .map(|v| scale * f64::from(*v))
+            .map(|v| v * v)
+            .sum::<f64>()
+            .sqrt();
+        assert!(
+            dot / (na * nb) > 0.5,
+            "the escape quantisation lost the shape: correlation {}",
+            dot / (na * nb)
+        );
     }
 
     #[test]

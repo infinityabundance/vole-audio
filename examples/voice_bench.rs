@@ -311,12 +311,13 @@ fn exp2_probe(filter: Option<&str>) {
         source.extend_from_slice(s);
     }
     const FRAME: usize = 320;
-    let configs: [(&str, Options); 3] = [
+    let configs: [(&str, Options); 4] = [
         (
             "scalar+noise      ",
             Options {
                 celp: false,
                 track_acelp: false,
+                tcx: false,
             },
         ),
         (
@@ -324,6 +325,7 @@ fn exp2_probe(filter: Option<&str>) {
             Options {
                 celp: true,
                 track_acelp: false,
+                tcx: false,
             },
         ),
         (
@@ -331,6 +333,15 @@ fn exp2_probe(filter: Option<&str>) {
             Options {
                 celp: true,
                 track_acelp: true,
+                tcx: false,
+            },
+        ),
+        (
+            "+tcx (7C.2-G)     ",
+            Options {
+                celp: true,
+                track_acelp: true,
+                tcx: true,
             },
         ),
     ];

@@ -730,8 +730,15 @@ mod tests {
 
     #[test]
     fn track_codebook_is_a_bijection() {
+        // Allocation discipline: the exhaustive walk is hard-capped so the test
+        // cannot grow with the codebook, and the set holds three-element tuples.
+        const MAX_INDICES: u64 = 4_096;
         for k in 1..=MAX_PER_TRACK {
             let total = comb(TRACK_POS as u32, k as u32) * (1u64 << k);
+            assert!(
+                total <= MAX_INDICES,
+                "k={k} would need {total} indices, above the {MAX_INDICES} test cap"
+            );
             assert_eq!(
                 u64::from(track_bits(k)),
                 (total - 1).ilog2() as u64 + 1,
