@@ -52,39 +52,43 @@ const MAX_FRAMES: usize = 16_000;
 /// Alignment search bound in samples.
 const ALIGN_LAG: i64 = 512;
 
-fn research_root() -> PathBuf {
+// The media helpers below are shared with the Phase 7C voice court. They are
+// deliberately `pub(crate)`: duplicating WAV I/O, alignment and the metric
+// wrappers would mean two implementations that could disagree about what a
+// measurement means.
+pub(crate) fn research_root() -> PathBuf {
     PathBuf::from("research")
 }
 
-fn visqol_model() -> PathBuf {
+pub(crate) fn visqol_model() -> PathBuf {
     research_root().join(
         "visqol-master/model/lattice_tcditugenmeetpackhref_ls2_nl60_lr12_bs2048_learn.\
          005_ep2400_train1_7_raw.tflite",
     )
 }
 
-fn tool_available(path: &Path) -> bool {
+pub(crate) fn tool_available(path: &Path) -> bool {
     path.is_file()
 }
 
 /// Run an external tool with its chatter suppressed (it is a measuring stick,
 /// not part of the measurement).
-fn quiet(cmd: &mut Command) -> &mut Command {
+pub(crate) fn quiet(cmd: &mut Command) -> &mut Command {
     cmd.stdout(Stdio::null()).stderr(Stdio::null())
 }
 
-struct Tools {
-    opusenc: Option<PathBuf>,
-    opusdec: Option<PathBuf>,
-    lyra_enc: Option<PathBuf>,
-    lyra_dec: Option<PathBuf>,
-    lyra_model: PathBuf,
-    visqol: Option<PathBuf>,
-    visqol_model: PathBuf,
+pub(crate) struct Tools {
+    pub(crate) opusenc: Option<PathBuf>,
+    pub(crate) opusdec: Option<PathBuf>,
+    pub(crate) lyra_enc: Option<PathBuf>,
+    pub(crate) lyra_dec: Option<PathBuf>,
+    pub(crate) lyra_model: PathBuf,
+    pub(crate) visqol: Option<PathBuf>,
+    pub(crate) visqol_model: PathBuf,
 }
 
 impl Tools {
-    fn discover() -> Tools {
+    pub(crate) fn discover() -> Tools {
         let which = |name: &str| -> Option<PathBuf> {
             let p = PathBuf::from(format!("/usr/bin/{name}"));
             if p.is_file() { Some(p) } else { None }
@@ -109,7 +113,7 @@ impl Tools {
 // Minimal 16-bit WAV I/O (no dependency; competitors read/write plain PCM).
 // ---------------------------------------------------------------------------
 
-fn write_wav(path: &Path, samples: &[i16], channels: u16, rate: u32) -> Result<()> {
+pub(crate) fn write_wav(path: &Path, samples: &[i16], channels: u16, rate: u32) -> Result<()> {
     let data_len = samples.len() * 2;
     let byte_rate = rate * u32::from(channels) * 2;
     let block_align = channels * 2;
@@ -133,7 +137,7 @@ fn write_wav(path: &Path, samples: &[i16], channels: u16, rate: u32) -> Result<(
 }
 
 /// Read the first `fmt ` and `data` chunks of a PCM WAV.
-fn read_wav(path: &Path) -> Result<(Vec<i16>, u16, u32)> {
+pub(crate) fn read_wav(path: &Path) -> Result<(Vec<i16>, u16, u32)> {
     let b = std::fs::read(path).map_err(Error::io)?;
     if b.len() < 12 || &b[0..4] != b"RIFF" || &b[8..12] != b"WAVE" {
         return Err(Error::malformed("not a RIFF/WAVE file"));
@@ -176,7 +180,7 @@ fn read_wav(path: &Path) -> Result<(Vec<i16>, u16, u32)> {
 
 /// Best integer lag of `test` relative to `reference`, searched over a bounded
 /// window around the origin, maximising normalised cross-correlation.
-fn best_lag(reference: &[i32], test: &[i32], max_lag: i64) -> i64 {
+pub(crate) fn best_lag(reference: &[i32], test: &[i32], max_lag: i64) -> i64 {
     let n = reference.len().min(test.len());
     if n == 0 {
         return 0;
@@ -209,7 +213,7 @@ fn best_lag(reference: &[i32], test: &[i32], max_lag: i64) -> i64 {
 }
 
 /// Delay-aligned reference/test pair.
-fn aligned_pair(reference: &[i32], test: &[i32], lag: i64) -> (Vec<i32>, Vec<i32>) {
+pub(crate) fn aligned_pair(reference: &[i32], test: &[i32], lag: i64) -> (Vec<i32>, Vec<i32>) {
     let n = reference.len().min(test.len());
     let mut a = Vec::with_capacity(n);
     let mut b = Vec::with_capacity(n);
@@ -223,7 +227,7 @@ fn aligned_pair(reference: &[i32], test: &[i32], lag: i64) -> (Vec<i32>, Vec<i32
     (a, b)
 }
 
-fn snr_db(reference: &[i32], test: &[i32]) -> f64 {
+pub(crate) fn snr_db(reference: &[i32], test: &[i32]) -> f64 {
     let mut sig = 0.0f64;
     let mut err = 0.0f64;
     for (&r, &t) in reference.iter().zip(test.iter()) {
@@ -239,12 +243,12 @@ fn snr_db(reference: &[i32], test: &[i32]) -> f64 {
 
 /// `Some(x)` when `x` is finite. Non-finite metrics become `null` in the
 /// receipt rather than an invalid JSON number, and are never invented.
-fn finite(x: f64) -> Option<f64> {
+pub(crate) fn finite(x: f64) -> Option<f64> {
     x.is_finite().then_some(x)
 }
 
 /// Spectral (log-magnitude) distortion via a naive DFT on a bounded frame.
-fn spectral_distortion_db(reference: &[i32], test: &[i32]) -> f64 {
+pub(crate) fn spectral_distortion_db(reference: &[i32], test: &[i32]) -> f64 {
     let n = reference.len().min(test.len()).min(2048);
     if n < 32 {
         return 0.0;
@@ -276,7 +280,7 @@ fn spectral_distortion_db(reference: &[i32], test: &[i32]) -> f64 {
 
 /// Worst per-block error (a proxy for transient damage), in dB relative to the
 /// reference block energy.
-fn transient_error_db(reference: &[i32], test: &[i32]) -> f64 {
+pub(crate) fn transient_error_db(reference: &[i32], test: &[i32]) -> f64 {
     let block = 512usize;
     let n = reference.len().min(test.len());
     let mut worst = f64::NEG_INFINITY;
@@ -296,7 +300,12 @@ fn transient_error_db(reference: &[i32], test: &[i32]) -> f64 {
     if worst.is_finite() { worst } else { 0.0 }
 }
 
-fn visqol_mos(tools: &Tools, reference: &Path, degraded: &Path, speech: bool) -> Option<f64> {
+pub(crate) fn visqol_mos(
+    tools: &Tools,
+    reference: &Path,
+    degraded: &Path,
+    speech: bool,
+) -> Option<f64> {
     let visqol = tools.visqol.as_ref()?;
     let csv = degraded.with_extension("visqol.csv");
     // ViSQOL appends to the results CSV, so a stale row would be read back as a
@@ -331,15 +340,19 @@ fn visqol_mos(tools: &Tools, reference: &Path, degraded: &Path, speech: bool) ->
 
 /// One competitor operating point.
 #[derive(Clone)]
-struct Point {
-    bps: f64,
-    snr: f64,
-    visqol: Option<f64>,
+pub(crate) struct Point {
+    pub(crate) bps: f64,
+    pub(crate) snr: f64,
+    pub(crate) visqol: Option<f64>,
 }
 
 /// Linear interpolation of a quality field at a target bitrate. `None` outside
 /// the measured range, so unequal cells are never pretended to be equal.
-fn interp(points: &[Point], target: f64, field: fn(&Point) -> Option<f64>) -> Option<f64> {
+pub(crate) fn interp(
+    points: &[Point],
+    target: f64,
+    field: fn(&Point) -> Option<f64>,
+) -> Option<f64> {
     let mut sorted: Vec<(f64, f64)> = points
         .iter()
         .filter_map(|p| field(p).map(|v| (p.bps, v)))
@@ -568,7 +581,7 @@ fn cases() -> Result<Vec<Case>> {
     Ok(out)
 }
 
-fn to_i16(samples: &[i32]) -> Vec<i16> {
+pub(crate) fn to_i16(samples: &[i32]) -> Vec<i16> {
     samples
         .iter()
         .map(|&v| v.clamp(-32_768, 32_767) as i16)
@@ -576,7 +589,7 @@ fn to_i16(samples: &[i32]) -> Vec<i16> {
 }
 
 /// Extract channel `c` of an interleaved buffer.
-fn channel_of<T: Copy>(samples: &[T], ch: usize, c: usize) -> Vec<T> {
+pub(crate) fn channel_of<T: Copy>(samples: &[T], ch: usize, c: usize) -> Vec<T> {
     if ch <= 1 {
         samples.to_vec()
     } else {

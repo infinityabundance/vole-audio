@@ -103,6 +103,8 @@ pub mod seal;
 #[cfg(feature = "std")]
 pub mod transport;
 #[cfg(feature = "std")]
+pub mod voice;
+#[cfg(feature = "std")]
 pub use error::{Error, Kind, Result};
 
 // ---------------------------------------------------------------------------

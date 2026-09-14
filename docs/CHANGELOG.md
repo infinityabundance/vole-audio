@@ -385,6 +385,62 @@ used as a fallback.
 Measured position, the attributed losing cells and the declared remainder are
 in [`PHASE_7B.md`](PHASE_7B.md).
 
+## Phase 7C — `vole.audio.stream.voice.exp1` (voice-call profile)
+
+A **streaming** profile whose constitution is latency, packet loss and jitter
+rather than archival bytes or a static listening score
+([`PHASE_7C.md`](PHASE_7C.md), frozen before implementation).
+
+```text
+frame      16 kHz mono, 160 (10 ms) or 320 (20 ms) samples; no whole-clip mode
+packet     1 or 2 coded frames, self-contained
+parameters ABSOLUTE within a packet: a lost packet can never desynchronise a later one
+state      two bounded rings of reconstructed output and excitation
+```
+
+* **Predictor** — bounded competition over autocorrelation+Levinson, Burg and
+  covariance least-squares, orders 8–16, uniform Q quantisation in the
+  **reflection** domain, plus a long-term predictor whose reference is the
+  reconstructed *excitation*. Predicting from the reconstructed output instead
+  puts the long-term gain inside the short-term filter's feedback path and the
+  cascade diverges for legal parameters; the excitation reference is bounded by
+  the quantiser step, so it cannot.
+* **Residual** — a compact voice residual coder (Elias-gamma zero runs +
+  Golomb-Rice, plain Rice, varint) over the same machinery, because every member
+  of the general learned residual family writes an 8-byte length prefix that by
+  itself exceeds a 10 ms frame's allowance at 8 kbps. The general family stays
+  reachable (`id ≥ 128`) and is chosen when it wins on complete bytes.
+* **Concealment** — excitation-ring repetition at the last good pitch period
+  (voiced) or shaped noise through a four-tap envelope (unvoiced), with monotone
+  decay and a fade to the comfort-noise class. Concealed audio is never called
+  reconstruction.
+* **Capsules / redundancy / DTX** — checksummed state capsules applied to the
+  concealment model only; redundancy priced on/off and defaulted **off** because
+  the measurement is a net negative; VAD/DTX with procedural comfort noise and
+  active/inactive/whole-call rates reported separately.
+* **Impairment engine** — seeded and fully deterministic, with no networking
+  stack: i.i.d. and Gilbert–Elliott loss, duplication, adjacent reordering,
+  uniform and two-mode jitter, late delivery and clock drift. A frame decodes
+  exactly when its packet arrived and beat its playout deadline, which makes the
+  required jitter-buffer depth a measured quantity.
+
+Court `learned-voice-stream` measures (1) clean quality at matched **actual**
+bitrate against external Opus, EVS and Lyra, (2) quality under the loss, burst,
+jitter, drift and mixed ladders, and (3) one-way latency with all eight
+contributions kept separate. EVS is additionally driven through its own G.192
+bad-frame erasure sync word, which is the standard's documented loss simulation.
+No competitor code is imported, linked, wrapped or used as a fallback, and no
+competitor payload enters a VOLE object.
+
+Measured: encode p99 1.46 ms against a 5 ms budget with zero deadline misses;
+one-way p50 31.1 ms on 20 ms frames against the 40 ms envelope; zero concealment
+at every jitter rung once the measured depth is provided; recovery to the
+no-loss trajectory within 10 ms at 1 % loss. Clean quality **loses** to Opus
+(−8.36 dB mean), EVS (−5.75 dB mean) and has no cell inside Lyra's range —
+attributed to scalar coefficient transmission setting a ~17.7 kbps floor before
+any residual symbol exists. The remainder, with coefficient vector quantisation
+first, is declared in [`PHASE_7C.md`](PHASE_7C.md) §13.4.
+
 ## Current measured position
 
 Frozen real-speech **lossless** portfolio (effectiveness + held-out Mode C,

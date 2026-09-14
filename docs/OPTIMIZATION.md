@@ -356,7 +356,22 @@ matched-actual-bitrate court against external Opus and Lyra. The measured
 position, the attributed losing cells and the declared remainder are in
 [`PHASE_7B.md`](PHASE_7B.md).
 
-**7C — `vole.audio.stream.voice.exp1` — open.**
+**7C — `vole.audio.stream.voice.exp1` — implemented; the latency/loss/jitter
+constitution passes and clean quality is attributed as a loss.** 16 kHz mono,
+10/20 ms causal frames, absolute per-packet parameters, bounded reconstructed
+state, state capsules, VAD/DTX with procedural comfort noise, and a seeded
+deterministic impairment engine. Measured: encode p99 1.46 ms against a 5 ms
+budget with zero deadline misses, one-way p50 31.1 ms on 20 ms frames against a
+40 ms envelope, zero concealment across the whole jitter ladder once the
+*measured* buffer depth is provided, and graceful concealment under burst and
+random loss. Clean quality loses to external Opus (−8.36 dB mean), EVS
+(−5.75 dB mean) and has no operating point inside Lyra's range, and the cause is
+attributed to scalar coefficient transmission setting a ~17.7 kbps floor before
+any residual symbol exists. Selective redundancy is measured a net negative and
+defaulted off. The full accounting, the declared remainder (coefficient VQ
+first, then ALSA hardware-clock scheduling) and the non-claims are in
+[`PHASE_7C.md`](PHASE_7C.md); court `learned-voice-stream`, frozen projection
+`989e3c3b98a304da615e1880a5ec0a4fb285aae50b612f720359fd9300f7c331`.
 
 Earlier campaign status follows.
 

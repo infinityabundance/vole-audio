@@ -154,6 +154,8 @@ pub mod learned_u1_wasted;
 #[cfg(feature = "std")]
 pub mod learned_valuation_split;
 #[cfg(feature = "std")]
+pub mod learned_voice_stream;
+#[cfg(feature = "std")]
 pub(crate) mod measure;
 #[cfg(feature = "std")]
 pub mod metadata_codes;
@@ -436,6 +438,14 @@ centroid scalar quantization + native entropy coding) measured against external 
 matched actual bitrate, with delay-aligned SNR, spectral distortion, ViSQOL where available, and
 encode/decode time; competitors run as external processes and only VOLE-derived integers freeze
 the result",
+    ),
+    (
+        "learned-voice-stream",
+        "Phase 7C: the streaming voice profile vole.audio.stream.voice.exp1 (16 kHz, 10/20 ms
+causal frames, absolute parameters, bounded reconstructed state, state capsules, selective
+redundancy, VAD/DTX with procedural comfort noise) measured on clean quality at matched actual
+bitrate against external Opus, EVS and Lyra, and on the latency/loss/jitter Pareto surface through
+a deterministic seeded impairment engine; concealed audio is never claimed as reconstruction",
     ),
     (
         "learned-expert-mux",
@@ -769,6 +779,7 @@ pub fn run(name: &str, receipts_root: &Path) -> crate::error::Result<Verdict> {
         "learned-residual-entropy" => learned_residual_entropy::run(receipts_root),
         "learned-ngsa" => learned_ngsa::run(receipts_root),
         "learned-lossy" => learned_lossy::run(receipts_root),
+        "learned-voice-stream" => learned_voice_stream::run(receipts_root),
         "learned-residual-fusion" => learned_residual_fusion::run(receipts_root),
         "learned-stateful-parse" => learned_stateful_parse::run(receipts_root),
         "learned-iterative-reprice" => learned_iterative_reprice::run(receipts_root),

@@ -146,9 +146,11 @@ added parameter deltas, SRLA coefficient refinement, the widened natural-gradien
 ladder and Zstd-style integer metadata codes; **Phase 7A** (entropy-seed
 proceduralization, v0.74.0) makes the inverse path discover a deterministic
 `Compound` explanation *blind* from samples and persists it as entropy-coded H
-state plus an entropy-coded exact residual; and **Phase 7B** (v0.75.0) adds
+state plus an entropy-coded exact residual; **Phase 7B** (v0.75.0) adds
 `vole.audio.lossy.exp1` — VOLE's first real lossy profile — with a
-matched-actual-bitrate court against external Opus and Lyra.
+matched-actual-bitrate court against external Opus and Lyra; and **Phase 7C**
+(v0.76.0) adds `vole.audio.stream.voice.exp1`, a voice-call profile whose
+constitution is latency, packet loss and jitter rather than archival bytes.
 
 **Measured position (as of v0.73.0, lossless).** On the frozen real-speech
 corpus (LibriSpeech, CC BY 4.0), the exact learned portfolio is:
@@ -171,9 +173,26 @@ in [PHASE_7B.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/
 It is not a competitor wrapper: no competitor code is imported, linked or used
 as a fallback.
 
-Phase 7 is the current program: **7A** entropy-seed proceduralization
-(sealed), **7B** `vole.audio.lossy.exp1` (this release), then **7C**
-`vole.audio.stream.voice.exp1`. Phase 7A's evidence is the
+**Voice-call position (v0.76.0).** `vole.audio.stream.voice.exp1` is a real
+streaming profile: 16 kHz mono, 10/20 ms causal frames, **absolute** per-packet
+parameters so a lost packet can never desynchronise a later one, bounded
+reconstructed state, checksummed state capsules, VAD/DTX with procedural comfort
+noise, and concealment that repeats the reconstructed excitation ring. Court
+`learned-voice-stream` measures it on three axes at once — clean quality at
+matched actual bitrate against external Opus, EVS and Lyra (EVS also driven
+through its own G.192 erasure flag), quality under a seeded deterministic loss
+/burst/jitter/drift engine, and one-way latency with every contribution kept
+separate. The latency constitution passes with margin (encode p99 1.46 ms
+against a 5 ms budget, one-way p50 31.1 ms on 20 ms frames against a 40 ms
+envelope, zero deadline misses); clean quality **loses**, and the loss is
+attributed to scalar coefficient transmission setting a ~17.7 kbps floor. The
+full accounting and the declared remainder are in
+[PHASE_7C.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/PHASE_7C.md).
+
+Phase 7 is the current program: **7A** entropy-seed proceduralization (sealed),
+**7B** `vole.audio.lossy.exp1` (sealed), **7C**
+`vole.audio.stream.voice.exp1` (this release, with its remainder declared).
+Phase 7A's evidence is the
 `learned-entropy-seed` court: the blind `Compound` proposer (autocorrelation
 fundamental estimation, orthogonal matching pursuit over the *integer tone atoms
 the graph can emit* with a joint least-squares re-solve and split refinement,
@@ -188,7 +207,7 @@ court list is the registry in `src/courts/mod.rs`; the aggregate courts are
 `all` (Phase M), `h2` (Phase H.2), `phase-n` (Phase N) and `learned` (Phase O),
 and every court emits an immutable receipt under `receipts/`. The exact seal
 expectation is checked by `vole-audio seal verify --receipts receipts`
-(75 rows at v0.75.0). The full per-phase evidence narrative — the Phase H/H.2
+(76 rows at v0.76.0). The full per-phase evidence narrative — the Phase H/H.2
 endpoint measurements, the Phase K/L inverse results, and every seal's numbers —
 lives in
 [CHANGELOG.md](https://github.com/infinityabundance/vole-audio/blob/main/docs/CHANGELOG.md).
