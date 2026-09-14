@@ -243,6 +243,12 @@ pub enum Excitation {
     /// ACELP. **No length field**: the record length follows from the pulse
     /// counts, which are in the stream.
     Celp(celp::Params),
+    /// The low-information fallback core: a deterministic, packet-local shaped
+    /// stochastic excitation (white excitation through the synthesis filter, so
+    /// its spectrum follows the transmitted envelope) with one level and a
+    /// three-bit seed the encoder chooses. This is what makes a 64-bit (3.2
+    /// kbps) frame expressible at all.
+    Noise { gain: i32, seed: u8 },
 }
 
 impl Excitation {
@@ -266,6 +272,7 @@ impl Excitation {
                         })
                         .sum::<usize>()
             }
+            Excitation::Noise { .. } => usize::from(FAMILY_BITS) + 6 + 3,
         }
     }
 
@@ -306,6 +313,11 @@ impl Excitation {
                         w.bits(u32::from(positive), celp::SIGN_BITS);
                     }
                 }
+            }
+            Excitation::Noise { gain, seed } => {
+                w.bits(2, FAMILY_BITS);
+                w.bits((*gain).clamp(0, celp::GAIN_LEVELS - 1) as u32, 6);
+                w.bits(u32::from(*seed) & 0x7, 3);
             }
         }
     }
@@ -349,12 +361,32 @@ impl Excitation {
                 }
                 Ok(Excitation::Celp(p))
             }
+            2 => {
+                let gain = r.bits(6)? as i32;
+                let seed = r.bits(3)? as u8;
+                Ok(Excitation::Noise { gain, seed })
+            }
             _ => Err(Error::new(
                 Kind::Unsupported,
                 "voice.exp2 excitation family reserved",
             )),
         }
     }
+}
+
+/// A deterministic, packet-local white sample in `[-1, 1)` from a three-bit seed
+/// and the sample index. Depends on nothing but its arguments, so a lost packet
+/// cannot perturb a later one.
+fn noise_sample(seed: u8, n: usize) -> f64 {
+    let mut x = 0x9E37_79B9_7F4A_7C15u64
+        .wrapping_add(u64::from(seed).wrapping_mul(0xBF58_476D_1CE4_E5B9))
+        .wrapping_add((n as u64).wrapping_mul(0x94D0_49BB_1331_11EB));
+    x ^= x >> 30;
+    x = x.wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    x ^= x >> 27;
+    x = x.wrapping_mul(0x94D0_49BB_1331_11EB);
+    x ^= x >> 31;
+    (x as f64 / u64::MAX as f64) * 2.0 - 1.0
 }
 
 /// One `exp2` frame: a tiered spectrum plus one excitation family.
@@ -402,6 +434,18 @@ impl Frame2 {
         }
     }
 
+    /// The smallest legal frame: the full-precision spectrum with the
+    /// low-information fallback core at its lowest level. Its fitting inside 64
+    /// bits is the hard-rate conformance property required by §5 of the
+    /// charter — every declared rate must admit at least one legal
+    /// representation.
+    pub fn minimal() -> Frame2 {
+        Frame2 {
+            spectral: Spectral::Vq([0; vq::VQ_INDEX_BYTES]),
+            excitation: Excitation::Noise { gain: 0, seed: 0 },
+        }
+    }
+
     /// Decode this frame into reconstructed samples, advancing `state` exactly
     /// as the `exp1` decoder's shared synthesis loop does. Scalar frames use the
     /// per-subframe gain geometry; CELP frames render the reconstructed shot.
@@ -425,11 +469,173 @@ impl Frame2 {
                 let shot = celp::reconstruct(params, frame_len)?;
                 shot.render(state, &k_q, width)
             }
+            Excitation::Noise { gain, seed } => {
+                let level = celp::gain_of(*gain);
+                let exc: Vec<f64> = (0..frame_len)
+                    .map(|n| level * noise_sample(*seed, n))
+                    .collect();
+                vp::synthesize_excitation(state, &k_q, width, 0, 0, &exc)
+            }
         };
         Ok(samples
             .iter()
             .map(|&x| x.round().clamp(-2.0e9, 2.0e9) as i32)
             .collect())
+    }
+}
+
+/// The declared 20 ms operating points and their exact frame allowances (bits).
+pub const DECLARED_RATES: [(u32, usize); 6] = [
+    (3_200, 64),
+    (6_000, 120),
+    (8_000, 160),
+    (9_200, 184),
+    (12_000, 240),
+    (16_000, 320),
+];
+
+/// Sum of squared error between a frame and its reconstruction.
+fn mse(a: &[f64], b: &[f64]) -> f64 {
+    a.iter().zip(b.iter()).map(|(x, y)| (x - y) * (x - y)).sum()
+}
+
+/// Pulse-gain codes spanning the level implied by a residual RMS.
+fn noise_gain_codes(rms: f64) -> [i32; 3] {
+    let centre = celp::gain_code(rms.max(1.0));
+    [
+        (centre - 8).clamp(0, celp::GAIN_LEVELS - 1),
+        centre.clamp(0, celp::GAIN_LEVELS - 1),
+        (centre + 8).clamp(0, celp::GAIN_LEVELS - 1),
+    ]
+}
+
+/// The `exp2` frame codec: hard-rate encoding and faithful decoding.
+///
+/// The encoder is the hard-rate authority. It enumerates representations across
+/// the spectral tiers and the excitation families, keeps only those whose
+/// **exact** serialised bit count fits the frame allowance, and returns the
+/// lowest-distortion survivor. When nothing fits it returns
+/// [`Frame2::minimal`], which is legal at every declared rate. It never
+/// overshoots, so there is no `OVERSHOOT_LIMIT` in this profile.
+pub struct Exp2Codec;
+
+impl Exp2Codec {
+    /// Encode one frame into at most `frame_bits` bits; returns the artifact and
+    /// the exact information bit count.
+    pub fn encode_frame(state: &VoiceState, frame: &[i32], frame_bits: usize) -> (Vec<u8>, usize) {
+        let f: Vec<f64> = frame.iter().map(|&v| f64::from(v)).collect();
+        let mut best: Option<(f64, usize, Frame2)> = None;
+        let cands = vp::analyse(state, frame, 0);
+        let nsub = celp::subframes(frame.len()).max(1);
+        let rms = (f.iter().map(|v| v * v).sum::<f64>() / f.len().max(1) as f64).sqrt();
+        let noise_codes = noise_gain_codes(rms);
+
+        for c in cands.iter().take(3) {
+            let mut opts: Vec<(Vec<i32>, u8, Spectral)> = Vec::new();
+            if c.model.order == vq::VQ_ORDER
+                && let Some(lsf) = crate::voice::lsf::reflections_to_lsf(&c.k_raw)
+                && let Some(idx) = vq::encode_lsf(&lsf)
+            {
+                opts.push((
+                    vq::decode_index(&idx),
+                    vq::VQ_INTERNAL_WIDTH,
+                    Spectral::Vq(idx),
+                ));
+            }
+            opts.push((
+                c.k_q.clone(),
+                c.model.width,
+                Spectral::Scalar {
+                    width: c.model.width,
+                    codes: c.k_q.clone(),
+                },
+            ));
+
+            for (k_q, width, spectral) in opts {
+                let model = vp::FrameModel { width, ..c.model };
+                let mut consider = |d: f64, fr: Frame2| {
+                    let bits = fr.bits();
+                    if bits > frame_bits {
+                        return;
+                    }
+                    let better = match &best {
+                        None => true,
+                        Some((bd, bb, _)) => {
+                            d < *bd - 1e-9 || ((d - *bd).abs() <= 1e-9 && bits < *bb)
+                        }
+                    };
+                    if better {
+                        best = Some((d, bits, fr));
+                    }
+                };
+
+                // ACELP, within the remaining allowance.
+                let avail = frame_bits.saturating_sub(spectral.bits()) / nsub;
+                let maxp = celp::max_pulses_for_bits(avail);
+                if maxp > 0 {
+                    let (params, _d, shot) = celp::analyse(state, &f, &model, &k_q, maxp);
+                    let fr = Frame2 {
+                        spectral: spectral.clone(),
+                        excitation: Excitation::Celp(params),
+                    };
+                    if fr.bits() <= frame_bits {
+                        let mut s = state.clone();
+                        let out = shot.render(&mut s, &k_q, width);
+                        consider(mse(&f, &out), fr);
+                    }
+                }
+
+                // Scalar residual across the gain ladder.
+                for gain in [-4, 4, 12, 20, 28, 36, 44] {
+                    let s = vp::close_loop_gains(
+                        state,
+                        &f,
+                        &model,
+                        &k_q,
+                        vp::RESIDUAL_SUB_LEN,
+                        &[gain],
+                    );
+                    let payload = residual::encode_best(&s.symbols, &[]);
+                    let fr = Frame2 {
+                        spectral: spectral.clone(),
+                        excitation: Excitation::Scalar { gain, payload },
+                    };
+                    if fr.bits() <= frame_bits {
+                        consider(mse(&f, &s.samples), fr);
+                    }
+                }
+
+                // The noise fallback core: level and seed are both chosen.
+                for code in noise_codes {
+                    for seed in 0..8u8 {
+                        let fr = Frame2 {
+                            spectral: spectral.clone(),
+                            excitation: Excitation::Noise { gain: code, seed },
+                        };
+                        if fr.bits() > frame_bits {
+                            continue;
+                        }
+                        let mut s = state.clone();
+                        if let Ok(out) = fr.decode_into(&mut s, frame.len()) {
+                            let out: Vec<f64> = out.iter().map(|&v| f64::from(v)).collect();
+                            consider(mse(&f, &out), fr);
+                        }
+                    }
+                }
+            }
+        }
+
+        let chosen = best.map(|(_, _, fr)| fr).unwrap_or_else(Frame2::minimal);
+        chosen.write()
+    }
+
+    /// Decode one frame's artifact.
+    pub fn decode_frame(
+        state: &mut VoiceState,
+        bytes: &[u8],
+        frame_len: usize,
+    ) -> Result<Vec<i32>> {
+        Frame2::read(bytes, frame_len)?.decode_into(state, frame_len)
     }
 }
 
@@ -567,6 +773,117 @@ mod tests {
             .map(|&x| x.round() as i32)
             .collect();
         assert_eq!(got, want);
+    }
+
+    #[test]
+    fn hard_rate_encoder_never_overshoots_at_any_declared_rate() {
+        // A speech-like synthetic frame: a periodic glottal pulse train through a
+        // formant-ish resonator plus low-level noise, near 16-bit speech level.
+        let mut source = Vec::with_capacity(320 * 40);
+        let mut s = 0x1234_5678_9abc_def0u64;
+        for i in 0..320 * 40 {
+            s = s
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            let noise = ((s >> 40) as i64 % 2001 - 1000) as f64;
+            let voiced = if i % 78 < 3 { 6000.0 } else { 0.0 };
+            let x = voiced + 0.35 * noise + 900.0 * ((i as f64) * 0.09).sin();
+            source.push(x.round().clamp(-32768.0, 32767.0) as i32);
+        }
+
+        for (bps, bits) in DECLARED_RATES {
+            // The encoder reads the decoder's state, so the two cannot drift.
+            let mut state = VoiceState::new();
+            let mut sig = 0.0;
+            let mut err = 0.0;
+            let mut frames = 0usize;
+            for chunk in source.chunks(320) {
+                let enc_state = state.clone();
+                let (bytes, nbits) = Exp2Codec::encode_frame(&enc_state, chunk, bits);
+                assert!(
+                    nbits <= bits,
+                    "{bps} bps: {nbits} information bits exceed the {bits}-bit allowance"
+                );
+                assert!(
+                    bytes.len() * 8 <= bits,
+                    "{bps} bps: artifact of {} bytes ({}) exceeds the {bits}-bit allowance",
+                    bytes.len(),
+                    bytes.len() * 8
+                );
+                let out = Exp2Codec::decode_frame(&mut state, &bytes, 320).unwrap();
+                assert_eq!(out.len(), 320);
+                let f: Vec<f64> = chunk.iter().map(|&v| f64::from(v)).collect();
+                let o: Vec<f64> = out.iter().map(|&v| f64::from(v)).collect();
+                sig += f.iter().map(|v| v * v).sum::<f64>();
+                err += f
+                    .iter()
+                    .zip(&o)
+                    .map(|(a, b)| (a - b) * (a - b))
+                    .sum::<f64>();
+                frames += 1;
+            }
+            assert!(
+                frames > 0 && err > 0.0,
+                "the profile is lossy; exactness is not a claim"
+            );
+            let snr = 10.0 * (sig / err).log10();
+            println!("{bps} bps allowance {bits}: hard-rate SNR {snr:.2} dB over {frames} frames");
+        }
+    }
+
+    #[test]
+    fn every_declared_rate_admits_a_legal_frame() {
+        // 20 ms frames: bits per frame for each declared operating rate.
+        let rates: [(u32, usize); 6] = [
+            (3_200, 64),
+            (6_000, 120),
+            (8_000, 160),
+            (9_200, 184),
+            (12_000, 240),
+            (16_000, 320),
+        ];
+        let minimal = Frame2::minimal();
+        for (bps, bits) in rates {
+            assert!(
+                minimal.bits() <= bits,
+                "{bps} bps ({bits} bits/frame) admits no legal frame: minimal costs {} bits",
+                minimal.bits()
+            );
+        }
+        // And the minimal frame must actually serialise, parse and decode.
+        let (bytes, written) = minimal.write();
+        assert_eq!(written, minimal.bits());
+        assert!(bytes.len() * 8 <= 64, "minimal frame must fit 3.2 kbps");
+        let back = Frame2::read(&bytes, 320).unwrap();
+        assert_eq!(back, minimal);
+        let mut state = VoiceState::new();
+        let out = back.decode_into(&mut state, 320).unwrap();
+        assert_eq!(out.len(), 320);
+        // Deterministic and packet-local: the same frame decodes identically.
+        let mut state2 = VoiceState::new();
+        assert_eq!(back.decode_into(&mut state2, 320).unwrap(), out);
+    }
+
+    #[test]
+    fn noise_core_is_seeded_and_deterministic() {
+        let a = Frame2 {
+            spectral: Spectral::Vq([5, 4, 3, 2]),
+            excitation: Excitation::Noise { gain: 20, seed: 3 },
+        };
+        let b = Frame2 {
+            spectral: Spectral::Vq([5, 4, 3, 2]),
+            excitation: Excitation::Noise { gain: 20, seed: 5 },
+        };
+        let (ba, _) = a.write();
+        let (bb, _) = b.write();
+        assert_eq!(Frame2::read(&ba, 320).unwrap(), a);
+        assert_eq!(Frame2::read(&bb, 320).unwrap(), b);
+        let mut sa = VoiceState::new();
+        let mut sb = VoiceState::new();
+        let oa = a.decode_into(&mut sa, 320).unwrap();
+        let ob = b.decode_into(&mut sb, 320).unwrap();
+        // Different seeds are different realisations, so the encoder has a choice.
+        assert_ne!(oa, ob);
     }
 
     #[test]
