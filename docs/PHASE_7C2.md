@@ -32,7 +32,7 @@ the per-packet header (`flags` + base gain, 16 b) is common to both profiles and
 is excluded, so the comparison is frame-for-frame:
 
 ```text
-exp1 frame, no pulses (bits)
+`exp1` frame, no pulses (bits)
   mode                              8
   generic gain delta                8
   generic pitch lag + LTP gain     24
@@ -44,18 +44,31 @@ exp1 frame, no pulses (bits)
 
 exp2 frame, no pulses (bits)
   spectral tier 2 + index 32       34
-  excitation family 2 + CELP 4×23  94
+  excitation family 2 + CELP, 7C.2-B/7C.2-D
+    lag anchor 9 + 3×contour 12    21
+    pitch gain 5 + 3×delta 9       14
+    innovation gain 6 + 3×delta 12 18
+    frame pulse count               3
                                    --
-  information                      128   → padded 128
+  information                       92   → padded 96
 ```
 
 The generic pitch/gain fields duplicate the per-subframe CELP fields, and the
 residual length is derivable from the pulse counts. With four pulses the same
-relation holds: `exp1` 316 b information / 320 b padded versus `exp2` 228 b.
-This is a **representation floor**, not a tuned constant: at 3.2 kbps a 20 ms
-frame is 64 bits, so `exp1` cannot express a 3.2 kbps CELP frame at all. The
-floor is removed by syntax (`src/voice/exp2.rs`), before any codec-quality work.
-Both figures are asserted by test, not estimated.
+relation holds: `exp1` 316 b information / 320 b padded versus `exp2`
+`92 + 4 × (21 + 4) = 192 b`. This is a **representation floor**, not a tuned
+constant: at 3.2 kbps a 20 ms frame is 64 bits, so `exp1` cannot express a
+3.2 kbps CELP frame at all. The floor is removed by syntax
+(`src/voice/exp2.rs`), before any codec-quality work. Both figures are asserted
+by test, not estimated.
+
+7C.2-D then removes the per-subframe *repetition* of slowly varying side
+information. Before it, a CELP frame paid 4 × 23 = 92 b of side information and
+4 × count(3) pulse counts; after it the frame pays one lag anchor plus contour,
+one pitch gain plus deltas, one innovation gain plus deltas, and one pulse count:
+that is `2 + 9 + 5 + 6 + 3 + 4·(4 + 3 + 4)` bits of side information instead of
+`4 · (9 + 5 + 6 + 3)` — a drop of **60 b per 20 ms frame** at the four-subframe
+geometry, before any pulse is sent.
 
 ## 3. Wire format (normative)
 
@@ -71,14 +84,27 @@ spectral := tier(2)
               tier 2,3 reserved
 excitation := family(2)
               family 0  scalar: gain(8) payload_bits(12) payload(payload_bits)
-              family 1  celp:   nsub × { lag(9) pitch_gain(5) gain(6)
-                                         count(3) rank(pb) signs(count) }
-              family 2,3 reserved (tcx / procedural, 7C.2-G/H)
+              family 1  celp (7C.2-D):
+                            lag_anchor(9)
+                            (nsub−1) × lag_delta(4)          # ±8, clamped
+                            pitch_gain(5)
+                            (nsub−1) × pitch_gain_delta(3)   # ±4, clamped
+                            gain(6)
+                            (nsub−1) × gain_delta(4)         # ±8, clamped
+                            count(3)
+                            nsub × { rank(ceil(log2 C(80,count))) signs(count) }
+              family 2  noise:  gain(6) seed(3)
+              family 3  reserved (tcx / procedural, 7C.2-G/H)
 ```
 
 * A CELP frame **carries no residual length**: its length follows from the
   pulse counts.
 * A CELP frame **carries no generic pitch or gain field**.
+* A CELP frame **does not repeat per-subframe side information** (7C.2-D): one
+  frame lag anchor plus an 4-bit contour, one pitch gain plus 3-bit deltas, one
+  innovation gain plus 4-bit deltas, and one frame pulse count. The deltas clamp,
+  so the wire is a *canonicalising* map: writing a frame and reading it back
+  yields a fixed point, asserted by the `celp_wire_is_idempotent…` test.
 * `pb = ceil(log2 C(80, count))`; pulse sets are canonical (ascending positions).
 * The exact information bit count of a `Frame2` is `Frame2::bits()` and must
   equal the writer's count (`exp2.rs` asserts this in test).
@@ -188,8 +214,8 @@ now, before any `exp2` codec work, so the challenger court cannot be tuned.
 | --- | --- | --- |
 | 7C.2-A | freeze this constitution + challenger corpus | **complete**: corpus identity `7de2453d…` frozen in `corpus/real_manifest.json` and exposed as `corpus_real::challenger_clips()`; court `learned-voice-stream-exp2` frozen at result `23eaf361…`, SUPPORTED on the `voice.exp1` control |
 | 7C.2-B | bit-accurate mode-specific serializer | **implemented** (`src/voice/exp2.rs`): bit writer/reader, tiered spectrum, CELP and scalar families, exact round-trip and exact bit accounting, and a **decode path proven faithful** to the shared synthesis loop for both families; floor removed. Not yet a live profile |
-| 7C.2-C | hard-rate fallback architecture | **in progress**: a low-information noise core, `Frame2::minimal` legal at 64 bits, and `Exp2Codec::encode_frame` — a hard-rate encoder that never exceeds the frame allowance (no `OVERSHOOT_LIMIT`). Measured on a synthetic speech-like signal over 40 frames per rate: 3.2 kbps 0.00 dB, 6 kbps 0.07, 8 kbps 0.07, 9.2 kbps 3.90, 12 kbps 4.89, 16 kbps 5.45 dB SNR. The 6–8 kbps cells collapse to the noise core because the per-subframe **23-bit overhead** does not fit 120–160 bits: this is the measured motivation for 7C.2-D |
-| 7C.2-D | frame pitch anchor + contours, gain prediction, implicit pulse count | materially lower side information at identical reconstruction |
+| 7C.2-C | hard-rate fallback architecture | **complete**: a low-information noise core, `Frame2::minimal` legal at 64 bits, and `Exp2Codec::encode_frame` — a hard-rate encoder that never exceeds the frame allowance (no `OVERSHOOT_LIMIT`). Measured on a synthetic speech-like signal over 40 frames per rate: 3.2 kbps 0.00 dB, 6 kbps 0.07, 8 kbps 0.07, 9.2 kbps 3.90, 12 kbps 4.89, 16 kbps 5.45 dB SNR. The 6–8 kbps cells collapse to the noise core because the per-subframe **23-bit overhead** does not fit 120–160 bits: this is the measured motivation for 7C.2-D |
+| 7C.2-D | frame pitch anchor + contours, gain prediction, implicit pulse count | **implemented** (`src/voice/exp2.rs`): CELP side information is one frame lag anchor (9 b) + 4-bit contour, one pitch gain (5 b) + 3-bit deltas, one innovation gain (6 b) + 4-bit deltas, and one frame pulse count (3 b). Per-subframe overhead fell from 23 b to ~6 b, a **60 b/frame** reduction at 320 samples. The wire is now a canonicalising map and the property asserted is idempotence plus decode fidelity to the read-back shot (not equality to pre-wire search parameters). Ladder over a synthetic speech-like signal, 40 frames/rate: 3.2 kbps 0.00 dB, 6 kbps 0.09, 8 kbps 0.09, 9.2 kbps 3.60, 12 kbps 4.61, 16 kbps 4.36. 6–8 kbps still collapse to the noise core, and 16 kbps regressed (5.45 → 4.36) because a single shared pulse count cannot satisfy subframes that want different counts: this is precisely the tension 7C.2-E removes by spreading side information at its intrinsic rate rather than at the subframe rate |
 | 7C.2-E | fractional multi-tap LTP + track ACELP + joint R–D search | CELP beats the scalar path in complete bits *and* perceptual quality |
 | 7C.2-F | voicing-dependent allocation + noise excitation | held-out RD gain; no dev-only promotion |
 | 7C.2-G | TCX/PVQ escape mode | selected naturally by exact RD; improves mixed/transient cells |

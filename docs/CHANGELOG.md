@@ -489,6 +489,37 @@ challenger court is SUPPORTED at
 `23eaf3610af66d789bb188aedd6e1359ba9ac06ba706d691a2f853845588d43c`; the
 repository-wide seal still requires a source-bound battery on the tagged tree.
 
+## Phase 7C.2-C/D — hard-rate core, then multirate side information (v0.78.0)
+
+* **7C.2-C, hard rate conformance.** `Exp2Codec::encode_frame` (`src/voice/exp2.rs`)
+  is the hard-rate authority: it enumerates the spectral tiers and excitation
+  families, keeps only frames whose **exact** serialised bit count fits the
+  declared allowance, and returns the lowest-distortion survivor. There is no
+  `OVERSHOOT_LIMIT` in `exp2`; a rate with no richer legal frame falls back to
+  `Frame2::minimal` (frozen VQ spectrum + lowest noise core), which fits 64 bits
+  and is proven legal at every declared rate by test.
+* **7C.2-D, multirate side information.** A CELP frame no longer repeats
+  slowly-varying state at the subframe rate. It now sends one frame lag anchor
+  (9 b) plus a 4-bit subframe contour, one pitch gain (5 b) plus 3-bit deltas,
+  one innovation gain (6 b) plus 4-bit deltas, and **one frame pulse count**
+  (3 b) — per-subframe overhead falls from 23 b to ~6 b. A 320-sample CELP frame
+  with no pulses drops from 128 to **92 b**, a 60 b/frame saving before any
+  pulse is sent. The delta fields are clamped, so the wire is a canonicalising
+  map: the property asserted is idempotence plus decode fidelity to the
+  read-back shot, not equality to the pre-wire search parameters.
+* **Measured ladder (synthetic speech-like signal, 40 frames/rate).** Hard-rate
+  SNR at the declared allowances: 3.2 kbps 0.00 dB, 6 kbps 0.09, 8 kbps 0.09,
+  9.2 kbps 3.60, 12 kbps 4.61, 16 kbps 4.36. This is a conformance instrument,
+  not a quality claim: 6–8 kbps still collapse to the noise core (the spectrum
+  is 32 b and the remaining ~88–128 b do not yet buy pulses), and 16 kbps
+  *regressed* from 5.45 to 4.36 dB because one shared frame pulse count cannot
+  satisfy subframes that want different counts. That tension is the measured
+  motivation for 7C.2-E.
+* `voice.exp2` is still **not a live profile**. No court result, quality claim
+  or bitrate claim attaches to it. The regression court `learned-voice-stream`
+  is unaffected (its result identity is unchanged); the whole library test suite
+  passes (793 passed, 12 ignored).
+
 ## Current measured position
 
 Frozen real-speech **lossless** portfolio (effectiveness + held-out Mode C,

@@ -259,18 +259,28 @@ impl Excitation {
                 usize::from(FAMILY_BITS) + 8 + 12 + payload.len() * 8
             }
             Excitation::Celp(p) => {
+                // Multirate side information (7C.2-D): one frame pitch anchor plus
+                // 4-bit contour deltas, one pitch gain plus 3-bit deltas, one
+                // innovation gain plus 4-bit deltas, and a single frame pulse count.
+                let nsub = p.subframes.len();
+                let tail = nsub.saturating_sub(1);
+                let count = p
+                    .subframes
+                    .first()
+                    .map(|s| s.pulses.len())
+                    .unwrap_or(0)
+                    .min((1usize << celp::COUNT_BITS) - 1);
                 usize::from(FAMILY_BITS)
-                    + p.subframes
-                        .iter()
-                        .map(|s| {
-                            usize::from(celp::LAG_BITS)
-                                + usize::from(celp::PITCH_GAIN_BITS)
-                                + usize::from(celp::GAIN_BITS)
-                                + usize::from(celp::COUNT_BITS)
-                                + usize::from(celp::position_bits(s.pulses.len()))
-                                + s.pulses.len() * usize::from(celp::SIGN_BITS)
-                        })
-                        .sum::<usize>()
+                    + usize::from(celp::LAG_BITS)
+                    + 4 * tail
+                    + usize::from(celp::PITCH_GAIN_BITS)
+                    + 3 * tail
+                    + usize::from(celp::GAIN_BITS)
+                    + 4 * tail
+                    + usize::from(celp::COUNT_BITS)
+                    + nsub
+                        * (usize::from(celp::position_bits(count))
+                            + count * usize::from(celp::SIGN_BITS))
             }
             Excitation::Noise { .. } => usize::from(FAMILY_BITS) + 6 + 3,
         }
@@ -286,21 +296,49 @@ impl Excitation {
             }
             Excitation::Celp(p) => {
                 w.bits(1, FAMILY_BITS);
+                let count = p
+                    .subframes
+                    .first()
+                    .map(|s| s.pulses.len())
+                    .unwrap_or(0)
+                    .min((1usize << celp::COUNT_BITS) - 1);
+                // Lag anchor + contour.
+                let mut lag = p
+                    .subframes
+                    .first()
+                    .map(|s| s.lag)
+                    .unwrap_or(vp::MIN_LAG as i32);
+                w.bits(
+                    (lag - vp::MIN_LAG as i32).clamp(0, (1 << celp::LAG_BITS) - 1) as u32,
+                    celp::LAG_BITS,
+                );
+                for sub in p.subframes.iter().skip(1) {
+                    let d = (sub.lag - lag).clamp(-8, 7);
+                    w.bits((d as u32) & 0xF, 4);
+                    lag = (lag + d).clamp(vp::MIN_LAG as i32, vp::MAX_LAG as i32);
+                }
+                // Pitch gain + deltas.
+                let mut pg = p.subframes.first().map(|s| s.pitch_gain).unwrap_or(0);
+                w.bits(
+                    pg.clamp(0, celp::PITCH_GAIN_LEVELS - 1) as u32,
+                    celp::PITCH_GAIN_BITS,
+                );
+                for sub in p.subframes.iter().skip(1) {
+                    let d = (sub.pitch_gain - pg).clamp(-4, 3);
+                    w.bits((d as u32) & 0x7, 3);
+                    pg = (pg + d).clamp(0, celp::PITCH_GAIN_LEVELS - 1);
+                }
+                // Innovation gain + deltas.
+                let mut g = p.subframes.first().map(|s| s.gain).unwrap_or(0);
+                w.bits(g.clamp(0, celp::GAIN_LEVELS - 1) as u32, celp::GAIN_BITS);
+                for sub in p.subframes.iter().skip(1) {
+                    let d = (sub.gain - g).clamp(-8, 7);
+                    w.bits((d as u32) & 0xF, 4);
+                    g = (g + d).clamp(0, celp::GAIN_LEVELS - 1);
+                }
+                // One pulse count for the whole frame, then the pulses.
+                w.bits(count as u32, celp::COUNT_BITS);
                 for sub in &p.subframes {
-                    w.bits(
-                        (sub.lag - vp::MIN_LAG as i32).clamp(0, (1 << celp::LAG_BITS) - 1) as u32,
-                        celp::LAG_BITS,
-                    );
-                    w.bits(
-                        sub.pitch_gain.clamp(0, celp::PITCH_GAIN_LEVELS - 1) as u32,
-                        celp::PITCH_GAIN_BITS,
-                    );
-                    w.bits(
-                        sub.gain.clamp(0, celp::GAIN_LEVELS - 1) as u32,
-                        celp::GAIN_BITS,
-                    );
-                    let count = sub.pulses.len().min((1usize << celp::COUNT_BITS) - 1);
-                    w.bits(count as u32, celp::COUNT_BITS);
                     let mut ordered: Vec<(u8, bool)> =
                         sub.pulses.iter().take(count).copied().collect();
                     ordered.sort_unstable_by_key(|&(pos, _)| pos);
@@ -332,16 +370,36 @@ impl Excitation {
             }
             1 => {
                 let nsub = celp::subframes(frame_len);
+                // Lag anchor + contour.
+                let anchor = vp::MIN_LAG as i32 + r.bits(celp::LAG_BITS)? as i32;
+                let mut lags = vec![anchor.clamp(vp::MIN_LAG as i32, vp::MAX_LAG as i32)];
+                for _ in 1..nsub {
+                    let d = sign_extend(r.bits(4)?, 4);
+                    let prev = *lags.last().unwrap();
+                    lags.push((prev + d).clamp(vp::MIN_LAG as i32, vp::MAX_LAG as i32));
+                }
+                // Pitch gain + deltas.
+                let mut pgs = vec![r.bits(celp::PITCH_GAIN_BITS)? as i32];
+                for _ in 1..nsub {
+                    let d = sign_extend(r.bits(3)?, 3);
+                    let prev = *pgs.last().unwrap();
+                    pgs.push((prev + d).clamp(0, celp::PITCH_GAIN_LEVELS - 1));
+                }
+                // Innovation gain + deltas.
+                let mut gs = vec![r.bits(celp::GAIN_BITS)? as i32];
+                for _ in 1..nsub {
+                    let d = sign_extend(r.bits(4)?, 4);
+                    let prev = *gs.last().unwrap();
+                    gs.push((prev + d).clamp(0, celp::GAIN_LEVELS - 1));
+                }
+                // One pulse count, then the pulses.
+                let count = r.bits(celp::COUNT_BITS)? as usize;
+                if count > celp::MAX_PULSES {
+                    return Err(Error::malformed("voice.exp2 pulse count above the bound"));
+                }
+                let pb = celp::position_bits(count);
                 let mut p = celp::Params::default();
-                for _ in 0..nsub {
-                    let lag = vp::MIN_LAG as i32 + r.bits(celp::LAG_BITS)? as i32;
-                    let pitch_gain = r.bits(celp::PITCH_GAIN_BITS)? as i32;
-                    let gain = r.bits(celp::GAIN_BITS)? as i32;
-                    let count = r.bits(celp::COUNT_BITS)? as usize;
-                    if count > celp::MAX_PULSES {
-                        return Err(Error::malformed("voice.exp2 pulse count above the bound"));
-                    }
-                    let pb = celp::position_bits(count);
+                for i in 0..nsub {
                     let positions = if pb > 0 {
                         celp::unrank_positions(u64::from(r.bits(pb)?), count)
                     } else {
@@ -353,9 +411,9 @@ impl Excitation {
                         pulses.push((pos, positive));
                     }
                     p.subframes.push(celp::Subframe {
-                        lag,
-                        pitch_gain,
-                        gain,
+                        lag: lags[i],
+                        pitch_gain: pgs[i],
+                        gain: gs[i],
                         pulses,
                     });
                 }
@@ -372,6 +430,12 @@ impl Excitation {
             )),
         }
     }
+}
+
+/// Sign-extend the low `n` bits of `v`.
+fn sign_extend(v: u32, n: u8) -> i32 {
+    let shift = 32 - u32::from(n);
+    ((v << shift) as i32) >> shift
 }
 
 /// A deterministic, packet-local white sample in `[-1, 1)` from a three-bit seed
@@ -553,11 +617,25 @@ impl Exp2Codec {
 
             for (k_q, width, spectral) in opts {
                 let model = vp::FrameModel { width, ..c.model };
-                let mut consider = |d: f64, fr: Frame2| {
+                // Every candidate is scored on its **round-tripped** frame, so the
+                // encoder measures exactly what the decoder will reconstruct. This
+                // is what makes the differential/contour coding safe: a lag delta
+                // the wire clamps cannot desynchronise the two sides.
+                let mut consider = |fr: Frame2| {
                     let bits = fr.bits();
                     if bits > frame_bits {
                         return;
                     }
+                    let (bytes, _) = fr.write();
+                    let Ok(rt) = Frame2::read(&bytes, frame.len()) else {
+                        return;
+                    };
+                    let mut s = state.clone();
+                    let Ok(out) = rt.decode_into(&mut s, frame.len()) else {
+                        return;
+                    };
+                    let o: Vec<f64> = out.iter().map(|&v| f64::from(v)).collect();
+                    let d = mse(&f, &o);
                     let better = match &best {
                         None => true,
                         Some((bd, bb, _)) => {
@@ -573,16 +651,11 @@ impl Exp2Codec {
                 let avail = frame_bits.saturating_sub(spectral.bits()) / nsub;
                 let maxp = celp::max_pulses_for_bits(avail);
                 if maxp > 0 {
-                    let (params, _d, shot) = celp::analyse(state, &f, &model, &k_q, maxp);
-                    let fr = Frame2 {
+                    let (params, _d, _shot) = celp::analyse(state, &f, &model, &k_q, maxp);
+                    consider(Frame2 {
                         spectral: spectral.clone(),
                         excitation: Excitation::Celp(params),
-                    };
-                    if fr.bits() <= frame_bits {
-                        let mut s = state.clone();
-                        let out = shot.render(&mut s, &k_q, width);
-                        consider(mse(&f, &out), fr);
-                    }
+                    });
                 }
 
                 // Scalar residual across the gain ladder.
@@ -596,30 +669,19 @@ impl Exp2Codec {
                         &[gain],
                     );
                     let payload = residual::encode_best(&s.symbols, &[]);
-                    let fr = Frame2 {
+                    consider(Frame2 {
                         spectral: spectral.clone(),
                         excitation: Excitation::Scalar { gain, payload },
-                    };
-                    if fr.bits() <= frame_bits {
-                        consider(mse(&f, &s.samples), fr);
-                    }
+                    });
                 }
 
                 // The noise fallback core: level and seed are both chosen.
                 for code in noise_codes {
                     for seed in 0..8u8 {
-                        let fr = Frame2 {
+                        consider(Frame2 {
                             spectral: spectral.clone(),
                             excitation: Excitation::Noise { gain: code, seed },
-                        };
-                        if fr.bits() > frame_bits {
-                            continue;
-                        }
-                        let mut s = state.clone();
-                        if let Ok(out) = fr.decode_into(&mut s, frame.len()) {
-                            let out: Vec<f64> = out.iter().map(|&v| f64::from(v)).collect();
-                            consider(mse(&f, &out), fr);
-                        }
+                        });
                     }
                 }
             }
@@ -653,9 +715,9 @@ mod tests {
                         .collect();
                     pulses.sort_unstable_by_key(|&(pos, _)| pos);
                     celp::Subframe {
-                        lag: vp::MIN_LAG as i32 + (s as i32 * 17) % 200,
-                        pitch_gain: (s as i32 * 5) % celp::PITCH_GAIN_LEVELS,
-                        gain: (s as i32 * 9) % celp::GAIN_LEVELS,
+                        lag: 100 + vp::MIN_LAG as i32 + s as i32 * 3,
+                        pitch_gain: 8 + s as i32 * 2,
+                        gain: 16 + s as i32 * 3,
                         pulses,
                     }
                 })
@@ -732,8 +794,22 @@ mod tests {
         assert_eq!(got, want);
     }
 
+    /// The CELP wire is *differential* (7C.2-D): it sends one frame lag anchor
+    /// and a quarter of the subframe parameters as 3–4-bit contour deltas. Those
+    /// deltas clamp and the pulse count is shared per frame, so the wire is a
+    /// canonicalising map, not the identity. The properties that must actually
+    /// hold are therefore:
+    ///
+    /// 1. **Idempotence** — reading a written frame yields a frame that writes
+    ///    to the identical bytes and reads back to itself. A decoder can never
+    ///    be handed a frame that re-encodes differently, so a lost packet cannot
+    ///    desynchronise the interpretation of a later one.
+    /// 2. **Decode fidelity** — decoding the read-back frame equals rendering the
+    ///    read-back frame's *own* reconstructed shot through the shared
+    ///    synthesis loop. The wire description is behaviour-preserving even
+    ///    though the pre-wire search parameters are not.
     #[test]
-    fn celp_decode_reproduces_the_reconstructed_shot() {
+    fn celp_wire_is_idempotent_and_decodes_its_own_shot() {
         let k = vec![
             0.70, -0.50, 0.40, -0.30, 0.25, -0.20, 0.15, -0.10, 0.08, -0.06, 0.05, -0.04, 0.03,
         ];
@@ -755,7 +831,7 @@ mod tests {
             frame.push(noise + if i % 73 < 2 { 800.0 } else { 0.0 });
         }
         let state = VoiceState::new();
-        let (params, _d, shot) = celp::analyse(&state, &frame, &model, &k_q, 4);
+        let (params, _d, _shot) = celp::analyse(&state, &frame, &model, &k_q, 4);
         let f = Frame2 {
             spectral: Spectral::Vq([1, 2, 3, 4]),
             excitation: Excitation::Celp(params),
@@ -763,10 +839,22 @@ mod tests {
         let (bytes, bits) = f.write();
         assert_eq!(bits, f.bits());
         let back = Frame2::read(&bytes, 320).unwrap();
+
+        // 1. Idempotence: the read-back frame is a wire fixed point.
+        let (bytes2, bits2) = back.write();
+        assert_eq!(bits2, back.bits());
+        assert_eq!(bytes2, bytes, "write must be stable on a canonical frame");
+        assert_eq!(Frame2::read(&bytes2, 320).unwrap(), back);
+
+        // 2. Decode fidelity against the read-back frame's own shot.
         let mut a = state.clone();
         let got = back.decode_into(&mut a, 320).unwrap();
+        let (codes, width) = back.synthesis_codes();
+        let Excitation::Celp(back_params) = &back.excitation else {
+            unreachable!("the frame was written as CELP")
+        };
+        let shot = celp::reconstruct(back_params, 320).unwrap();
         let mut b = state.clone();
-        let (codes, width) = f.synthesis_codes();
         let want: Vec<i32> = shot
             .render(&mut b, &codes, width)
             .iter()
@@ -918,10 +1006,11 @@ mod tests {
             excitation: Excitation::Celp(sample_celp(320, 0)),
         };
         let (bytes, bits) = f.write();
-        // tier 2 + index 32 + family 2 + 4 × (9+5+6+3)
-        assert_eq!(bits, 2 + 32 + 2 + 4 * 23);
-        assert_eq!(bits, 128);
-        assert_eq!(bytes.len(), 16);
+        // spectral tier 2 + index 32; family 2 + anchor 9 + contour 3×4
+        // + pitch gain 5 + deltas 3×3 + gain 6 + deltas 3×4 + count 3.
+        assert_eq!(bits, 2 + 32 + 2 + 9 + 12 + 5 + 9 + 6 + 12 + 3);
+        assert_eq!(bits, 92);
+        assert_eq!(bytes.len(), 12);
         assert!(bits < exp1_floor_bits);
 
         // With four pulses the same relation holds: exp1 pays 8 bits/pulse with
@@ -932,8 +1021,8 @@ mod tests {
         };
         let (bytes4, bits4) = f4.write();
         let exp1_4pulse = 16 + 8 + 8 + 24 + 32 + 16 + 8 + 4 * (23 + 4 * 8);
-        assert_eq!(bits4, 2 + 32 + 2 + 4 * (23 + 21 + 4));
-        assert_eq!(bits4, 228);
+        assert_eq!(bits4, 92 + 4 * (21 + 4));
+        assert_eq!(bits4, 192);
         assert!(bits4 < exp1_4pulse);
         assert!(bytes4.len() * 8 - bits4 < 8);
     }

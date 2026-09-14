@@ -1,0 +1,2501 @@
+{
+  "schema": "vole.audio.evidence.v1",
+  "schema_version": 1,
+  "receipt": {
+    "schema": "vole.audio.evidence.v1",
+    "schema_version": 1,
+    "run_id": "learned-voice-stream-exp2-1789383519989-33107e",
+    "court": "learned-voice-stream-exp2",
+    "created_unix_ms": 1789383519989,
+    "result": "SUPPORTED",
+    "result_detail": "voice.exp2 challenger court over 2 held-out cases of 7de2453d2b249130b2edff2b457fcc29a37eb200215387aac82debec4200c6fa (codec under test: vole.audio.stream.voice.exp1 control): quality-at-equal-rate vs Opus -4.54 dB SNR / -2.61 MOS, vs EVS -4.39 / -2.59, vs Lyra n/a / n/a; bitrate-at-equal-quality vs Opus +2.72 dB, vs EVS +3.39 dB, vs Lyra n/a dB (n/a where the quality ranges do not overlap); matched-bitrate SNR vs Opus -6.35 dB; encode p99 4958 µs; the profile is lossy and makes no exactness claim; result sha256 23eaf3610af66d789bb188aedd6e1359ba9ac06ba706d691a2f853845588d43c",
+    "environment": {
+      "os": {
+        "sysname": "Linux",
+        "release": "7.2.4-1-cachyos",
+        "version": "#1 SMP PREEMPT_DYNAMIC Thu, 10 Sep 2026 17:19:37 +0000",
+        "machine": "x86_64",
+        "nodename": "vanir",
+        "os_pretty_name": "CachyOS"
+      },
+      "cpu": {
+        "model": "AMD Ryzen 7 9800X3D 8-Core Processor",
+        "flags": [
+          "3dnowprefetch",
+          "abm",
+          "adx",
+          "aes",
+          "amd_lbr_pmc_freeze",
+          "amd_lbr_v2",
+          "aperfmperf",
+          "apic",
+          "arat",
+          "avic",
+          "avx",
+          "avx2",
+          "avx512_bf16",
+          "avx512_bitalg",
+          "avx512_vbmi2",
+          "avx512_vnni",
+          "avx512_vp2intersect",
+          "avx512_vpopcntdq",
+          "avx512bw",
+          "avx512cd",
+          "avx512dq",
+          "avx512f",
+          "avx512ifma",
+          "avx512vbmi",
+          "avx512vl",
+          "avx_vnni",
+          "bmi1",
+          "bmi2",
+          "bpext",
+          "bus_lock_detect",
+          "cat_l3",
+          "cdp_l3",
+          "clflush",
+          "clflushopt",
+          "clwb",
+          "clzero",
+          "cmov",
+          "cmp_legacy",
+          "constant_tsc",
+          "cpb",
+          "cppc",
+          "cpuid",
+          "cpuid_fault",
+          "cqm",
+          "cqm_llc",
+          "cqm_mbm_local",
+          "cqm_mbm_total",
+          "cqm_occup_llc",
+          "cr8_legacy",
+          "cx16",
+          "cx8",
+          "de",
+          "decodeassists",
+          "erms",
+          "extapic",
+          "extd_apicid",
+          "f16c",
+          "flush_l1d",
+          "flushbyasid",
+          "fma",
+          "fpu",
+          "fsgsbase",
+          "fsrm",
+          "fxsr",
+          "fxsr_opt",
+          "gfni",
+          "ht",
+          "hw_pstate",
+          "ibpb",
+          "ibrs",
+          "ibrs_enhanced",
+          "ibs",
+          "invpcid",
+          "irperf",
+          "lahf_lm",
+          "lbrv",
+          "lm",
+          "mba",
+          "mca",
+          "mce",
+          "misalignsse",
+          "mmx",
+          "mmxext",
+          "monitor",
+          "movbe",
+          "movdir64b",
+          "movdiri",
+          "msr",
+          "mtrr",
+          "mwaitx",
+          "nonstop_tsc",
+          "nopl",
+          "npt",
+          "nrip_save",
+          "nx",
+          "ospke",
+          "osvw",
+          "overflow_recov",
+          "pae",
+          "pat",
+          "pausefilter",
+          "pclmulqdq",
+          "pdpe1gb",
+          "perfctr_core",
+          "perfctr_llc",
+          "perfctr_nb",
+          "perfmon_v2",
+          "pfthreshold",
+          "pge",
+          "pku",
+          "pni",
+          "popcnt",
+          "pse",
+          "pse36",
+          "rapl",
+          "rdpid",
+          "rdpru",
+          "rdrand",
+          "rdseed",
+          "rdt_a",
+          "rdtscp",
+          "rep_good",
+          "sep",
+          "sha_ni",
+          "skinit",
+          "smap",
+          "smca",
+          "smep",
+          "ssbd",
+          "sse",
+          "sse2",
+          "sse4_1",
+          "sse4_2",
+          "sse4a",
+          "ssse3",
+          "stibp",
+          "succor",
+          "svm",
+          "svm_lock",
+          "syscall",
+          "tce",
+          "topoext",
+          "tsc",
+          "tsc_adjust",
+          "tsc_scale",
+          "umip",
+          "user_shstk",
+          "v_spec_ctrl",
+          "v_vmsave_vmload",
+          "vaes",
+          "vgif",
+          "vmcb_clean",
+          "vme",
+          "vmmcall",
+          "vnmi",
+          "vpclmulqdq",
+          "wbnoinvd",
+          "wdt",
+          "x2avic",
+          "xgetbv1",
+          "xsave",
+          "xsavec",
+          "xsaveerptr",
+          "xsaveopt",
+          "xsaves",
+          "xtopology"
+        ],
+        "has_avx2": true,
+        "has_avx512": true,
+        "has_neon": false
+      },
+      "memory": {
+        "total_bytes": 134689931264
+      },
+      "git_commit": "d176f9afd16a0a2d88f62048b026b1d1fa35630e",
+      "git_dirty": true,
+      "git_branch": "main",
+      "rustc_version": "rustc 1.99.0-nightly (89c61a754 2026-07-23)",
+      "crate_version": "0.78.0",
+      "target_arch": "x86_64",
+      "target_os": "linux",
+      "cpu_governor": "performance",
+      "bios_version": "1402",
+      "git_tree_sha": "8ea2e2bd8afe73126f1fc5fa0b807561c82d4aa1",
+      "build_git_commit": "d176f9afd16a0a2d88f62048b026b1d1fa35630e",
+      "build_tree_sha": "8ea2e2bd8afe73126f1fc5fa0b807561c82d4aa1",
+      "build_dirty": true,
+      "build_rustc": "rustc 1.99.0-nightly (89c61a754 2026-07-23)",
+      "build_profile": "release",
+      "build_target": "x86_64-unknown-linux-gnu",
+      "source_binding": "dirty",
+      "seal_subject_hash": "e0ad5c0b6569fd866ed36d76632c23e1a34f3a12b59817c10e97465375b4f15e"
+    },
+    "hardware": {
+      "pci_devices": [
+        {
+          "bdf": "0000:00:00.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14d8",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": null
+        },
+        {
+          "bdf": "0000:00:00.2",
+          "class": "0x080600",
+          "vendor": "0x1022",
+          "device": "0x14d9",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": null
+        },
+        {
+          "bdf": "0000:00:01.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "0"
+        },
+        {
+          "bdf": "0000:00:01.1",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14db",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "1"
+        },
+        {
+          "bdf": "0000:00:01.2",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14db",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "2"
+        },
+        {
+          "bdf": "0000:00:02.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "3"
+        },
+        {
+          "bdf": "0000:00:02.1",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14db",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "4"
+        },
+        {
+          "bdf": "0000:00:02.2",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14db",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "5"
+        },
+        {
+          "bdf": "0000:00:03.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "6"
+        },
+        {
+          "bdf": "0000:00:04.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "7"
+        },
+        {
+          "bdf": "0000:00:08.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14da",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "8"
+        },
+        {
+          "bdf": "0000:00:08.1",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14dd",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "9"
+        },
+        {
+          "bdf": "0000:00:08.3",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x14dd",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "10"
+        },
+        {
+          "bdf": "0000:00:14.0",
+          "class": "0x0c0500",
+          "vendor": "0x1022",
+          "device": "0x790b",
+          "driver": "piix4_smbus",
+          "numa_node": -1,
+          "iommu_group": "11"
+        },
+        {
+          "bdf": "0000:00:14.3",
+          "class": "0x060100",
+          "vendor": "0x1022",
+          "device": "0x790e",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "11"
+        },
+        {
+          "bdf": "0000:00:18.0",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e0",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.1",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e1",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.2",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e2",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.3",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e3",
+          "driver": "k10temp",
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.4",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e4",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.5",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e5",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.6",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e6",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:00:18.7",
+          "class": "0x060000",
+          "vendor": "0x1022",
+          "device": "0x14e7",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "12"
+        },
+        {
+          "bdf": "0000:01:00.0",
+          "class": "0x030000",
+          "vendor": "0x10de",
+          "device": "0x2702",
+          "driver": "nvidia",
+          "numa_node": -1,
+          "iommu_group": "13"
+        },
+        {
+          "bdf": "0000:01:00.1",
+          "class": "0x040300",
+          "vendor": "0x10de",
+          "device": "0x22bb",
+          "driver": "snd_hda_intel",
+          "numa_node": -1,
+          "iommu_group": "13"
+        },
+        {
+          "bdf": "0000:02:00.0",
+          "class": "0x010802",
+          "vendor": "0xc0a9",
+          "device": "0x542b",
+          "driver": "nvme",
+          "numa_node": -1,
+          "iommu_group": "14"
+        },
+        {
+          "bdf": "0000:03:00.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f4",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "15"
+        },
+        {
+          "bdf": "0000:04:00.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "16"
+        },
+        {
+          "bdf": "0000:04:04.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "17"
+        },
+        {
+          "bdf": "0000:04:05.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "18"
+        },
+        {
+          "bdf": "0000:04:08.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "19"
+        },
+        {
+          "bdf": "0000:04:0c.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "20"
+        },
+        {
+          "bdf": "0000:04:0d.0",
+          "class": "0x060400",
+          "vendor": "0x1022",
+          "device": "0x43f5",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "21"
+        },
+        {
+          "bdf": "0000:05:00.0",
+          "class": "0x010802",
+          "vendor": "0x2646",
+          "device": "0x5019",
+          "driver": "nvme",
+          "numa_node": -1,
+          "iommu_group": "16"
+        },
+        {
+          "bdf": "0000:06:00.0",
+          "class": "0x020000",
+          "vendor": "0x10ec",
+          "device": "0x8125",
+          "driver": "r8169",
+          "numa_node": -1,
+          "iommu_group": "17"
+        },
+        {
+          "bdf": "0000:09:00.0",
+          "class": "0x0c0330",
+          "vendor": "0x1022",
+          "device": "0x43fc",
+          "driver": "xhci-pci-prom21",
+          "numa_node": -1,
+          "iommu_group": "20"
+        },
+        {
+          "bdf": "0000:0a:00.0",
+          "class": "0x010601",
+          "vendor": "0x1022",
+          "device": "0x43f6",
+          "driver": "ahci",
+          "numa_node": -1,
+          "iommu_group": "21"
+        },
+        {
+          "bdf": "0000:0b:00.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2421",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "22"
+        },
+        {
+          "bdf": "0000:0c:00.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2423",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "23"
+        },
+        {
+          "bdf": "0000:0c:01.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2423",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "24"
+        },
+        {
+          "bdf": "0000:0c:02.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2423",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "25"
+        },
+        {
+          "bdf": "0000:0c:03.0",
+          "class": "0x060400",
+          "vendor": "0x1b21",
+          "device": "0x2423",
+          "driver": "pcieport",
+          "numa_node": -1,
+          "iommu_group": "26"
+        },
+        {
+          "bdf": "0000:71:00.0",
+          "class": "0x0c0330",
+          "vendor": "0x1b21",
+          "device": "0x2426",
+          "driver": "xhci_hcd",
+          "numa_node": -1,
+          "iommu_group": "25"
+        },
+        {
+          "bdf": "0000:72:00.0",
+          "class": "0x0c0340",
+          "vendor": "0x1b21",
+          "device": "0x2425",
+          "driver": "thunderbolt",
+          "numa_node": -1,
+          "iommu_group": "26"
+        },
+        {
+          "bdf": "0000:73:00.0",
+          "class": "0x130000",
+          "vendor": "0x1022",
+          "device": "0x14de",
+          "driver": null,
+          "numa_node": -1,
+          "iommu_group": "27"
+        },
+        {
+          "bdf": "0000:73:00.2",
+          "class": "0x108000",
+          "vendor": "0x1022",
+          "device": "0x1649",
+          "driver": "ccp",
+          "numa_node": -1,
+          "iommu_group": "28"
+        },
+        {
+          "bdf": "0000:73:00.3",
+          "class": "0x0c0330",
+          "vendor": "0x1022",
+          "device": "0x15b6",
+          "driver": "xhci_hcd",
+          "numa_node": -1,
+          "iommu_group": "29"
+        },
+        {
+          "bdf": "0000:73:00.4",
+          "class": "0x0c0330",
+          "vendor": "0x1022",
+          "device": "0x15b7",
+          "driver": "xhci_hcd",
+          "numa_node": -1,
+          "iommu_group": "30"
+        },
+        {
+          "bdf": "0000:73:00.6",
+          "class": "0x040300",
+          "vendor": "0x1022",
+          "device": "0x15e3",
+          "driver": "snd_hda_intel",
+          "numa_node": -1,
+          "iommu_group": "31"
+        },
+        {
+          "bdf": "0000:74:00.0",
+          "class": "0x0c0330",
+          "vendor": "0x1022",
+          "device": "0x15b8",
+          "driver": "xhci_hcd",
+          "numa_node": -1,
+          "iommu_group": "32"
+        }
+      ],
+      "gpu": {
+        "vendor": null,
+        "name": null,
+        "bdf": null,
+        "compute_capability": null,
+        "memory_bytes": null,
+        "driver_version": null,
+        "runtime_version": null
+      },
+      "audio": {
+        "card": null,
+        "device": null,
+        "name": null,
+        "subdevice": null
+      }
+    },
+    "params": {
+      "universe": "vole.audio.u1",
+      "profile": "vole.audio.learned.exp3",
+      "backend": "scalar canonical learned evaluator",
+      "sample_rate_hz": null,
+      "channels": null,
+      "voices": null,
+      "quantum_frames": null,
+      "duration_secs": null,
+      "content_kind": "Phase O learned deterministic prediction"
+    },
+    "counters": {
+      "host_pcm_staging_bytes": 0,
+      "host_pcm_copy_bytes": 0,
+      "gpu_to_host_pcm_bytes": 0,
+      "endpoint_observation_bytes": 0,
+      "device_sample_block_bytes": 0,
+      "transient_compute_words": 0,
+      "host_pcm_resident_peak_bytes": 0,
+      "host_pcm_resident_integral": 0.0,
+      "endpoint_depth_frames": 0,
+      "endpoint_depth_min_frames": 18446744073709551615,
+      "endpoint_depth_max_frames": 0,
+      "quanta_submitted": 0,
+      "events_consumed": 0,
+      "xruns": 0,
+      "kernel_launches": 0,
+      "missed_deadlines": 0
+    },
+    "timing": {
+      "total_ns": null,
+      "deadline_ns": null,
+      "warmup_runs": null,
+      "run_count": null,
+      "observation_count": null,
+      "tail": null
+    },
+    "provenance": {
+      "reference_hash": "23eaf3610af66d789bb188aedd6e1359ba9ac06ba706d691a2f853845588d43c",
+      "backend_hash": null,
+      "endpoint_hash": null,
+      "gpu_artifact_hash": null,
+      "source_hash": null,
+      "corpus_hash": null,
+      "table_hashes": [],
+      "benchmark_order": [],
+      "exact_equality": null
+    },
+    "endpoint": {
+      "directness": null,
+      "topology": null,
+      "registered_range": null,
+      "registration_result": null,
+      "device_pointer": null,
+      "synchronization_mechanism": null,
+      "fence_sync_evidence": null,
+      "coherency_assumptions": null,
+      "hidden_staging_investigation": null,
+      "endpoint_clock": null
+    },
+    "energy": null,
+    "trace": null,
+    "limitations": [
+      "learned prediction is an experimental profile: it does not change u1/v1, the literal fallback remains mandatory, and negative learned results are preserved rather than hidden"
+    ],
+    "extras": {
+      "cases": [
+        {
+          "case": "1089-134686-0000",
+          "shape": "160x1",
+          "target_bps": 6000,
+          "actual_bps": 30166.0,
+          "bytes": 15083,
+          "snr_db": 9.071949010160488,
+          "visqol_mos": 1.0
+        },
+        {
+          "case": "1089-134686-0000",
+          "shape": "160x1",
+          "target_bps": 8000,
+          "actual_bps": 30166.0,
+          "bytes": 15083,
+          "snr_db": 9.071949010160488,
+          "visqol_mos": 1.0
+        },
+        {
+          "case": "1089-134686-0000",
+          "shape": "160x1",
+          "target_bps": 12000,
+          "actual_bps": 36432.0,
+          "bytes": 18216,
+          "snr_db": 13.92755329740086,
+          "visqol_mos": 1.47531962
+        },
+        {
+          "case": "1089-134686-0000",
+          "shape": "160x1",
+          "target_bps": 16000,
+          "actual_bps": 37438.0,
+          "bytes": 18719,
+          "snr_db": 7.260953984177373,
+          "visqol_mos": 1.0
+        },
+        {
+          "case": "1089-134686-0000",
+          "shape": "160x1",
+          "target_bps": 24000,
+          "actual_bps": 44542.0,
+          "bytes": 22271,
+          "snr_db": 10.324697541714034,
+          "visqol_mos": 1.64593387
+        },
+        {
+          "case": "1089-134686-0000",
+          "shape": "160x1",
+          "target_bps": 32000,
+          "actual_bps": 35906.0,
+          "bytes": 17953,
+          "snr_db": 11.132395569115214,
+          "visqol_mos": 1.0
+        },
+        {
+          "case": "1089-134686-0000",
+          "shape": "320x1",
+          "target_bps": 6000,
+          "actual_bps": 17190.0,
+          "bytes": 8595,
+          "snr_db": 6.468674321684162,
+          "visqol_mos": 1.0
+        },
+        {
+          "case": "1089-134686-0000",
+          "shape": "320x1",
+          "target_bps": 8000,
+          "actual_bps": 18116.0,
+          "bytes": 9058,
+          "snr_db": 4.107144830325701,
+          "visqol_mos": 1.0
+        },
+        {
+          "case": "1089-134686-0000",
+          "shape": "320x1",
+          "target_bps": 12000,
+          "actual_bps": 23986.0,
+          "bytes": 11993,
+          "snr_db": 6.550226128033991,
+          "visqol_mos": 1.0
+        },
+        {
+          "case": "1089-134686-0000",
+          "shape": "320x1",
+          "target_bps": 16000,
+          "actual_bps": 25430.0,
+          "bytes": 12715,
+          "snr_db": 8.428905653840769,
+          "visqol_mos": 1.36933374
+        },
+        {
+          "case": "1089-134686-0000",
+          "shape": "320x1",
+          "target_bps": 24000,
+          "actual_bps": 24704.0,
+          "bytes": 12352,
+          "snr_db": 9.928083601396763,
+          "visqol_mos": 1.0
+        },
+        {
+          "case": "1089-134686-0000",
+          "shape": "320x1",
+          "target_bps": 32000,
+          "actual_bps": 29550.0,
+          "bytes": 14775,
+          "snr_db": 15.087209434372921,
+          "visqol_mos": 2.25937438
+        },
+        {
+          "case": "1089-134686-0000",
+          "shape": "160x2",
+          "target_bps": 6000,
+          "actual_bps": 26842.0,
+          "bytes": 13421,
+          "snr_db": 6.5338870062697385,
+          "visqol_mos": 1.0
+        },
+        {
+          "case": "1089-134686-0000",
+          "shape": "160x2",
+          "target_bps": 8000,
+          "actual_bps": 27860.0,
+          "bytes": 13930,
+          "snr_db": 6.871377723906545,
+          "visqol_mos": 1.0063622
+        },
+        {
+          "case": "1089-134686-0000",
+          "shape": "160x2",
+          "target_bps": 12000,
+          "actual_bps": 30910.0,
+          "bytes": 15455,
+          "snr_db": 4.6028682695581296,
+          "visqol_mos": 1.0
+        },
+        {
+          "case": "1089-134686-0000",
+          "shape": "160x2",
+          "target_bps": 16000,
+          "actual_bps": 41746.0,
+          "bytes": 20873,
+          "snr_db": 3.834454128663063,
+          "visqol_mos": 1.8066175
+        },
+        {
+          "case": "1089-134686-0000",
+          "shape": "160x2",
+          "target_bps": 24000,
+          "actual_bps": 39394.0,
+          "bytes": 19697,
+          "snr_db": 4.9018766601121575,
+          "visqol_mos": 1.25663805
+        },
+        {
+          "case": "1089-134686-0000",
+          "shape": "160x2",
+          "target_bps": 32000,
+          "actual_bps": 31916.0,
+          "bytes": 15958,
+          "snr_db": 7.32689803833545,
+          "visqol_mos": 1.36665797
+        },
+        {
+          "case": "1089-134686-0000",
+          "kind": "summary",
+          "held_out_speaker": true,
+          "matched": {
+            "opus": {
+              "available": true,
+              "cells": 4,
+              "snr_wins": 0,
+              "snr_delta_mean_db": -3.5573407334359692,
+              "visqol_cells": 4,
+              "visqol_wins": 0,
+              "visqol_delta_mean": -2.516656853463198,
+              "cells_detail": [
+                {
+                  "vole_actual_bps": 17190.0,
+                  "competitor_snr_at_vole_bps": 10.010198371345298,
+                  "competitor_visqol_at_vole_bps": 3.5763643370473535,
+                  "delta_snr_db": -3.5415240496611364,
+                  "delta_visqol_mos": -2.5763643370473535
+                },
+                {
+                  "vole_actual_bps": 18116.0,
+                  "competitor_snr_at_vole_bps": 9.461004237648886,
+                  "competitor_visqol_at_vole_bps": 3.1809249050951376,
+                  "delta_snr_db": -5.353859407323185,
+                  "delta_visqol_mos": -2.1809249050951376
+                },
+                {
+                  "vole_actual_bps": 23986.0,
+                  "competitor_snr_at_vole_bps": 10.839414367427842,
+                  "competitor_visqol_at_vole_bps": 3.637894911331924,
+                  "delta_snr_db": -4.289188239393852,
+                  "delta_visqol_mos": -2.637894911331924
+                },
+                {
+                  "vole_actual_bps": 24704.0,
+                  "competitor_snr_at_vole_bps": 10.972874838762467,
+                  "competitor_visqol_at_vole_bps": 3.6714432603783784,
+                  "delta_snr_db": -1.044791237365704,
+                  "delta_visqol_mos": -2.6714432603783784
+                },
+                {
+                  "vole_actual_bps": 25430.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 26842.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 27860.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 29550.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 30166.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 30166.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 30910.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 31916.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 35906.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 36432.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 37438.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 39394.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 41746.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 44542.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                }
+              ]
+            },
+            "evs": {
+              "available": true,
+              "cells": 3,
+              "snr_wins": 0,
+              "snr_delta_mean_db": -5.277146341821385,
+              "visqol_cells": 3,
+              "visqol_wins": 0,
+              "visqol_delta_mean": -2.5738518474150003,
+              "cells_detail": [
+                {
+                  "vole_actual_bps": 17190.0,
+                  "competitor_snr_at_vole_bps": 10.45108205311043,
+                  "competitor_visqol_at_vole_bps": 3.5294742759625,
+                  "delta_snr_db": -3.9824077314262674,
+                  "delta_visqol_mos": -2.5294742759625
+                },
+                {
+                  "vole_actual_bps": 18116.0,
+                  "competitor_snr_at_vole_bps": 10.643457671261121,
+                  "competitor_visqol_at_vole_bps": 3.545439167635,
+                  "delta_snr_db": -6.53631284093542,
+                  "delta_visqol_mos": -2.545439167635
+                },
+                {
+                  "vole_actual_bps": 23986.0,
+                  "competitor_snr_at_vole_bps": 11.862944581136459,
+                  "competitor_visqol_at_vole_bps": 3.6466420986475,
+                  "delta_snr_db": -5.312718453102468,
+                  "delta_visqol_mos": -2.6466420986475
+                },
+                {
+                  "vole_actual_bps": 24704.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 25430.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 26842.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 27860.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 29550.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 30166.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 30166.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 30910.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 31916.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 35906.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 36432.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 37438.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 39394.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 41746.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 44542.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                }
+              ]
+            },
+            "lyra": {
+              "available": true,
+              "cells": 0,
+              "snr_wins": 0,
+              "snr_delta_mean_db": null,
+              "visqol_cells": 0,
+              "visqol_wins": 0,
+              "visqol_delta_mean": null,
+              "cells_detail": [
+                {
+                  "vole_actual_bps": 17190.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 18116.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 23986.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 24704.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 25430.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 26842.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 27860.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 29550.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 30166.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 30166.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 30910.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 31916.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 35906.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 36432.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 37438.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 39394.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 41746.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 44542.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                }
+              ]
+            }
+          },
+          "integrated_rate_delta": {
+            "opus": {
+              "quality_at_equal_rate_snr_db": -3.717365958288533,
+              "quality_at_equal_rate_visqol_mos": -2.6515175861321767,
+              "rate_at_equal_quality_db": 2.5273365945097876,
+              "rate_metric": "snr",
+              "rate_reason": null,
+              "vole_quality_range": [
+                3.834454128663063,
+                15.087209434372921
+              ],
+              "competitor_quality_range": [
+                -0.588303393017525,
+                11.022306444423812
+              ]
+            },
+            "evs": {
+              "quality_at_equal_rate_snr_db": -4.663148050832599,
+              "quality_at_equal_rate_visqol_mos": -2.592983165387323,
+              "rate_at_equal_quality_db": 3.3126754102708285,
+              "rate_metric": "snr",
+              "rate_reason": null,
+              "vole_quality_range": [
+                3.834454128663063,
+                15.087209434372921
+              ],
+              "competitor_quality_range": [
+                7.863520684345078,
+                11.948952686875536
+              ]
+            },
+            "lyra": {
+              "quality_at_equal_rate_snr_db": null,
+              "quality_at_equal_rate_visqol_mos": null,
+              "rate_at_equal_quality_db": 9.632529424061698,
+              "rate_metric": "visqol",
+              "rate_reason": null,
+              "vole_quality_range": [
+                3.834454128663063,
+                15.087209434372921
+              ],
+              "competitor_quality_range": [
+                -6.864159971417676,
+                4.034731889536828
+              ]
+            }
+          },
+          "vole": [
+            {
+              "bps": 17190.0,
+              "snr": 6.468674321684162,
+              "visqol": 1.0
+            },
+            {
+              "bps": 18116.0,
+              "snr": 4.107144830325701,
+              "visqol": 1.0
+            },
+            {
+              "bps": 23986.0,
+              "snr": 6.550226128033991,
+              "visqol": 1.0
+            },
+            {
+              "bps": 24704.0,
+              "snr": 9.928083601396763,
+              "visqol": 1.0
+            },
+            {
+              "bps": 25430.0,
+              "snr": 8.428905653840769,
+              "visqol": 1.36933374
+            },
+            {
+              "bps": 26842.0,
+              "snr": 6.5338870062697385,
+              "visqol": 1.0
+            },
+            {
+              "bps": 27860.0,
+              "snr": 6.871377723906545,
+              "visqol": 1.0063622
+            },
+            {
+              "bps": 29550.0,
+              "snr": 15.087209434372921,
+              "visqol": 2.25937438
+            },
+            {
+              "bps": 30166.0,
+              "snr": 9.071949010160488,
+              "visqol": 1.0
+            },
+            {
+              "bps": 30166.0,
+              "snr": 9.071949010160488,
+              "visqol": 1.0
+            },
+            {
+              "bps": 30910.0,
+              "snr": 4.6028682695581296,
+              "visqol": 1.0
+            },
+            {
+              "bps": 31916.0,
+              "snr": 7.32689803833545,
+              "visqol": 1.36665797
+            },
+            {
+              "bps": 35906.0,
+              "snr": 11.132395569115214,
+              "visqol": 1.0
+            },
+            {
+              "bps": 36432.0,
+              "snr": 13.92755329740086,
+              "visqol": 1.47531962
+            },
+            {
+              "bps": 37438.0,
+              "snr": 7.260953984177373,
+              "visqol": 1.0
+            },
+            {
+              "bps": 39394.0,
+              "snr": 4.9018766601121575,
+              "visqol": 1.25663805
+            },
+            {
+              "bps": 41746.0,
+              "snr": 3.834454128663063,
+              "visqol": 1.8066175
+            },
+            {
+              "bps": 44542.0,
+              "snr": 10.324697541714034,
+              "visqol": 1.64593387
+            }
+          ],
+          "opus": [
+            {
+              "bps": 7738.0,
+              "snr": 5.189752893388987,
+              "visqol": 1.83169937
+            },
+            {
+              "bps": 9432.0,
+              "snr": 7.860117717070847,
+              "visqol": 2.6280365
+            },
+            {
+              "bps": 9556.0,
+              "snr": -0.588303393017525,
+              "visqol": 1.09590721
+            },
+            {
+              "bps": 10012.0,
+              "snr": 2.8205910134160983,
+              "visqol": 1.58129692
+            },
+            {
+              "bps": 13668.0,
+              "snr": 8.847308073366777,
+              "visqol": 3.22187757
+            },
+            {
+              "bps": 14302.0,
+              "snr": 6.9649923013756485,
+              "visqol": 2.86569524
+            },
+            {
+              "bps": 17092.0,
+              "snr": 10.108364327360578,
+              "visqol": 3.64263463
+            },
+            {
+              "bps": 17810.0,
+              "snr": 9.389148445534344,
+              "visqol": 3.1571033
+            },
+            {
+              "bps": 24432.0,
+              "snr": 10.944145358549036,
+              "visqol": 3.67261529
+            },
+            {
+              "bps": 25172.0,
+              "snr": 11.022306444423812,
+              "visqol": 3.66942668
+            }
+          ],
+          "evs": [
+            {
+              "bps": 7200.0,
+              "snr": 7.863520684345078,
+              "visqol": 2.61444306
+            },
+            {
+              "bps": 8000.0,
+              "snr": 8.46830954317614,
+              "visqol": 2.70984173
+            },
+            {
+              "bps": 9600.0,
+              "snr": 8.609431715538856,
+              "visqol": 2.72535563
+            },
+            {
+              "bps": 13200.0,
+              "snr": 9.570276453377225,
+              "visqol": 3.26586151
+            },
+            {
+              "bps": 16400.0,
+              "snr": 10.286960305444072,
+              "visqol": 3.51585412
+            },
+            {
+              "bps": 24400.0,
+              "snr": 11.948952686875536,
+              "visqol": 3.65377975
+            }
+          ],
+          "lyra": [
+            {
+              "bps": 3200.0,
+              "snr": 4.034731889536828,
+              "visqol": 2.18439698
+            },
+            {
+              "bps": 6000.0,
+              "snr": -6.737934091783377,
+              "visqol": 1.0
+            },
+            {
+              "bps": 9200.0,
+              "snr": -6.864159971417676,
+              "visqol": 1.00486016
+            }
+          ]
+        },
+        {
+          "case": "1284-1180-0000",
+          "shape": "160x1",
+          "target_bps": 6000,
+          "actual_bps": 28988.0,
+          "bytes": 14494,
+          "snr_db": 10.188901427537381,
+          "visqol_mos": 1.47967339
+        },
+        {
+          "case": "1284-1180-0000",
+          "shape": "160x1",
+          "target_bps": 8000,
+          "actual_bps": 28988.0,
+          "bytes": 14494,
+          "snr_db": 10.188901427537381,
+          "visqol_mos": 1.47967339
+        },
+        {
+          "case": "1284-1180-0000",
+          "shape": "160x1",
+          "target_bps": 12000,
+          "actual_bps": 37002.0,
+          "bytes": 18501,
+          "snr_db": 12.571950775031297,
+          "visqol_mos": 2.10743475
+        },
+        {
+          "case": "1284-1180-0000",
+          "shape": "160x1",
+          "target_bps": 16000,
+          "actual_bps": 38768.0,
+          "bytes": 19384,
+          "snr_db": -5.282156259684314,
+          "visqol_mos": 1.75028896
+        },
+        {
+          "case": "1284-1180-0000",
+          "shape": "160x1",
+          "target_bps": 24000,
+          "actual_bps": 50920.0,
+          "bytes": 25460,
+          "snr_db": 13.39209920588409,
+          "visqol_mos": 3.15896797
+        },
+        {
+          "case": "1284-1180-0000",
+          "shape": "160x1",
+          "target_bps": 32000,
+          "actual_bps": 33750.0,
+          "bytes": 16875,
+          "snr_db": 12.240788226790137,
+          "visqol_mos": 2.02930307
+        },
+        {
+          "case": "1284-1180-0000",
+          "shape": "320x1",
+          "target_bps": 6000,
+          "actual_bps": 17502.0,
+          "bytes": 8751,
+          "snr_db": 7.157959237713674,
+          "visqol_mos": 1.72050142
+        },
+        {
+          "case": "1284-1180-0000",
+          "shape": "320x1",
+          "target_bps": 8000,
+          "actual_bps": 19318.0,
+          "bytes": 9659,
+          "snr_db": -4.754916813240978,
+          "visqol_mos": 1.58021116
+        },
+        {
+          "case": "1284-1180-0000",
+          "shape": "320x1",
+          "target_bps": 12000,
+          "actual_bps": 25214.0,
+          "bytes": 12607,
+          "snr_db": 8.9967500105284,
+          "visqol_mos": 2.16196084
+        },
+        {
+          "case": "1284-1180-0000",
+          "shape": "320x1",
+          "target_bps": 16000,
+          "actual_bps": 28210.0,
+          "bytes": 14105,
+          "snr_db": 10.442316931044065,
+          "visqol_mos": 2.29609704
+        },
+        {
+          "case": "1284-1180-0000",
+          "shape": "320x1",
+          "target_bps": 24000,
+          "actual_bps": 26670.0,
+          "bytes": 13335,
+          "snr_db": 12.066781141771548,
+          "visqol_mos": 2.14695549
+        },
+        {
+          "case": "1284-1180-0000",
+          "shape": "320x1",
+          "target_bps": 32000,
+          "actual_bps": 30158.0,
+          "bytes": 15079,
+          "snr_db": 17.62850868302875,
+          "visqol_mos": 3.01400852
+        },
+        {
+          "case": "1284-1180-0000",
+          "shape": "160x2",
+          "target_bps": 6000,
+          "actual_bps": 26992.0,
+          "bytes": 13496,
+          "snr_db": 6.085167730838387,
+          "visqol_mos": 1.41771221
+        },
+        {
+          "case": "1284-1180-0000",
+          "shape": "160x2",
+          "target_bps": 8000,
+          "actual_bps": 27898.0,
+          "bytes": 13949,
+          "snr_db": 6.864147346158852,
+          "visqol_mos": 1.47030067
+        },
+        {
+          "case": "1284-1180-0000",
+          "shape": "160x2",
+          "target_bps": 12000,
+          "actual_bps": 32468.0,
+          "bytes": 16234,
+          "snr_db": 4.5571803518054015,
+          "visqol_mos": 1.52894235
+        },
+        {
+          "case": "1284-1180-0000",
+          "shape": "160x2",
+          "target_bps": 16000,
+          "actual_bps": 41804.0,
+          "bytes": 20902,
+          "snr_db": 2.294278366798504,
+          "visqol_mos": 1.92723107
+        },
+        {
+          "case": "1284-1180-0000",
+          "shape": "160x2",
+          "target_bps": 24000,
+          "actual_bps": 41994.0,
+          "bytes": 20997,
+          "snr_db": 6.345247105792607,
+          "visqol_mos": 1.55023479
+        },
+        {
+          "case": "1284-1180-0000",
+          "shape": "160x2",
+          "target_bps": 32000,
+          "actual_bps": 32868.0,
+          "bytes": 16434,
+          "snr_db": 4.943074188777391,
+          "visqol_mos": 1.73116374
+        },
+        {
+          "case": "1284-1180-0000",
+          "kind": "summary",
+          "held_out_speaker": true,
+          "matched": {
+            "opus": {
+              "available": true,
+              "cells": 3,
+              "snr_wins": 0,
+              "snr_delta_mean_db": -9.148899199557272,
+              "visqol_cells": 3,
+              "visqol_wins": 0,
+              "visqol_delta_mean": -2.5407262920844498,
+              "cells_detail": [
+                {
+                  "vole_actual_bps": 17502.0,
+                  "competitor_snr_at_vole_bps": 12.65304135860698,
+                  "competitor_visqol_at_vole_bps": 4.448320792624114,
+                  "delta_snr_db": -5.495082120893307,
+                  "delta_visqol_mos": -2.727819372624114
+                },
+                {
+                  "vole_actual_bps": 19318.0,
+                  "competitor_snr_at_vole_bps": 12.402699031700386,
+                  "competitor_visqol_at_vole_bps": 4.268598824427331,
+                  "delta_snr_db": -17.157615844941365,
+                  "delta_visqol_mos": -2.6883876644273306
+                },
+                {
+                  "vole_actual_bps": 25214.0,
+                  "competitor_snr_at_vole_bps": 13.790749643365546,
+                  "competitor_visqol_at_vole_bps": 4.367932679201904,
+                  "delta_snr_db": -4.793999632837146,
+                  "delta_visqol_mos": -2.2059718392019043
+                },
+                {
+                  "vole_actual_bps": 26670.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 26992.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 27898.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 28210.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 28988.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 28988.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 30158.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 32468.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 32868.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 33750.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 37002.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 38768.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 41804.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 41994.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 50920.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                }
+              ]
+            },
+            "evs": {
+              "available": true,
+              "cells": 2,
+              "snr_wins": 0,
+              "snr_delta_mean_db": -10.191516077674136,
+              "visqol_cells": 2,
+              "visqol_wins": 0,
+              "visqol_delta_mean": -2.68772579295,
+              "cells_detail": [
+                {
+                  "vole_actual_bps": 17502.0,
+                  "competitor_snr_at_vole_bps": 11.236386359916992,
+                  "competitor_visqol_at_vole_bps": 4.30474277909,
+                  "delta_snr_db": -4.078427122203318,
+                  "delta_visqol_mos": -2.58424135909
+                },
+                {
+                  "vole_actual_bps": 19318.0,
+                  "competitor_snr_at_vole_bps": 11.549688219903974,
+                  "competitor_visqol_at_vole_bps": 4.37142138681,
+                  "delta_snr_db": -16.304605033144952,
+                  "delta_visqol_mos": -2.7912102268099996
+                },
+                {
+                  "vole_actual_bps": 25214.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 26670.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 26992.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 27898.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 28210.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 28988.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 28988.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 30158.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 32468.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 32868.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 33750.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 37002.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 38768.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 41804.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 41994.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 50920.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                }
+              ]
+            },
+            "lyra": {
+              "available": true,
+              "cells": 0,
+              "snr_wins": 0,
+              "snr_delta_mean_db": null,
+              "visqol_cells": 0,
+              "visqol_wins": 0,
+              "visqol_delta_mean": null,
+              "cells_detail": [
+                {
+                  "vole_actual_bps": 17502.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 19318.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 25214.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 26670.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 26992.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 27898.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 28210.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 28988.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 28988.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 30158.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 32468.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 32868.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 33750.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 37002.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 38768.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 41804.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 41994.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                },
+                {
+                  "vole_actual_bps": 50920.0,
+                  "competitor_snr_at_vole_bps": null,
+                  "competitor_visqol_at_vole_bps": null,
+                  "delta_snr_db": null,
+                  "delta_visqol_mos": null
+                }
+              ]
+            }
+          },
+          "integrated_rate_delta": {
+            "opus": {
+              "quality_at_equal_rate_snr_db": -5.353953150144232,
+              "quality_at_equal_rate_visqol_mos": -2.562027359634131,
+              "rate_at_equal_quality_db": 2.9116603641337355,
+              "rate_metric": "snr",
+              "rate_reason": null,
+              "vole_quality_range": [
+                -5.282156259684314,
+                17.62850868302875
+              ],
+              "competitor_quality_range": [
+                2.6598950780714774,
+                13.805816678498953
+              ]
+            },
+            "evs": {
+              "quality_at_equal_rate_snr_db": -4.124747389464387,
+              "quality_at_equal_rate_visqol_mos": -2.578655956731668,
+              "rate_at_equal_quality_db": 3.466314117706347,
+              "rate_metric": "snr",
+              "rate_reason": null,
+              "vole_quality_range": [
+                -5.282156259684314,
+                17.62850868302875
+              ],
+              "competitor_quality_range": [
+                8.952079530393311,
+                12.426450363325692
+              ]
+            },
+            "lyra": {
+              "quality_at_equal_rate_snr_db": null,
+              "quality_at_equal_rate_visqol_mos": null,
+              "rate_at_equal_quality_db": null,
+              "rate_metric": "none",
+              "rate_reason": "snr: no competitor operating point lies inside the shared quality range; visqol: no competitor operating point lies inside the shared quality range",
+              "vole_quality_range": [
+                -5.282156259684314,
+                17.62850868302875
+              ],
+              "competitor_quality_range": [
+                -5.186306426650727,
+                5.017807257289791
+              ]
+            }
+          },
+          "vole": [
+            {
+              "bps": 17502.0,
+              "snr": 7.157959237713674,
+              "visqol": 1.72050142
+            },
+            {
+              "bps": 19318.0,
+              "snr": -4.754916813240978,
+              "visqol": 1.58021116
+            },
+            {
+              "bps": 25214.0,
+              "snr": 8.9967500105284,
+              "visqol": 2.16196084
+            },
+            {
+              "bps": 26670.0,
+              "snr": 12.066781141771548,
+              "visqol": 2.14695549
+            },
+            {
+              "bps": 26992.0,
+              "snr": 6.085167730838387,
+              "visqol": 1.41771221
+            },
+            {
+              "bps": 27898.0,
+              "snr": 6.864147346158852,
+              "visqol": 1.47030067
+            },
+            {
+              "bps": 28210.0,
+              "snr": 10.442316931044065,
+              "visqol": 2.29609704
+            },
+            {
+              "bps": 28988.0,
+              "snr": 10.188901427537381,
+              "visqol": 1.47967339
+            },
+            {
+              "bps": 28988.0,
+              "snr": 10.188901427537381,
+              "visqol": 1.47967339
+            },
+            {
+              "bps": 30158.0,
+              "snr": 17.62850868302875,
+              "visqol": 3.01400852
+            },
+            {
+              "bps": 32468.0,
+              "snr": 4.5571803518054015,
+              "visqol": 1.52894235
+            },
+            {
+              "bps": 32868.0,
+              "snr": 4.943074188777391,
+              "visqol": 1.73116374
+            },
+            {
+              "bps": 33750.0,
+              "snr": 12.240788226790137,
+              "visqol": 2.02930307
+            },
+            {
+              "bps": 37002.0,
+              "snr": 12.571950775031297,
+              "visqol": 2.10743475
+            },
+            {
+              "bps": 38768.0,
+              "snr": -5.282156259684314,
+              "visqol": 1.75028896
+            },
+            {
+              "bps": 41804.0,
+              "snr": 2.294278366798504,
+              "visqol": 1.92723107
+            },
+            {
+              "bps": 41994.0,
+              "snr": 6.345247105792607,
+              "visqol": 1.55023479
+            },
+            {
+              "bps": 50920.0,
+              "snr": 13.39209920588409,
+              "visqol": 3.15896797
+            }
+          ],
+          "opus": [
+            {
+              "bps": 7908.0,
+              "snr": 8.418288787480716,
+              "visqol": 3.04207301
+            },
+            {
+              "bps": 9648.0,
+              "snr": 2.6598950780714774,
+              "visqol": 1.43379903
+            },
+            {
+              "bps": 9688.0,
+              "snr": 10.490005708626054,
+              "visqol": 3.25898862
+            },
+            {
+              "bps": 10150.0,
+              "snr": 6.994125163118675,
+              "visqol": 2.67435288
+            },
+            {
+              "bps": 13842.0,
+              "snr": 11.313683530787218,
+              "visqol": 4.37327909
+            },
+            {
+              "bps": 14552.0,
+              "snr": 9.503837883267863,
+              "visqol": 4.21335936
+            },
+            {
+              "bps": 17654.0,
+              "snr": 12.81530540208208,
+              "visqol": 4.46042728
+            },
+            {
+              "bps": 18136.0,
+              "snr": 12.124429726580267,
+              "visqol": 4.24868488
+            },
+            {
+              "bps": 25278.0,
+              "snr": 13.805816678498953,
+              "visqol": 4.36901093
+            },
+            {
+              "bps": 25808.0,
+              "snr": 13.505349570244306,
+              "visqol": 4.41019058
+            }
+          ],
+          "evs": [
+            {
+              "bps": 7200.0,
+              "snr": 9.009302654997988,
+              "visqol": 3.83913326
+            },
+            {
+              "bps": 8000.0,
+              "snr": 8.952079530393311,
+              "visqol": 3.78418231
+            },
+            {
+              "bps": 9600.0,
+              "snr": 9.106492162892172,
+              "visqol": 3.71349859
+            },
+            {
+              "bps": 13200.0,
+              "snr": 10.337327378626712,
+              "visqol": 4.24250126
+            },
+            {
+              "bps": 16400.0,
+              "snr": 11.046265958096697,
+              "visqol": 4.26428032
+            },
+            {
+              "bps": 24400.0,
+              "snr": 12.426450363325692,
+              "visqol": 4.55801868
+            }
+          ],
+          "lyra": [
+            {
+              "bps": 3200.0,
+              "snr": 5.017807257289791,
+              "visqol": 3.6679461
+            },
+            {
+              "bps": 6000.0,
+              "snr": -5.186306426650727,
+              "visqol": 1.0
+            },
+            {
+              "bps": 9200.0,
+              "snr": -4.800120167591883,
+              "visqol": 1.0
+            }
+          ]
+        }
+      ],
+      "harness": {
+        "court": "learned-voice-stream-exp2",
+        "constitution": "docs/PHASE_7C2.md",
+        "codec_under_test": "vole.audio.stream.voice.exp1",
+        "codec_under_test_note": "voice.exp1 is the labelled control until 7C.2-C lands voice.exp2",
+        "corpus": "held-out test-clean (speaker-disjoint)",
+        "corpus_sha256": "7de2453d2b249130b2edff2b457fcc29a37eb200215387aac82debec4200c6fa",
+        "opus": "/usr/bin/opusenc",
+        "evs": "research/clean-evs-master/EVS_cod",
+        "lyra": "research/lyra-main/bazel-bin/lyra/cli_example/encoder_main",
+        "visqol": "research/visqol-master/bazel-bin/visqol",
+        "shapes": [
+          "160x1",
+          "320x1",
+          "160x2"
+        ],
+        "vole_rates": [
+          6000,
+          8000,
+          12000,
+          16000,
+          24000,
+          32000
+        ],
+        "metric": "quality-at-equal-rate (SNR dB, ViSQOL MOS) plus bitrate-at-equal-quality (dB), integrated over the shared rate range with the monotone quality envelope",
+        "bootstrap": 2000,
+        "seed": 2083269121,
+        "note": "competitors are external processes; no code is imported, linked, wrapped or used as a fallback"
+      },
+      "integrated_metrics": {
+        "quality_at_equal_rate_snr_db": {
+          "opus": {
+            "mean": -4.535659554216382,
+            "lo": -5.353953150144232,
+            "hi": -3.717365958288533,
+            "cases": 2
+          },
+          "evs": {
+            "mean": -4.393947720148493,
+            "lo": -4.663148050832599,
+            "hi": -4.124747389464387,
+            "cases": 2
+          },
+          "lyra": null
+        },
+        "quality_at_equal_rate_visqol_mos": {
+          "opus": {
+            "mean": -2.606772472883154,
+            "lo": -2.6515175861321767,
+            "hi": -2.562027359634131,
+            "cases": 2
+          },
+          "evs": {
+            "mean": -2.5858195610594956,
+            "lo": -2.592983165387323,
+            "hi": -2.578655956731668,
+            "cases": 2
+          },
+          "lyra": null
+        },
+        "bitrate_at_equal_quality_snr_db": {
+          "opus": {
+            "mean": 2.7194984793217616,
+            "lo": 2.5273365945097876,
+            "hi": 2.9116603641337355,
+            "cases": 2
+          },
+          "evs": {
+            "mean": 3.389494763988588,
+            "lo": 3.3126754102708285,
+            "hi": 3.466314117706347,
+            "cases": 2
+          },
+          "lyra": null
+        },
+        "matched_snr_vs_opus_db": {
+          "mean": -6.353119966496621,
+          "lo": -9.148899199557272,
+          "hi": -3.5573407334359692,
+          "cases": 2
+        },
+        "matched_visqol_vs_opus": {
+          "mean": -2.528691572773824,
+          "lo": -2.5407262920844498,
+          "hi": -2.516656853463198,
+          "cases": 2
+        },
+        "encode_p99_us": 4958,
+        "interpretation": "quality deltas are VOLE minus competitor at equal rate (negative = VOLE worse); bitrate deltas are dB of rate at equal quality (negative = VOLE needs fewer bits)"
+      },
+      "limitations": [
+        "the held-out corpus is read speech only: no whisper/breath, no realistic background noise, no non-English speech; broader claims are blocked until more rights-clean speaker-disjoint material is frozen",
+        "the codec under test is the voice.exp1 control until the voice.exp2 profile lands (7C.2-C)",
+        "integrated deltas are computed over the competitor's measured quality range only; no extrapolation",
+        "Opus and Lyra expose no packet-loss simulation through their pinned CLIs, so their loss behaviour is NOT_AVAILABLE rather than guessed",
+        "ViSQOL speech mode is applied where the pinned binary and model run; absent cells are null"
+      ],
+      "protocol": {
+        "protocol_schema": "vole.audio.learned.protocol.v1",
+        "schema": "vole.audio.learned.exp3.evidence.v1",
+        "profile": "vole.audio.learned.exp3",
+        "version": 1,
+        "semantic_authority": "none: a learned hypothesis is a candidate family, never truth; scalar exact closure decides acceptance"
+      }
+    }
+  },
+  "receipt_sha256": "942e92d16f2a2876698635433a60f53ea23d7a24e77008e8c58aac5a08188511"
+}
