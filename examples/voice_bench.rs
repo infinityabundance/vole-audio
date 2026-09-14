@@ -13,8 +13,12 @@
 //! cargo run --release --example voice_bench -- diag       # predictor RD curve
 //! cargo run --release --example voice_bench -- celp       # excitation coder RD
 //! cargo run --release --example voice_bench -- exp2       # voice.exp2 core A/B
+//! cargo run --release --example voice_bench -- visqol     # perceptual A/B (ViSQOL)
 //! cargo run --release --example voice_bench -- dump       # write case WAVs
 //! ```
+
+use std::path::Path;
+use std::process::Command;
 
 use vole_audio::learned::corpus_real;
 use vole_audio::voice::exp2::{self, Exp2Codec, Options};
@@ -233,6 +237,10 @@ fn main() {
             exp2_probe(args.get(1).map(String::as_str));
             return;
         }
+        Some("visqol") => {
+            visqol_probe();
+            return;
+        }
         _ => {}
     }
     let filter: Option<(u32, u8)> = if args.len() >= 2 {
@@ -412,6 +420,192 @@ fn exp2_probe(filter: Option<&str>) {
                 used as f64 / frames.max(1) as f64,
                 percentile(&enc_us, 99.0),
                 pulses as f64 / frames.max(1) as f64
+            );
+        }
+    }
+}
+
+/// Write mono 16 kHz 16-bit PCM. Shared by the dump and perceptual instruments.
+fn write_wav(path: &Path, samples: &[i32]) -> std::io::Result<()> {
+    let mut out = Vec::with_capacity(44 + samples.len() * 2);
+    let data_len = (samples.len() * 2) as u32;
+    out.extend_from_slice(b"RIFF");
+    out.extend_from_slice(&(36 + data_len).to_le_bytes());
+    out.extend_from_slice(b"WAVEfmt ");
+    out.extend_from_slice(&16u32.to_le_bytes());
+    out.extend_from_slice(&1u16.to_le_bytes());
+    out.extend_from_slice(&1u16.to_le_bytes());
+    out.extend_from_slice(&16_000u32.to_le_bytes());
+    out.extend_from_slice(&32_000u32.to_le_bytes());
+    out.extend_from_slice(&2u16.to_le_bytes());
+    out.extend_from_slice(&16u16.to_le_bytes());
+    out.extend_from_slice(b"data");
+    out.extend_from_slice(&data_len.to_le_bytes());
+    for &s in samples {
+        out.extend_from_slice(&(s.clamp(-32_768, 32_767) as i16).to_le_bytes());
+    }
+    std::fs::write(path, out)
+}
+
+/// The frozen ViSQOL protocol the court uses, duplicated here on purpose: this is
+/// a development instrument and must not be able to change what the court
+/// measures by editing a shared wrapper.
+fn visqol_mos(reference: &Path, degraded: &Path) -> Option<f64> {
+    let exe = Path::new("research/visqol-master/bazel-bin/visqol");
+    let model = Path::new(
+        "research/visqol-master/model/\
+         lattice_tcditugenmeetpackhref_ls2_nl60_lr12_bs2048_learn.005_ep2400_train1_7_raw.tflite",
+    );
+    if !exe.is_file() || !model.is_file() {
+        return None;
+    }
+    let csv = degraded.with_extension("visqol.csv");
+    let _ = std::fs::remove_file(&csv);
+    let out = Command::new(exe)
+        .arg(format!("--reference_file={}", reference.display()))
+        .arg(format!("--degraded_file={}", degraded.display()))
+        .arg(format!("--similarity_to_quality_model={}", model.display()))
+        .arg(format!("--results_csv={}", csv.display()))
+        .arg("--use_speech_mode=true")
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let text = std::fs::read_to_string(&csv).ok()?;
+    let mut rows: Vec<&str> = text.lines().collect();
+    if rows.len() < 2 {
+        return None;
+    }
+    let header = rows.remove(0);
+    let col = header
+        .split(',')
+        .position(|c| c.trim().eq_ignore_ascii_case("moslqo"))?;
+    rows.last()?.split(',').nth(col)?.trim().parse::<f64>().ok()
+}
+
+/// Perceptual A/B of the `voice.exp2` cores on the development corpus, with
+/// ViSQOL as arbiter.
+///
+/// This exists because §12–§13 of the charter measured the MSE objective
+/// structurally preferring silence, so waveform SNR cannot decide whether a core
+/// is good. The development corpus is used deliberately: the held-out challenger
+/// corpus stays untouched so a selector fitted here can still be judged there.
+fn visqol_probe() {
+    let cases = cases();
+    let dir = std::path::PathBuf::from("target/voice-bench-vq");
+    std::fs::create_dir_all(&dir).unwrap();
+    const FRAME: usize = 320;
+    let configs: [(&str, Options); 4] = [
+        (
+            "noise only        ",
+            Options {
+                celp: false,
+                track_acelp: false,
+                tcx: false,
+            },
+        ),
+        (
+            "+celp (7C.2-B/D)  ",
+            Options {
+                celp: true,
+                track_acelp: false,
+                tcx: false,
+            },
+        ),
+        (
+            "+acelp (7C.2-E)   ",
+            Options {
+                celp: true,
+                track_acelp: true,
+                tcx: false,
+            },
+        ),
+        (
+            "+tcx (7C.2-G)     ",
+            Options {
+                celp: true,
+                track_acelp: true,
+                tcx: true,
+            },
+        ),
+    ];
+    // References first, and a self-comparison so the instrument reports its own
+    // ceiling instead of implying that 5.0 is reachable.
+    let refs: Vec<std::path::PathBuf> = cases
+        .iter()
+        .enumerate()
+        .map(|(i, (_, s))| {
+            let p = dir.join(format!("ref-{i}.wav"));
+            write_wav(&p, s).unwrap();
+            p
+        })
+        .collect();
+    let mut self_sum = 0.0;
+    let mut self_n = 0usize;
+    for p in &refs {
+        if let Some(m) = visqol_mos(p, p) {
+            self_sum += m;
+            self_n += 1;
+        }
+    }
+    if self_n == 0 {
+        println!("visqol is not available (research/visqol-master is missing)");
+        return;
+    }
+    println!(
+        "voice.exp2 perceptual A/B over {} development cases (ViSQOL speech mode)",
+        cases.len()
+    );
+    println!(
+        "  self-comparison ceiling: {:.3} MOS-LQO (not 5.0)",
+        self_sum / self_n as f64
+    );
+    println!("  rate | configuration       | MOS-LQO mean | bits/frame | enc p99");
+    for (bps, bits) in exp2::DECLARED_RATES {
+        for (ci, (label, opts)) in configs.iter().enumerate() {
+            let mut mos_sum = 0.0;
+            let mut n = 0usize;
+            let mut used = 0usize;
+            let mut frames = 0usize;
+            let mut enc_us: Vec<i64> = Vec::new();
+            for (i, (_, source)) in cases.iter().enumerate() {
+                let mut state = vp::VoiceState::new();
+                let mut out: Vec<i32> = Vec::with_capacity(source.len());
+                for chunk in source.chunks(FRAME) {
+                    if chunk.len() < FRAME {
+                        break;
+                    }
+                    let enc_state = state.clone();
+                    let t0 = std::time::Instant::now();
+                    let (bytes, nbits) =
+                        Exp2Codec::encode_frame_with(&enc_state, chunk, bits, *opts);
+                    enc_us.push(t0.elapsed().as_micros() as i64);
+                    used += nbits;
+                    frames += 1;
+                    out.extend_from_slice(
+                        &Exp2Codec::decode_frame(&mut state, &bytes, FRAME).unwrap(),
+                    );
+                }
+                let p = dir.join(format!("deg-{ci}-{bps}-{i}.wav"));
+                write_wav(&p, &out).unwrap();
+                if let Some(m) = visqol_mos(&refs[i], &p) {
+                    mos_sum += m;
+                    n += 1;
+                }
+            }
+            enc_us.sort_unstable();
+            if n == 0 {
+                continue;
+            }
+            println!(
+                "  {:>4} | {label} | {:>12.3} | {:>10.1} | {:>6}us",
+                bps,
+                mos_sum / n as f64,
+                used as f64 / frames.max(1) as f64,
+                percentile(&enc_us, 99.0)
             );
         }
     }

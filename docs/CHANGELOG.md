@@ -646,6 +646,49 @@ break the tie toward the target picks the wrong sign; both are pinned by tests.
 Regression court `learned-voice-stream` still reproduces `cc2addfa…`. Voice
 tests: 95 passed.
 
+## Phase 7C.2-H (first step) — perceptual arbiter (v0.82.0)
+
+`voice_bench visqol` runs the court's **frozen ViSQOL protocol** (same binary,
+same speech-mode lattice model, same `moslqo` column) on the **development**
+corpus, so nothing fitted here contaminates the held-out challenger court. The
+protocol is duplicated into the instrument rather than shared, so a dev probe
+cannot silently change what the court measures.
+
+Calibration: on three development cases ViSQOL scores a self-comparison at
+**4.402 MOS-LQO** — its ceiling here, not 5.0 — and one call takes ≈0.42 s.
+
+Measured MOS-LQO mean:
+
+| rate | noise only | +celp | +acelp | +tcx | bits/frame noise → acelp |
+| ---- | ---------- | ----- | ------ | ---- | ------------------------ |
+| 3.2 kbps | 1.000 | 1.000 | 1.000 | 1.000 | 46.0 → 46.0 |
+| 6 kbps | 1.205 | 1.205 | 1.205 | 1.205 | 87.8 → 87.8 |
+| 8 kbps | 1.151 | 1.180 | 1.180 | 1.180 | 99.1 → 122.1 |
+| 9.2 kbps | 1.151 | 1.156 | 1.156 | 1.156 | 108.4 → 143.3 |
+| 12 kbps | 1.190 | 1.221 | **1.342** | 1.342 | 123.7 → 209.1 |
+| 16 kbps | 1.110 | 1.144 | **1.369** | 1.369 | 149.7 → 246.1 |
+
+* **7C.2-E's win survives a perceptual judge.** The fractional-track core beats
+the control core at 12 kbps (1.342 vs 1.221) and 16 kbps (1.369 vs 1.144) — the
+same two rates, the same direction as waveform SNR. That seal's claim does not
+depend on SNR being a good proxy. This is its strongest evidence.
+* **7C.2-G's negative is confirmed perceptually**: `+tcx` is identical to
+`+acelp` at every rate.
+* **Absolute position**: 1.0–1.37 MOS-LQO against a 4.40 ceiling, corroborating
+the court's −2.61 / −2.59 ViSQOL MOS against Opus / EVS.
+* **New defect — and it is a rate defect.** With only fallback cores available
+the codec spends **99.1 of 160 bits** at 8 kbps and **149.7 of 320** at 16 kbps:
+up to **53 % of the frame allowance is left idle**, because MSE prefers a 12-bit
+stochastic frame to a several-hundred-bit scalar frame that is weakly but
+positively correlated. The MSE objective costs the codec bandwidth as well as
+quality, and no additional excitation machinery can help while the selector is
+free to choose near-silence and leave the frame half-empty.
+* At 3.2–9.2 kbps the spread between cores is within ±0.03 MOS: the low-rate
+range is uniformly non-competitive regardless of core, reaching 7C.2-F's
+conclusion independently by a perceptual measure.
+
+Regression court `learned-voice-stream` unaffected. Voice tests: 95 passed.
+
 ## Current measured position
 
 Frozen real-speech **lossless** portfolio (effectiveness + held-out Mode C,
