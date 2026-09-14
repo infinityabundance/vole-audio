@@ -908,6 +908,48 @@ at once.
 
 No codec behaviour changed. Voice tests: 100 passed.
 
+## Phase 7C.2-I (first attempt) — compact CELP, measured and reverted (v0.88.0)
+
+§19 put 7C.2-I's entropy ceiling at ≈5–8 bits/frame and pointed at a larger prize in
+the same area: at 6 kbps the full multirate CELP record costs **92 bits** with the
+spectrum against a 120-bit frame, so the codec falls back to a 12-bit stochastic
+frame and leaves ~70 bits idle. A **compact** family-1 form — one frame-wide lag,
+pitch gain and innovation gain instead of per-subframe contours and deltas — costs
+**23 bits** of side information instead of 56.
+
+Implemented, measured, and reverted. MOS-LQO on the development corpus:
+
+| rate | free competitor | strict fallback | baseline |
+| ---- | --------------- | --------------- | -------- |
+| 6 kbps | 1.474 (+0.029) | 1.474 (+0.029) | 1.445 |
+| 8 kbps | 1.403 (+0.020) | **1.290 (−0.093)** | 1.383 |
+| 9.2 kbps | **1.306 (−0.102)** | 1.408 (0.000) | 1.408 |
+| 12 kbps | **1.300 (−0.114)** | 1.414 (0.000) | 1.414 |
+| 16 kbps | **1.365 (−0.063)** | 1.428 (0.000) | 1.428 |
+
+As a free competitor it displaces better cores above 9.2 kbps; restricted to a
+strict fallback those rates recover but 8 kbps stays at −0.093.
+
+**The pitfall, and why it is recorded.** The fit check is evaluated **per spectral
+tier**, not per frame. On an expensive tier (order-12 scalar, 79 bits of spectrum)
+the full record does not fit while the cheap VQ tier (34 bits) fits it
+comfortably, so the compact form is offered on a tier that does not reflect the
+frame's real option set — it won 96 of 600 frames at 8 kbps to the frame's
+detriment. A correct gate is a **frame-level** budget test.
+
+**Verdict:** reverted and not offered; the mechanism is sound (at 6 kbps it
+converts 189 of 600 frames from stochastic noise to CELP) but its A/B is not clean
+and the gate is wrong in a way that needs a frame-level test rather than tuning.
+
+**Measurement caveat recorded with it:** with three development cases a MOS move of
+≈0.1 can come from a *one-bit* change cascading through the decoder state, because
+the selector's tie-break prefers the shorter frame on equal distortion and that
+choice propagates. Per-rate deltas of that size are therefore not reliable evidence
+on this instrument; the held-out court is required before any of them can carry a
+claim.
+
+No shipped behaviour changed — the tree is verified at the v0.87.0 baseline.
+
 ## Current measured position
 
 Frozen real-speech **lossless** portfolio (effectiveness + held-out Mode C,

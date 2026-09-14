@@ -790,7 +790,53 @@ not close the gap to Opus on its own. The gap is where §16 has pointed all alon
 the spectral envelope and quantiser efficiency at low rate, not the framing of the
 bits already being sent.
 
-## 20. Non-claims
+## 20. Compact CELP — 7C.2-I, first implementation attempt (reverted)
+
+§19 put 7C.2-I's ceiling at ≈5–8 bits/frame and pointed at a bigger prize in the
+same area: at 6 kbps the full multirate CELP record costs **92 bits** with the
+spectrum against a 120-bit frame, so the codec falls back to a 12-bit stochastic
+frame and leaves ~70 bits idle. A **compact** family-1 form — one frame-wide lag,
+pitch gain and innovation gain instead of per-subframe contours and deltas — costs
+**23 bits** of side information instead of 56. It was implemented, measured, and
+is recorded here rather than shipped.
+
+**A/B, MOS-LQO on the development corpus:**
+
+```text
+              free competitor      strict fallback      baseline
+6 kbps        1.474 (+0.029)       1.474 (+0.029)       1.445
+8 kbps        1.403 (+0.020)       1.290 (−0.093)       1.383
+9.2 kbps      1.306 (−0.102)       1.408  (0.000)       1.408
+12 kbps       1.300 (−0.114)       1.414  (0.000)       1.414
+16 kbps       1.365 (−0.063)       1.428  (0.000)       1.428
+```
+
+Offered as a free competitor it wins at 6–8 kbps but **displaces better cores** at
+9.2–16 kbps, so it was restricted to a strict fallback: offered only where the
+multirate record cannot fit even one pulse. That restored 9.2/12/16 kbps but left
+8 kbps at −0.093.
+
+**The pitfall, which is the reason this is written down.** The fit check is
+evaluated **per spectral tier**, not per frame. On an expensive tier (order-12
+scalar, 79 bits of spectrum) the full record does not fit, while the cheap VQ tier
+(34 bits) fits it comfortably — so the compact form is offered on a tier that does
+not reflect the frame's real option set, and it won 96 of 600 frames at 8 kbps to
+the frame's detriment. A correct gate is a **frame-level** budget test: the
+cheapest available tier decides whether the full record is reachable, and only then
+is the compact form a fallback. That is the next step, not a tuning exercise.
+
+**Verdict.** Reverted; not offered. The mechanism is sound — at 6 kbps it
+structurally converts 189 of 600 frames from stochastic noise to CELP — but its
+A/B is not clean, and the gate is wrong in a way that needs a frame-level test.
+
+**A measurement caveat worth recording.** With three development cases, a MOS move
+of ≈0.1 can be caused by a *one-bit* change in the bitstream cascading through the
+decoder state, because the selector's tie-break on equal distortion picks the
+shorter frame and that choice propagates. Per-rate deltas of that size on this
+instrument are therefore not reliable evidence; the held-out court is needed before
+any of these numbers can carry a claim.
+
+## 21. Non-claims
 
 * `exp1` remains the control; its wire format is untouched.
 * The serializer in `src/voice/exp2.rs` is not yet a live profile: no court
