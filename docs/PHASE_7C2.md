@@ -247,7 +247,7 @@ now, before any `exp2` codec work, so the challenger court cannot be tuned.
 | 7C.2-E | fractional multi-tap LTP + track ACELP + joint R–D search | **implemented** (`src/voice/fcelp.rs`, wire family 3). Quarter-sample lag via a fixed 4-tap Lagrange interpolation of the reconstructed excitation; four interleaved tracks of `k` signed pulses, with the pulse count carried by the codebook class instead of a field; joint per-subframe selection where the pitch is scored through the real synthesis loop and the innovation gain is closed-loop. **Measured A/B on the frozen effectiveness corpus (600 frames, `voice_bench exp2`):** vs the 7C.2-B/D CELP core, +1.77 dB at 12 kbps and +2.23 dB at 16 kbps; vs the scalar+noise baseline +3.27 dB and +3.26 dB. The core wins 271/600 frames at 12 kbps and 279/600 at 16 kbps. **It is never selected at ≤ 9.2 kbps**, because its side information does not fit those allowances: that is the measured motivation for 7C.2-F/G/H. Synthetic hard-rate ladder moved from 4.61/4.36 dB to **6.63/8.75 dB** at 12/16 kbps. Encode p99 was 11 477 µs when first written; after three measured cost fixes it is **4805 µs**, inside the 5 ms constitution. Two findings are retained as tests: the long-term gain is *recursive* (the output is a polynomial in the gain, not linear), and the class field removes the shared-count truncation flaw |
 | 7C.2-F | voicing-dependent allocation + noise excitation | **implemented, not promoted; two negative results recorded.** (a) The **nested spectral operating point** (`Spectral::Vq0`, tier 2, 18 bits vs 34, saving 16 bits/frame) is legal because the MSVQ is embedded, but it is selected in **zero frames at every declared rate** — the coarse spectrum's distortion penalty exceeds the excitation the freed bits buy. Kept in-tree at zero cost when unused; it is a prerequisite for 7C.2-H. (b) **Diagnosis: at 3.2 kbps the codec outputs near-silence** (SNR 0.00 dB), because for an *uncorrelated* excitation — exactly what the stochastic fallback produces — MSE is minimised by gain → 0, so the selector prefers silence to correctly-levelled shaped noise. A short-time envelope term (`envelope_penalty`, weight `ENV_WEIGHT`) was implemented as §10 requires and **measured and disabled**: at weight 2.0 waveform SNR fell at 6/8/9.2/16 kbps and rose only at 12 kbps. Promotion on dev-only evidence is forbidden, so the weight ships at 0.0 |
 | 7C.2-G | TCX/PVQ escape mode | **implemented, measured, disabled; negative result recorded.** A new voice-track primitive `src/voice/pvq.rs` (orthonormal DCT-IV + PVQ, no dependency on the general-audio `src/lossy/` track) backs an escape sub-mode of the fallback family, so ACELP frames pay zero bits for it. On the frozen development corpus it is selected in **zero frames at every declared rate** — bits and SNR are identical with and without it — and it costs up to **8864 µs** encode p99 at 16 kbps against the 5 ms constitution. The mechanism is verified *faithful* by test (`the_escape_core_reconstructs_its_own_quantisation`), so the negative is a real measurement. The diagnosis in §13 ties it to 7C.2-F: with MSE as the objective, any reconstruction with correlation ρ < 0.5 scores worse than silence |
-| 7C.2-H | procedural excitation + zero-bit predicted refinement | **three steps landed.** (1) The perceptual arbiter (§14) and (2) the **fitted selector weight** (§15) — mean MOS-LQO 1.250 → **1.416 (+13 %)**, with **SNR and MOS disagreeing in sign** at 6 and 9.2 kbps, which is the phase's most important result and reverses 7C.2-G's verdict. (3) **Procedural excitation** (§16): implemented, tested, packet-local by construction, and selected in **zero frames** even when it is the only pitched core; shipped disabled. Two hypotheses (phase resolution, lag resolution) were tested and rejected; the real cause is measured — order-16 LPC takes 18.31 dB and leaves the residual with only **0.66 dB** of pitch predictability, so every long-term mechanism has under 1 dB of headroom. Zero-bit predicted refinement still to come |
+| 7C.2-H | procedural excitation + zero-bit predicted refinement | **four steps landed.** (1) The perceptual arbiter (§14) and (2) the **fitted selector weight** (§15) — mean MOS-LQO 1.250 → **1.416 (+13 %)**, with **SNR and MOS disagreeing in sign** at 6 and 9.2 kbps, the phase's most important result, which also reverses 7C.2-G's verdict. (3) **Procedural excitation** (§16): implemented, tested, packet-local by construction, selected in **zero frames**; shipped disabled. (4) **The prediction split** (§17): the proposed re-balance of short-term against long-term prediction order is **refuted by measurement** — total prediction gain is maximized at the highest short-term order (19.62 dB) and a finer spectrum does not change it. That closes the prediction direction and confirms the remaining lever is quantisation efficiency. Zero-bit predicted refinement still to come |
 | 7C.2-I | packet-reset entropy coding of remaining uncertainty | artifact shrinks without quality or recovery regression |
 | 7C.2-J | frozen causal learned refinement experiment | promote only if a gain survives model size, decode p99, memory and the held-out court |
 | 7C.2-K | final listening + impairment seal | superiority claim permitted **only** here |
@@ -651,7 +651,59 @@ long-term stage has structure to exploit. The next work on this path is therefor
 to re-balance short-term and long-term prediction order (§16's spectral work is the
 same lever from the other side), not to add further excitation machinery.
 
-## 17. Non-claims
+## 17. The prediction split — 7C.2-H, fourth step (hypothesis refuted)
+
+§16 ended by proposing the next lever: re-balance short-term against long-term
+prediction, following SILK's low-order short-term filter plus high-order long-term
+predictor. That proposal was a *hypothesis about why* the residual is pitch-poor,
+and `voice_bench split` tests it directly before any architecture changes. It is
+refuted.
+
+The diagnostic reports the **total** prediction gain per short-term order, with the
+long-term gain measured both frame-wide and per 5 ms subframe — the latter is what
+the codec actually carries, and the former understates it by roughly 2×:
+
+```text
+ order |  frames | short-term | LTP frame | gain  | LTP 5 ms | gain
+     8 |     600 |   17.15 dB |  17.95 dB | +0.80 |  18.71 dB | +1.56
+    10 |     600 |   17.59 dB |  18.34 dB | +0.75 |  19.05 dB | +1.47
+    12 |     600 |   17.86 dB |  18.62 dB | +0.76 |  19.33 dB | +1.47
+    14 |     600 |   18.11 dB |  18.82 dB | +0.71 |  19.49 dB | +1.38
+    16 |     600 |   18.27 dB |  18.96 dB | +0.69 |  19.62 dB | +1.35
+
+ order-16 width sweep
+ width |  frames | short-term | LTP frame | gain  | LTP 5 ms | gain
+     6 |     600 |   18.27 dB |  18.96 dB | +0.69 |  19.62 dB | +1.35
+     8 |     600 |   18.43 dB |  18.98 dB | +0.55 |  19.62 dB | +1.19
+```
+
+**1. There is no beneficial re-balance.** Lowering the short-term order raises the
+long-term gain (+0.69 → +1.56 dB) but by *less* than the short-term gain falls
+(18.27 → 17.15 dB). Total prediction gain is maximized at the **highest** order,
+monotonically. SILK's split does not transfer to this predictor.
+
+**2. Quantisation is not hiding pitch either.** A *finer* spectrum at the top order
+(width 8 vs 6) raises the short-term gain (18.43 vs 18.27) and *lowers* the
+long-term gain (1.19 vs 1.35), leaving the total unchanged at 19.62 dB. A better
+short-term filter simply absorbs more of the pitch — the same trade seen along the
+order axis, from the other direction.
+
+**3. The frame-wide figure understates the long-term gain by about 2×.** This
+matters for honesty: §16 recorded 0.66–0.69 dB, which is the frame-wide number,
+while the codec carries one lag and gain per 5 ms subframe. The diagnostic now
+reports both so the figure cannot be misread. The corrected value is 1.35–1.56 dB —
+still small, and still shrinking as the short-term filter improves, but not
+negligible.
+
+**What this closes off, and what it leaves.** Total prediction gain is 19.62 dB,
+so the residual carries 1/92 of the signal energy: the *predictor is good*. The
+codec's loss is therefore not prediction, which confirms `VOICE_RD.md`'s
+attribution to the residual quantiser and closes the prediction-order direction.
+The remaining levers are **quantisation efficiency** — the spectral envelope (§16)
+and packet-reset entropy coding (7C.2-I) — not more excitation structure and not a
+re-balanced predictor.
+
+## 18. Non-claims
 
 * `exp1` remains the control; its wire format is untouched.
 * The serializer in `src/voice/exp2.rs` is not yet a live profile: no court

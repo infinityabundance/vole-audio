@@ -788,6 +788,53 @@ long-term prediction order is the next work on this path.
 Regression court `learned-voice-stream` reproduces `cc2addfa…`. Voice tests: 100
 passed. New code clippy-clean and rustfmt-clean.
 
+## Phase 7C.2-H (fourth step) — the prediction split is refuted (v0.85.0)
+
+A diagnostic-only increment, and the discipline is the point: the previous seal
+ended by *proposing* an architecture change (re-balance short-term against
+long-term prediction, as SILK does), so this seal measures the hypothesis before
+anything is built. `voice_bench split` reports the **total** prediction gain per
+short-term order, with the long-term gain at both frame-wide and 5 ms-subframe
+resolution.
+
+```text
+ order |  frames | short-term | LTP frame | gain  | LTP 5 ms | gain
+     8 |     600 |   17.15 dB |  17.95 dB | +0.80 |  18.71 dB | +1.56
+    10 |     600 |   17.59 dB |  18.34 dB | +0.75 |  19.05 dB | +1.47
+    12 |     600 |   17.86 dB |  18.62 dB | +0.76 |  19.33 dB | +1.47
+    14 |     600 |   18.11 dB |  18.82 dB | +0.71 |  19.49 dB | +1.38
+    16 |     600 |   18.27 dB |  18.96 dB | +0.69 |  19.62 dB | +1.35
+
+ order-16 width sweep
+ width |  frames | short-term | LTP frame | gain  | LTP 5 ms | gain
+     6 |     600 |   18.27 dB |  18.96 dB | +0.69 |  19.62 dB | +1.35
+     8 |     600 |   18.43 dB |  18.98 dB | +0.55 |  19.62 dB | +1.19
+```
+
+* **No beneficial re-balance exists.** Lowering the short-term order raises the
+  long-term gain (+0.69 → +1.56 dB) but by *less* than the short-term gain falls
+  (18.27 → 17.15 dB). Total prediction gain is maximized at the **highest** order,
+  monotonically. SILK's low-order/high-order split does not transfer here.
+* **Quantisation is not hiding pitch either.** A finer spectrum at the top order
+  (width 8) raises the short-term gain and *lowers* the long-term gain, leaving the
+  total unchanged at 19.62 dB. A better short-term filter simply absorbs more of
+  the pitch — the same trade from the other direction.
+* **A correction to the previous seal.** The 0.66–0.69 dB recorded there is the
+  frame-wide figure; the codec carries one lag and gain per 5 ms subframe, and the
+  per-subframe value is roughly twice as large (1.35–1.56 dB). The instrument now
+  reports both so the figure cannot be misread.
+
+**What this closes off.** Total prediction gain is 19.62 dB — the residual carries
+1/92 of the signal energy, so the predictor is good. The codec's loss is not
+prediction, which confirms `VOICE_RD.md`'s attribution to the residual quantiser
+and closes the prediction-order direction entirely. The remaining levers are
+quantisation efficiency — the spectral envelope (charter §16) and packet-reset
+entropy coding (7C.2-I) — not more excitation structure and not a re-balanced
+predictor.
+
+Diagnostic only: no codec behaviour changed, and the regression court is
+unaffected. Voice tests: 100 passed.
+
 ## Current measured position
 
 Frozen real-speech **lossless** portfolio (effectiveness + held-out Mode C,

@@ -13,6 +13,7 @@
 //! cargo run --release --example voice_bench -- diag       # predictor RD curve
 //! cargo run --release --example voice_bench -- celp       # excitation coder RD
 //! cargo run --release --example voice_bench -- exp2       # voice.exp2 core A/B
+//! cargo run --release --example voice_bench -- split      # ST/LT prediction split
 //! cargo run --release --example voice_bench -- visqol     # perceptual A/B (ViSQOL)
 //! cargo run --release --example voice_bench -- dump       # write case WAVs
 //! ```
@@ -223,6 +224,10 @@ fn main() {
         }
         Some("pg") => {
             prediction_gain();
+            return;
+        }
+        Some("split") => {
+            split_probe();
             return;
         }
         Some("cmp") => {
@@ -983,6 +988,227 @@ fn coder_compare(frame_len: usize) {
         println!("  {b:>4} B  {sb:>7.1}  {ss:>7.2} dB  {cb:>7.1}  {cs:>7.2} dB");
     }
     println!("  per-cell wins: scalar {sc_wins}, celp {cl_wins}");
+}
+
+/// Best integer-lag long-term prediction energy over the frame part
+/// `resid[base..]`, with the optimal scalar gain per lag.
+///
+/// Integer resolution on purpose: this measures how much pitch *structure* a
+/// residual retains, not the best achievable LTP, so it needs no interpolation
+/// convention and no shared inner loop with the codec.
+fn best_ltp_energy(resid: &[f64], base: usize) -> f64 {
+    let n = resid.len();
+    let mut best = f64::INFINITY;
+    for lag in 32..=288usize {
+        if lag > base {
+            break;
+        }
+        let mut num = 0.0f64;
+        let mut den = 0.0f64;
+        for i in base..n {
+            num += resid[i] * resid[i - lag];
+            den += resid[i - lag] * resid[i - lag];
+        }
+        if den <= 1e-12 {
+            continue;
+        }
+        let g = (num / den).clamp(0.0, 1.5);
+        let mut e = 0.0f64;
+        for i in base..n {
+            let r = resid[i] - g * resid[i - lag];
+            e += r * r;
+        }
+        if e < best {
+            best = e;
+        }
+    }
+    best
+}
+
+/// The same, but with an independent lag and gain **per 80-sample subframe**.
+///
+/// This is the number the codec actually faces: both control and `exp2` carry one
+/// adaptive lag and gain per 5 ms subframe, so a frame-wide measurement understates
+/// the available gain whenever the pitch moves inside the frame.
+fn best_ltp_energy_subframe(resid: &[f64], base: usize, sub: usize) -> f64 {
+    let n = resid.len();
+    let mut total = 0.0f64;
+    let mut lo = base;
+    while lo < n {
+        let hi = (lo + sub).min(n);
+        let mut best = f64::INFINITY;
+        for lag in 32..=288usize {
+            if lag > lo {
+                break;
+            }
+            let mut num = 0.0f64;
+            let mut den = 0.0f64;
+            for i in lo..hi {
+                num += resid[i] * resid[i - lag];
+                den += resid[i - lag] * resid[i - lag];
+            }
+            if den <= 1e-12 {
+                continue;
+            }
+            let g = (num / den).clamp(0.0, 1.5);
+            let mut e = 0.0f64;
+            for i in lo..hi {
+                let r = resid[i] - g * resid[i - lag];
+                e += r * r;
+            }
+            if e < best {
+                best = e;
+            }
+        }
+        total += if best.is_finite() { best } else { 0.0 };
+        lo = hi;
+    }
+    total
+}
+
+/// Residual of `f` under weights `w`, with `hist` as its true history, together
+/// with the frame part's short-term energy and its long-term energies at
+/// frame-wide and per-subframe resolution.
+fn split_energies(w: &[f64], hist: &[f64], f: &[f64]) -> (f64, f64, f64) {
+    let mut resid: Vec<f64> = Vec::with_capacity(hist.len() + f.len());
+    for (i, &h) in hist.iter().enumerate() {
+        let mut p = 0.0;
+        for (j, &wj) in w.iter().enumerate() {
+            if i > j {
+                p += wj * hist[i - 1 - j];
+            }
+        }
+        resid.push(h - p);
+    }
+    let base = resid.len();
+    for (i, &x) in f.iter().enumerate() {
+        let mut p = 0.0;
+        for (j, &wj) in w.iter().enumerate() {
+            let t = i as i64 - 1 - j as i64;
+            let v = if t >= 0 {
+                f[t as usize]
+            } else {
+                hist[(base as i64 + t) as usize]
+            };
+            p += wj * v;
+        }
+        resid.push(x - p);
+    }
+    let e_st: f64 = resid[base..].iter().map(|x| x * x).sum();
+    let e_lt = best_ltp_energy(&resid, base).min(e_st);
+    let e_lt_sub = best_ltp_energy_subframe(&resid, base, 80).min(e_st);
+    (e_st, e_lt, e_lt_sub)
+}
+
+/// Prediction-split diagnostic: the short-term / long-term trade.
+///
+/// The finding it exists to test (charter §16): order-16 LPC takes 18.31 dB and
+/// leaves a pitch predictor only 0.66 dB, because a high-order short-term filter
+/// absorbs the pitch harmonics. The standards split the work differently — SILK
+/// pairs a *low-order* short-term filter with a fifth-order long-term predictor.
+/// This reports the **total** prediction gain per short-term order, so the split
+/// can be chosen from measurement instead of convention.
+///
+/// It also reports what the analysis width does to the long-term gain at the
+/// top order, which separates "the residual is pitch-poor" from "the quantised
+/// spectrum destroyed the pitch".
+fn split_probe() {
+    let cases = cases();
+    let frame_len = 320usize;
+    let mut sig = 0.0f64;
+    let mut st_e: std::collections::BTreeMap<usize, f64> = std::collections::BTreeMap::new();
+    let mut lt_e: std::collections::BTreeMap<usize, f64> = std::collections::BTreeMap::new();
+    let mut lts_e: std::collections::BTreeMap<usize, f64> = std::collections::BTreeMap::new();
+    let mut frames: std::collections::BTreeMap<usize, usize> = std::collections::BTreeMap::new();
+    // Width comparison at the top order, keyed by width.
+    let mut w_st: std::collections::BTreeMap<u8, f64> = std::collections::BTreeMap::new();
+    let mut w_lt: std::collections::BTreeMap<u8, f64> = std::collections::BTreeMap::new();
+    let mut w_lts: std::collections::BTreeMap<u8, f64> = std::collections::BTreeMap::new();
+    let mut w_frames: std::collections::BTreeMap<u8, usize> = std::collections::BTreeMap::new();
+    for (_, source) in &cases {
+        let mut state = vp::VoiceState::new();
+        for chunk in source.chunks(frame_len) {
+            if chunk.len() < frame_len {
+                break;
+            }
+            let f: Vec<f64> = chunk.iter().map(|&v| f64::from(v)).collect();
+            sig += f.iter().map(|v| v * v).sum::<f64>();
+            let cands = vp::analyse(&state, chunk, 0);
+            // The best candidate at each order, so orders are compared fairly.
+            let mut best: std::collections::BTreeMap<usize, &vp::Candidate> =
+                std::collections::BTreeMap::new();
+            for c in &cands {
+                best.entry(c.model.order)
+                    .and_modify(|b| {
+                        if c.energy < b.energy {
+                            *b = c;
+                        }
+                    })
+                    .or_insert(c);
+            }
+            let hist = state.chronological(vp::HIST_LEN);
+            for (&order, c) in &best {
+                let w = vp::weights_of(&c.k_q, c.model.width);
+                let (e_st, e_lt, e_lts) = split_energies(&w, &hist, &f);
+                *st_e.entry(order).or_default() += e_st;
+                *lt_e.entry(order).or_default() += e_lt;
+                *lts_e.entry(order).or_default() += e_lts;
+                *frames.entry(order).or_default() += 1;
+                // At the top order, also ask what a finer spectrum does.
+                if order == *vp::ORDER_LADDER.last().unwrap() {
+                    for width in [c.model.width, 8u8] {
+                        let kq = if width == c.model.width {
+                            c.k_q.clone()
+                        } else {
+                            vp::quantise_k(&c.k_raw, width)
+                        };
+                        let w = vp::weights_of(&kq, width);
+                        let (s, l, ls) = split_energies(&w, &hist, &f);
+                        *w_st.entry(width).or_default() += s;
+                        *w_lt.entry(width).or_default() += l;
+                        *w_lts.entry(width).or_default() += ls;
+                        *w_frames.entry(width).or_default() += 1;
+                    }
+                }
+            }
+            for &x in chunk.iter() {
+                state.push(f64::from(x), 0.0);
+            }
+        }
+    }
+    let db = |e: f64| 10.0 * (sig / e).log10();
+    println!("prediction split over the development corpus (open loop, true history)");
+    println!("  order |  frames | short-term | LTP frame | gain  | LTP 5 ms | gain");
+    for (&order, &e) in &st_e {
+        let lt = lt_e[&order];
+        let lts = lts_e[&order];
+        println!(
+            "  {:>5} | {:>7} | {:>7.2} dB | {:>6.2} dB | {:>+5.2} | {:>6.2} dB | {:>+5.2}",
+            order,
+            frames[&order],
+            db(e),
+            db(lt),
+            db(lt) - db(e),
+            db(lts),
+            db(lts) - db(e)
+        );
+    }
+    println!("  order-16 width sweep (does a finer spectrum restore the pitch?)");
+    println!("   width |  frames | short-term | LTP frame | gain  | LTP 5 ms | gain");
+    for (&width, &e) in &w_st {
+        let lt = w_lt[&width];
+        let lts = w_lts[&width];
+        println!(
+            "   {:>5} | {:>7} | {:>7.2} dB | {:>6.2} dB | {:>+5.2} | {:>6.2} dB | {:>+5.2}",
+            width,
+            w_frames[&width],
+            db(e),
+            db(lt),
+            db(lt) - db(e),
+            db(lts),
+            db(lts) - db(e)
+        );
+    }
 }
 
 /// Upper-bound prediction gain: short-term (LPC) and long-term (pitch), measured
