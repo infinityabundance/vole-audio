@@ -248,7 +248,7 @@ now, before any `exp2` codec work, so the challenger court cannot be tuned.
 | 7C.2-F | voicing-dependent allocation + noise excitation | **implemented, not promoted; two negative results recorded.** (a) The **nested spectral operating point** (`Spectral::Vq0`, tier 2, 18 bits vs 34, saving 16 bits/frame) is legal because the MSVQ is embedded, but it is selected in **zero frames at every declared rate** — the coarse spectrum's distortion penalty exceeds the excitation the freed bits buy. Kept in-tree at zero cost when unused; it is a prerequisite for 7C.2-H. (b) **Diagnosis: at 3.2 kbps the codec outputs near-silence** (SNR 0.00 dB), because for an *uncorrelated* excitation — exactly what the stochastic fallback produces — MSE is minimised by gain → 0, so the selector prefers silence to correctly-levelled shaped noise. A short-time envelope term (`envelope_penalty`, weight `ENV_WEIGHT`) was implemented as §10 requires and **measured and disabled**: at weight 2.0 waveform SNR fell at 6/8/9.2/16 kbps and rose only at 12 kbps. Promotion on dev-only evidence is forbidden, so the weight ships at 0.0 |
 | 7C.2-G | TCX/PVQ escape mode | **implemented, measured, disabled; negative result recorded.** A new voice-track primitive `src/voice/pvq.rs` (orthonormal DCT-IV + PVQ, no dependency on the general-audio `src/lossy/` track) backs an escape sub-mode of the fallback family, so ACELP frames pay zero bits for it. On the frozen development corpus it is selected in **zero frames at every declared rate** — bits and SNR are identical with and without it — and it costs up to **8864 µs** encode p99 at 16 kbps against the 5 ms constitution. The mechanism is verified *faithful* by test (`the_escape_core_reconstructs_its_own_quantisation`), so the negative is a real measurement. The diagnosis in §13 ties it to 7C.2-F: with MSE as the objective, any reconstruction with correlation ρ < 0.5 scores worse than silence |
 | 7C.2-H | procedural excitation + zero-bit predicted refinement | **five steps landed.** (1) The perceptual arbiter (§14) and (2) the **fitted selector weight** (§15) — mean MOS-LQO 1.250 → **1.416 (+13 %)**, with **SNR and MOS disagreeing in sign** at 6 and 9.2 kbps, the phase's most important result, which also reverses 7C.2-G's verdict. (3) **Procedural excitation** (§16): implemented, tested, packet-local by construction, selected in **zero frames**; shipped disabled. (4) **The prediction split** (§17): the proposed re-balance of short-term against long-term prediction order is **refuted** — total prediction gain is maximized at the highest short-term order (19.62 dB). (5) **Scalar rate resolution** (§18): the idle channel is **not** a defect fixable by a finer scalar gain ladder — the fine ladder used 41 more bits per frame at 16 kbps and scored 0.082 MOS worse. That closes the under-spend hypothesis and points at entropy coding as the cheap-bits lever. Zero-bit predicted refinement still to come |
-| 7C.2-I | packet-reset entropy coding of remaining uncertainty | artifact shrinks without quality or recovery regression |
+| 7C.2-I | packet-reset entropy coding of remaining uncertainty | **ceiling measured (§19)**: ≈**5–8 bits/frame, 2.6–4.6 %** of the frame at 6–16 kbps, from an ideal coder over static per-field models. Top targets: the family/sub discriminator (+2.62 b at 8 kbps), the lag anchor (+1.96), the pitch-gain anchor (5 distinct values, +1.31), the gain anchor (+1.01). Lossless by construction, so the A/B is unambiguous. Coder not yet built. Also recorded: at 3.2 kbps every field has one symbol value and the encoder emits `Frame2::minimal` for all 600 frames — not a poor operating point, but no operating point |
 | 7C.2-J | frozen causal learned refinement experiment | promote only if a gain survives model size, decode p99, memory and the held-out court |
 | 7C.2-K | final listening + impairment seal | superiority claim permitted **only** here |
 
@@ -746,7 +746,51 @@ is a symptom of the scalar quantiser's quality, not of its search.
 The lever it points at is the *opposite* of spending more bits: make the existing
 bits cheaper, which is 7C.2-I's packet-reset entropy coding.
 
-## 19. Non-claims
+## 19. Entropy headroom — 7C.2-I, measured ceiling
+
+§18 closed the "spend more bits" direction and pointed at the opposite one: make
+the existing bits cheaper. `voice_bench entropy` measures what a packet-reset
+entropy coder could win, by comparing each transmitted field's empirical entropy
+against the fixed width the wire pays. Fields are weighted by the fraction of
+frames that carry them, because mutually exclusive fields — a noise gain and a lag
+anchor never co-occur — must not be summed as if simultaneous.
+
+```text
+rate     fixed side-info   entropy   headroom   % of frame
+3.2 kbps      29.00          0.00      +29.00      (see below)
+6 kbps        12.92          7.79       +5.13       4.3 %
+8 kbps        17.21          9.78       +7.43       4.6 %
+9.2 kbps      17.01          9.50       +7.51       4.1 %
+12 kbps       20.72         12.44       +8.28       3.5 %
+16 kbps       19.96         11.75       +8.21       2.6 %
+```
+
+Per field at 8 kbps, in value order: the **family/sub discriminator** (4 b fixed,
+H = 1.38, carry 1.00 — every frame, so +2.62), the **lag anchor** (+1.96), the
+**pitch-gain anchor** (5 b fixed, H = 2.21 on only **5 distinct values**, +1.31),
+the **gain anchor** (+1.01), and the **noise gain** (+0.50).
+
+Two honest qualifications. This is an **upper bound**, not a forecast: it assumes
+an ideally efficient coder over static per-field models fitted to the same corpus,
+so it carries no model cost and no held-out penalty. And the saving is a **bit
+count** only — entropy coding is lossless, so quality cannot move; the A/B for
+7C.2-I is therefore unambiguous by construction.
+
+**The 3.2 kbps row is not a headroom result; it is a finding.** Every field there
+has exactly **one** symbol value and entropy zero, which means the encoder emits
+*the same frame for all 600 frames* — `Frame2::minimal`. So 3.2 kbps is currently
+not an operating point at all: the codec does not fail to be *good* there, it fails
+to *operate*. That is consistent with the charter's §18 (a 64-bit frame cannot
+carry a coarse spectrum, a pitch trajectory, gains and a useful innovation at once)
+and with §11–§13, and it is stated plainly rather than buried in a table.
+
+**Reading for the seal.** 7C.2-I's ceiling is **≈5–8 bits/frame, 2.6–4.6 % of the
+frame** — real, bounded, quality-neutral, and modest. It is worth doing and it will
+not close the gap to Opus on its own. The gap is where §16 has pointed all along:
+the spectral envelope and quantiser efficiency at low rate, not the framing of the
+bits already being sent.
+
+## 20. Non-claims
 
 * `exp1` remains the control; its wire format is untouched.
 * The serializer in `src/voice/exp2.rs` is not yet a live profile: no court

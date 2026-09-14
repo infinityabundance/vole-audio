@@ -14,6 +14,7 @@
 //! cargo run --release --example voice_bench -- celp       # excitation coder RD
 //! cargo run --release --example voice_bench -- exp2       # voice.exp2 core A/B
 //! cargo run --release --example voice_bench -- split      # ST/LT prediction split
+//! cargo run --release --example voice_bench -- entropy    # entropy headroom
 //! cargo run --release --example voice_bench -- visqol     # perceptual A/B (ViSQOL)
 //! cargo run --release --example voice_bench -- dump       # write case WAVs
 //! ```
@@ -24,7 +25,7 @@ use std::process::Command;
 use vole_audio::learned::corpus_real;
 use vole_audio::voice::exp2::{self, Exp2Codec, Options};
 use vole_audio::voice::predict as vp;
-use vole_audio::voice::{VoiceConfig, VoiceDecoder, VoiceEncoder};
+use vole_audio::voice::{VoiceConfig, VoiceDecoder, VoiceEncoder, celp, fcelp, pvq, vq};
 
 const CASE_TARGET_SAMPLES: usize = 16_000 * 4;
 const CASE_CLIP_POOL: usize = 40;
@@ -228,6 +229,10 @@ fn main() {
         }
         Some("split") => {
             split_probe();
+            return;
+        }
+        Some("entropy") => {
+            entropy_probe();
             return;
         }
         Some("cmp") => {
@@ -661,6 +666,179 @@ fn visqol_probe() {
                 println!("  {bps:>4} | {label} | {mos:>12.3} | {bpf:>10.1} | {p99:>6}us");
             }
         }
+    }
+}
+
+/// Entropy headroom of the `voice.exp2` side information.
+///
+/// 7C.2-I proposes packet-reset entropy coding. Before building a coder, this
+/// measures what a coder could possibly win: the empirical entropy of each
+/// transmitted field versus the fixed-width cost the wire currently pays. The
+/// saving is exact for an ideal coder on this corpus — an upper bound, not a
+/// forecast — and it says which fields are worth coding.
+fn entropy_probe() {
+    use std::collections::BTreeMap;
+    let cases = cases();
+    let mut source: Vec<i32> = Vec::new();
+    for (_, s) in &cases {
+        source.extend_from_slice(s);
+    }
+    const FRAME: usize = 320;
+    let opts = Options::default();
+    for (bps, bits) in exp2::DECLARED_RATES {
+        // field -> (fixed bits, histogram, frames carrying it)
+        let mut fields: BTreeMap<&str, (u8, BTreeMap<i64, usize>, usize)> = BTreeMap::new();
+        let count = |f: &mut BTreeMap<&'static str, (u8, BTreeMap<i64, usize>, usize)>,
+                     name: &'static str,
+                     width: u8,
+                     value: i64| {
+            let e = f.entry(name).or_insert_with(|| (width, BTreeMap::new(), 0));
+            e.2 += 1;
+            e.1.entry(value).and_modify(|c| *c += 1).or_insert(1);
+        };
+        let mut state = vp::VoiceState::new();
+        let mut frames = 0usize;
+        for chunk in source.chunks(FRAME) {
+            if chunk.len() < FRAME {
+                break;
+            }
+            let (bytes, _) = Exp2Codec::encode_frame_with(&state.clone(), chunk, bits, opts);
+            let Ok(f) = exp2::Frame2::read(&bytes, FRAME) else {
+                continue;
+            };
+            match &f.spectral {
+                exp2::Spectral::Vq(idx) | exp2::Spectral::Vq0(idx) => {
+                    let (s0, s1) = vq::stage0(idx);
+                    count(&mut fields, "spectral stage0 split0", 8, i64::from(s0));
+                    count(&mut fields, "spectral stage0 split1", 8, i64::from(s1));
+                }
+                _ => {}
+            }
+            match &f.excitation {
+                exp2::Excitation::Scalar { .. } => {
+                    count(&mut fields, "family+sub", 4, 0);
+                }
+                exp2::Excitation::Celp(p) => {
+                    count(&mut fields, "family+sub", 4, 1);
+                    if let Some(s) = p.subframes.first() {
+                        count(&mut fields, "lag anchor", celp::LAG_BITS, i64::from(s.lag));
+                        count(
+                            &mut fields,
+                            "pitch gain anchor",
+                            celp::PITCH_GAIN_BITS,
+                            i64::from(s.pitch_gain),
+                        );
+                        count(
+                            &mut fields,
+                            "gain anchor",
+                            celp::GAIN_BITS,
+                            i64::from(s.gain),
+                        );
+                    }
+                }
+                exp2::Excitation::Noise { gain, seed } => {
+                    count(&mut fields, "family+sub", 4, 2);
+                    count(&mut fields, "noise gain", 6, i64::from(*gain));
+                    count(&mut fields, "noise seed", 3, i64::from(*seed));
+                }
+                exp2::Excitation::Ac3(p) => {
+                    count(&mut fields, "family+sub", 4, 3);
+                    if let Some(s) = p.subframes.first() {
+                        count(
+                            &mut fields,
+                            "lag anchor",
+                            fcelp::LAG_Q_BITS,
+                            i64::from(s.lag_q),
+                        );
+                        count(
+                            &mut fields,
+                            "pitch gain anchor",
+                            celp::PITCH_GAIN_BITS,
+                            i64::from(s.pitch_gain),
+                        );
+                        count(
+                            &mut fields,
+                            "gain anchor",
+                            celp::GAIN_BITS,
+                            i64::from(s.gain),
+                        );
+                    }
+                }
+                exp2::Excitation::Tcx { k, gains, .. } => {
+                    count(&mut fields, "family+sub", 4, 4);
+                    count(&mut fields, "tcx k", pvq::K_BITS, *k as i64);
+                    if let Some(&g) = gains.first() {
+                        count(&mut fields, "gain anchor", celp::GAIN_BITS, i64::from(g));
+                    }
+                }
+                exp2::Excitation::Proc {
+                    lag_q,
+                    gain,
+                    voicing,
+                    phase,
+                    seed,
+                } => {
+                    count(&mut fields, "family+sub", 4, 5);
+                    count(
+                        &mut fields,
+                        "proc lag",
+                        exp2::PROC_LAG_BITS,
+                        i64::from(*lag_q),
+                    );
+                    count(&mut fields, "proc gain", 6, i64::from(*gain));
+                    count(&mut fields, "voicing", 4, i64::from(*voicing));
+                    count(
+                        &mut fields,
+                        "proc phase",
+                        exp2::PROC_PHASE_BITS,
+                        i64::from(*phase),
+                    );
+                    count(&mut fields, "noise seed", 3, i64::from(*seed));
+                }
+            }
+            frames += 1;
+            let _ = Exp2Codec::decode_frame(&mut state, &bytes, FRAME).unwrap();
+        }
+        println!("rate {bps} bps over {frames} frames -- entropy headroom of the side information");
+        println!("  field                      |   fix | H(X) | gain | carry | sym");
+        let mut total_fix = 0.0f64;
+        let mut total_h = 0.0f64;
+        for (name, (width, hist, carried)) in &fields {
+            let n: usize = hist.values().sum();
+            if n == 0 {
+                continue;
+            }
+            let h: f64 = hist
+                .values()
+                .map(|&c| {
+                    let p = c as f64 / n as f64;
+                    -p * p.log2()
+                })
+                .sum();
+            // A field only costs its width on the frames that carry it, so the
+            // fixed cost and the entropy are both weighted by the carry rate.
+            // Without this, mutually exclusive fields (a noise gain and a lag
+            // anchor never co-occur) would be summed as if simultaneous.
+            let carry = *carried as f64 / frames.max(1) as f64;
+            let fix = f64::from(*width) * carry;
+            let hact = h * carry;
+            total_fix += fix;
+            total_h += hact;
+            println!(
+                "  {name:<26} | {:>5.2} | {:>4.2} | {:>+4.2} | {:>5.2} | {:>4}",
+                fix,
+                h,
+                fix - hact,
+                carry,
+                hist.len()
+            );
+        }
+        println!(
+            "  TOTAL per frame             | {:>5.2} | {:>4.2} | {:>+4.2}",
+            total_fix,
+            total_h,
+            total_fix - total_h
+        );
     }
 }
 

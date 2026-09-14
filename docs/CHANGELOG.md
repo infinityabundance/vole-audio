@@ -871,6 +871,43 @@ search.
 The lever it points at is the opposite of spending more bits: make the existing
 bits cheaper, which is 7C.2-I's packet-reset entropy coding.
 
+## Phase 7C.2-I (measurement) — the entropy ceiling, and a 3.2 kbps finding (v0.87.0)
+
+Before building a packet-reset entropy coder, this measures what one could win.
+`voice_bench entropy` compares each transmitted field's empirical entropy against
+the fixed width the wire pays, weighted by the fraction of frames that carry each
+field (mutually exclusive fields must not be summed as if simultaneous).
+
+| rate | fixed side-info | entropy | headroom | % of frame |
+| ---- | --------------- | ------- | -------- | ---------- |
+| 6 kbps | 12.92 | 7.79 | +5.13 | 4.3 % |
+| 8 kbps | 17.21 | 9.78 | +7.43 | 4.6 % |
+| 9.2 kbps | 17.01 | 9.50 | +7.51 | 4.1 % |
+| 12 kbps | 20.72 | 12.44 | +8.28 | 3.5 % |
+| 16 kbps | 19.96 | 11.75 | +8.21 | 2.6 % |
+
+Per field at 8 kbps, in value order: the family/sub discriminator (+2.62 b, present
+in every frame), the lag anchor (+1.96), the pitch-gain anchor (5 b fixed, entropy
+2.21 on only **5 distinct values**, +1.31), the gain anchor (+1.01), the noise gain
+(+0.50).
+
+* This is an **upper bound**, not a forecast: an ideal coder over static per-field
+  models fitted to the same corpus, carrying no model cost and no held-out penalty.
+* The saving is a **bit count** only. Entropy coding is lossless, so quality cannot
+  move, which makes 7C.2-I's A/B unambiguous by construction.
+* **7C.2-I's ceiling is ≈5–8 bits/frame, 2.6–4.6 % of the frame.** Real, bounded,
+  quality-neutral — and modest. It is worth doing; it will not close the gap.
+
+**A finding that came out of the same table.** At 3.2 kbps every field has exactly
+**one** symbol value and entropy zero: the encoder emits the *same frame* for all
+600 frames (`Frame2::minimal`). So 3.2 kbps is not a poor operating point — it is
+**no** operating point. The codec does not fail to be good there, it fails to
+operate, which is consistent with the charter's own analysis that a 64-bit frame
+cannot carry a coarse spectrum, a pitch trajectory, gains and a useful innovation
+at once.
+
+No codec behaviour changed. Voice tests: 100 passed.
+
 ## Current measured position
 
 Frozen real-speech **lossless** portfolio (effectiveness + held-out Mode C,
