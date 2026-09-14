@@ -908,6 +908,69 @@ at once.
 
 No codec behaviour changed. Voice tests: 100 passed.
 
+## Phase 7C.2-I (second attempt) — the candidate-proposal defect, and a compact CELP that ships (v0.89.0)
+
+§20's compact CELP form was reverted because its fit test was evaluated per
+spectral tier. This rebuilds it with the frame-level gate §20 specifies — and, in
+doing so, finds a defect in the encoder's **candidate proposal** that is larger than
+the mechanism it was blocking.
+
+**The defect.** The encoder pruned candidates with `cands.iter().take(3)`.
+`analyse` returns candidates estimator-major and order-minor, so those three are
+estimator 0 at orders **8, 10 and 12** — while `analyse`'s own documentation says
+ordering is by open-loop residual energy, and the **`exp1` control implements exactly
+that**. The 28-bit split-MSVQ spectrum and its nested operating point are only built
+for an order-16 candidate, so **neither could ever be transmitted**: every frame at
+every rate carried a scalar spectrum. The existing instrument already said so —
+`voice_bench entropy` reports spectral fields at 3.2 kbps only, where the frame is
+`Frame2::minimal()`.
+
+**Measured, energy ranking on (`voice_bench exp2`, 600 frames, `+acelp`):**
+
+| rate | ladder order | energy-ranked | Δ SNR | encode p99 |
+| ---- | ------------ | ------------- | ----- | ---------- |
+| 3.2 kbps | −0.00 dB, 47.0 b | −6.68 dB, 40.2 b | −6.68 | 885 → 1720 µs |
+| 6 kbps | −0.69 dB, 81.6 b | +0.55 dB, 87.3 b | **+1.24** | 1196 → 2582 µs |
+| 8 kbps | +0.73 dB, 121.5 b | +1.31 dB, 118.1 b | **+0.58** | 1892 → 3778 µs |
+| 9.2 kbps | +1.22 dB, 140.1 b | +2.90 dB, 156.3 b | **+1.68** | 2535 → 4748 µs |
+| 12 kbps | +4.77 dB, 212.8 b | +4.61 dB, 203.9 b | −0.16 | 3643 → 7396 µs |
+| 16 kbps | +4.80 dB, 250.9 b | +5.77 dB, 240.8 b | **+0.97** | 4596 → 8913 µs |
+
+The fix wins **+0.58…+1.68 dB SNR** at 6–9.2 and 16 kbps and is *cheaper in
+transmitted bits* at 8/12/16 (a 32-bit VQ spectrum replaces a 48-bit order-8 scalar
+one, and is a better spectrum). It also raises p99 to **2.6–8.9 ms** against the 5 ms
+constitution and lowers SNR at 3.2 and 12 kbps. A first version derived the VQ
+spectrum for every kept order-16 candidate and reached 12–14 ms; deriving it **once
+per frame** from the lowest-energy order-16 candidate, as `exp1` does, produced the
+numbers above. It ships behind `Options::energy_rank`, **default off**, with the
+measurement retained. The charter's §9 deterministic **work budget** is now the
+binding constraint on the phase.
+
+**The compact sub-mode.** Family 1 now carries a one-bit sub-mode discriminator:
+multirate (one lag anchor + contour, pitch-gain anchor + deltas, gain anchor +
+deltas) or compact (one lag, one pitch gain, one innovation gain), 56 bits of side
+information becoming 23. Every multirate record is consequently one bit dearer; the
+exact-bit tests pin that down (a 4-pulse VQ+CELP frame: 192 → 193 bits). Compact is
+offered only when **no spectral tier of the frame admits a full record** — the
+frame-level gate §20 asks for — which removes the 8 kbps regression (−0.093 MOS)
+completely.
+
+On the shipped ordering it is the only way any CELP record fits at 6 kbps (cheapest
+tier 55 b + 91 b of multirate record against a 120-bit frame), so it converts **205
+of 600 frames** from stochastic noise to CELP and buys **+0.55 dB SNR**, spending
+10.4 more of the 120 bits the frame is allowed. Every other declared rate is
+bit-identical to v0.88.0. The 3-case ViSQOL arbiter moves 1.445 → 1.427 MOS-LQO at
+6 kbps, a −0.018 change inside that instrument's noise band and not evidence of a
+perceptual loss.
+
+Under the energy-ranked set compact is also positive: **+0.16 dB at 6 kbps and
++0.12 dB at 8 kbps** against energy ranking with compact withheld, at equal or fewer
+bits.
+
+Both voice courts are unchanged and re-verified on this tree:
+`learned-voice-stream` = `cc2addfa…`, `learned-voice-stream-exp2` = `23eaf361…`.
+Voice tests: 101 passed.
+
 ## Phase 7C.2-I (first attempt) — compact CELP, measured and reverted (v0.88.0)
 
 §19 put 7C.2-I's entropy ceiling at ≈5–8 bits/frame and pointed at a larger prize in

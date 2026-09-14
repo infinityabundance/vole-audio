@@ -326,10 +326,23 @@ fn main() {
 fn opts(celp: bool, track_acelp: bool, tcx: bool) -> Options {
     Options {
         celp,
+        compact: true,
+        energy_rank: true,
         track_acelp,
         tcx,
         proc: true,
         env_weight: exp2::DEFAULT_ENV_WEIGHT,
+    }
+}
+
+/// The `exp1`-equivalent control for this profile: the energy ranking withheld
+/// too, so a row can separate "the better spectrum" from "the compact record".
+fn opts_v088() -> Options {
+    Options {
+        energy_rank: false,
+        compact: false,
+        proc: false,
+        ..opts(true, true, false)
     }
 }
 
@@ -341,11 +354,24 @@ fn opts_no_proc(celp: bool, track_acelp: bool, tcx: bool) -> Options {
     }
 }
 
+/// The 7C.2-B/D core with the 7C.2-I compact sub-mode **withheld**, so a measured
+/// delta can be attributed to the compact mechanism rather than to the whole
+/// stack. Everything else is the shipped configuration.
+fn opts_no_compact() -> Options {
+    Options {
+        compact: false,
+        proc: false,
+        ..opts(true, true, false)
+    }
+}
+
 /// The procedural core alone. Separates "the mechanism is weak" from "the
 /// selector chose it away", which a whole-stack row cannot distinguish.
 fn opts_proc_only() -> Options {
     Options {
         celp: false,
+        compact: false,
+        energy_rank: false,
         track_acelp: false,
         tcx: false,
         proc: true,
@@ -363,11 +389,13 @@ fn exp2_probe(filter: Option<&str>) {
         source.extend_from_slice(s);
     }
     const FRAME: usize = 320;
-    let configs: [(&str, Options); 6] = [
+    let configs: [(&str, Options); 8] = [
         ("scalar+noise      ", opts_no_proc(false, false, false)),
         ("proc only (7C.2-H)", opts_proc_only()),
         ("+celp (7C.2-B/D)  ", opts_no_proc(true, false, false)),
         ("+acelp (7C.2-E)   ", opts_no_proc(true, true, false)),
+        ("+acelp, no compact", opts_no_compact()),
+        ("+acelp no rank    ", opts_v088()),
         ("+proc (7C.2-H)    ", opts(true, true, false)),
         ("+tcx (7C.2-G)     ", opts(true, true, true)),
     ];
@@ -610,6 +638,8 @@ fn weight_probe() {
             }
             let o = Options {
                 celp: true,
+                compact: true,
+                energy_rank: false,
                 track_acelp: true,
                 tcx: false,
                 proc: true,
@@ -637,11 +667,13 @@ fn visqol_probe() {
     let dir = std::path::PathBuf::from("target/voice-bench-vq");
     std::fs::create_dir_all(&dir).unwrap();
     const FRAME: usize = 320;
-    let configs: [(&str, Options); 6] = [
+    let configs: [(&str, Options); 8] = [
         ("noise only        ", opts_no_proc(false, false, false)),
         ("proc only (7C.2-H)", opts_proc_only()),
         ("+celp (7C.2-B/D)  ", opts_no_proc(true, false, false)),
         ("+acelp (7C.2-E)   ", opts_no_proc(true, true, false)),
+        ("+acelp, no compact", opts_no_compact()),
+        ("+acelp no rank    ", opts_v088()),
         ("+proc (7C.2-H)    ", opts(true, true, false)),
         ("+tcx (7C.2-G)     ", opts(true, true, true)),
     ];
@@ -717,6 +749,24 @@ fn entropy_probe() {
             match &f.excitation {
                 exp2::Excitation::Scalar { .. } => {
                     count(&mut fields, "family+sub", 4, 0);
+                }
+                exp2::Excitation::Celp1(p) => {
+                    count(&mut fields, "family+sub", 4, 6);
+                    if let Some(s) = p.subframes.first() {
+                        count(&mut fields, "lag anchor", celp::LAG_BITS, i64::from(s.lag));
+                        count(
+                            &mut fields,
+                            "pitch gain anchor",
+                            celp::PITCH_GAIN_BITS,
+                            i64::from(s.pitch_gain),
+                        );
+                        count(
+                            &mut fields,
+                            "gain anchor",
+                            celp::GAIN_BITS,
+                            i64::from(s.gain),
+                        );
+                    }
                 }
                 exp2::Excitation::Celp(p) => {
                     count(&mut fields, "family+sub", 4, 1);

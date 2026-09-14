@@ -836,7 +836,125 @@ shorter frame and that choice propagates. Per-rate deltas of that size on this
 instrument are therefore not reliable evidence; the held-out court is needed before
 any of these numbers can carry a claim.
 
-## 21. Non-claims
+## 21. Compact CELP retry, and the candidate-proposal defect — 7C.2-I (shipped)
+
+§20 reverted the compact CELP form because its fit test was evaluated per spectral
+tier instead of per frame. This step rebuilds it with the **frame-level gate**
+§20 asks for, measures it, and in doing so uncovers a defect in the encoder's
+candidate proposal that is larger than the mechanism it was blocking.
+
+### 21.1 The compact sub-mode, as shipped
+
+Family 1 (CELP) now carries a one-bit **sub-mode discriminator**:
+
+| sub-mode | frame-level adaptive side information |
+| -------- | ------------------------------------- |
+| `0` multirate (7C.2-D) | lag anchor $+$ 4-bit contour, pitch gain $+$ 3-bit deltas, gain $+$ 4-bit deltas |
+| `1` compact (7C.2-I) | one lag, one pitch gain, one innovation gain |
+
+Both carry one frame-wide pulse count and the same combinatorial pulse plane, so
+the two forms differ only in how the adaptive parameters are described: 56 bits of
+side information become 23. The whole multirate record is consequently **one bit
+dearer** than it was, which the exact-bit tests pin down (a 4-pulse VQ+CELP frame
+moves 192 → 193 bits).
+
+The compact form is offered only when **no spectral tier of the frame admits a full
+record with real excitation**, tested frame-wide against the cheapest tier the frame
+can actually use. That is the correction §20 asks for, and it removes the 8 kbps
+regression (−0.093 MOS) completely.
+
+### 21.2 The defect this uncovered
+
+The encoder pruned its candidate list with `cands.iter().take(3)`. `analyse` returns
+candidates in **estimator-major, order-minor** order, so those three are estimator 0
+at orders **8, 10 and 12** — while `analyse`'s own documentation says ordering is by
+open-loop residual energy, and the **`exp1` control implements exactly that**
+(`voice::CANDIDATE_KEEP`, sorted by `energy`).
+
+The consequence is not subtle once stated. The 28-bit split-MSVQ spectrum and its
+nested operating point are only constructed for a candidate whose order is
+`vq::VQ_ORDER` (16). No order-16 candidate was ever in the proposal set, so **neither
+spectral tier could ever be transmitted**, at any rate, in any frame. The tell is in
+the existing instrument: `voice_bench entropy` reports spectral fields at 3.2 kbps
+only (where the frame is `Frame2::minimal()`), and **no spectral field at all above
+it** — i.e. every frame at every real rate carried a scalar spectrum.
+
+This is a proposal heuristic, not a decision: the selector still judged exact
+serialised bits and closed-loop distortion. But it meant the phase's headline
+spectral work was unreachable on the wire, and it is the most direct explanation of
+the charter's standing diagnosis in §16.
+
+### 21.3 Measured: the ranking fix is worth a lot, and costs more
+
+`voice_bench exp2`, 600 frames, committed source. `+acelp` = `celp` + `track_acelp`
+with the other cores withheld.
+
+| rate | ladder order (v0.88.0 path) | energy-ranked | Δ SNR | p99 (order → ranked) |
+| ---- | --------------------------- | ------------- | ----- | -------------------- |
+| 3.2 kbps | −0.00 dB, 47.0 b | −6.68 dB, 40.2 b | **−6.68** | 885 → 1720 µs |
+| 6 kbps | −0.69 dB, 81.6 b | **+0.55 dB**, 87.3 b | **+1.24** | 1196 → 2582 µs |
+| 8 kbps | +0.73 dB, 121.5 b | **+1.31 dB**, 118.1 b | **+0.58** | 1892 → 3778 µs |
+| 9.2 kbps | +1.22 dB, 140.1 b | **+2.90 dB**, 156.3 b | **+1.68** | 2535 → 4748 µs |
+| 12 kbps | +4.77 dB, 212.8 b | +4.61 dB, 203.9 b | −0.16 | 3643 → 7396 µs |
+| 16 kbps | +4.80 dB, 250.9 b | **+5.77 dB**, 240.8 b | **+0.97** | 4596 → 8913 µs |
+
+Two things are true at once and both are recorded:
+
+1. The fix is worth **+0.58 to +1.68 dB SNR** at 6–9.2 and 16 kbps, and it is
+   *cheaper in transmitted bits* at 8, 12 and 16 kbps than the path it replaces
+   (the VQ spectrum is 32 bits against a 48-bit order-8 scalar spectrum, and it is a
+   better spectrum).
+2. It raises encode p99 to **2.6–8.9 ms**, against a 5 ms constitution, and it
+   *lowers* SNR at 3.2 kbps and 12 kbps.
+
+A first version derived the VQ spectrum for *every* kept order-16 candidate; the
+LSF conversion and codebook search are the codec's most expensive analysis steps, and
+re-deriving one frame-level spectrum three times pushed p99 to 12–14 ms. Deriving it
+**once per frame** from the lowest-energy order-16 candidate — exactly what `exp1`
+does — brought it to the numbers above. The remaining excess is the ordinary cost of
+evaluating the extra spectral tier per frame.
+
+**Verdict.** The ranking is the documented behaviour and a large, honest gain, but it
+cannot be enabled while it breaches the deadline. It ships behind
+`Options::energy_rank`, **default off**, with the measurement retained. Unlocking it
+is a bounded, well-defined piece of work: the charter's own §9 requires a
+**deterministic work budget** rather than a ladder-shaped one, and that budget is now
+the binding constraint on the whole phase.
+
+### 21.4 Measured: the compact sub-mode on the shipped ordering
+
+With the ladder-order proposal set retained as the default, the compact form is the
+only way any CELP record fits at 6 kbps: the cheapest tier costs 55 bits and a
+multirate record with one pulse costs 91, against a 120-bit frame, so `maxp` is zero
+on every tier. The frame therefore goes to the 12-bit stochastic core with ~70 bits
+idle, unless compact is offered.
+
+| configuration | 6 kbps SNR | bits/frame | families |
+| ------------- | ---------: | ---------: | -------- |
+| no CELP at all | −0.69 dB | 81.6 | `noise 595, scalar 5` |
+| + compact CELP | **−0.14 dB** | 92.0 | `celp1 205, noise 390, scalar 5` |
+
+So compact converts **205 of 600 frames** from stochastic noise to CELP at 6 kbps and
+buys **+0.55 dB SNR**, spending 10.4 more of the 120 bits the frame is allowed. On the
+3-case ViSQOL arbiter the same configuration moves 1.445 → **1.427** MOS-LQO, a
+−0.018 change that is inside this instrument's noise band (§20) and is *not* evidence
+of a perceptual loss; the 600-frame SNR instrument and the perceptual arbiter disagree
+in the usual direction. Every other declared rate is bit-identical to v0.88.0.
+
+Under the energy-ranked proposal set compact is also measurable and positive:
+**+0.16 dB at 6 kbps and +0.12 dB at 8 kbps** against `energy_rank` alone with compact
+withheld, at equal or fewer bits. That is the A/B that should be re-read first when the
+work budget lands.
+
+### 21.5 What is retained, and what is disabled
+
+| mechanism | state | evidence |
+| --------- | ----- | -------- |
+| compact CELP sub-mode (7C.2-I) | **enabled** | +0.55 dB at 6 kbps, 205/600 frames converted; all other rates unchanged |
+| energy-ranked candidate proposal | **disabled**, in-tree | +0.58…+1.68 dB, but p99 2.6–8.9 ms |
+| per-frame VQ spectrum derivation | shipped as part of the above | p99 12–14 → 2.6–8.9 ms |
+
+## 22. Non-claims
 
 * `exp1` remains the control; its wire format is untouched.
 * The serializer in `src/voice/exp2.rs` is not yet a live profile: no court
@@ -847,3 +965,9 @@ any of these numbers can carry a claim.
   hashed, reproducibly trained and inside the evidence chain.
 * Mechanisms that lose a controlled A/B stay in-tree but disabled, as
   established by 7C.1.
+* `exp2`'s ladder-order candidate proposal is a **defect that is currently
+  tolerated only to hold the encode deadline**, not a design choice. The
+  analyser documents energy ordering and the `exp1` control implements it; until
+  the deterministic work budget of §9 exists, this profile cannot reach orders 14
+  and 16, and therefore cannot transmit the 28-bit split-MSVQ spectrum or its
+  nested operating point, in any frame at any rate.

@@ -165,6 +165,13 @@ pub const TIER_BITS: u8 = 2;
 /// Bits of the excitation family selector.
 pub const FAMILY_BITS: u8 = 2;
 
+/// Candidates carried into the closed-loop search per frame, pruned by open-loop
+/// residual energy. Deliberately equal to the `exp1` control's
+/// `voice::CANDIDATE_KEEP` so both codecs spend the same closed-loop work on the
+/// same number of representations; only the *ranking* differs, and this profile's
+/// ranking is now the energy ranking the analyser documents.
+const CANDIDATE_KEEP: usize = 3;
+
 /// Spectral description. The tier is carried in the frame, so a low-rate mode
 /// does not pay for the full quantiser.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -274,6 +281,16 @@ pub enum Excitation {
     /// ACELP. **No length field**: the record length follows from the pulse
     /// counts, which are in the stream.
     Celp(celp::Params),
+    /// The same core with **frame-wide** adaptive parameters (7C.2-I, "compact"):
+    /// one lag, one pitch gain and one innovation gain for the whole frame, then a
+    /// single pulse count. This drops 56 bits of side information to 23.
+    ///
+    /// It exists to reach a budget the multirate record cannot: at 6 kbps the
+    /// full form needs 124 bits *with the spectrum* against a 120-bit frame, so
+    /// without it the codec sends a 12-bit stochastic frame and leaves ~70 bits
+    /// idle. Offered only when the full form is unreachable **for the frame**, not
+    /// merely for the spectral tier under consideration.
+    Celp1(celp::Params),
     /// The low-information fallback core: a deterministic, packet-local shaped
     /// stochastic excitation (white excitation through the synthesis filter, so
     /// its spectrum follows the transmitted envelope) with one level and a
@@ -332,21 +349,38 @@ impl Excitation {
                 // Multirate side information (7C.2-D): one frame pitch anchor plus
                 // 4-bit contour deltas, one pitch gain plus 3-bit deltas, one
                 // innovation gain plus 4-bit deltas, and a single frame pulse count.
+                //
+                // 7C.2-I added a one-bit sub-mode discriminator after the family,
+                // so every multirate record is exactly one bit dearer than before
+                // the compact form existed.
                 let nsub = p.subframes.len();
                 let tail = nsub.saturating_sub(1);
-                let count = p
-                    .subframes
-                    .first()
-                    .map(|s| s.pulses.len())
-                    .unwrap_or(0)
-                    .min((1usize << celp::COUNT_BITS) - 1);
+                let count = celp_count(p);
                 usize::from(FAMILY_BITS)
+                    + 1
                     + usize::from(celp::LAG_BITS)
                     + 4 * tail
                     + usize::from(celp::PITCH_GAIN_BITS)
                     + 3 * tail
                     + usize::from(celp::GAIN_BITS)
                     + 4 * tail
+                    + usize::from(celp::COUNT_BITS)
+                    + nsub
+                        * (usize::from(celp::position_bits(count))
+                            + count * usize::from(celp::SIGN_BITS))
+            }
+            Excitation::Celp1(p) => {
+                // Compact record (7C.2-I): one lag, one pitch gain and one
+                // innovation gain for the whole frame, then a single pulse count.
+                // 23 bits of side information instead of 56, paid for by giving up
+                // the per-subframe contour the multirate form carries.
+                let nsub = p.subframes.len();
+                let count = celp_count(p);
+                usize::from(FAMILY_BITS)
+                    + 1
+                    + usize::from(celp::LAG_BITS)
+                    + usize::from(celp::PITCH_GAIN_BITS)
+                    + usize::from(celp::GAIN_BITS)
                     + usize::from(celp::COUNT_BITS)
                     + nsub
                         * (usize::from(celp::position_bits(count))
@@ -398,12 +432,8 @@ impl Excitation {
             }
             Excitation::Celp(p) => {
                 w.bits(1, FAMILY_BITS);
-                let count = p
-                    .subframes
-                    .first()
-                    .map(|s| s.pulses.len())
-                    .unwrap_or(0)
-                    .min((1usize << celp::COUNT_BITS) - 1);
+                w.bits(0, 1); // multirate sub-mode
+                let count = celp_count(p);
                 // Lag anchor + contour.
                 let mut lag = p
                     .subframes
@@ -440,19 +470,31 @@ impl Excitation {
                 }
                 // One pulse count for the whole frame, then the pulses.
                 w.bits(count as u32, celp::COUNT_BITS);
-                for sub in &p.subframes {
-                    let mut ordered: Vec<(u8, bool)> =
-                        sub.pulses.iter().take(count).copied().collect();
-                    ordered.sort_unstable_by_key(|&(pos, _)| pos);
-                    let positions: Vec<u8> = ordered.iter().map(|&(p, _)| p).collect();
-                    let pb = celp::position_bits(count);
-                    if pb > 0 {
-                        w.bits(celp::rank_positions(&positions) as u32, pb);
-                    }
-                    for &(_, positive) in &ordered {
-                        w.bits(u32::from(positive), celp::SIGN_BITS);
-                    }
-                }
+                write_pulses(w, &p.subframes, count);
+            }
+            Excitation::Celp1(p) => {
+                w.bits(1, FAMILY_BITS);
+                w.bits(1, 1); // compact sub-mode
+                let count = celp_count(p);
+                // Frame-wide adaptive parameters: one value decides each subframe.
+                let lag = p
+                    .subframes
+                    .first()
+                    .map(|s| s.lag)
+                    .unwrap_or(vp::MIN_LAG as i32);
+                w.bits(
+                    (lag - vp::MIN_LAG as i32).clamp(0, (1 << celp::LAG_BITS) - 1) as u32,
+                    celp::LAG_BITS,
+                );
+                let pg = p.subframes.first().map(|s| s.pitch_gain).unwrap_or(0);
+                w.bits(
+                    pg.clamp(0, celp::PITCH_GAIN_LEVELS - 1) as u32,
+                    celp::PITCH_GAIN_BITS,
+                );
+                let g = p.subframes.first().map(|s| s.gain).unwrap_or(0);
+                w.bits(g.clamp(0, celp::GAIN_LEVELS - 1) as u32, celp::GAIN_BITS);
+                w.bits(count as u32, celp::COUNT_BITS);
+                write_pulses(w, &p.subframes, count);
             }
             Excitation::Noise { gain, seed } => {
                 w.bits(2, FAMILY_BITS);
@@ -577,46 +619,50 @@ impl Excitation {
             }
             1 => {
                 let nsub = celp::subframes(frame_len);
-                // Lag anchor + contour.
-                let anchor = vp::MIN_LAG as i32 + r.bits(celp::LAG_BITS)? as i32;
-                let mut lags = vec![anchor.clamp(vp::MIN_LAG as i32, vp::MAX_LAG as i32)];
-                for _ in 1..nsub {
-                    let d = sign_extend(r.bits(4)?, 4);
-                    let prev = *lags.last().unwrap();
-                    lags.push((prev + d).clamp(vp::MIN_LAG as i32, vp::MAX_LAG as i32));
-                }
-                // Pitch gain + deltas.
-                let mut pgs = vec![r.bits(celp::PITCH_GAIN_BITS)? as i32];
-                for _ in 1..nsub {
-                    let d = sign_extend(r.bits(3)?, 3);
-                    let prev = *pgs.last().unwrap();
-                    pgs.push((prev + d).clamp(0, celp::PITCH_GAIN_LEVELS - 1));
-                }
-                // Innovation gain + deltas.
-                let mut gs = vec![r.bits(celp::GAIN_BITS)? as i32];
-                for _ in 1..nsub {
-                    let d = sign_extend(r.bits(4)?, 4);
-                    let prev = *gs.last().unwrap();
-                    gs.push((prev + d).clamp(0, celp::GAIN_LEVELS - 1));
-                }
+                let compact = r.bits(1)? == 1;
+                // Frame-level adaptive parameters. The compact sub-mode carries one
+                // value per field for the whole frame; the multirate sub-mode an
+                // anchor plus a contour. Both are reconstructed identically: the
+                // compact values are simply repeated across the subframes.
+                let (lags, pgs, gs) = if compact {
+                    let lag = (vp::MIN_LAG as i32 + r.bits(celp::LAG_BITS)? as i32)
+                        .clamp(vp::MIN_LAG as i32, vp::MAX_LAG as i32);
+                    let pg = r.bits(celp::PITCH_GAIN_BITS)? as i32;
+                    let g = r.bits(celp::GAIN_BITS)? as i32;
+                    (vec![lag; nsub], vec![pg; nsub], vec![g; nsub])
+                } else {
+                    // Lag anchor + contour.
+                    let anchor = vp::MIN_LAG as i32 + r.bits(celp::LAG_BITS)? as i32;
+                    let mut lags = vec![anchor.clamp(vp::MIN_LAG as i32, vp::MAX_LAG as i32)];
+                    for _ in 1..nsub {
+                        let d = sign_extend(r.bits(4)?, 4);
+                        let prev = *lags.last().unwrap();
+                        lags.push((prev + d).clamp(vp::MIN_LAG as i32, vp::MAX_LAG as i32));
+                    }
+                    // Pitch gain + deltas.
+                    let mut pgs = vec![r.bits(celp::PITCH_GAIN_BITS)? as i32];
+                    for _ in 1..nsub {
+                        let d = sign_extend(r.bits(3)?, 3);
+                        let prev = *pgs.last().unwrap();
+                        pgs.push((prev + d).clamp(0, celp::PITCH_GAIN_LEVELS - 1));
+                    }
+                    // Innovation gain + deltas.
+                    let mut gs = vec![r.bits(celp::GAIN_BITS)? as i32];
+                    for _ in 1..nsub {
+                        let d = sign_extend(r.bits(4)?, 4);
+                        let prev = *gs.last().unwrap();
+                        gs.push((prev + d).clamp(0, celp::GAIN_LEVELS - 1));
+                    }
+                    (lags, pgs, gs)
+                };
                 // One pulse count, then the pulses.
                 let count = r.bits(celp::COUNT_BITS)? as usize;
                 if count > celp::MAX_PULSES {
                     return Err(Error::malformed("voice.exp2 pulse count above the bound"));
                 }
-                let pb = celp::position_bits(count);
                 let mut p = celp::Params::default();
                 for i in 0..nsub {
-                    let positions = if pb > 0 {
-                        celp::unrank_positions(u64::from(r.bits(pb)?), count)
-                    } else {
-                        Vec::new()
-                    };
-                    let mut pulses = Vec::with_capacity(count);
-                    for &pos in &positions {
-                        let positive = r.bits(celp::SIGN_BITS)? == 1;
-                        pulses.push((pos, positive));
-                    }
+                    let pulses = read_pulses(r, count)?;
                     p.subframes.push(celp::Subframe {
                         lag: lags[i],
                         pitch_gain: pgs[i],
@@ -624,7 +670,11 @@ impl Excitation {
                         pulses,
                     });
                 }
-                Ok(Excitation::Celp(p))
+                Ok(if compact {
+                    Excitation::Celp1(p)
+                } else {
+                    Excitation::Celp(p)
+                })
             }
             2 => {
                 let sub = r.bits(SUB_BITS)?;
@@ -757,6 +807,51 @@ impl Excitation {
     }
 }
 
+/// Pulse count carried by a CELP-family record: the frame-wide count, clamped to
+/// the transmitted field. Encoder and wire agree because both call this.
+fn celp_count(p: &celp::Params) -> usize {
+    p.subframes
+        .first()
+        .map(|s| s.pulses.len())
+        .unwrap_or(0)
+        .min((1usize << celp::COUNT_BITS) - 1)
+}
+
+/// Write the per-subframe pulse plane: one combinatorial position rank followed
+/// by `count` signs, repeated for every subframe. Shared by both CELP sub-modes,
+/// which differ only in their frame-level adaptive parameters.
+fn write_pulses(w: &mut BitWriter, subframes: &[celp::Subframe], count: usize) {
+    for sub in subframes {
+        let mut ordered: Vec<(u8, bool)> = sub.pulses.iter().take(count).copied().collect();
+        ordered.sort_unstable_by_key(|&(pos, _)| pos);
+        let positions: Vec<u8> = ordered.iter().map(|&(p, _)| p).collect();
+        let pb = celp::position_bits(count);
+        if pb > 0 {
+            w.bits(celp::rank_positions(&positions) as u32, pb);
+        }
+        for &(_, positive) in &ordered {
+            w.bits(u32::from(positive), celp::SIGN_BITS);
+        }
+    }
+}
+
+/// Read one subframe's pulse plane: positions from the combinatorial rank, then
+/// `count` signs. The inverse of [`write_pulses`].
+fn read_pulses(r: &mut BitReader<'_>, count: usize) -> Result<Vec<(u8, bool)>> {
+    let pb = celp::position_bits(count);
+    let positions = if pb > 0 {
+        celp::unrank_positions(u64::from(r.bits(pb)?), count)
+    } else {
+        Vec::new()
+    };
+    let mut pulses = Vec::with_capacity(count);
+    for &pos in &positions {
+        let positive = r.bits(celp::SIGN_BITS)? == 1;
+        pulses.push((pos, positive));
+    }
+    Ok(pulses)
+}
+
 /// Sign-extend the low `n` bits of `v`.
 fn sign_extend(v: u32, n: u8) -> i32 {
     let shift = 32 - u32::from(n);
@@ -856,7 +951,7 @@ impl Frame2 {
                     &symbols,
                 )
             }
-            Excitation::Celp(params) => {
+            Excitation::Celp(params) | Excitation::Celp1(params) => {
                 let shot = celp::reconstruct(params, frame_len)?;
                 shot.render(state, &k_q, width)
             }
@@ -947,6 +1042,7 @@ pub const DECLARED_RATES: [(u32, usize); 6] = [
 fn celp_bits(nsub: usize, count: usize) -> usize {
     let tail = nsub.saturating_sub(1);
     usize::from(FAMILY_BITS)
+        + 1
         + usize::from(celp::LAG_BITS)
         + 4 * tail
         + usize::from(celp::PITCH_GAIN_BITS)
@@ -957,6 +1053,53 @@ fn celp_bits(nsub: usize, count: usize) -> usize {
         + nsub * (usize::from(celp::position_bits(count)) + count * usize::from(celp::SIGN_BITS))
 }
 
+/// Exact information bits a **compact** CELP frame costs: frame-wide lag, pitch
+/// gain and innovation gain, then one pulse count and the pulses. Mirrors the
+/// `Excitation::Celp1` accounting, so the encoder's feasibility test and the wire
+/// cannot disagree about whether a compact record fits.
+fn celp1_bits(nsub: usize, count: usize) -> usize {
+    usize::from(FAMILY_BITS)
+        + 1
+        + usize::from(celp::LAG_BITS)
+        + usize::from(celp::PITCH_GAIN_BITS)
+        + usize::from(celp::GAIN_BITS)
+        + usize::from(celp::COUNT_BITS)
+        + nsub * (usize::from(celp::position_bits(count)) + count * usize::from(celp::SIGN_BITS))
+}
+
+/// Collapse a per-subframe CELP record to the compact (frame-wide) form by
+/// taking the median of each adaptive field. The median is used rather than the
+/// first subframe because it is the value that best represents the frame's own
+/// contour — the compact form has exactly one lag, pitch gain and innovation
+/// gain to spend on four subframes — and because it is deterministic under any
+/// subframe ordering. The pulses are left untouched: they are what the compact
+/// record exists to carry, and the selector measures the result of the collapse
+/// through the same round-trip as every other candidate.
+fn collapse_to_frame_wide(p: &celp::Params) -> celp::Params {
+    if p.subframes.is_empty() {
+        return p.clone();
+    }
+    let median = |mut v: Vec<i32>| {
+        v.sort_unstable();
+        v[v.len() / 2]
+    };
+    let lag = median(p.subframes.iter().map(|s| s.lag).collect());
+    let pitch_gain = median(p.subframes.iter().map(|s| s.pitch_gain).collect());
+    let gain = median(p.subframes.iter().map(|s| s.gain).collect());
+    celp::Params {
+        subframes: p
+            .subframes
+            .iter()
+            .map(|s| celp::Subframe {
+                lag,
+                pitch_gain,
+                gain,
+                pulses: s.pulses.clone(),
+            })
+            .collect(),
+    }
+}
+
 /// Diagnostic label for the excitation family a frame selects. Development
 /// instrument: it lets an experiment report *which* core won rather than only
 /// the resulting distortion.
@@ -964,6 +1107,7 @@ pub fn family_label(f: &Frame2) -> &'static str {
     match f.excitation {
         Excitation::Scalar { .. } => "scalar",
         Excitation::Celp(_) => "celp",
+        Excitation::Celp1(_) => "celp1",
         Excitation::Noise { .. } => "noise",
         Excitation::Ac3(_) => "acelp",
         Excitation::Tcx { .. } => "tcx",
@@ -975,7 +1119,7 @@ pub fn family_label(f: &Frame2) -> &'static str {
 /// instrument.
 pub fn pulse_count(f: &Frame2) -> usize {
     match &f.excitation {
-        Excitation::Celp(p) => p.subframes.iter().map(|s| s.pulses.len()).sum(),
+        Excitation::Celp(p) | Excitation::Celp1(p) => p.subframes.iter().map(|s| s.pulses.len()).sum(),
         Excitation::Ac3(p) => p.subframes.iter().map(|s| s.pulses.len()).sum(),
         Excitation::Tcx { k, indices, .. } => k * indices.len(),
         _ => 0,
@@ -1104,6 +1248,21 @@ fn noise_gain_codes(rms: f64) -> [i32; 3] {
 pub struct Options {
     /// Offer the 7C.2-B/D free-combinatorial CELP core (family 1).
     pub celp: bool,
+    /// Offer the 7C.2-I **compact** CELP sub-mode: frame-wide adaptive
+    /// parameters for the budgets the multirate record cannot reach. It is a
+    /// sub-mode of the family-1 core, so it is only reachable when `celp` is set.
+    pub compact: bool,
+    /// Prune the analysed candidates by **open-loop residual energy** to the
+    /// [`CANDIDATE_KEEP`] best, instead of taking the first [`CANDIDATE_KEEP`] in
+    /// ladder order.
+    ///
+    /// This is the behaviour the analyser documents and the `exp1` control
+    /// implements. It is a switch because the measured quality gain and the
+    /// measured encode cost have to be attributed separately: enabling it is worth
+    /// **+0.58 to +1.68 dB SNR** at 6–9.2 and 16 kbps but raises encode p99 to
+    /// 2.6–8.9 ms, against the 5 ms constitution. See the phase record in
+    /// `docs/PHASE_7C2.md`.
+    pub energy_rank: bool,
     /// Offer the 7C.2-E fractional-track ACELP core (family 3).
     pub track_acelp: bool,
     /// Offer the 7C.2-G transform/PVQ escape (fallback family sub-mode).
@@ -1144,6 +1303,21 @@ impl Default for Options {
     fn default() -> Self {
         Options {
             celp: true,
+            compact: true,
+            // **Measured, not enabled** (7C.2-I). Ranking the candidates by
+            // open-loop residual energy is what the analyser documents and what the
+            // `exp1` control does, and it unlocks orders 14/16 and with them the
+            // 28-bit split-MSVQ spectrum, which no frame could otherwise reach. The
+            // controlled A/B over the 600-frame development instrument
+            // (`voice_bench exp2`, `+acelp` against `+acelp no rank`) measures
+            // **+1.24 dB SNR at 6 kbps, +0.58 at 8, +1.68 at 9.2, −0.16 at 12 and
+            // +0.97 at 16**, and it raises encode p99 from 1.2–4.6 ms to
+            // 2.6–8.9 ms. The deadline is a constitution requirement, so the ranking
+            // cannot ship until the encoder's per-frame evaluation cost is bounded by
+            // a deterministic work budget instead of by the size of the candidate
+            // ladder. The switch and the measurement stay so a gain this large is not
+            // lost and can be promoted the moment the cost is reclaimed.
+            energy_rank: false,
             track_acelp: true,
             // **Measured and disabled** (7C.2-G), following the `SUBFRAME_GAIN`
             // precedent. On the frozen development corpus the
@@ -1201,44 +1375,104 @@ impl Exp2Codec {
         let rms = (f.iter().map(|v| v * v).sum::<f64>() / f.len().max(1) as f64).sqrt();
         let noise_codes = noise_gain_codes(rms);
 
-        // The fractional-track core is the most expensive analysis, so it is
-        // offered exactly once per frame: on the cheapest spectral tier (which is
-        // the only one that ever leaves room for pulses) and on the candidate the
-        // analysis itself ranks best by residual energy. Offering it on every
-        // candidate/tier combination multiplied its cost sixfold for a measured
-        // zero quality difference; the encode deadline is a constitution
-        // requirement, so the work has to be spent where it is used.
-        let best_cand = cands
+        // Bound the closed-loop work exactly as the `exp1` control does: prune to
+        // the lowest **open-loop residual energy** candidates (§9) when
+        // `Options::energy_rank` is set; otherwise keep the ladder-order prefix the
+        // profile historically used. The two differ in which orders are reachable:
+        // ladder order yields estimator 0 at orders 8, 10 and 12, so orders 14 and
+        // 16 — and with them the entire 28-bit split-MSVQ spectrum and its nested
+        // operating point, which are only constructed for an order-16 candidate —
+        // are never proposed. `voice_bench entropy` reports no spectral field at all
+        // above 3.2 kbps under that ordering, i.e. the encoder transmitted a scalar
+        // spectrum in every frame while the phase's spectral work was unreachable on
+        // the wire.
+        //
+        // Either way this is a proposal heuristic only. Every accept/reject decision
+        // below is still made on closed-loop distortion and exact serialised bits,
+        // and the keep count is identical, so the *number* of closed-loop
+        // evaluations is unchanged and only their identity differs.
+        let mut keep: Vec<usize> = (0..cands.len()).collect();
+        if sel.energy_rank {
+            keep.sort_by(|&a, &b| {
+                cands[a]
+                    .energy
+                    .partial_cmp(&cands[b].energy)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+        }
+        keep.truncate(CANDIDATE_KEEP);
+
+        let best_cand = keep
             .iter()
-            .take(3)
-            .enumerate()
-            .min_by(|a, b| a.1.energy.total_cmp(&b.1.energy))
-            .map(|(i, _)| i)
+            .copied()
+            .min_by(|&a, &b| cands[a].energy.total_cmp(&cands[b].energy))
             .unwrap_or(0);
 
-        for (ci, c) in cands.iter().take(3).enumerate() {
-            let mut opts: Vec<(Vec<i32>, u8, Spectral)> = Vec::new();
-            if c.model.order == vq::VQ_ORDER
-                && let Some(lsf) = crate::voice::lsf::reflections_to_lsf(&c.k_raw)
-                && let Some(idx) = vq::encode_lsf(&lsf)
-            {
-                opts.push((
-                    vq::decode_index(&idx),
-                    vq::VQ_INTERNAL_WIDTH,
-                    Spectral::Vq(idx),
-                ));
-                // 7C.2-F: the nested operating point, offered so the selector can
-                // trade spectral precision for transmitted excitation. It is a
-                // legal frame the decoder reconstructs exactly, and the encoder
-                // measures its consequence through the same round-trip as any
-                // other candidate.
+        // Frame-level gate for the compact CELP form (7C.2-I). The compact record
+        // is a fallback for a budget the *frame* cannot reach, not for one
+        // spectral tier. Measuring it per tier is exactly what made the first
+        // attempt offer it on an expensive tier while the cheapest tier could
+        // still hold the full record, and it lost 96 frames at 8 kbps. If any
+        // tier admits the full record with real excitation, compact is not offered
+        // at all. The cheapest tier is computed from the same tier construction the
+        // loop below uses, so the gate cannot disagree with it.
+        let cheapest_tier = keep
+            .iter()
+            .map(|&ci| &cands[ci])
+            .map(|c| {
+                if c.model.order == vq::VQ_ORDER {
+                    usize::from(TIER_BITS) + vq::STAGE0_BITS as usize
+                } else {
+                    usize::from(TIER_BITS) + 5 + c.model.order * usize::from(c.model.width)
+                }
+            })
+            .min()
+            .unwrap_or(usize::MAX);
+        let full_celp_possible = cheapest_tier + celp_bits(nsub, 1) <= frame_bits;
+
+        // The vector-quantised spectrum is built **once per frame** from the single
+        // lowest-energy order-16 candidate, exactly as the `exp1` control does
+        // (§16). `keep` is energy-sorted, so the first order-16 entry is that
+        // candidate. The LSF conversion and the codebook search are the most
+        // expensive analysis steps in the codec, and the two spectral descriptions
+        // they produce are *frame-level* options, not per-candidate ones: deriving
+        // them again for each kept candidate evaluates the identical spectra twice
+        // more while tripling encode p99.
+        let vq_source = keep
+            .iter()
+            .copied()
+            .find(|&ci| cands[ci].model.order == vq::VQ_ORDER);
+        let vq_opts: Vec<(Vec<i32>, u8, Spectral)> = vq_source
+            .and_then(|ci| {
+                let lsf = crate::voice::lsf::reflections_to_lsf(&cands[ci].k_raw)?;
+                let idx = vq::encode_lsf(&lsf)?;
+                // 7C.2-F: the nested operating point, a legal coarser spectrum the
+                // decoder reconstructs exactly, offered so the selector can trade
+                // spectral precision for transmitted excitation.
                 let (s0, s1) = vq::stage0(&idx);
-                let idx0 = vq::pack_stage0(s0, s1);
-                opts.push((
-                    vq::decode_index(&idx0),
-                    vq::VQ_INTERNAL_WIDTH,
-                    Spectral::Vq0(idx0),
-                ));
+                let nested = vq::pack_stage0(s0, s1);
+                Some(vec![
+                    (
+                        vq::decode_index(&idx),
+                        vq::VQ_INTERNAL_WIDTH,
+                        Spectral::Vq(idx),
+                    ),
+                    (
+                        vq::decode_index(&nested),
+                        vq::VQ_INTERNAL_WIDTH,
+                        Spectral::Vq0(nested),
+                    ),
+                ])
+            })
+            .unwrap_or_default();
+
+        for &ci in &keep {
+            let c = &cands[ci];
+            let mut opts: Vec<(Vec<i32>, u8, Spectral)> = Vec::new();
+            // The VQ spectral tiers belong to the frame, not to this candidate, so
+            // they are offered once, on the candidate they were derived from.
+            if Some(ci) == vq_source {
+                opts.extend(vq_opts.iter().cloned());
             }
             opts.push((
                 c.k_q.clone(),
@@ -1288,7 +1522,7 @@ impl Exp2Codec {
                     .filter(|&k| spectral.bits() + celp_bits(nsub, k) <= frame_bits)
                     .max()
                     .unwrap_or(0);
-                if sel.celp && spectral.bits() + celp_bits(nsub, maxp) <= frame_bits {
+                if sel.celp && maxp > 0 && spectral.bits() + celp_bits(nsub, maxp) <= frame_bits {
                     let (params, _d, _shot) = celp::analyse(state, &f, &model, &k_q, maxp);
                     consider(Frame2 {
                         spectral: spectral.clone(),
@@ -1296,9 +1530,42 @@ impl Exp2Codec {
                     });
                 }
 
+                // 7C.2-I: the compact form, offered **only** when no tier can hold
+                // a full record with real excitation. It buys frame-wide adaptive
+                // parameters at the price of the per-subframe contour, so it is a
+                // fallback for the low-rate cliff: at 6 kbps the multirate record
+                // needs 122 bits against a 120-bit frame, and without compact the
+                // frame goes to the 12-bit stochastic core with ~70 bits idle.
+                if sel.celp && sel.compact && !full_celp_possible && maxp == 0 {
+                    let maxp_c = (0..=celp::MAX_PULSES)
+                        .filter(|&k| spectral.bits() + celp1_bits(nsub, k) <= frame_bits)
+                        .max()
+                        .unwrap_or(0);
+                    if maxp_c > 0 && spectral.bits() + celp1_bits(nsub, maxp_c) <= frame_bits {
+                        let (full, _d, _shot) = celp::analyse(state, &f, &model, &k_q, maxp_c);
+                        // Collapse the per-subframe contour to one frame-wide value
+                        // per field. The selector then measures the *round-tripped*
+                        // frame like any other candidate, so a collapse that loses
+                        // distortion is rejected on the reconstruction it really
+                        // produces rather than on the analysis it came from.
+                        let compact = collapse_to_frame_wide(&full);
+                        consider(Frame2 {
+                            spectral: spectral.clone(),
+                            excitation: Excitation::Celp1(compact),
+                        });
+                    }
+                }
+
                 // 7C.2-E: the fractional-track core, offered against the control
                 // core rather than replacing it. Its pulse count is the codebook
                 // class, so each class is one candidate and the selector decides.
+                //
+                // It is the most expensive analysis in the codec, so it is offered
+                // exactly once per frame: on the two cheapest spectral tiers of the
+                // candidate the analysis ranks best by residual energy. Offering it
+                // on every candidate/tier combination multiplied its cost sixfold
+                // for a measured zero quality difference; the encode deadline is a
+                // constitution requirement, so the work is spent where it is used.
                 if sel.track_acelp && ci == best_cand && si <= 1 {
                     for per in 1..=fcelp::MAX_PER_TRACK {
                         let dummy = fcelp::Params {
@@ -1958,10 +2225,10 @@ mod tests {
             excitation: Excitation::Celp(sample_celp(320, 0)),
         };
         let (bytes, bits) = f.write();
-        // spectral tier 2 + index 32; family 2 + anchor 9 + contour 3×4
-        // + pitch gain 5 + deltas 3×3 + gain 6 + deltas 3×4 + count 3.
-        assert_eq!(bits, 2 + 32 + 2 + 9 + 12 + 5 + 9 + 6 + 12 + 3);
-        assert_eq!(bits, 92);
+        // spectral tier 2 + index 32; family 2 + sub-mode 1 + anchor 9 + contour
+        // 3×4 + pitch gain 5 + deltas 3×3 + gain 6 + deltas 3×4 + count 3.
+        assert_eq!(bits, 2 + 32 + 3 + 9 + 12 + 5 + 9 + 6 + 12 + 3);
+        assert_eq!(bits, 93);
         assert_eq!(bytes.len(), 12);
         assert!(bits < exp1_floor_bits);
 
@@ -1973,9 +2240,66 @@ mod tests {
         };
         let (bytes4, bits4) = f4.write();
         let exp1_4pulse = 16 + 8 + 8 + 24 + 32 + 16 + 8 + 4 * (23 + 4 * 8);
-        assert_eq!(bits4, 92 + 4 * (21 + 4));
-        assert_eq!(bits4, 192);
+        assert_eq!(bits4, 93 + 4 * (21 + 4));
+        assert_eq!(bits4, 193);
         assert!(bits4 < exp1_4pulse);
         assert!(bytes4.len() * 8 - bits4 < 8);
+    }
+
+    /// 7C.2-I: the compact CELP sub-mode round-trips exactly, is measured by the
+    /// same accounting the wire uses, and is strictly smaller than the multirate
+    /// record at the same pulse count — which is the entire reason it exists.
+    ///
+    /// The two sub-modes share family 1 and are separated by one discriminator
+    /// bit, so this also pins down that the discriminator is actually read: a
+    /// multirate frame must not come back as a compact one, nor the reverse.
+    #[test]
+    fn compact_celp_round_trips_and_is_exactly_smaller() {
+        let full = sample_celp(320, 2);
+        // The compact record carries one adaptive value per field for the frame.
+        let lag = full.subframes[0].lag;
+        let pitch_gain = full.subframes[0].pitch_gain;
+        let gain = full.subframes[0].gain;
+        let compact = celp::Params {
+            subframes: full
+                .subframes
+                .iter()
+                .map(|s| celp::Subframe {
+                    lag,
+                    pitch_gain,
+                    gain,
+                    pulses: s.pulses.iter().copied().collect(),
+                })
+                .collect(),
+        };
+        let a = Frame2 {
+            spectral: Spectral::Vq([1, 2, 3, 4]),
+            excitation: Excitation::Celp(full),
+        };
+        let b = Frame2 {
+            spectral: Spectral::Vq([1, 2, 3, 4]),
+            excitation: Excitation::Celp1(compact),
+        };
+        let (ba, na) = a.write();
+        let (bb, nb) = b.write();
+        assert!(
+            nb < na,
+            "compact {nb} bits is not smaller than multirate {na} bits"
+        );
+        // The wire accounting and the wire itself must agree, exactly.
+        assert_eq!(na, a.bits());
+        assert_eq!(nb, b.bits());
+        assert!(ba.len() * 8 - na < 8);
+        assert!(bb.len() * 8 - nb < 8);
+        // Round-trip: each frame parses back to the family it was written as.
+        let ra = Frame2::read(&ba, 320).unwrap();
+        let rb = Frame2::read(&bb, 320).unwrap();
+        assert_eq!(ra, a);
+        assert_eq!(rb, b);
+        assert_eq!(family_label(&ra), "celp");
+        assert_eq!(family_label(&rb), "celp1");
+        // The pulse plane is identical between the two forms.
+        assert_eq!(pulse_count(&ra), pulse_count(&rb));
+        assert_eq!(pulse_count(&rb), 8);
     }
 }
