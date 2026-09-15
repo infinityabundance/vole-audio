@@ -908,6 +908,50 @@ at once.
 
 No codec behaviour changed. Voice tests: 100 passed.
 
+## Phase 7C.2-I (third step) — the encode work decomposition (v0.90.0)
+
+§21 left one mechanism blocked: the energy-ranked candidate proposal is worth
++0.58…+1.68 dB but breaches the 5 ms encode deadline. Charter §9 names the remedy —
+a declared *work budget* rather than wall-clock timing — and this step measures the
+work that budget must be expressed in.
+
+`Exp2Codec::encode_frame_counted` now returns the exact `Work` a frame consumed:
+tiers evaluated, round-trip candidate evaluations, and the two expensive closed-loop
+searches. `voice_bench exp2` prints it per configuration. Mean per frame:
+
+| rate | tiers | considers | `celp` | `acelp` | p99 ranked | p99 ladder |
+| ---- | ----: | --------: | -----: | ------: | ---------: | ---------: |
+| 3.2 kbps | 4.7 | 147 | 0.00 | 0.00 | 1710 µs | 870 µs |
+| 6 kbps | 4.7 | 147 | 1.02 | 0.00 | 2555 µs | 1185 µs |
+| 8 kbps | 4.7 | 148 | 2.15 | 0.00 | 3760 µs | 1870 µs |
+| 9.2 kbps | 4.7 | 149 | 2.87 | 0.73 | 4682 µs | 2442 µs |
+| 12 kbps | 4.7 | 152 | 4.67 | 2.29 | 7345 µs | 3534 µs |
+| 16 kbps | 4.6 | 152 | 4.64 | 3.35 | 8998 µs | 4546 µs |
+
+Decomposition at 16 kbps against the measured 8998 µs: fixed (analysis plus one
+LSF/MSVQ search) ≈ 0.9 ms; 152 round-trip `consider` calls ≈ 1.4 ms at ≈ 9 µs each;
+4.64 `celp::analyse` ≈ 4.5 ms at ≈ 0.96 ms each; 3.35 `fcelp::analyse` ≈ 2.3 ms.
+
+Three conclusions, and they change the next step:
+
+* The round-trip candidate evaluation — the mechanism the differential/contour coding
+  depends on — is **not** the cost. A budget counting candidate evaluations would
+  bound almost nothing.
+* The cost is the closed-loop **pulse search**, and it is the beam *depth* that makes
+  a call expensive: the same `celp` count costs ≈ 0.96 ms at 16 kbps where `maxp` is
+  large and far less at 6 kbps where it is 1. The budget must be over pulse-search
+  work.
+* Both expensive counts grow with the frame allowance, so the p99 curve is
+  rate-shaped: 3.2–9.2 kbps fit inside 5 ms, 12–16 kbps do not.
+
+Fitting `p99 ≈ 0.9 + 0.009·considers + 0.96·celp + 0.68·acelp` ms gives the
+constitution condition `0.96·celp + 0.68·acelp ≤ 2.8 ms` at 16 kbps — roughly two
+CELP searches and one ACELP search per frame, against the 4.64 and 3.35 the ranked
+configuration spends. That trade has to be measured against the gain it bounds.
+
+No behaviour changed. Voice tests: 815 passed (one new test asserts the counters and
+the frame bytes are deterministic, and that no closed-loop search runs at 3.2 kbps).
+
 ## Phase 7C.2-I (second attempt) — the candidate-proposal defect, and a compact CELP that ships (v0.89.0)
 
 §20's compact CELP form was reverted because its fit test was evaluated per

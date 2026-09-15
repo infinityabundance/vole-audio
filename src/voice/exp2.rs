@@ -1344,6 +1344,24 @@ impl Default for Options {
     }
 }
 
+/// Exact deterministic work one frame consumed (7C.2-I instrumentation).
+///
+/// A *countable* budget is what charter §9 requires in place of a ladder-shaped
+/// cost, so that the encode deadline can be reasoned about deterministically
+/// instead of measured per candidate. These are the quantities that budget will be
+/// expressed in.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct Work {
+    /// Full round-trip candidate evaluations: serialise, re-parse, decode, score.
+    pub considers: usize,
+    /// Spectral tiers whose excitation set was evaluated.
+    pub tiers: usize,
+    /// `celp::analyse` calls (closed-loop pitch plus algebraic pulse search).
+    pub celp: usize,
+    /// `fcelp::analyse` calls (fractional-track ACELP search).
+    pub acelp: usize,
+}
+
 /// The `exp2` frame codec: hard-rate encoding and faithful decoding.
 ///
 /// The encoder is the hard-rate authority. It enumerates representations across
@@ -1358,7 +1376,7 @@ impl Exp2Codec {
     /// Encode one frame into at most `frame_bits` bits; returns the artifact and
     /// the exact information bit count.
     pub fn encode_frame(state: &VoiceState, frame: &[i32], frame_bits: usize) -> (Vec<u8>, usize) {
-        Self::encode_frame_with(state, frame, frame_bits, Options::default())
+        Self::encode_frame_counted(state, frame, frame_bits, Options::default()).0
     }
 
     /// [`Exp2Codec::encode_frame`] with an explicit core selection.
@@ -1368,6 +1386,26 @@ impl Exp2Codec {
         frame_bits: usize,
         sel: Options,
     ) -> (Vec<u8>, usize) {
+        Self::encode_frame_counted(state, frame, frame_bits, sel).0
+    }
+
+    /// [`Exp2Codec::encode_frame_with`], also reporting the **exact deterministic
+    /// work** the frame consumed.
+    ///
+    /// Charter §9 requires that the encode deadline be met by a *work budget* — a
+    /// declared, countable limit — rather than by whatever the candidate ladder
+    /// happens to cost, so that behaviour stays deterministic and the deadline can
+    /// be reasoned about instead of timed. Designing that budget needs the real
+    /// decomposition of the work, which is what this reports; the counters are
+    /// plain `usize` increments on paths the encoder already walks, so they cost
+    /// nothing measurable and cannot change a decision.
+    pub fn encode_frame_counted(
+        state: &VoiceState,
+        frame: &[i32],
+        frame_bits: usize,
+        sel: Options,
+    ) -> ((Vec<u8>, usize), Work) {
+        let mut work = Work::default();
         let f: Vec<f64> = frame.iter().map(|&v| f64::from(v)).collect();
         let mut best: Option<(f64, usize, Frame2)> = None;
         let cands = vp::analyse(state, frame, 0);
@@ -1484,12 +1522,14 @@ impl Exp2Codec {
             ));
 
             for (si, (k_q, width, spectral)) in opts.into_iter().enumerate() {
+                work.tiers += 1;
                 let model = vp::FrameModel { width, ..c.model };
                 // Every candidate is scored on its **round-tripped** frame, so the
                 // encoder measures exactly what the decoder will reconstruct. This
                 // is what makes the differential/contour coding safe: a lag delta
                 // the wire clamps cannot desynchronise the two sides.
                 let mut consider = |fr: Frame2| {
+                    work.considers += 1;
                     let bits = fr.bits();
                     if bits > frame_bits {
                         return;
@@ -1524,6 +1564,7 @@ impl Exp2Codec {
                     .unwrap_or(0);
                 if sel.celp && maxp > 0 && spectral.bits() + celp_bits(nsub, maxp) <= frame_bits {
                     let (params, _d, _shot) = celp::analyse(state, &f, &model, &k_q, maxp);
+                    work.celp += 1;
                     consider(Frame2 {
                         spectral: spectral.clone(),
                         excitation: Excitation::Celp(params),
@@ -1543,6 +1584,7 @@ impl Exp2Codec {
                         .unwrap_or(0);
                     if maxp_c > 0 && spectral.bits() + celp1_bits(nsub, maxp_c) <= frame_bits {
                         let (full, _d, _shot) = celp::analyse(state, &f, &model, &k_q, maxp_c);
+                        work.celp += 1;
                         // Collapse the per-subframe contour to one frame-wide value
                         // per field. The selector then measures the *round-tripped*
                         // frame like any other candidate, so a collapse that loses
@@ -1583,6 +1625,7 @@ impl Exp2Codec {
                             continue;
                         }
                         let (params, _d, _shot) = fcelp::analyse(state, &f, &model, &k_q, per);
+                        work.acelp += 1;
                         consider(Frame2 {
                             spectral: spectral.clone(),
                             excitation: Excitation::Ac3(params),
@@ -1700,7 +1743,7 @@ impl Exp2Codec {
         }
 
         let chosen = best.map(|(_, _, fr)| fr).unwrap_or_else(Frame2::minimal);
-        chosen.write()
+        (chosen.write(), work)
     }
 
     /// Decode one frame's artifact.
@@ -2301,5 +2344,43 @@ mod tests {
         // The pulse plane is identical between the two forms.
         assert_eq!(pulse_count(&ra), pulse_count(&rb));
         assert_eq!(pulse_count(&rb), 8);
+    }
+
+    /// 7C.2-I instrumentation: the work counters are **deterministic**, and they
+    /// report the decomposition the encode budget of charter §9 has to be expressed
+    /// in. A budget that is a timing cannot be a contract; a budget that is a count
+    /// can.
+    #[test]
+    fn work_counters_are_deterministic_and_report_the_decomposition() {
+        let mut source = Vec::with_capacity(320 * 8);
+        let mut s = 0x0f1e_2d3c_4b5a_6978u64;
+        for i in 0..320 * 8 {
+            s = s
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            let noise = ((s >> 40) as i64 % 2001 - 1000) as f64;
+            let voiced = if i % 78 < 3 { 6000.0 } else { 0.0 };
+            let x = voiced + 0.35 * noise + 900.0 * ((i as f64) * 0.09).sin();
+            source.push(x.round().clamp(-32768.0, 32767.0) as i32);
+        }
+        let frame = &source[..320];
+
+        // The same frame must cost the same work, byte for byte and count for
+        // count: the budget is a deterministic quantity, never a timing.
+        let a = Exp2Codec::encode_frame_counted(&VoiceState::new(), frame, 120, Options::default());
+        let b = Exp2Codec::encode_frame_counted(&VoiceState::new(), frame, 120, Options::default());
+        assert_eq!(a.0, b.0, "the encoder is not deterministic");
+        assert_eq!(a.1, b.1, "the work counters are not deterministic");
+        assert!(a.1.tiers >= 1, "no spectral tier was evaluated");
+        assert!(a.1.considers > 0, "no candidate was evaluated");
+
+        // 3.2 kbps cannot hold a CELP record on any tier, so the expensive closed-
+        // loop search must not run there at all. That is the work the hard-rate
+        // fallback exists to avoid, and it is the first thing a budget must
+        // preserve.
+        let small =
+            Exp2Codec::encode_frame_counted(&VoiceState::new(), frame, 64, Options::default());
+        assert_eq!(small.1.celp, 0, "CELP was searched at 3.2 kbps");
+        assert_eq!(small.1.acelp, 0, "ACELP was searched at 3.2 kbps");
     }
 }

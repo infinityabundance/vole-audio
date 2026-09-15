@@ -416,6 +416,7 @@ fn exp2_probe(filter: Option<&str>) {
             let mut err = 0.0f64;
             let mut used = 0usize;
             let mut frames = 0usize;
+            let mut work = exp2::Work::default();
             let mut per_family: std::collections::BTreeMap<&str, usize> =
                 std::collections::BTreeMap::new();
             let mut pulses = 0usize;
@@ -426,8 +427,13 @@ fn exp2_probe(filter: Option<&str>) {
                 }
                 let enc_state = state.clone();
                 let t0 = std::time::Instant::now();
-                let (bytes, nbits) = Exp2Codec::encode_frame_with(&enc_state, chunk, bits, opts);
+                let ((bytes, nbits), w) =
+                    Exp2Codec::encode_frame_counted(&enc_state, chunk, bits, opts);
                 enc_us.push(t0.elapsed().as_micros() as i64);
+                work.considers += w.considers;
+                work.tiers += w.tiers;
+                work.celp += w.celp;
+                work.acelp += w.acelp;
                 assert!(
                     nbits <= bits,
                     "{bps}: {nbits} bits over the {bits}-bit allowance"
@@ -466,6 +472,17 @@ fn exp2_probe(filter: Option<&str>) {
                 used as f64 / frames.max(1) as f64,
                 percentile(&enc_us, 99.0),
                 pulses as f64 / frames.max(1) as f64
+            );
+            // The deterministic work the frame consumed, which is the quantity
+            // charter §9's budget has to be expressed in.
+            let n = frames.max(1) as f64;
+            println!(
+                "       | {:18} | work/frame: tiers {:.1} considers {:.1} celp {:.2} acelp {:.2}",
+                "",
+                work.tiers as f64 / n,
+                work.considers as f64 / n,
+                work.celp as f64 / n,
+                work.acelp as f64 / n
             );
         }
     }

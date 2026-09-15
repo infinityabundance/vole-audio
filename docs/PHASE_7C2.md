@@ -954,7 +954,81 @@ work budget lands.
 | energy-ranked candidate proposal | **disabled**, in-tree | +0.58…+1.68 dB, but p99 2.6–8.9 ms |
 | per-frame VQ spectrum derivation | shipped as part of the above | p99 12–14 → 2.6–8.9 ms |
 
-## 22. Non-claims
+## 22. The encode work decomposition — 7C.2-I, third step
+
+§21 leaves one mechanism blocked: the energy-ranked candidate proposal is worth
++0.58…+1.68 dB but breaches the 5 ms encode deadline. Charter §9 already names the
+remedy — *“the work budget, not wall-clock timing, must constrain complexity so
+deterministic behavior remains intact”* — and this step measures the work that budget
+has to be expressed in, because the estimates were wrong in an instructive way.
+
+`Exp2Codec::encode_frame_counted` now returns the exact [`Work`] a frame consumed:
+spectral tiers evaluated, full round-trip candidate evaluations (`consider`), and
+the two expensive closed-loop searches (`celp::analyse`, `fcelp::analyse`). The
+counters are `usize` increments on paths the encoder already walks and cannot change a
+decision; a test asserts both the counters and the frame bytes are deterministic.
+
+`voice_bench exp2`, 600 frames per cell, mean per frame:
+
+| rate | tiers | considers | `celp` | `acelp` | p99 (ranked) | p99 (ladder) |
+| ---- | ----: | --------: | -----: | ------: | -----------: | -----------: |
+| 3.2 kbps | 4.7 | 147 | 0.00 | 0.00 | 1710 µs | 870 µs |
+| 6 kbps | 4.7 | 147 | 1.02 | 0.00 | 2555 µs | 1185 µs |
+| 8 kbps | 4.7 | 148 | 2.15 | 0.00 | 3760 µs | 1870 µs |
+| 9.2 kbps | 4.7 | 149 | 2.87 | 0.73 | 4682 µs | 2442 µs |
+| 12 kbps | 4.7 | 152 | 4.67 | 2.29 | 7345 µs | 3534 µs |
+| 16 kbps | 4.6 | 152 | 4.64 | 3.35 | 8998 µs | 4546 µs |
+
+The decomposition this gives at 16 kbps, against the measured 8998 µs:
+
+| term | per frame | unit | total |
+| ---- | --------- | ---- | ----- |
+| fixed (`vp::analyse` + one LSF/MSVQ search) | 1 | ≈ 0.9 ms | ≈ 0.9 ms |
+| `consider` (serialise, re-parse, decode, score) | 152 | ≈ 9 µs | ≈ 1.4 ms |
+| `celp::analyse` (closed-loop pitch + beam pulse search) | 4.64 | ≈ 0.96 ms | ≈ 4.5 ms |
+| `fcelp::analyse` (fractional-track ACELP) | 3.35 | ≈ 0.68 ms | ≈ 2.3 ms |
+
+**Three things follow, and they change what the next step is.**
+
+1. `consider` — the round-trip evaluation the differential/contour coding depends on
+   — is **not** the cost. At ≈9 µs it is 16 % of the frame budget even though it is
+   called 152 times. A budget that counts candidate evaluations would therefore
+   bound almost nothing.
+2. The cost is the **closed-loop pulse search**, and it is the *beam depth* that
+   makes a call expensive, not the call itself: the same `celp` count costs ≈0.96 ms
+   per call at 16 kbps where `maxp` is large, and far less at 6 kbps where `maxp` is
+   1. So the budget has to be expressed over **pulse-search work**, not over tiers
+   or calls.
+3. Both expensive counts grow with the frame allowance, because a larger allowance
+   admits more pulses per subframe and more ACELP codebook classes. The p99 curve is
+   therefore *rate-shaped*, which is why 3.2–9.2 kbps fit inside 5 ms and 12–16 kbps
+   do not.
+
+### 22.1 What the budget must be
+
+Fitting the model to the two measured curves gives
+`p99 ≈ 0.9 + 0.009·considers + 0.96·celp + 0.68·acelp` ms at 16 kbps. Holding the
+constitution there requires
+
+$$
+0.96\,\mathrm{celp} + 0.68\,\mathrm{acelp} \le 2.8\ \mathrm{ms}
+$$
+
+i.e. roughly **two CELP searches and one ACELP search per frame**, against the 4.64
+and 3.35 the energy-ranked configuration now spends — or, equivalently, a bound on
+Σ over tier-instances of the pulse-search work `f(maxp)`.
+
+That is a real trade and it is not free: it must be measured against the +0.58…+1.68 dB
+the ranking fix is worth. It is *not* the same trade, either — a budget that removes
+the deepest beam searches of the least-promising tiers is not the same thing as one
+that removes whole tiers, and the difference is exactly what the counters now make
+measurable.
+
+**Verdict.** Instrumentation and cost model shipped; no behaviour changed. The
+energy-ranked proposal stays disabled until a pulse-search budget is fitted and
+measured against its quality cost, which is the next step in order.
+
+## 23. Non-claims
 
 * `exp1` remains the control; its wire format is untouched.
 * The serializer in `src/voice/exp2.rs` is not yet a live profile: no court
